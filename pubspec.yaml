@@ -1,0 +1,81 @@
+name: aiservice
+description: "AI Chat with Branch Tree - 支持分支对话树的 AI 聊天应用"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # ========== 状态管理 ==========
+  flutter_riverpod: ^2.4.9
+  riverpod_annotation: ^2.3.3
+
+  # ========== 代码生成 ==========
+  freezed_annotation: ^2.4.1
+  json_annotation: ^4.8.1
+
+  # ========== HTTP 网络请求 ==========
+  http: ^1.2.0
+
+  # ========== 本地存储/文件操作 ==========
+  path_provider: ^2.1.2
+  path: ^1.8.3
+
+  # ========== Markdown 渲染 ==========
+  flutter_markdown: ^0.6.18
+
+  # ========== UUID 生成 ==========
+  uuid: ^4.3.3
+
+  # ========== 图片/附件选择 ==========
+  image_picker: ^1.0.7
+
+  # ========== 基础 UI 组件 ==========
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  # ========== 代码生成工具 ==========
+  build_runner: ^2.4.8
+  freezed: ^2.4.6
+  json_serializable: ^6.7.1
+  riverpod_generator: ^2.3.9
+
+  # ========== 单元测试 Mock ==========
+  mockito: ^5.4.4
+
+  # ========== 代码检查 ==========
+  flutter_lints: ^6.0.0
+
+  flutter_slidable: ^3.0.1
+
+  graphview: ^1.2.0
+
+  intl: ^0.19.0
+
+  file_picker: ^8.1.2
+
+  synchronized: ^3.3.0
+  
+flutter:
+  uses-material-design: true
+
+  # ========== 资源文件 (可选) ==========
+  # assets:
+  #   - assets/images/
+  #   - assets/icons/
+
+  # ========== 字体 (可选) ==========
+  # fonts:
+  #   - family: CustomFont
+  #     fonts:
+  #       - asset: fonts/CustomFont-Regular.ttf
+  #       - asset: fonts/CustomFont-Bold.ttf
+  #         weight: 700

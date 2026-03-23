@@ -1,0 +1,282 @@
+import 'package:collection/collection.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/app_config.dart';
+import '../../core/models/chat_round.dart';
+import '../../core/models/api_message.dart';
+import '../../core/models/model_info.dart';
+import '../../domain/models/chat_page.dart';
+import '../../domain/services/attachment_preparer.dart';
+import '../../domain/services/branch_navigator.dart';
+import '../../domain/services/chat_context_builder.dart';
+import '../../domain/services/chat_round_factory.dart';
+import '../../domain/services/chat_stream_accumulator.dart';
+import '../../domain/services/chat_view_state_builder.dart';
+import '../../domain/states/chat_state.dart';
+import '../../di/providers.dart';
+import '../models/pending_attachment.dart';
+
+class ChatNotifier extends StateNotifier<ChatState> {
+  final Ref ref;
+  final String fileName;
+
+  ChatNotifier(this.ref, this.fileName) : super(ChatState.initial());
+
+  Future<void> loadSession() async {
+    state = state.copyWithLoading(true);
+    try {
+      final repository = ref.read(conversationRepositoryProvider);
+      final session = await repository.getSession(fileName);
+      final viewState = ChatViewStateBuilder.buildInitial(session);
+      state = state.copyWithSession(session).copyWith(
+            currentRoundId: viewState.currentRoundId,
+            pageList: viewState.pageList,
+            error: null,
+          );
+    } catch (e) {
+      state = state.copyWithError(e.toString());
+    }
+  }
+
+  ModelInfo? _findSelectedModelInfo(AppConfig config) {
+    final selectedId = config.selectedModel;
+    if (selectedId == null || selectedId.trim().isEmpty) return null;
+
+    final models = config.availableModels ?? const <ModelInfo>[];
+    return models.firstWhereOrNull((m) => m.id == selectedId);
+  }
+
+  bool _shouldEnableReasoning(AppConfig config) {
+    final selectedModel = _findSelectedModelInfo(config);
+    return selectedModel?.supportsReasoning == true;
+  }
+
+  void _validateRequestCapability({
+    required AppConfig config,
+    required List<PendingAttachment> attachments,
+  }) {
+    final selectedModel = _findSelectedModelInfo(config);
+    if (selectedModel == null) return;
+
+    final hasImage = attachments.any((a) => a.isImage);
+
+    if (hasImage && selectedModel.supportsVision != true) {
+      throw Exception('当前模型未声明支持图片输入');
+    }
+  }
+
+  Future<void> sendMessage(
+    String content, {
+    List<PendingAttachment>? attachments,
+  }) async {
+    if (state.session == null) {
+      state = state.copyWithError('会话未初始化');
+      return;
+    }
+
+    try {
+      final pendingAttachments = attachments ?? const <PendingAttachment>[];
+      final repository = ref.read(conversationRepositoryProvider);
+      final config = await ref.read(configRepositoryProvider).getConfig();
+
+      _validateRequestCapability(
+        config: config,
+        attachments: pendingAttachments,
+      );
+
+      final savedAttachments = await AttachmentPreparer.savePendingAttachments(
+        repository,
+        pendingAttachments,
+      );
+
+      final round = ChatRoundFactory.createUserRound(
+        content: content,
+        parentId: state.currentRoundId,
+        attachments: savedAttachments,
+      );
+
+      await _appendRoundAndEnterStreaming(round);
+
+      final updatedSession = await repository.getSession(fileName);
+      final contextRounds =
+          BranchNavigator.getCurrentBranchPath(updatedSession, round.id);
+      final apiContext = await ChatContextBuilder.buildFromRounds(
+        contextRounds,
+        repository,
+      );
+
+      _handleStreamTask(round, apiContext, config);
+    } catch (e) {
+      state = state.copyWithError(e.toString());
+    }
+  }
+
+  Future<void> retryFromRound(String roundId) async {
+    if (state.session == null) {
+      state = state.copyWithError('会话未初始化');
+      return;
+    }
+
+    try {
+      final repository = ref.read(conversationRepositoryProvider);
+      final config = await ref.read(configRepositoryProvider).getConfig();
+      final sourceRound =
+          state.session!.rounds.firstWhereOrNull((round) => round.id == roundId);
+
+      if (sourceRound == null) {
+        state = state.copyWithError('未找到要重新回复的对话');
+        return;
+      }
+
+      final selectedModel = _findSelectedModelInfo(config);
+      if (selectedModel != null) {
+        final hasImage = sourceRound.userAttachments.any((a) => a.isImage);
+
+        if (hasImage && selectedModel.supportsVision != true) {
+          state = state.copyWithError('当前模型未声明支持图片输入');
+          return;
+        }
+      }
+
+      final newRound = ChatRoundFactory.createRetryRound(
+        sourceRound: sourceRound,
+      );
+
+      await _appendRoundAndEnterStreaming(newRound);
+
+      final updatedSession = await repository.getSession(fileName);
+      final contextRounds =
+          BranchNavigator.getCurrentBranchPath(updatedSession, newRound.id);
+      final apiContext = await ChatContextBuilder.buildFromRounds(
+        contextRounds,
+        repository,
+      );
+
+      _handleStreamTask(newRound, apiContext, config);
+    } catch (e) {
+      state = state.copyWithError(e.toString());
+    }
+  }
+
+  Future<void> _appendRoundAndEnterStreaming(ChatRound round) async {
+    final repository = ref.read(conversationRepositoryProvider);
+    await repository.appendRound(fileName, round);
+    final updatedSession = await repository.getSession(fileName);
+    final viewState = ChatViewStateBuilder.buildForRound(updatedSession, round.id);
+    final newActiveStreams = Map<String, StreamStatus>.from(state.activeStreams);
+    newActiveStreams[round.id] = const StreamStatus();
+    state = state.copyWithSession(updatedSession).copyWith(
+          currentRoundId: viewState.currentRoundId,
+          pageList: viewState.pageList,
+          activeStreams: newActiveStreams,
+          error: null,
+        );
+  }
+
+  Future<void> _handleStreamTask(
+    ChatRound round,
+    List<ApiMessage> apiContext,
+    AppConfig config,
+  ) async {
+    final apiService = ref.read(apiServiceProvider);
+    final accumulator = ChatStreamAccumulator();
+
+    try {
+      final stream = apiService.chatStream(
+        taskId: round.id,
+        baseUrl: config.baseUrl,
+        apiKey: config.apiKey,
+        chatPath: config.chatPath,
+        apiMode: config.apiMode,
+        model: config.selectedModel ?? 'unknown-model',
+        context: apiContext,
+        enableReasoning: _shouldEnableReasoning(config),
+      );
+
+      await for (final chunk in stream) {
+        if (chunk.error != null) {
+          state = state.copyWithStreaming(round.id, error: chunk.error);
+          return;
+        }
+        if (!chunk.isDone) {
+          accumulator.add(chunk);
+          state = state.copyWithStreaming(
+            round.id,
+            content: accumulator.content,
+            reasoning: accumulator.reasoning,
+            isDone: false,
+          );
+        } else {
+          break;
+        }
+      }
+
+      final updatedRound = ChatRoundFactory.completeRound(
+        round: round,
+        content: accumulator.content,
+        reasoning: accumulator.reasoning,
+      );
+
+      final repository = ref.read(conversationRepositoryProvider);
+      await repository.updateRound(fileName, round.id, updatedRound);
+      final finalSession = await repository.getSession(fileName);
+      final finalPageList = _replaceRoundInCurrentPages(updatedRound);
+
+      state = state.copyWithStreaming(round.id, isDone: true).copyWith(
+            session: finalSession,
+            pageList: finalPageList,
+            error: null,
+          );
+    } catch (e) {
+      state = state.copyWithStreaming(round.id, error: e.toString());
+    }
+  }
+
+  ChatPageList? _replaceRoundInCurrentPages(ChatRound updatedRound) {
+    final currentPageList = state.pageList;
+    if (currentPageList == null) return null;
+    final updatedPages = currentPageList.pages.map((page) {
+      if (page.round.id == updatedRound.id) {
+        return page.copyWith(round: updatedRound);
+      }
+      return page;
+    }).toList();
+    return currentPageList.copyWith(pages: updatedPages);
+  }
+
+  void stopGeneration() {
+    if (state.pageList == null || state.pageList!.pages.isEmpty) return;
+    final viewingRound =
+        state.pageList!.pages[state.pageList!.currentPageIndex].round;
+    if (!state.activeStreams.containsKey(viewingRound.id)) return;
+    final apiService = ref.read(apiServiceProvider);
+    apiService.cancelRequest(viewingRound.id);
+  }
+
+  Future<void> switchBranch(String targetRoundId) async {
+    if (state.session == null) return;
+    final session = state.session!;
+    final newRoundId = BranchNavigator.switchBranch(session, targetRoundId);
+    final viewState = ChatViewStateBuilder.buildForRound(session, newRoundId);
+    state = state.copyWithCurrentRoundId(newRoundId).copyWith(
+          pageList: viewState.pageList,
+        );
+  }
+
+  void changePage(int pageIndex) {
+    if (state.pageList == null) return;
+    final pages = state.pageList!.pages;
+    if (pageIndex < 0 || pageIndex >= pages.length) return;
+    final targetPage = pages[pageIndex];
+    final newRoundId = targetPage.round.id;
+    state = state.copyWithCurrentRoundId(newRoundId).copyWith(
+          pageList: state.pageList!.copyWith(currentPageIndex: pageIndex),
+        );
+  }
+}
+
+final chatProvider =
+    StateNotifierProvider.family<ChatNotifier, ChatState, String>(
+  (ref, fileName) {
+    return ChatNotifier(ref, fileName);
+  },
+);
