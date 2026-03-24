@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/attachment.dart';
 import '../../core/models/chat_round.dart';
+import '../../core/utils/app_route_observer.dart';
 import '../../core/utils/time_format_utils.dart';
 import '../models/pending_attachment.dart';
 import '../providers/chat_notifier.dart';
@@ -32,10 +32,13 @@ class ChatPage extends ConsumerStatefulWidget {
   ConsumerState<ChatPage> createState() => _ChatPageState();
 }
 
-class _ChatPageState extends ConsumerState<ChatPage> {
+class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
   late final PageController _pageController;
   bool _initialMessageHandled = false;
   bool _isSyncingPageFromState = false;
+  bool _isMarkingSeen = false;
+  bool _isRouteVisible = false;
+  ModalRoute<dynamic>? _route;
 
   @override
   void initState() {
@@ -44,6 +47,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
     Future.microtask(() async {
       await ref.read(chatProvider(widget.fileName).notifier).loadSession();
+
       final message = widget.initialMessage?.trim() ?? '';
       final attachments =
           widget.initialAttachments ?? const <PendingAttachment>[];
@@ -63,9 +67,51 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null && route != _route) {
+      if (_route != null) {
+        appRouteObserver.unsubscribe(this);
+      }
+      _route = route;
+      appRouteObserver.subscribe(this, route as PageRoute);
+    }
+  }
+
+  @override
   void dispose() {
+    appRouteObserver.unsubscribe(this);
     _pageController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didPush() {
+    _isRouteVisible = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await _syncSeenWithVisiblePage();
+    });
+  }
+
+  @override
+  void didPopNext() {
+    _isRouteVisible = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await _syncSeenWithVisiblePage();
+    });
+  }
+
+  @override
+  void didPushNext() {
+    _isRouteVisible = false;
+  }
+
+  @override
+  void didPop() {
+    _isRouteVisible = false;
   }
 
   Future<void> _copyText(String text) async {
@@ -88,7 +134,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   void _syncPageController(int targetIndex) {
     if (!_pageController.hasClients) return;
-    final currentPage = _pageController.page?.round() ?? _pageController.initialPage;
+    final currentPage =
+        _pageController.page?.round() ?? _pageController.initialPage;
     if (currentPage == targetIndex) return;
 
     _isSyncingPageFromState = true;
@@ -103,6 +150,30 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     });
   }
 
+  Future<void> _syncSeenWithVisiblePage() async {
+    if (!_isRouteVisible) return;
+    if (_isMarkingSeen) return;
+
+    final state = ref.read(chatProvider(widget.fileName));
+    final pageList = state.pageList;
+    if (pageList == null || pageList.pages.isEmpty) return;
+
+    final index = pageList.currentPageIndex;
+    if (index < 0 || index >= pageList.pages.length) return;
+
+    final round = pageList.pages[index].round;
+    if (!round.hasUnseenUpdate) return;
+
+    _isMarkingSeen = true;
+    try {
+      await ref
+          .read(chatProvider(widget.fileName).notifier)
+          .markRoundSeen(round.id);
+    } finally {
+      _isMarkingSeen = false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(chatProvider(widget.fileName));
@@ -114,11 +185,16 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         state.pageList != null && state.pageList!.pages.isNotEmpty;
     final currentIndex = hasPages ? state.pageList!.currentPageIndex : 0;
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      if (!hasPages) return;
-      if (_isSyncingPageFromState) return;
-      _syncPageController(currentIndex);
+
+      if (hasPages && !_isSyncingPageFromState) {
+        _syncPageController(currentIndex);
+      }
+
+      if (hasPages) {
+        await _syncSeenWithVisiblePage();
+      }
     });
 
     return AppPageScaffold(
@@ -194,12 +270,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                                 ? const NeverScrollableScrollPhysics()
                                 : const PageScrollPhysics(),
                             itemCount: state.pageList?.pages.length ?? 0,
-                            onPageChanged: (index) {
+                            onPageChanged: (index) async {
                               if (state.pageList == null) return;
-                              if (index == state.pageList!.currentPageIndex) {
-                                return;
+                              if (index != state.pageList!.currentPageIndex) {
+                                notifier.changePage(index);
                               }
-                              notifier.changePage(index);
+                              await _syncSeenWithVisiblePage();
                             },
                             itemBuilder: (context, index) {
                               final round = state.pageList!.pages[index].round;
@@ -751,6 +827,7 @@ class _PagerButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = onTap != null;
+
     return InkWell(
       onTap: onTap,
       borderRadius: AppTokens.brMd,

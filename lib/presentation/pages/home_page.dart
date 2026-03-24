@@ -3,8 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../core/models/session.dart';
 import '../../core/utils/time_format_utils.dart';
-import '../providers/global_streaming_provider.dart';
-import '../providers/session_card_provider.dart';
+import '../providers/home_session_list_provider.dart';
 import '../providers/session_list_notifier.dart';
 import '../themes/app_tokens.dart';
 import '../widgets/common/app_badge.dart';
@@ -21,7 +20,6 @@ class HomePage extends ConsumerWidget {
     BuildContext context,
     SessionListNotifier notifier,
     Session session,
-    WidgetRef ref,
   ) async {
     final controller = TextEditingController(text: session.title);
     final result = await showDialog<String>(
@@ -59,8 +57,6 @@ class HomePage extends ConsumerWidget {
 
     if (result != null && result.isNotEmpty && result != session.title) {
       await notifier.updateSessionTitle('${session.id}.json', result);
-      ref.invalidate(sessionFileNamesProvider);
-      ref.invalidate(sessionCardProvider('${session.id}.json'));
     }
   }
 
@@ -68,7 +64,6 @@ class HomePage extends ConsumerWidget {
     BuildContext context,
     SessionListNotifier notifier,
     Session session,
-    WidgetRef ref,
   ) async {
     final confirmed = await showDialog<bool>(
           context: context,
@@ -105,15 +100,13 @@ class HomePage extends ConsumerWidget {
 
     if (confirmed == true) {
       await notifier.deleteSession('${session.id}.json');
-      ref.invalidate(sessionFileNamesProvider);
-      ref.invalidate(sessionCardProvider('${session.id}.json'));
     }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final sessionsAsync = ref.watch(homeSessionListProvider);
     final notifier = ref.read(sessionListProvider.notifier);
-    final fileNamesAsync = ref.watch(sessionFileNamesProvider);
 
     return AppPageScaffold(
       appBar: AppBar(
@@ -144,45 +137,43 @@ class HomePage extends ConsumerWidget {
       body: Column(
         children: [
           Expanded(
-            child: fileNamesAsync.when(
+            child: sessionsAsync.when(
               loading: () => const Center(
                 child: CircularProgressIndicator(),
               ),
               error: (e, st) => _HomeErrorState(
                 message: '加载会话失败：$e',
                 onRetry: () async {
-                  ref.invalidate(sessionFileNamesProvider);
+                  await notifier.refresh();
                 },
               ),
-              data: (fileNames) {
-                if (fileNames.isEmpty) {
+              data: (items) {
+                if (items.isEmpty) {
                   return const _HomeEmptyState();
                 }
-                return RefreshIndicator(
-                  onRefresh: () async {
-                    ref.invalidate(sessionFileNamesProvider);
-                  },
-                  child: ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                    children: [
-                      ...fileNames.map((fileName) {
-                        return Padding(
-                          padding:
-                              const EdgeInsets.only(bottom: AppTokens.space12),
-                          child: _SessionCard(
-                            fileName: fileName,
-                            notifier: notifier,
-                            onRename: (session) =>
-                                _showRenameDialog(context, notifier, session, ref),
-                            onDelete: (session) =>
-                                _showDeleteConfirmDialog(context, notifier, session, ref),
+
+                return ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                  children: [
+                    ...items.map((item) {
+                      return Padding(
+                        padding:
+                            const EdgeInsets.only(bottom: AppTokens.space12),
+                        child: _SessionCard(
+                          item: item,
+                          notifier: notifier,
+                          onRename: (session) =>
+                              _showRenameDialog(context, notifier, session),
+                          onDelete: (session) => _showDeleteConfirmDialog(
+                            context,
+                            notifier,
+                            session,
                           ),
-                        );
-                      }),
-                      const SizedBox(height: 12),
-                    ],
-                  ),
+                        ),
+                      );
+                    }),
+                    const SizedBox(height: 12),
+                  ],
                 );
               },
             ),
@@ -191,10 +182,8 @@ class HomePage extends ConsumerWidget {
             hintText: '发送消息',
             onSend: (content, attachments) async {
               final newFileName = await notifier.createSession('新对话');
-              ref.invalidate(sessionFileNamesProvider);
-              ref.invalidate(sessionCardProvider(newFileName));
               if (context.mounted) {
-                Navigator.push(
+                await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => ChatPage(
@@ -204,6 +193,9 @@ class HomePage extends ConsumerWidget {
                     ),
                   ),
                 );
+                if (context.mounted) {
+                  await notifier.refresh();
+                }
               }
             },
           ),
@@ -312,251 +304,180 @@ class _HomeErrorState extends StatelessWidget {
   }
 }
 
-class _SessionCard extends ConsumerWidget {
-  final String fileName;
+class _SessionCard extends StatelessWidget {
+  final HomeSessionItem item;
   final SessionListNotifier notifier;
   final Future<void> Function(Session session) onRename;
   final Future<void> Function(Session session) onDelete;
 
   const _SessionCard({
-    required this.fileName,
+    required this.item,
     required this.notifier,
     required this.onRename,
     required this.onDelete,
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final sessionAsync = ref.watch(sessionCardProvider(fileName));
-    final streamingSessions = ref.watch(globalStreamingSessionsProvider);
-    final streamingPreviewMap = ref.watch(globalStreamingPreviewProvider);
-    final isStreaming = streamingSessions.contains(fileName);
-    final streamingPreview = streamingPreviewMap[fileName];
+  Widget build(BuildContext context) {
+    final session = item.session;
+    final fileName = '${session.id}.json';
+    final updatedAt = TimeFormatUtils.formatTimestamp(item.updatedAt);
 
-    return sessionAsync.when(
-      loading: () => AppCard(
-        padding: const EdgeInsets.all(16),
-        boxShadow: AppTokens.shadowSm,
-        child: const SizedBox(
-          height: 88,
-          child: Center(
-            child: CircularProgressIndicator(),
+    return Slidable(
+      key: ValueKey(fileName),
+      endActionPane: ActionPane(
+        motion: const DrawerMotion(),
+        extentRatio: 0.34,
+        children: [
+          CustomSlidableAction(
+            onPressed: (_) => onRename(session),
+            backgroundColor: AppTokens.info,
+            borderRadius: AppTokens.brLg,
+            child: const Icon(
+              Icons.edit_outlined,
+              color: Colors.white,
+            ),
           ),
-        ),
+          CustomSlidableAction(
+            onPressed: (_) => onDelete(session),
+            backgroundColor: AppTokens.danger,
+            borderRadius: AppTokens.brLg,
+            child: const Icon(
+              Icons.delete_outline,
+              color: Colors.white,
+            ),
+          ),
+        ],
       ),
-      error: (e, st) => AppCard(
-        padding: const EdgeInsets.all(16),
-        boxShadow: AppTokens.shadowSm,
-        child: Text(
-          '会话读取失败：$e',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppTokens.danger,
-              ),
-        ),
-      ),
-      data: (session) {
-        final roundCount = session.rounds.length;
-        final updatedAt = TimeFormatUtils.formatTimestamp(session.updatedAt);
-
-        final preview = streamingPreview != null
-            ? _SessionPreview(
-                userPreview: session.rounds.isEmpty
-                    ? '点击开始新的对话'
-                    : session.rounds.last.userContent.trim().isEmpty
-                        ? '（空输入）'
-                        : session.rounds.last.userContent,
-                aiPreview: streamingPreview.content.trim().isEmpty
-                    ? '正在生成...'
-                    : streamingPreview.content,
-              )
-            : _buildLatestPreview(session);
-
-        return Slidable(
-          key: ValueKey(fileName),
-          endActionPane: ActionPane(
-            motion: const DrawerMotion(),
-            extentRatio: 0.34,
-            children: [
-              CustomSlidableAction(
-                onPressed: (_) => onRename(session),
-                backgroundColor: AppTokens.info,
-                borderRadius: AppTokens.brLg,
-                child: const Icon(
-                  Icons.edit_outlined,
-                  color: Colors.white,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ChatPage(
+                  fileName: fileName,
                 ),
               ),
-              CustomSlidableAction(
-                onPressed: (_) => onDelete(session),
-                backgroundColor: AppTokens.danger,
-                borderRadius: AppTokens.brLg,
-                child: const Icon(
-                  Icons.delete_outline,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ChatPage(
-                      fileName: fileName,
-                    ),
+            );
+            if (context.mounted) {
+              await notifier.refresh();
+            }
+          },
+          borderRadius: AppTokens.brLg,
+          child: AppCard(
+            padding: const EdgeInsets.all(16),
+            boxShadow: AppTokens.shadowSm,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: AppTokens.surfaceSoft,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppTokens.border),
                   ),
-                );
-              },
-              borderRadius: AppTokens.brLg,
-              child: AppCard(
-                padding: const EdgeInsets.all(16),
-                boxShadow: AppTokens.shadowSm,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 46,
-                      height: 46,
-                      decoration: BoxDecoration(
-                        color: AppTokens.surfaceSoft,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppTokens.border),
+                  child: const Icon(
+                    Icons.forum_outlined,
+                    color: AppTokens.textSecondary,
+                  ),
+                ),
+                const SizedBox(width: AppTokens.space12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              session.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                          ),
+                          if (item.isStreaming) ...[
+                            const SizedBox(width: 8),
+                            AppBadge.info(
+                              '生成中',
+                              icon: Icons.bolt_outlined,
+                            ),
+                          ],
+                          if (item.hasUnseen) ...[
+                            const SizedBox(width: 8),
+                            AppBadge.warning(
+                              '未查看',
+                              icon: Icons.mark_chat_unread_outlined,
+                            ),
+                          ],
+                        ],
                       ),
-                      child: const Icon(
-                        Icons.forum_outlined,
-                        color: AppTokens.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(width: AppTokens.space12),
-                    Expanded(
-                      child: Column(
+                      const SizedBox(height: 8),
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  session.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleMedium
-                                      ?.copyWith(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                ),
-                              ),
-                              if (isStreaming) ...[
-                                const SizedBox(width: 8),
-                                AppBadge.info(
-                                  '生成中',
-                                  icon: Icons.bolt_outlined,
-                                ),
-                              ],
-                              if (session.hasUnseenUpdate) ...[
-                                const SizedBox(width: 8),
-                                AppBadge.warning(
-                                  '未查看',
-                                  icon: Icons.mark_chat_unread_outlined,
-                                ),
-                              ],
-                            ],
+                          _PreviewLine(
+                            label: 'YOU',
+                            text: item.userPreview,
+                            color: AppTokens.info,
                           ),
-                          const SizedBox(height: 8),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _PreviewLine(
-                                label: 'YOU',
-                                text: preview.userPreview,
-                                color: AppTokens.info,
-                              ),
-                              const SizedBox(height: 4),
-                              _PreviewLine(
-                                label: 'AI',
-                                text: preview.aiPreview,
-                                color: AppTokens.success,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              AppBadge.info(
-                                '$roundCount 轮',
-                                icon: Icons.chat_bubble_outline,
-                              ),
-                              AppBadge.primary(
-                                updatedAt,
-                                icon: Icons.schedule_outlined,
-                              ),
-                            ],
+                          const SizedBox(height: 4),
+                          _PreviewLine(
+                            label: 'AI',
+                            text: item.aiPreview,
+                            color: AppTokens.success,
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(width: AppTokens.space8),
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: AppTokens.surfaceSoft,
-                        borderRadius: AppTokens.brMd,
-                        border: Border.all(color: AppTokens.border),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          AppBadge.info(
+                            '${item.roundCount} 轮',
+                            icon: Icons.chat_bubble_outline,
+                          ),
+                          AppBadge.primary(
+                            updatedAt,
+                            icon: Icons.schedule_outlined,
+                          ),
+                        ],
                       ),
-                      child: const Icon(
-                        Icons.chevron_right_rounded,
-                        color: AppTokens.textSecondary,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
+                const SizedBox(width: AppTokens.space8),
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: AppTokens.surfaceSoft,
+                    borderRadius: AppTokens.brMd,
+                    border: Border.all(color: AppTokens.border),
+                  ),
+                  child: const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppTokens.textSecondary,
+                  ),
+                ),
+              ],
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
-
-  _SessionPreview _buildLatestPreview(Session session) {
-    if (session.rounds.isEmpty) {
-      return const _SessionPreview(
-        userPreview: '点击开始新的对话',
-        aiPreview: '等待助手回复',
-      );
-    }
-
-    final latest = session.rounds.last;
-    final user = latest.userContent.trim().isEmpty
-        ? '（空输入）'
-        : latest.userContent.trim();
-    final ai = (latest.assistantContent ?? '').trim().isEmpty
-        ? '（等待回复）'
-        : latest.assistantContent!.trim();
-
-    return _SessionPreview(
-      userPreview: user,
-      aiPreview: ai,
-    );
-  }
-}
-
-class _SessionPreview {
-  final String userPreview;
-  final String aiPreview;
-
-  const _SessionPreview({
-    required this.userPreview,
-    required this.aiPreview,
-  });
 }
 
 class _PreviewLine extends StatelessWidget {

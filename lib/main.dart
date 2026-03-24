@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'core/utils/app_route_observer.dart';
 import 'di/providers.dart';
 import 'presentation/pages/home_page.dart';
 import 'presentation/themes/app_theme.dart';
@@ -47,6 +48,7 @@ class MyApp extends StatelessWidget {
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
         themeMode: ThemeMode.system,
+        navigatorObservers: [appRouteObserver],
         home: const HomePage(),
       ),
     );

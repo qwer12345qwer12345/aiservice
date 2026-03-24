@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:graphview/GraphView.dart';
@@ -32,15 +31,11 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   final TransformationController _transformationController =
       TransformationController();
 
-  Graph _graph = Graph()..isTree = true;
   final BuchheimWalkerConfiguration _builder =
       BuchheimWalkerConfiguration();
 
-  final Map<String, Node> _nodeMap = {};
-  final Map<Node, TreeNode> _graphNodeToTreeNodeMap = {};
-
   List<TreeNode> _roots = [];
-  String _lastRootsSignature = '';
+  String _lastSignature = '';
 
   @override
   void initState() {
@@ -62,20 +57,19 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
 
   void _reloadTree(List<ChatRound> rounds) {
     final roots = rounds.isEmpty ? <TreeNode>[] : TreeBuilder.buildTree(rounds);
-    final signature = _buildRootsSignature(roots);
+    final signature = _buildSignature(roots);
 
     setState(() {
       _roots = roots;
-      _lastRootsSignature = signature;
-      _rebuildGraph(_roots);
+      _lastSignature = signature;
     });
   }
 
-  String _buildRootsSignature(List<TreeNode> roots) {
+  String _buildSignature(List<TreeNode> roots) {
     dynamic toJsonNode(TreeNode node) {
       return {
         'id': node.id,
-        'preview': node.preview,
+        'parentId': node.parentId,
         'assistantContent': node.round.assistantContent,
         'assistantThinking': node.round.assistantThinking,
         'isIncomplete': node.round.isIncomplete,
@@ -84,35 +78,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
       };
     }
 
-    return jsonEncode(roots.map(toJsonNode).toList());
-  }
-
-  void _rebuildGraph(List<TreeNode> roots) {
-    _graph = Graph()..isTree = true;
-    _nodeMap.clear();
-    _graphNodeToTreeNodeMap.clear();
-
-    for (final root in roots) {
-      _addTreeToGraph(root, null);
-    }
-  }
-
-  void _addTreeToGraph(TreeNode treeNode, TreeNode? parent) {
-    final currentNode = Node.Id(treeNode.id);
-    _nodeMap[treeNode.id] = currentNode;
-    _graphNodeToTreeNodeMap[currentNode] = treeNode;
-    _graph.addNode(currentNode);
-
-    if (parent != null) {
-      final parentNode = _nodeMap[parent.id];
-      if (parentNode != null) {
-        _graph.addEdge(parentNode, currentNode);
-      }
-    }
-
-    for (final child in treeNode.children) {
-      _addTreeToGraph(child, treeNode);
-    }
+    return roots.map((e) => toJsonNode(e).toString()).join('|');
   }
 
   Set<String> _collectSubtreeIds(TreeNode node) {
@@ -175,6 +141,41 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     await ref.read(chatProvider(widget.fileName).notifier).loadSession();
   }
 
+  Future<bool> _confirmDelete(TreeNode node) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: AppTokens.brLg,
+            ),
+            title: Text(
+              '删除节点',
+              style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            content: Text(
+              '确定删除这一轮及其后续全部分支吗？',
+              style: Theme.of(ctx).textTheme.bodyMedium,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppTokens.danger,
+                ),
+                child: const Text('删除'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final chatState = ref.watch(chatProvider(widget.fileName));
@@ -183,9 +184,9 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     final latestRoots = session.rounds.isEmpty
         ? <TreeNode>[]
         : TreeBuilder.buildTree(session.rounds);
-    final latestSignature = _buildRootsSignature(latestRoots);
+    final latestSignature = _buildSignature(latestRoots);
 
-    if (latestSignature != _lastRootsSignature) {
+    if (latestSignature != _lastSignature) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _reloadTree(session.rounds);
@@ -244,59 +245,39 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
                     maxScale: 3.0,
                     transformationController: _transformationController,
                     child: Container(
-                      padding: const EdgeInsets.all(32),
+                      padding: const EdgeInsets.all(20),
                       color: AppTokens.bg,
-                      child: GraphView(
-                        key: ValueKey(_lastRootsSignature),
-                        graph: _graph,
-                        animated: false,
-                        algorithm: BuchheimWalkerAlgorithm(
-                          _builder,
-                          TreeEdgeRenderer(_builder),
-                        ),
-                        paint: Paint()
-                          ..color = const Color(0xFFD8DEE8)
-                          ..strokeWidth = 1.6
-                          ..style = PaintingStyle.stroke,
-                        builder: (Node node) {
-                          final treeNode = _graphNodeToTreeNodeMap[node];
-                          if (treeNode == null) {
-                            return const SizedBox.shrink();
-                          }
-                          return _GraphNodeCard(
-                            key: ValueKey(treeNode.id),
-                            treeNode: treeNode,
-                            onSwitch: () async {
-                              await chatNotifier.switchBranch(treeNode.id);
-                              if (context.mounted) {
-                                Navigator.of(context).pop();
-                              }
-                            },
-                            onDelete: () async {
-                              final confirmed =
-                                  await _showDeleteDialog(context, treeNode);
-                              if (!confirmed) return;
-                              try {
-                                await _deleteNode(treeNode.id);
+                      child: Wrap(
+                        spacing: 40,
+                        runSpacing: 40,
+                        crossAxisAlignment: WrapCrossAlignment.start,
+                        children: [
+                          for (final root in _roots)
+                            _RootTreeGroup(
+                              key: ValueKey('root-tree-${root.id}'),
+                              root: root,
+                              builderConfig: _builder,
+                              onSwitch: (treeNode) async {
+                                await chatNotifier.switchBranch(treeNode.id);
                                 if (context.mounted) {
+                                  Navigator.of(context).pop();
+                                }
+                              },
+                              onDelete: (treeNode) async {
+                                final confirmed =
+                                    await _confirmDelete(treeNode);
+                                if (!confirmed) return;
+                                try {
+                                  await _deleteNode(treeNode.id);
+                                } catch (e) {
+                                  if (!mounted) return;
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('节点及其后续分支已删除'),
-                                    ),
+                                    SnackBar(content: Text('删除失败：$e')),
                                   );
                                 }
-                              } catch (e) {
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('删除失败：$e'),
-                                    ),
-                                  );
-                                }
-                              }
-                            },
-                          );
-                        },
+                              },
+                            ),
+                        ],
                       ),
                     ),
                   ),
@@ -355,43 +336,71 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
       ),
     );
   }
+}
 
-  Future<bool> _showDeleteDialog(
-    BuildContext context,
-    TreeNode node,
-  ) async {
-    return await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: AppTokens.brLg,
-            ),
-            title: Text(
-              '删除节点',
-              style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-            content: Text(
-              '确定删除这一轮及其后续全部分支吗？\n\n${node.round.userContent}',
-              style: Theme.of(ctx).textTheme.bodyMedium,
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppTokens.danger,
-                ),
-                child: const Text('删除'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
+class _RootTreeGroup extends StatelessWidget {
+  final TreeNode root;
+  final BuchheimWalkerConfiguration builderConfig;
+  final Future<void> Function(TreeNode treeNode) onSwitch;
+  final Future<void> Function(TreeNode treeNode) onDelete;
+
+  const _RootTreeGroup({
+    super.key,
+    required this.root,
+    required this.builderConfig,
+    required this.onSwitch,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final graph = Graph()..isTree = true;
+    final nodeMap = <String, Node>{};
+    final graphNodeToTreeNodeMap = <Node, TreeNode>{};
+
+    void addTree(TreeNode treeNode, TreeNode? parent) {
+      final currentNode = Node.Id(treeNode.id);
+      nodeMap[treeNode.id] = currentNode;
+      graphNodeToTreeNodeMap[currentNode] = treeNode;
+      graph.addNode(currentNode);
+
+      if (parent != null) {
+        final parentNode = nodeMap[parent.id];
+        if (parentNode != null) {
+          graph.addEdge(parentNode, currentNode);
+        }
+      }
+
+      for (final child in treeNode.children) {
+        addTree(child, treeNode);
+      }
+    }
+
+    addTree(root, null);
+
+    return GraphView(
+      graph: graph,
+      animated: false,
+      algorithm: BuchheimWalkerAlgorithm(
+        builderConfig,
+        TreeEdgeRenderer(builderConfig),
+      ),
+      paint: Paint()
+        ..color = const Color(0xFFD8DEE8)
+        ..strokeWidth = 1.6
+        ..style = PaintingStyle.stroke,
+      builder: (Node node) {
+        final treeNode = graphNodeToTreeNodeMap[node];
+        if (treeNode == null) return const SizedBox.shrink();
+
+        return _GraphNodeCard(
+          key: ValueKey(treeNode.id),
+          treeNode: treeNode,
+          onSwitch: () => onSwitch(treeNode),
+          onDelete: () => onDelete(treeNode),
+        );
+      },
+    );
   }
 }
 
@@ -590,11 +599,6 @@ class _GraphNodeCard extends StatelessWidget {
                   '深度 ${treeNode.depth + 1}',
                   icon: Icons.layers_outlined,
                 ),
-                if (isRoot)
-                  AppBadge.info(
-                    '根节点',
-                    icon: Icons.flag_outlined,
-                  ),
                 if (isIncomplete)
                   AppBadge.warning(
                     '未完成',

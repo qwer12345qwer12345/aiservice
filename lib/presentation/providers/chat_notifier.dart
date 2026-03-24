@@ -4,7 +4,6 @@ import '../../core/models/api_message.dart';
 import '../../core/models/app_config.dart';
 import '../../core/models/chat_round.dart';
 import '../../core/models/model_info.dart';
-import '../../core/models/session.dart';
 import '../../di/providers.dart';
 import '../../domain/models/chat_page.dart';
 import '../../domain/services/attachment_preparer.dart';
@@ -17,6 +16,7 @@ import '../../domain/states/chat_state.dart';
 import '../models/pending_attachment.dart';
 import 'global_streaming_provider.dart';
 import 'session_card_provider.dart';
+import 'session_list_notifier.dart';
 
 class ChatNotifier extends StateNotifier<ChatState> {
   final Ref ref;
@@ -34,6 +34,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
         final cleared = session.copyWith(hasUnseenUpdate: false);
         await repository.saveSession(fileName, cleared);
         session = cleared;
+        await ref.read(sessionListProvider.notifier).refresh();
       }
 
       final viewState = ChatViewStateBuilder.buildInitial(session);
@@ -44,9 +45,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
             error: null,
           );
 
-      if (viewState.currentRoundId != null) {
-        await _markRoundSeen(viewState.currentRoundId!);
-      }
+      ref.invalidate(sessionCardProvider(fileName));
     } catch (e) {
       state = state.copyWithError(e.toString());
     }
@@ -109,7 +108,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     }
   }
 
-  Future<void> _markRoundSeen(String roundId) async {
+  Future<void> markRoundSeen(String roundId) async {
     final session = state.session;
     if (session == null) return;
 
@@ -122,6 +121,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
         if (r.id == roundId) return updatedRound;
         return r;
       }).toList(),
+      hasUnseenUpdate:
+          session.rounds.any((r) => r.id != roundId && r.hasUnseenUpdate),
     );
 
     final repository = ref.read(conversationRepositoryProvider);
@@ -138,6 +139,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     );
 
     ref.invalidate(sessionCardProvider(fileName));
+    await ref.read(sessionListProvider.notifier).refresh();
   }
 
   Future<void> sendMessage(
@@ -326,6 +328,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
         );
 
     ref.invalidate(sessionCardProvider(fileName));
+    await ref.read(sessionListProvider.notifier).refresh();
   }
 
   Future<void> _handleStreamTask(
@@ -411,6 +414,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
             pageList: finalPageList,
             error: null,
           );
+
+      await ref.read(sessionListProvider.notifier).refresh();
     } catch (e) {
       _markSessionStreaming(false);
       _clearStreamingPreview();
@@ -467,11 +472,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
     state = state.copyWithCurrentRoundId(newRoundId).copyWith(
           pageList: viewState.pageList,
         );
-
-    await _markRoundSeen(newRoundId);
   }
 
-  Future<void> changePage(int pageIndex) async {
+  void changePage(int pageIndex) {
     if (state.pageList == null) return;
 
     final pages = state.pageList!.pages;
@@ -483,8 +486,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
     state = state.copyWithCurrentRoundId(newRoundId).copyWith(
           pageList: state.pageList!.copyWith(currentPageIndex: pageIndex),
         );
-
-    await _markRoundSeen(newRoundId);
   }
 }
 

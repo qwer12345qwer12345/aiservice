@@ -6,31 +6,38 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<Session>>> {
   final Ref ref;
 
   SessionListNotifier(this.ref) : super(const AsyncValue.loading()) {
-    _loadSessions();
+    _loadSessions(initial: true);
   }
 
-  Future<void> _loadSessions() async {
-    state = const AsyncValue.loading();
+  Future<void> _loadSessions({bool initial = false}) async {
+    if (initial || !state.hasValue) {
+      state = const AsyncValue.loading();
+    }
+
     try {
       final repository = ref.read(conversationRepositoryProvider);
       final sessions = await repository.getAllSessions();
       state = AsyncValue.data(sessions);
     } catch (e, st) {
-      state = AsyncValue.error(e, st);
+      if (initial || !state.hasValue) {
+        state = AsyncValue.error(e, st);
+      }
     }
   }
 
   Future<void> refresh() async {
-    await _loadSessions();
+    await _loadSessions(initial: false);
   }
 
   Future<void> deleteSession(String fileName) async {
     try {
       final repository = ref.read(conversationRepositoryProvider);
       await repository.deleteSession(fileName);
-      await _loadSessions();
+      await _loadSessions(initial: false);
     } catch (e, st) {
-      state = AsyncValue.error(e, st);
+      if (!state.hasValue) {
+        state = AsyncValue.error(e, st);
+      }
     }
   }
 
@@ -40,9 +47,11 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<Session>>> {
       final cleanTitle = newTitle.trim();
       if (cleanTitle.isEmpty) return;
       await repository.updateSessionTitle(fileName, cleanTitle);
-      await _loadSessions();
+      await _loadSessions(initial: false);
     } catch (e, st) {
-      state = AsyncValue.error(e, st);
+      if (!state.hasValue) {
+        state = AsyncValue.error(e, st);
+      }
     }
   }
 
@@ -52,7 +61,7 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<Session>>> {
     final session = await repository.createSessionWithGeneratedId(
       title: cleanTitle,
     );
-    await _loadSessions();
+    await _loadSessions(initial: false);
     return '${session.id}.json';
   }
 }
