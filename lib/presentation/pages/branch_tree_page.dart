@@ -157,7 +157,12 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
       updatedAt: DateTime.now().millisecondsSinceEpoch,
     );
 
-    await repository.saveSession(widget.fileName, updatedSession);
+    await repository.saveSessionAndCleanupOrphanAttachments(
+      widget.fileName,
+      session,
+      updatedSession,
+    );
+
     _reloadTree(updatedRounds);
     await ref.read(chatProvider(widget.fileName).notifier).loadSession();
   }

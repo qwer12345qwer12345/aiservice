@@ -1,9 +1,9 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as path;
-import 'package:uuid/uuid.dart';
-import '../../core/errors/exceptions.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/errors/exceptions.dart';
 
 abstract class ILocalFileSource {
   Future<String> get basePath;
@@ -94,14 +94,17 @@ class LocalFileSource implements ILocalFileSource {
   @override
   Future<String> saveAttachment(Uint8List data, String fileName) async {
     try {
-      final uuid = const Uuid().v4();
-      final ext = path.extension(fileName);
-      final newFileName = '$uuid$ext';
-      final relativePath =
-          '${AppConstants.dirAttachments}/$newFileName';
+      final ext = path.extension(fileName).toLowerCase();
+      final hash = sha256.convert(data).toString();
+      final hashedFileName = '$hash$ext';
+      final relativePath = '${AppConstants.dirAttachments}/$hashedFileName';
       final filePath = path.join(_baseDir, relativePath);
       final file = File(filePath);
-      await file.writeAsBytes(data, flush: true);
+
+      if (!await file.exists()) {
+        await file.writeAsBytes(data, flush: true);
+      }
+
       return relativePath;
     } on FileSystemException catch (e) {
       throw FileException(

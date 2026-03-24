@@ -1,22 +1,57 @@
 import 'dart:typed_data';
 import 'package:synchronized/synchronized.dart';
-import '../../core/models/session.dart';
-import '../../core/models/chat_round.dart';
 import '../../core/interfaces/file_service.dart';
+import '../../core/models/chat_round.dart';
+import '../../core/models/session.dart';
 import '../../core/utils/id_generator.dart';
 
 class ConversationRepository {
   final IFileService _fileService;
 
-  // 针对特定文件名的异步互斥锁，防止并发任务覆盖存档
   final Map<String, Lock> _locks = {};
 
   ConversationRepository(this._fileService);
 
-  /// 互斥锁执行器，确保对同一个文件操作是顺序的
   Future<T> _runWithLock<T>(String fileName, Future<T> Function() action) {
     final lock = _locks.putIfAbsent(fileName, () => Lock());
     return lock.synchronized(action);
+  }
+
+  Set<String> _collectAttachmentPaths(Session session) {
+    return session.rounds
+        .expand((round) => round.userAttachments)
+        .map((attachment) => attachment.relativePath)
+        .toSet();
+  }
+
+  Future<Set<String>> _findRemovableAttachmentPaths({
+    required String targetFileName,
+    required Set<String> candidatePaths,
+  }) async {
+    if (candidatePaths.isEmpty) return <String>{};
+
+    final allFileNames = await _fileService.getConversationFileList();
+    final otherFileNames =
+        allFileNames.where((name) => name != targetFileName).toList();
+
+    final referencedByOthers = <String>{};
+
+    for (final otherFileName in otherFileNames) {
+      try {
+        final otherSession = await _fileService.readSession(otherFileName);
+        for (final round in otherSession.rounds) {
+          for (final attachment in round.userAttachments) {
+            if (candidatePaths.contains(attachment.relativePath)) {
+              referencedByOthers.add(attachment.relativePath);
+            }
+          }
+        }
+      } catch (_) {
+        // 忽略损坏/不可读会话
+      }
+    }
+
+    return candidatePaths.difference(referencedByOthers);
   }
 
   Future<List<String>> getAllSessionFileNames() async {
@@ -35,8 +70,58 @@ class ConversationRepository {
     });
   }
 
+  Future<void> saveSessionAndCleanupOrphanAttachments(
+    String fileName,
+    Session oldSession,
+    Session newSession,
+  ) async {
+    return _runWithLock(fileName, () async {
+      final oldPaths = _collectAttachmentPaths(oldSession);
+      final newPaths = _collectAttachmentPaths(newSession);
+
+      final removedPaths = oldPaths.difference(newPaths);
+      final removablePaths = await _findRemovableAttachmentPaths(
+        targetFileName: fileName,
+        candidatePaths: removedPaths,
+      );
+
+      await _fileService.writeSession(fileName, newSession);
+
+      for (final relativePath in removablePaths) {
+        try {
+          await _fileService.deleteAttachment(relativePath);
+        } catch (_) {
+          // 忽略单个附件删除失败，避免整个流程失败
+        }
+      }
+    });
+  }
+
   Future<void> deleteSession(String fileName) async {
     return _runWithLock(fileName, () async {
+      Session? targetSession;
+      try {
+        targetSession = await _fileService.readSession(fileName);
+      } catch (_) {
+        targetSession = null;
+      }
+
+      if (targetSession != null) {
+        final targetAttachmentPaths = _collectAttachmentPaths(targetSession);
+        final removablePaths = await _findRemovableAttachmentPaths(
+          targetFileName: fileName,
+          candidatePaths: targetAttachmentPaths,
+        );
+
+        for (final relativePath in removablePaths) {
+          try {
+            await _fileService.deleteAttachment(relativePath);
+          } catch (_) {
+            // 忽略单个附件删除失败，避免整个会话删除失败
+          }
+        }
+      }
+
       await _fileService.deleteSession(fileName);
     });
   }
@@ -139,7 +224,6 @@ class ConversationRepository {
         rounds: updatedRounds,
         updatedAt: DateTime.now().millisecondsSinceEpoch,
       );
-
       await _fileService.writeSession(fileName, updatedSession);
     });
   }
