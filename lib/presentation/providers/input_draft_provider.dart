@@ -5,3 +5,6 @@ final globalInputDraftProvider = StateProvider<String>((ref) => '');
 
 final globalAttachmentDraftProvider =
     StateProvider<List<PendingAttachment>>((ref) => []);
+
+final globalEditSourceRoundIdProvider =
+    StateProvider<String?>((ref) => null);

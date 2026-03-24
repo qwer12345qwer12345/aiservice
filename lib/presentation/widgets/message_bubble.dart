@@ -7,6 +7,7 @@ class MessageBubble extends StatelessWidget {
   final bool isUser;
   final VoidCallback? onCopy;
   final VoidCallback? onRetryReply;
+  final VoidCallback? onEdit;
 
   const MessageBubble({
     super.key,
@@ -14,6 +15,7 @@ class MessageBubble extends StatelessWidget {
     required this.isUser,
     this.onCopy,
     this.onRetryReply,
+    this.onEdit,
   });
 
   @override
@@ -138,7 +140,7 @@ class MessageBubble extends StatelessWidget {
                 ),
               ),
             ),
-            if (onCopy != null || onRetryReply != null) ...[
+            if (onCopy != null || onRetryReply != null || onEdit != null) ...[
               const SizedBox(height: AppTokens.space6),
               Row(
                 mainAxisSize: MainAxisSize.min,
@@ -149,6 +151,14 @@ class MessageBubble extends StatelessWidget {
                       tooltip: '复制',
                       onTap: onCopy!,
                     ),
+                  if (onEdit != null) ...[
+                    const SizedBox(width: AppTokens.space4),
+                    _ActionIconButton(
+                      icon: Icons.edit_outlined,
+                      tooltip: '编辑后发送',
+                      onTap: onEdit!,
+                    ),
+                  ],
                   if (onRetryReply != null) ...[
                     const SizedBox(width: AppTokens.space4),
                     _ActionIconButton(

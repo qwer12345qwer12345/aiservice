@@ -9,6 +9,7 @@ import '../../di/providers.dart';
 import '../../domain/models/tree_node.dart';
 import '../../domain/services/tree_builder.dart';
 import '../providers/chat_notifier.dart';
+import '../providers/global_streaming_provider.dart';
 import '../themes/app_tokens.dart';
 import '../widgets/common/app_badge.dart';
 import '../widgets/common/app_page_scaffold.dart';
@@ -44,13 +45,11 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   @override
   void initState() {
     super.initState();
-
     _builder
       ..siblingSeparation = 40
       ..levelSeparation = 78
       ..subtreeSeparation = 50
       ..orientation = BuchheimWalkerConfiguration.ORIENTATION_TOP_BOTTOM;
-
     _reloadTree(widget.session.rounds);
   }
 
@@ -63,7 +62,6 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   void _reloadTree(List<ChatRound> rounds) {
     final roots = rounds.isEmpty ? <TreeNode>[] : TreeBuilder.buildTree(rounds);
     final signature = _buildRootsSignature(roots);
-
     setState(() {
       _roots = roots;
       _lastRootsSignature = signature;
@@ -86,7 +84,6 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     _graph = Graph()..isTree = true;
     _nodeMap.clear();
     _graphNodeToTreeNodeMap.clear();
-
     for (final root in roots) {
       _addTreeToGraph(root, null);
     }
@@ -110,31 +107,50 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     }
   }
 
+  Set<String> _collectSubtreeIds(TreeNode node) {
+    final ids = <String>{node.id};
+    for (final child in node.children) {
+      ids.addAll(_collectSubtreeIds(child));
+    }
+    return ids;
+  }
+
+  TreeNode? _findTreeNodeById(List<TreeNode> roots, String nodeId) {
+    for (final root in roots) {
+      final result = _findTreeNodeByIdRecursive(root, nodeId);
+      if (result != null) return result;
+    }
+    return null;
+  }
+
+  TreeNode? _findTreeNodeByIdRecursive(TreeNode node, String nodeId) {
+    if (node.id == nodeId) return node;
+    for (final child in node.children) {
+      final result = _findTreeNodeByIdRecursive(child, nodeId);
+      if (result != null) return result;
+    }
+    return null;
+  }
+
   Future<void> _deleteNode(String nodeId) async {
     final repository = ref.read(conversationRepositoryProvider);
     final chatState = ref.read(chatProvider(widget.fileName));
     final session = chatState.session ?? widget.session;
 
-    ChatRound? roundToDelete;
-    for (final round in session.rounds) {
-      if (round.id == nodeId) {
-        roundToDelete = round;
-        break;
-      }
-    }
+    final roots = session.rounds.isEmpty
+        ? <TreeNode>[]
+        : TreeBuilder.buildTree(session.rounds);
 
-    if (roundToDelete == null) {
+    final targetNode = _findTreeNodeById(roots, nodeId);
+    if (targetNode == null) {
       throw Exception('未找到要删除的节点');
     }
 
+    final idsToDelete = _collectSubtreeIds(targetNode);
+
     final updatedRounds = session.rounds
-        .where((round) => round.id != nodeId)
-        .map((round) {
-          if (round.parentId == nodeId) {
-            return round.copyWith(parentId: roundToDelete!.parentId);
-          }
-          return round;
-        }).toList();
+        .where((round) => !idsToDelete.contains(round.id))
+        .toList();
 
     final updatedSession = session.copyWith(
       rounds: updatedRounds,
@@ -149,23 +165,27 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   @override
   Widget build(BuildContext context) {
     final chatNotifier = ref.read(chatProvider(widget.fileName).notifier);
+    final streamingSessions = ref.watch(globalStreamingSessionsProvider);
+    final isStreaming = streamingSessions.contains(widget.fileName);
 
     return AppPageScaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        title: Row(
           children: [
-            Text(
-              widget.session.title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+            Expanded(
+              child: Text(
+                widget.session.title,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
             ),
-            const SizedBox(height: 2),
-            Text(
-              '对话分支结构',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+            if (isStreaming)
+              AppBadge.info(
+                '生成中',
+                icon: Icons.bolt_outlined,
+              ),
           ],
         ),
       ),
@@ -215,7 +235,6 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
                           if (treeNode == null) {
                             return const SizedBox.shrink();
                           }
-
                           return _GraphNodeCard(
                             key: ValueKey(treeNode.id),
                             treeNode: treeNode,
@@ -229,13 +248,12 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
                               final confirmed =
                                   await _showDeleteDialog(context, treeNode);
                               if (!confirmed) return;
-
                               try {
                                 await _deleteNode(treeNode.id);
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('节点已删除'),
+                                      content: Text('节点及其后续分支已删除'),
                                     ),
                                   );
                                 }
@@ -327,7 +345,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
                   ),
             ),
             content: Text(
-              '确定删除这一轮对话吗？\n\n${node.round.userContent}',
+              '确定删除这一轮及其后续全部分支吗？\n\n${node.round.userContent}',
               style: Theme.of(ctx).textTheme.bodyMedium,
             ),
             actions: [

@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../core/models/session.dart';
 import '../../core/utils/time_format_utils.dart';
+import '../providers/global_streaming_provider.dart';
+import '../providers/session_card_provider.dart';
 import '../providers/session_list_notifier.dart';
 import '../themes/app_tokens.dart';
 import '../widgets/common/app_badge.dart';
@@ -19,9 +21,9 @@ class HomePage extends ConsumerWidget {
     BuildContext context,
     SessionListNotifier notifier,
     Session session,
+    WidgetRef ref,
   ) async {
     final controller = TextEditingController(text: session.title);
-
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -54,9 +56,10 @@ class HomePage extends ConsumerWidget {
         ],
       ),
     );
-
     if (result != null && result.isNotEmpty && result != session.title) {
       await notifier.updateSessionTitle('${session.id}.json', result);
+      ref.invalidate(sessionFileNamesProvider);
+      ref.invalidate(sessionCardProvider('${session.id}.json'));
     }
   }
 
@@ -64,6 +67,7 @@ class HomePage extends ConsumerWidget {
     BuildContext context,
     SessionListNotifier notifier,
     Session session,
+    WidgetRef ref,
   ) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -96,34 +100,25 @@ class HomePage extends ConsumerWidget {
         ],
       ),
     );
-
     if (confirmed == true) {
       await notifier.deleteSession('${session.id}.json');
+      ref.invalidate(sessionFileNamesProvider);
+      ref.invalidate(sessionCardProvider('${session.id}.json'));
     }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sessionListState = ref.watch(sessionListProvider);
     final notifier = ref.read(sessionListProvider.notifier);
+    final fileNamesAsync = ref.watch(sessionFileNamesProvider);
 
     return AppPageScaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'AI Chat',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              '你的对话工作区',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
+        title: Text(
+          'AI Chat',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
         ),
         actions: [
           Padding(
@@ -146,81 +141,39 @@ class HomePage extends ConsumerWidget {
       body: Column(
         children: [
           Expanded(
-            child: sessionListState.when(
+            child: fileNamesAsync.when(
               loading: () => const Center(
                 child: CircularProgressIndicator(),
               ),
               error: (e, st) => _HomeErrorState(
                 message: '加载会话失败：$e',
-                onRetry: notifier.refresh,
+                onRetry: () async {
+                  ref.invalidate(sessionFileNamesProvider);
+                },
               ),
-              data: (sessions) {
-                if (sessions.isEmpty) {
+              data: (fileNames) {
+                if (fileNames.isEmpty) {
                   return const _HomeEmptyState();
                 }
-
                 return RefreshIndicator(
-                  onRefresh: notifier.refresh,
+                  onRefresh: () async {
+                    ref.invalidate(sessionFileNamesProvider);
+                  },
                   child: ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                     children: [
-                      _HomeHeaderSummary(
-                        sessionCount: sessions.length,
-                      ),
-                      const SizedBox(height: AppTokens.space16),
-                      ...sessions.map((session) {
-                        final fileName = '${session.id}.json';
+                      ...fileNames.map((fileName) {
                         return Padding(
                           padding:
                               const EdgeInsets.only(bottom: AppTokens.space12),
-                          child: Slidable(
-                            key: ValueKey(fileName),
-                            endActionPane: ActionPane(
-                              motion: const DrawerMotion(),
-                              extentRatio: 0.34,
-                              children: [
-                                CustomSlidableAction(
-                                  onPressed: (_) => _showRenameDialog(
-                                    context,
-                                    notifier,
-                                    session,
-                                  ),
-                                  backgroundColor: AppTokens.info,
-                                  borderRadius: AppTokens.brLg,
-                                  child: const Icon(
-                                    Icons.edit_outlined,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                CustomSlidableAction(
-                                  onPressed: (_) => _showDeleteConfirmDialog(
-                                    context,
-                                    notifier,
-                                    session,
-                                  ),
-                                  backgroundColor: AppTokens.danger,
-                                  borderRadius: AppTokens.brLg,
-                                  child: const Icon(
-                                    Icons.delete_outline,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            child: _SessionCard(
-                              session: session,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ChatPage(
-                                      fileName: fileName,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
+                          child: _SessionCard(
+                            fileName: fileName,
+                            notifier: notifier,
+                            onRename: (session) =>
+                                _showRenameDialog(context, notifier, session, ref),
+                            onDelete: (session) =>
+                                _showDeleteConfirmDialog(context, notifier, session, ref),
                           ),
                         );
                       }),
@@ -232,9 +185,11 @@ class HomePage extends ConsumerWidget {
             ),
           ),
           InputBar(
-            hintText: '开启一个新对话...',
+            hintText: '发送消息',
             onSend: (content, attachments) async {
               final newFileName = await notifier.createSession('新对话');
+              ref.invalidate(sessionFileNamesProvider);
+              ref.invalidate(sessionCardProvider(newFileName));
               if (context.mounted) {
                 Navigator.push(
                   context,
@@ -248,61 +203,6 @@ class HomePage extends ConsumerWidget {
                 );
               }
             },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HomeHeaderSummary extends StatelessWidget {
-  final int sessionCount;
-
-  const _HomeHeaderSummary({
-    required this.sessionCount,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      padding: const EdgeInsets.all(18),
-      child: Row(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: AppTokens.primarySoft,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: const Icon(
-              Icons.forum_outlined,
-              color: AppTokens.primary,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: AppTokens.space12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '最近会话',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '共 $sessionCount 个会话，可左滑进行重命名或删除。',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
-            ),
-          ),
-          AppBadge.primary(
-            '$sessionCount',
-            icon: Icons.layers_outlined,
           ),
         ],
       ),
@@ -350,26 +250,6 @@ class _HomeEmptyState extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: AppTokens.textSecondary,
                     ),
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                alignment: WrapAlignment.center,
-                children: [
-                  AppBadge.primary(
-                    '快速提问',
-                    icon: Icons.bolt_outlined,
-                  ),
-                  AppBadge.info(
-                    '支持附件',
-                    icon: Icons.attach_file_outlined,
-                  ),
-                  AppBadge.warning(
-                    '多分支对话',
-                    icon: Icons.account_tree_outlined,
-                  ),
-                ],
               ),
             ],
           ),
@@ -429,112 +309,196 @@ class _HomeErrorState extends StatelessWidget {
   }
 }
 
-class _SessionCard extends StatelessWidget {
-  final Session session;
-  final VoidCallback onTap;
+class _SessionCard extends ConsumerWidget {
+  final String fileName;
+  final SessionListNotifier notifier;
+  final Future<void> Function(Session session) onRename;
+  final Future<void> Function(Session session) onDelete;
 
   const _SessionCard({
-    required this.session,
-    required this.onTap,
+    required this.fileName,
+    required this.notifier,
+    required this.onRename,
+    required this.onDelete,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final roundCount = session.rounds.length;
-    final updatedAt = TimeFormatUtils.formatTimestamp(session.updatedAt);
-    final preview = _buildLatestPreview(session);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sessionAsync = ref.watch(sessionCardProvider(fileName));
+    final streamingSessions = ref.watch(globalStreamingSessionsProvider);
+    final isStreaming = streamingSessions.contains(fileName);
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: AppTokens.brLg,
-        child: AppCard(
-          padding: const EdgeInsets.all(16),
-          boxShadow: AppTokens.shadowSm,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return sessionAsync.when(
+      loading: () => AppCard(
+        padding: const EdgeInsets.all(16),
+        boxShadow: AppTokens.shadowSm,
+        child: const SizedBox(
+          height: 88,
+          child: Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      ),
+      error: (e, st) => AppCard(
+        padding: const EdgeInsets.all(16),
+        boxShadow: AppTokens.shadowSm,
+        child: Text(
+          '会话读取失败：$e',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppTokens.danger,
+              ),
+        ),
+      ),
+      data: (session) {
+        final roundCount = session.rounds.length;
+        final updatedAt = TimeFormatUtils.formatTimestamp(session.updatedAt);
+        final preview = _buildLatestPreview(session);
+
+        return Slidable(
+          key: ValueKey(fileName),
+          endActionPane: ActionPane(
+            motion: const DrawerMotion(),
+            extentRatio: 0.34,
             children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: AppTokens.surfaceSoft,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTokens.border),
-                ),
+              CustomSlidableAction(
+                onPressed: (_) => onRename(session),
+                backgroundColor: AppTokens.info,
+                borderRadius: AppTokens.brLg,
                 child: const Icon(
-                  Icons.forum_outlined,
-                  color: AppTokens.textSecondary,
+                  Icons.edit_outlined,
+                  color: Colors.white,
                 ),
               ),
-              const SizedBox(width: AppTokens.space12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      session.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                    const SizedBox(height: 8),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _PreviewLine(
-                          label: 'YOU',
-                          text: preview.userPreview,
-                          color: AppTokens.info,
-                        ),
-                        const SizedBox(height: 4),
-                        _PreviewLine(
-                          label: 'AI',
-                          text: preview.aiPreview,
-                          color: AppTokens.success,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        AppBadge.info(
-                          '$roundCount 轮',
-                          icon: Icons.chat_bubble_outline,
-                        ),
-                        AppBadge.primary(
-                          updatedAt,
-                          icon: Icons.schedule_outlined,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppTokens.space8),
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: AppTokens.surfaceSoft,
-                  borderRadius: AppTokens.brMd,
-                  border: Border.all(color: AppTokens.border),
-                ),
+              CustomSlidableAction(
+                onPressed: (_) => onDelete(session),
+                backgroundColor: AppTokens.danger,
+                borderRadius: AppTokens.brLg,
                 child: const Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppTokens.textSecondary,
+                  Icons.delete_outline,
+                  color: Colors.white,
                 ),
               ),
             ],
           ),
-        ),
-      ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ChatPage(
+                      fileName: fileName,
+                    ),
+                  ),
+                );
+              },
+              borderRadius: AppTokens.brLg,
+              child: AppCard(
+                padding: const EdgeInsets.all(16),
+                boxShadow: AppTokens.shadowSm,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: AppTokens.surfaceSoft,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppTokens.border),
+                      ),
+                      child: const Icon(
+                        Icons.forum_outlined,
+                        color: AppTokens.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(width: AppTokens.space12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  session.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                ),
+                              ),
+                              if (isStreaming) ...[
+                                const SizedBox(width: 8),
+                                AppBadge.info(
+                                  '生成中',
+                                  icon: Icons.bolt_outlined,
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _PreviewLine(
+                                label: 'YOU',
+                                text: preview.userPreview,
+                                color: AppTokens.info,
+                              ),
+                              const SizedBox(height: 4),
+                              _PreviewLine(
+                                label: 'AI',
+                                text: preview.aiPreview,
+                                color: AppTokens.success,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              AppBadge.info(
+                                '$roundCount 轮',
+                                icon: Icons.chat_bubble_outline,
+                              ),
+                              AppBadge.primary(
+                                updatedAt,
+                                icon: Icons.schedule_outlined,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppTokens.space8),
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: AppTokens.surfaceSoft,
+                        borderRadius: AppTokens.brMd,
+                        border: Border.all(color: AppTokens.border),
+                      ),
+                      child: const Icon(
+                        Icons.chevron_right_rounded,
+                        color: AppTokens.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -545,17 +509,13 @@ class _SessionCard extends StatelessWidget {
         aiPreview: '等待助手回复',
       );
     }
-
     final latest = session.rounds.last;
-
     final user = latest.userContent.trim().isEmpty
         ? '（空输入）'
         : latest.userContent.trim();
-
     final ai = (latest.assistantContent ?? '').trim().isEmpty
         ? '（等待回复）'
         : latest.assistantContent!.trim();
-
     return _SessionPreview(
       userPreview: user,
       aiPreview: ai,

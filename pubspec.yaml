@@ -38,6 +38,8 @@ dependencies:
   # ========== 基础 UI 组件 ==========
   cupertino_icons: ^1.0.8
 
+  share_plus: ^10.0.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -63,7 +65,7 @@ dev_dependencies:
   file_picker: ^8.1.2
 
   synchronized: ^3.3.0
-  
+
 flutter:
   uses-material-design: true
 

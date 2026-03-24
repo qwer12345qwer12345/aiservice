@@ -33,6 +33,22 @@ class ChatRoundFactory {
     );
   }
 
+  static ChatRound createEditedRetryRound({
+    required ChatRound sourceRound,
+    required String newContent,
+    required List<Attachment> attachments,
+  }) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return ChatRound(
+      id: IdGenerator.generate(),
+      parentId: sourceRound.parentId,
+      createdAt: now,
+      userContent: newContent,
+      userAttachments: attachments,
+      isIncomplete: true,
+    );
+  }
+
   static ChatRound completeRound({
     required ChatRound round,
     required String content,

@@ -25,7 +25,11 @@ class AppPageScaffold extends StatelessWidget {
       backgroundColor: backgroundColor ?? AppTokens.bg,
       appBar: appBar,
       bottomNavigationBar: bottomNavigationBar,
-      body: content,
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        child: content,
+      ),
     );
   }
 }

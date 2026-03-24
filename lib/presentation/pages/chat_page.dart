@@ -2,16 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/attachment.dart';
+import '../../core/models/chat_round.dart';
 import '../../core/utils/time_format_utils.dart';
 import '../models/pending_attachment.dart';
 import '../providers/chat_notifier.dart';
+import '../providers/input_draft_provider.dart';
 import '../themes/app_tokens.dart';
 import '../widgets/attachment_list.dart';
 import '../widgets/input_bar.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/thought_bubble.dart';
 import '../widgets/common/app_card.dart';
-import '../widgets/common/app_badge.dart';
 import '../widgets/common/app_page_scaffold.dart';
 import 'branch_tree_page.dart';
 
@@ -32,15 +33,17 @@ class ChatPage extends ConsumerStatefulWidget {
 }
 
 class _ChatPageState extends ConsumerState<ChatPage> {
-  final ScrollController _scrollController = ScrollController();
+  late final PageController _pageController;
   bool _initialMessageHandled = false;
+  bool _isSyncingPageFromState = false;
 
   @override
   void initState() {
     super.initState();
+    _pageController = PageController();
+
     Future.microtask(() async {
       await ref.read(chatProvider(widget.fileName).notifier).loadSession();
-
       final message = widget.initialMessage?.trim() ?? '';
       final attachments =
           widget.initialAttachments ?? const <PendingAttachment>[];
@@ -61,15 +64,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   @override
   void dispose() {
-    _scrollController.dispose();
+    _pageController.dispose();
     super.dispose();
-  }
-
-  void _scrollToTop() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollController.hasClients) return;
-      _scrollController.jumpTo(0);
-    });
   }
 
   Future<void> _copyText(String text) async {
@@ -80,63 +76,111 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     );
   }
 
+  void _enterEditMode(String roundId, String text) {
+    ref.read(globalInputDraftProvider.notifier).state = text;
+    ref.read(globalEditSourceRoundIdProvider.notifier).state = roundId;
+    FocusScope.of(context).unfocus();
+  }
+
+  void _cancelEditMode() {
+    ref.read(globalEditSourceRoundIdProvider.notifier).state = null;
+  }
+
+  void _syncPageController(int targetIndex) {
+    if (!_pageController.hasClients) return;
+    final currentPage = _pageController.page?.round() ?? _pageController.initialPage;
+    if (currentPage == targetIndex) return;
+
+    _isSyncingPageFromState = true;
+    _pageController
+        .animateToPage(
+          targetIndex,
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOutCubic,
+        )
+        .whenComplete(() {
+      _isSyncingPageFromState = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(chatProvider(widget.fileName));
     final notifier = ref.read(chatProvider(widget.fileName).notifier);
+    final editSourceRoundId = ref.watch(globalEditSourceRoundIdProvider);
+    final isEditMode = editSourceRoundId != null;
 
     final hasPages =
         state.pageList != null && state.pageList!.pages.isNotEmpty;
-    final currentPage = hasPages
-        ? state.pageList!.pages[state.pageList!.currentPageIndex]
-        : null;
-    final round = currentPage?.round;
+    final currentIndex = hasPages ? state.pageList!.currentPageIndex : 0;
 
-    final currentStreamStatus =
-        round != null ? state.activeStreams[round.id] : null;
-    final isViewingStreamingRound = currentStreamStatus != null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!hasPages) return;
+      if (_isSyncingPageFromState) return;
+      _syncPageController(currentIndex);
+    });
 
     return AppPageScaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              state.session?.title ?? '对话',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              'AI 对话工作台',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
+        title: Text(
+          state.session?.title ?? '对话',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
         ),
         actions: [
           if (state.session != null)
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: IconButton(
-                tooltip: '查看分支树',
+                tooltip: isEditMode ? '编辑模式下不可切换页面' : '查看分支树',
                 icon: const Icon(Icons.account_tree_outlined),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => BranchTreePage(
-                        session: state.session!,
-                        fileName: widget.fileName,
-                      ),
-                    ),
-                  );
-                },
+                onPressed: isEditMode
+                    ? null
+                    : () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => BranchTreePage(
+                              session: state.session!,
+                              fileName: widget.fileName,
+                            ),
+                          ),
+                        );
+                      },
               ),
             ),
         ],
       ),
       body: Column(
         children: [
+          if (state.pageList != null && state.pageList!.totalPages > 0)
+            _PaginationBar(
+              currentIndex: state.pageList!.currentPageIndex,
+              totalPages: state.pageList!.totalPages,
+              onPrev: isEditMode
+                  ? null
+                  : state.pageList!.currentPageIndex > 0
+                      ? () => _pageController.previousPage(
+                            duration: const Duration(milliseconds: 260),
+                            curve: Curves.easeOutCubic,
+                          )
+                      : null,
+              onNext: isEditMode
+                  ? null
+                  : state.pageList!.currentPageIndex <
+                          state.pageList!.totalPages - 1
+                      ? () => _pageController.nextPage(
+                            duration: const Duration(milliseconds: 260),
+                            curve: Curves.easeOutCubic,
+                          )
+                      : null,
+              isEditMode: isEditMode,
+            ),
+          if (isEditMode)
+            _EditModeBanner(
+              onCancel: _cancelEditMode,
+            ),
           Expanded(
             child: state.isLoading
                 ? const Center(child: CircularProgressIndicator())
@@ -144,64 +188,65 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     ? _buildErrorState(state.error ?? '会话不存在')
                     : !hasPages && state.activeStreams.isEmpty
                         ? _buildWelcomeEmpty(context)
-                        : ListView(
-                            controller: _scrollController,
-                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                            children: [
-                              if (round != null)
-                                _buildRoundCard(
-                                  context,
-                                  userContent: round.userContent,
-                                  attachments: round.userAttachments,
-                                  createdAt: round.createdAt,
-                                  onRetryReply: () =>
-                                      notifier.retryFromRound(round.id),
-                                  thinking: isViewingStreamingRound
-                                      ? currentStreamStatus.reasoning
-                                      : round.assistantThinking,
-                                  assistantContent: isViewingStreamingRound
-                                      ? currentStreamStatus.content
-                                      : round.assistantContent,
-                                  isStreaming: isViewingStreamingRound,
-                                ),
-                              if ((state.error ?? '').trim().isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 16),
-                                  child: _InlineErrorCard(
-                                    message: state.error!,
-                                  ),
-                                ),
-                            ],
+                        : PageView.builder(
+                            controller: _pageController,
+                            physics: isEditMode
+                                ? const NeverScrollableScrollPhysics()
+                                : const PageScrollPhysics(),
+                            itemCount: state.pageList?.pages.length ?? 0,
+                            onPageChanged: (index) {
+                              if (state.pageList == null) return;
+                              if (index == state.pageList!.currentPageIndex) {
+                                return;
+                              }
+                              notifier.changePage(index);
+                            },
+                            itemBuilder: (context, index) {
+                              final round = state.pageList!.pages[index].round;
+                              final canEdit =
+                                  !state.activeStreams.containsKey(round.id);
+
+                              return _ChatRoundPage(
+                                key: ValueKey(round.id),
+                                fileName: widget.fileName,
+                                round: round,
+                                canEdit: canEdit,
+                                errorMessage:
+                                    index == currentIndex ? state.error : null,
+                                onRetryReply: () =>
+                                    notifier.retryFromRound(round.id),
+                                onEdit: canEdit
+                                    ? () => _enterEditMode(
+                                          round.id,
+                                          round.userContent,
+                                        )
+                                    : null,
+                                onCopyText: _copyText,
+                              );
+                            },
                           ),
           ),
-          if (state.pageList != null && state.pageList!.totalPages > 0)
-            _PaginationBar(
-              currentIndex: state.pageList!.currentPageIndex,
-              totalPages: state.pageList!.totalPages,
-              onPrev: state.pageList!.currentPageIndex > 0
-                  ? () {
-                      notifier.changePage(
-                        state.pageList!.currentPageIndex - 1,
-                      );
-                      _scrollToTop();
-                    }
-                  : null,
-              onNext: state.pageList!.currentPageIndex <
-                      state.pageList!.totalPages - 1
-                  ? () {
-                      notifier.changePage(
-                        state.pageList!.currentPageIndex + 1,
-                      );
-                      _scrollToTop();
-                    }
-                  : null,
-            ),
           InputBar(
-            hintText: '发送消息，或附加图片/文件...',
-            isStreaming: isViewingStreamingRound,
+            hintText: isEditMode ? '修改文本后发送（保留原附件）' : '发送消息',
+            isStreaming: hasPages
+                ? state.activeStreams.containsKey(
+                    state.pageList!.pages[state.pageList!.currentPageIndex].round.id,
+                  )
+                : false,
             onStop: notifier.stopGeneration,
-            onSend: (text, attachments) {
-              notifier.sendMessage(text, attachments: attachments);
+            onSend: (text, attachments) async {
+              if (editSourceRoundId != null) {
+                await notifier.editAndResendFromRound(
+                  editSourceRoundId,
+                  text,
+                  attachments: attachments,
+                );
+                ref.read(globalEditSourceRoundIdProvider.notifier).state = null;
+                ref.read(globalInputDraftProvider.notifier).state = '';
+                ref.read(globalAttachmentDraftProvider.notifier).state = [];
+                return;
+              }
+              await notifier.sendMessage(text, attachments: attachments);
             },
           ),
         ],
@@ -279,143 +324,230 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       color: AppTokens.textSecondary,
                     ),
               ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                alignment: WrapAlignment.center,
-                children: [
-                  AppBadge.primary(
-                    '多轮上下文',
-                    icon: Icons.chat_bubble_outline,
-                  ),
-                  AppBadge.info(
-                    '附件输入',
-                    icon: Icons.attach_file_outlined,
-                  ),
-                  AppBadge.warning(
-                    '分支切换',
-                    icon: Icons.account_tree_outlined,
-                  ),
-                ],
-              ),
             ],
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildRoundCard(
-    BuildContext context, {
-    required String userContent,
-    required List<Attachment> attachments,
-    required int createdAt,
-    required VoidCallback onRetryReply,
-    String? thinking,
-    String? assistantContent,
-    bool isStreaming = false,
-  }) {
-    final hasUser = userContent.trim().isNotEmpty;
-    final hasAttachments = attachments.isNotEmpty;
+class _ChatRoundPage extends StatelessWidget {
+  final String fileName;
+  final ChatRound round;
+  final bool canEdit;
+  final String? errorMessage;
+  final VoidCallback onRetryReply;
+  final VoidCallback? onEdit;
+  final Future<void> Function(String text) onCopyText;
+
+  const _ChatRoundPage({
+    super.key,
+    required this.fileName,
+    required this.round,
+    required this.canEdit,
+    required this.errorMessage,
+    required this.onRetryReply,
+    required this.onEdit,
+    required this.onCopyText,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasUser = round.userContent.trim().isNotEmpty;
+    final hasAttachments = round.userAttachments.isNotEmpty;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      children: [
+        AppCard(
+          padding: const EdgeInsets.all(AppTokens.space16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _RoundHeader(createdAt: round.createdAt),
+              const SizedBox(height: AppTokens.space16),
+              const _SectionLabel(
+                icon: Icons.person_outline,
+                text: '你的输入',
+              ),
+              const SizedBox(height: AppTokens.space10),
+              if (hasUser)
+                MessageBubble(
+                  content: round.userContent,
+                  isUser: true,
+                  onCopy: () => onCopyText(round.userContent),
+                  onRetryReply: onRetryReply,
+                  onEdit: onEdit,
+                ),
+              if (hasAttachments) ...[
+                if (hasUser) const SizedBox(height: AppTokens.space8),
+                AttachmentList(
+                  attachments: round.userAttachments,
+                  rightAligned: true,
+                ),
+              ],
+              _RoundAnswerSection(
+                fileName: fileName,
+                roundId: round.id,
+                savedThinking: round.assistantThinking,
+                savedAssistantContent: round.assistantContent,
+                onRetryReply: onRetryReply,
+                onCopyText: onCopyText,
+              ),
+            ],
+          ),
+        ),
+        if ((errorMessage ?? '').trim().isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 16),
+            child: _InlineErrorCard(message: errorMessage!),
+          ),
+      ],
+    );
+  }
+}
+
+class _RoundAnswerSection extends ConsumerWidget {
+  final String fileName;
+  final String roundId;
+  final String? savedThinking;
+  final String? savedAssistantContent;
+  final VoidCallback onRetryReply;
+  final Future<void> Function(String text) onCopyText;
+
+  const _RoundAnswerSection({
+    required this.fileName,
+    required this.roundId,
+    required this.savedThinking,
+    required this.savedAssistantContent,
+    required this.onRetryReply,
+    required this.onCopyText,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(chatProvider(fileName));
+    final streamStatus = state.activeStreams[roundId];
+    final isStreaming = streamStatus != null;
+
+    final thinking = isStreaming ? streamStatus.reasoning : savedThinking;
+    final assistantContent =
+        isStreaming ? streamStatus.content : savedAssistantContent;
+
     final hasThinking = (thinking ?? '').trim().isNotEmpty;
     final hasAssistant = (assistantContent ?? '').trim().isNotEmpty;
 
-    return AppCard(
-      padding: const EdgeInsets.all(AppTokens.space16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _RoundHeader(
-            createdAt: createdAt,
-            isStreaming: isStreaming,
-          ),
+    if (!hasThinking && !hasAssistant && !isStreaming) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (hasThinking) ...[
+          const SizedBox(height: AppTokens.space20),
+          const Divider(),
           const SizedBox(height: AppTokens.space16),
           const _SectionLabel(
-            icon: Icons.person_outline,
-            text: '你的输入',
+            icon: Icons.psychology_alt_outlined,
+            text: '推理过程',
           ),
           const SizedBox(height: AppTokens.space10),
-          if (hasUser)
-            MessageBubble(
-              content: userContent,
-              isUser: true,
-              onCopy: () => _copyText(userContent),
-              onRetryReply: onRetryReply,
-            ),
-          if (hasAttachments) ...[
-            if (hasUser) const SizedBox(height: AppTokens.space8),
-            AttachmentList(attachments: attachments),
-          ],
-          if (hasThinking) ...[
-            const SizedBox(height: AppTokens.space20),
-            const Divider(),
-            const SizedBox(height: AppTokens.space16),
-            const _SectionLabel(
-              icon: Icons.psychology_alt_outlined,
-              text: '推理过程',
-            ),
-            const SizedBox(height: AppTokens.space10),
-            ThoughtBubble(content: thinking!),
-          ],
-          if (hasAssistant || isStreaming) ...[
-            const SizedBox(height: AppTokens.space20),
-            const Divider(),
-            const SizedBox(height: AppTokens.space16),
-            Row(
-              children: [
-                const Expanded(
-                  child: _SectionLabel(
-                    icon: Icons.smart_toy_outlined,
-                    text: '回答',
-                  ),
-                ),
-                if (isStreaming)
-                  AppBadge.info(
-                    '生成中',
-                    icon: Icons.bolt_outlined,
-                  ),
-              ],
-            ),
-            const SizedBox(height: AppTokens.space10),
-            if (hasAssistant)
-              MessageBubble(
-                content: assistantContent!,
-                isUser: false,
-                onCopy: () => _copyText(assistantContent),
-                onRetryReply: onRetryReply,
-              )
-            else
-              _buildTypingPlaceholder(),
-          ],
+          ThoughtBubble(content: thinking!),
         ],
-      ),
+        if (hasAssistant || isStreaming) ...[
+          const SizedBox(height: AppTokens.space20),
+          const Divider(),
+          const SizedBox(height: AppTokens.space16),
+          const _SectionLabel(
+            icon: Icons.smart_toy_outlined,
+            text: '回答',
+          ),
+          const SizedBox(height: AppTokens.space10),
+          if (hasAssistant)
+            MessageBubble(
+              content: assistantContent!,
+              isUser: false,
+              onCopy: () => onCopyText(assistantContent),
+              onRetryReply: onRetryReply,
+            )
+          else
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(AppTokens.space16),
+              decoration: BoxDecoration(
+                color: AppTokens.surfaceSoft,
+                borderRadius: AppTokens.brLg,
+                border: Border.all(color: AppTokens.border),
+              ),
+              child: Row(
+                children: const [
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: AppTokens.space12),
+                  Text(
+                    '正在生成回答...',
+                    style: TextStyle(
+                      color: AppTokens.textSecondary,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ],
     );
   }
+}
 
-  Widget _buildTypingPlaceholder() {
+class _EditModeBanner extends StatelessWidget {
+  final VoidCallback onCancel;
+
+  const _EditModeBanner({
+    required this.onCancel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppTokens.space16),
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 10,
+      ),
       decoration: BoxDecoration(
-        color: AppTokens.surfaceSoft,
-        borderRadius: AppTokens.brLg,
-        border: Border.all(color: AppTokens.border),
+        color: AppTokens.warningSoft,
+        borderRadius: AppTokens.brMd,
+        border: Border.all(
+          color: AppTokens.warning.withOpacity(0.18),
+        ),
       ),
       child: Row(
         children: [
-          const SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2),
+          const Icon(
+            Icons.edit_outlined,
+            size: 16,
+            color: AppTokens.warning,
           ),
-          const SizedBox(width: AppTokens.space12),
-          Text(
-            '正在生成回答...',
-            style: const TextStyle(
-              color: AppTokens.textSecondary,
-              fontSize: 14,
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '正在编辑重试，发送前不可切换页面，发送时将保留原附件',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTokens.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
+          ),
+          TextButton(
+            onPressed: onCancel,
+            child: const Text('取消编辑'),
           ),
         ],
       ),
@@ -425,11 +557,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
 class _RoundHeader extends StatelessWidget {
   final int createdAt;
-  final bool isStreaming;
 
   const _RoundHeader({
     required this.createdAt,
-    required this.isStreaming,
   });
 
   @override
@@ -453,12 +583,6 @@ class _RoundHeader extends StatelessWidget {
                 ),
           ),
         ),
-        const Spacer(),
-        if (isStreaming)
-          AppBadge.info(
-            '实时生成',
-            icon: Icons.graphic_eq_outlined,
-          ),
       ],
     );
   }
@@ -546,12 +670,14 @@ class _PaginationBar extends StatelessWidget {
   final int totalPages;
   final VoidCallback? onPrev;
   final VoidCallback? onNext;
+  final bool isEditMode;
 
   const _PaginationBar({
     required this.currentIndex,
     required this.totalPages,
     required this.onPrev,
     required this.onNext,
+    required this.isEditMode,
   });
 
   @override
@@ -563,7 +689,7 @@ class _PaginationBar extends StatelessWidget {
       decoration: const BoxDecoration(
         color: AppTokens.surface,
         border: Border(
-          top: BorderSide(color: AppTokens.border),
+          bottom: BorderSide(color: AppTokens.border),
         ),
       ),
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
@@ -579,7 +705,9 @@ class _PaginationBar extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  '第 ${currentIndex + 1} 页 / 共 $totalPages 页',
+                  isEditMode
+                      ? '编辑中｜第 ${currentIndex + 1} 页 / 共 $totalPages 页'
+                      : '第 ${currentIndex + 1} 页 / 共 $totalPages 页',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -623,7 +751,6 @@ class _PagerButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = onTap != null;
-
     return InkWell(
       onTap: onTap,
       borderRadius: AppTokens.brMd,
@@ -637,9 +764,7 @@ class _PagerButton extends StatelessWidget {
         ),
         child: Icon(
           icon,
-          color: enabled
-              ? AppTokens.textPrimary
-              : AppTokens.textTertiary,
+          color: enabled ? AppTokens.textPrimary : AppTokens.textTertiary,
         ),
       ),
     );
