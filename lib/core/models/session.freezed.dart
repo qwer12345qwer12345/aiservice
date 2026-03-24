@@ -27,6 +27,7 @@ mixin _$Session {
   int get updatedAt => throw _privateConstructorUsedError;
   List<ChatRound> get rounds => throw _privateConstructorUsedError;
   SessionConfig? get config => throw _privateConstructorUsedError;
+  bool get hasUnseenUpdate => throw _privateConstructorUsedError;
 
   /// Serializes this Session to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -49,6 +50,7 @@ abstract class $SessionCopyWith<$Res> {
     int updatedAt,
     List<ChatRound> rounds,
     SessionConfig? config,
+    bool hasUnseenUpdate,
   });
 
   $SessionConfigCopyWith<$Res>? get config;
@@ -75,6 +77,7 @@ class _$SessionCopyWithImpl<$Res, $Val extends Session>
     Object? updatedAt = null,
     Object? rounds = null,
     Object? config = freezed,
+    Object? hasUnseenUpdate = null,
   }) {
     return _then(
       _value.copyWith(
@@ -102,6 +105,10 @@ class _$SessionCopyWithImpl<$Res, $Val extends Session>
                 ? _value.config
                 : config // ignore: cast_nullable_to_non_nullable
                       as SessionConfig?,
+            hasUnseenUpdate: null == hasUnseenUpdate
+                ? _value.hasUnseenUpdate
+                : hasUnseenUpdate // ignore: cast_nullable_to_non_nullable
+                      as bool,
           )
           as $Val,
     );
@@ -137,6 +144,7 @@ abstract class _$$SessionImplCopyWith<$Res> implements $SessionCopyWith<$Res> {
     int updatedAt,
     List<ChatRound> rounds,
     SessionConfig? config,
+    bool hasUnseenUpdate,
   });
 
   @override
@@ -163,6 +171,7 @@ class __$$SessionImplCopyWithImpl<$Res>
     Object? updatedAt = null,
     Object? rounds = null,
     Object? config = freezed,
+    Object? hasUnseenUpdate = null,
   }) {
     return _then(
       _$SessionImpl(
@@ -190,6 +199,10 @@ class __$$SessionImplCopyWithImpl<$Res>
             ? _value.config
             : config // ignore: cast_nullable_to_non_nullable
                   as SessionConfig?,
+        hasUnseenUpdate: null == hasUnseenUpdate
+            ? _value.hasUnseenUpdate
+            : hasUnseenUpdate // ignore: cast_nullable_to_non_nullable
+                  as bool,
       ),
     );
   }
@@ -205,6 +218,7 @@ class _$SessionImpl implements _Session {
     required this.updatedAt,
     required final List<ChatRound> rounds,
     this.config,
+    this.hasUnseenUpdate = false,
   }) : _rounds = rounds;
 
   factory _$SessionImpl.fromJson(Map<String, dynamic> json) =>
@@ -228,10 +242,13 @@ class _$SessionImpl implements _Session {
 
   @override
   final SessionConfig? config;
+  @override
+  @JsonKey()
+  final bool hasUnseenUpdate;
 
   @override
   String toString() {
-    return 'Session(id: $id, title: $title, createdAt: $createdAt, updatedAt: $updatedAt, rounds: $rounds, config: $config)';
+    return 'Session(id: $id, title: $title, createdAt: $createdAt, updatedAt: $updatedAt, rounds: $rounds, config: $config, hasUnseenUpdate: $hasUnseenUpdate)';
   }
 
   @override
@@ -246,7 +263,9 @@ class _$SessionImpl implements _Session {
             (identical(other.updatedAt, updatedAt) ||
                 other.updatedAt == updatedAt) &&
             const DeepCollectionEquality().equals(other._rounds, _rounds) &&
-            (identical(other.config, config) || other.config == config));
+            (identical(other.config, config) || other.config == config) &&
+            (identical(other.hasUnseenUpdate, hasUnseenUpdate) ||
+                other.hasUnseenUpdate == hasUnseenUpdate));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -259,6 +278,7 @@ class _$SessionImpl implements _Session {
     updatedAt,
     const DeepCollectionEquality().hash(_rounds),
     config,
+    hasUnseenUpdate,
   );
 
   /// Create a copy of Session
@@ -283,6 +303,7 @@ abstract class _Session implements Session {
     required final int updatedAt,
     required final List<ChatRound> rounds,
     final SessionConfig? config,
+    final bool hasUnseenUpdate,
   }) = _$SessionImpl;
 
   factory _Session.fromJson(Map<String, dynamic> json) = _$SessionImpl.fromJson;
@@ -299,6 +320,8 @@ abstract class _Session implements Session {
   List<ChatRound> get rounds;
   @override
   SessionConfig? get config;
+  @override
+  bool get hasUnseenUpdate;
 
   /// Create a copy of Session
   /// with the given fields replaced by the non-null parameter values.

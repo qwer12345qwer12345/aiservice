@@ -4,6 +4,7 @@ import '../../core/models/api_message.dart';
 import '../../core/models/app_config.dart';
 import '../../core/models/chat_round.dart';
 import '../../core/models/model_info.dart';
+import '../../core/models/session.dart';
 import '../../di/providers.dart';
 import '../../domain/models/chat_page.dart';
 import '../../domain/services/attachment_preparer.dart';
@@ -27,13 +28,25 @@ class ChatNotifier extends StateNotifier<ChatState> {
     state = state.copyWithLoading(true);
     try {
       final repository = ref.read(conversationRepositoryProvider);
-      final session = await repository.getSession(fileName);
+      var session = await repository.getSession(fileName);
+
+      if (session.hasUnseenUpdate) {
+        final cleared = session.copyWith(hasUnseenUpdate: false);
+        await repository.saveSession(fileName, cleared);
+        session = cleared;
+      }
+
       final viewState = ChatViewStateBuilder.buildInitial(session);
+
       state = state.copyWithSession(session).copyWith(
             currentRoundId: viewState.currentRoundId,
             pageList: viewState.pageList,
             error: null,
           );
+
+      if (viewState.currentRoundId != null) {
+        await _markRoundSeen(viewState.currentRoundId!);
+      }
     } catch (e) {
       state = state.copyWithError(e.toString());
     }
@@ -47,6 +60,28 @@ class ChatNotifier extends StateNotifier<ChatState> {
     } else {
       current.remove(fileName);
     }
+    notifier.state = current;
+  }
+
+  void _updateStreamingPreview({
+    required String roundId,
+    required String content,
+    required String reasoning,
+  }) {
+    final notifier = ref.read(globalStreamingPreviewProvider.notifier);
+    final current = <String, StreamingPreview>{...notifier.state};
+    current[fileName] = StreamingPreview(
+      roundId: roundId,
+      content: content,
+      reasoning: reasoning,
+    );
+    notifier.state = current;
+  }
+
+  void _clearStreamingPreview() {
+    final notifier = ref.read(globalStreamingPreviewProvider.notifier);
+    final current = <String, StreamingPreview>{...notifier.state};
+    current.remove(fileName);
     notifier.state = current;
   }
 
@@ -74,6 +109,37 @@ class ChatNotifier extends StateNotifier<ChatState> {
     }
   }
 
+  Future<void> _markRoundSeen(String roundId) async {
+    final session = state.session;
+    if (session == null) return;
+
+    final target = session.rounds.firstWhereOrNull((r) => r.id == roundId);
+    if (target == null || !target.hasUnseenUpdate) return;
+
+    final updatedRound = target.copyWith(hasUnseenUpdate: false);
+    final updatedSession = session.copyWith(
+      rounds: session.rounds.map((r) {
+        if (r.id == roundId) return updatedRound;
+        return r;
+      }).toList(),
+    );
+
+    final repository = ref.read(conversationRepositoryProvider);
+    await repository.saveSession(fileName, updatedSession);
+
+    final updatedPageList = _replaceRoundInPageList(
+      state.pageList,
+      updatedRound,
+    );
+
+    state = state.copyWith(
+      session: updatedSession,
+      pageList: updatedPageList,
+    );
+
+    ref.invalidate(sessionCardProvider(fileName));
+  }
+
   Future<void> sendMessage(
     String content, {
     List<PendingAttachment>? attachments,
@@ -82,6 +148,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
       state = state.copyWithError('会话未初始化');
       return;
     }
+
     try {
       final pendingAttachments = attachments ?? const <PendingAttachment>[];
       final repository = ref.read(conversationRepositoryProvider);
@@ -108,6 +175,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
       final updatedSession = await repository.getSession(fileName);
       final contextRounds =
           BranchNavigator.getCurrentBranchPath(updatedSession, round.id);
+
       final apiContext = await ChatContextBuilder.buildFromRounds(
         contextRounds,
         repository,
@@ -124,12 +192,14 @@ class ChatNotifier extends StateNotifier<ChatState> {
       state = state.copyWithError('会话未初始化');
       return;
     }
+
     try {
       final repository = ref.read(conversationRepositoryProvider);
       final config = await ref.read(configRepositoryProvider).getConfig();
 
       final sourceRound =
           state.session!.rounds.firstWhereOrNull((round) => round.id == roundId);
+
       if (sourceRound == null) {
         state = state.copyWithError('未找到要重新回复的对话');
         return;
@@ -153,6 +223,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
       final updatedSession = await repository.getSession(fileName);
       final contextRounds =
           BranchNavigator.getCurrentBranchPath(updatedSession, newRound.id);
+
       final apiContext = await ChatContextBuilder.buildFromRounds(
         contextRounds,
         repository,
@@ -173,6 +244,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
       state = state.copyWithError('会话未初始化');
       return;
     }
+
     try {
       final repository = ref.read(conversationRepositoryProvider);
       final config = await ref.read(configRepositoryProvider).getConfig();
@@ -185,6 +257,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
       final sourceRound =
           state.session!.rounds.firstWhereOrNull((round) => round.id == roundId);
+
       if (sourceRound == null) {
         state = state.copyWithError('未找到要编辑重试的对话');
         return;
@@ -221,6 +294,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
       final updatedSession = await repository.getSession(fileName);
       final contextRounds =
           BranchNavigator.getCurrentBranchPath(updatedSession, newRound.id);
+
       final apiContext = await ChatContextBuilder.buildFromRounds(
         contextRounds,
         repository,
@@ -235,6 +309,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
   Future<void> _appendRoundAndEnterStreaming(ChatRound round) async {
     final repository = ref.read(conversationRepositoryProvider);
     await repository.appendRound(fileName, round);
+
     final updatedSession = await repository.getSession(fileName);
     final viewState = ChatViewStateBuilder.buildForRound(updatedSession, round.id);
 
@@ -249,6 +324,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
           activeStreams: newActiveStreams,
           error: null,
         );
+
+    ref.invalidate(sessionCardProvider(fileName));
   }
 
   Future<void> _handleStreamTask(
@@ -274,6 +351,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
       await for (final chunk in stream) {
         if (chunk.error != null) {
           _markSessionStreaming(false);
+          _clearStreamingPreview();
           ref.invalidate(sessionCardProvider(fileName));
           state = state.copyWithStreaming(round.id, error: chunk.error);
           return;
@@ -281,6 +359,13 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
         if (!chunk.isDone) {
           accumulator.add(chunk);
+
+          _updateStreamingPreview(
+            roundId: round.id,
+            content: accumulator.content,
+            reasoning: accumulator.reasoning,
+          );
+
           state = state.copyWithStreaming(
             round.id,
             content: accumulator.content,
@@ -292,19 +377,33 @@ class ChatNotifier extends StateNotifier<ChatState> {
         }
       }
 
-      final updatedRound = ChatRoundFactory.completeRound(
+      final completedRound = ChatRoundFactory.completeRound(
         round: round,
         content: accumulator.content,
         reasoning: accumulator.reasoning,
+      ).copyWith(
+        hasUnseenUpdate: true,
       );
 
       final repository = ref.read(conversationRepositoryProvider);
-      await repository.updateRound(fileName, round.id, updatedRound);
+      await repository.updateRound(fileName, round.id, completedRound);
 
-      final finalSession = await repository.getSession(fileName);
-      final finalPageList = _replaceRoundInCurrentPages(updatedRound);
+      final finalSessionRaw = await repository.getSession(fileName);
+      final finalSession = finalSessionRaw.copyWith(
+        hasUnseenUpdate: true,
+        rounds: finalSessionRaw.rounds.map((r) {
+          if (r.id == completedRound.id) return completedRound;
+          return r;
+        }).toList(),
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+      );
+
+      await repository.saveSession(fileName, finalSession);
+
+      final finalPageList = _replaceRoundInCurrentPages(completedRound);
 
       _markSessionStreaming(false);
+      _clearStreamingPreview();
       ref.invalidate(sessionCardProvider(fileName));
 
       state = state.copyWithStreaming(round.id, isDone: true).copyWith(
@@ -314,6 +413,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
           );
     } catch (e) {
       _markSessionStreaming(false);
+      _clearStreamingPreview();
       ref.invalidate(sessionCardProvider(fileName));
       state = state.copyWithStreaming(round.id, error: e.toString());
     }
@@ -322,15 +422,23 @@ class ChatNotifier extends StateNotifier<ChatState> {
   ChatPageList? _replaceRoundInCurrentPages(ChatRound updatedRound) {
     final currentPageList = state.pageList;
     if (currentPageList == null) return null;
+    return _replaceRoundInPageList(currentPageList, updatedRound);
+  }
 
-    final updatedPages = currentPageList.pages.map((page) {
+  ChatPageList? _replaceRoundInPageList(
+    ChatPageList? pageList,
+    ChatRound updatedRound,
+  ) {
+    if (pageList == null) return null;
+
+    final updatedPages = pageList.pages.map((page) {
       if (page.round.id == updatedRound.id) {
         return page.copyWith(round: updatedRound);
       }
       return page;
     }).toList();
 
-    return currentPageList.copyWith(pages: updatedPages);
+    return pageList.copyWith(pages: updatedPages);
   }
 
   void stopGeneration() {
@@ -338,11 +446,14 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
     final viewingRound =
         state.pageList!.pages[state.pageList!.currentPageIndex].round;
+
     if (!state.activeStreams.containsKey(viewingRound.id)) return;
 
     final apiService = ref.read(apiServiceProvider);
     apiService.cancelRequest(viewingRound.id);
+
     _markSessionStreaming(false);
+    _clearStreamingPreview();
     ref.invalidate(sessionCardProvider(fileName));
   }
 
@@ -356,9 +467,11 @@ class ChatNotifier extends StateNotifier<ChatState> {
     state = state.copyWithCurrentRoundId(newRoundId).copyWith(
           pageList: viewState.pageList,
         );
+
+    await _markRoundSeen(newRoundId);
   }
 
-  void changePage(int pageIndex) {
+  Future<void> changePage(int pageIndex) async {
     if (state.pageList == null) return;
 
     final pages = state.pageList!.pages;
@@ -370,6 +483,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
     state = state.copyWithCurrentRoundId(newRoundId).copyWith(
           pageList: state.pageList!.copyWith(currentPageIndex: pageIndex),
         );
+
+    await _markRoundSeen(newRoundId);
   }
 }
 

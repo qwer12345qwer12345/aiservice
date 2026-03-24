@@ -13,6 +13,7 @@ class Session with _$Session {
     required int updatedAt,
     required List<ChatRound> rounds,
     SessionConfig? config,
+    @Default(false) bool hasUnseenUpdate,
   }) = _Session;
 
   factory Session.fromJson(Map<String, dynamic> json) => _$SessionFromJson(json);

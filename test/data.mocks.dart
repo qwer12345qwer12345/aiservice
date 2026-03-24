@@ -3,21 +3,22 @@
 // Do not manually edit this file.
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-import 'dart:async' as _i5;
-import 'dart:typed_data' as _i7;
+import 'dart:async' as _i6;
+import 'dart:typed_data' as _i8;
 
-import 'package:aiservice/core/interfaces/api_service.dart' as _i13;
-import 'package:aiservice/core/interfaces/config_service.dart' as _i14;
-import 'package:aiservice/core/interfaces/file_service.dart' as _i12;
-import 'package:aiservice/core/models/api_message.dart' as _i11;
-import 'package:aiservice/core/models/app_config.dart' as _i2;
-import 'package:aiservice/core/models/chat_chunk.dart' as _i10;
-import 'package:aiservice/core/models/model_info.dart' as _i9;
+import 'package:aiservice/core/interfaces/api_service.dart' as _i14;
+import 'package:aiservice/core/interfaces/config_service.dart' as _i15;
+import 'package:aiservice/core/interfaces/file_service.dart' as _i13;
+import 'package:aiservice/core/models/api_message.dart' as _i12;
+import 'package:aiservice/core/models/app_config.dart' as _i4;
+import 'package:aiservice/core/models/app_config_store.dart' as _i2;
+import 'package:aiservice/core/models/chat_chunk.dart' as _i11;
+import 'package:aiservice/core/models/model_info.dart' as _i10;
 import 'package:aiservice/core/models/session.dart' as _i3;
-import 'package:aiservice/data/data_sources/local_file_source.dart' as _i4;
-import 'package:aiservice/data/data_sources/remote_api_source.dart' as _i8;
+import 'package:aiservice/data/data_sources/local_file_source.dart' as _i5;
+import 'package:aiservice/data/data_sources/remote_api_source.dart' as _i9;
 import 'package:mockito/mockito.dart' as _i1;
-import 'package:mockito/src/dummies.dart' as _i6;
+import 'package:mockito/src/dummies.dart' as _i7;
 
 // ignore_for_file: type=lint
 // ignore_for_file: avoid_redundant_argument_values
@@ -33,8 +34,9 @@ import 'package:mockito/src/dummies.dart' as _i6;
 // ignore_for_file: camel_case_types
 // ignore_for_file: subtype_of_sealed_class
 
-class _FakeAppConfig_0 extends _i1.SmartFake implements _i2.AppConfig {
-  _FakeAppConfig_0(Object parent, Invocation parentInvocation)
+class _FakeAppConfigStore_0 extends _i1.SmartFake
+    implements _i2.AppConfigStore {
+  _FakeAppConfigStore_0(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
@@ -43,104 +45,109 @@ class _FakeSession_1 extends _i1.SmartFake implements _i3.Session {
     : super(parent, parentInvocation);
 }
 
+class _FakeAppConfig_2 extends _i1.SmartFake implements _i4.AppConfig {
+  _FakeAppConfig_2(Object parent, Invocation parentInvocation)
+    : super(parent, parentInvocation);
+}
+
 /// A class which mocks [ILocalFileSource].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockILocalFileSource extends _i1.Mock implements _i4.ILocalFileSource {
+class MockILocalFileSource extends _i1.Mock implements _i5.ILocalFileSource {
   MockILocalFileSource() {
     _i1.throwOnMissingStub(this);
   }
 
   @override
-  _i5.Future<String> get basePath =>
+  _i6.Future<String> get basePath =>
       (super.noSuchMethod(
             Invocation.getter(#basePath),
-            returnValue: _i5.Future<String>.value(
-              _i6.dummyValue<String>(this, Invocation.getter(#basePath)),
+            returnValue: _i6.Future<String>.value(
+              _i7.dummyValue<String>(this, Invocation.getter(#basePath)),
             ),
           )
-          as _i5.Future<String>);
+          as _i6.Future<String>);
 
   @override
-  _i5.Future<void> initDirectories() =>
+  _i6.Future<void> initDirectories() =>
       (super.noSuchMethod(
             Invocation.method(#initDirectories, []),
-            returnValue: _i5.Future<void>.value(),
-            returnValueForMissingStub: _i5.Future<void>.value(),
+            returnValue: _i6.Future<void>.value(),
+            returnValueForMissingStub: _i6.Future<void>.value(),
           )
-          as _i5.Future<void>);
+          as _i6.Future<void>);
 
   @override
-  _i5.Future<String> readTextFile(String? relativePath) =>
+  _i6.Future<String> readTextFile(String? relativePath) =>
       (super.noSuchMethod(
             Invocation.method(#readTextFile, [relativePath]),
-            returnValue: _i5.Future<String>.value(
-              _i6.dummyValue<String>(
+            returnValue: _i6.Future<String>.value(
+              _i7.dummyValue<String>(
                 this,
                 Invocation.method(#readTextFile, [relativePath]),
               ),
             ),
           )
-          as _i5.Future<String>);
+          as _i6.Future<String>);
 
   @override
-  _i5.Future<void> writeTextFile(String? relativePath, String? content) =>
+  _i6.Future<void> writeTextFile(String? relativePath, String? content) =>
       (super.noSuchMethod(
             Invocation.method(#writeTextFile, [relativePath, content]),
-            returnValue: _i5.Future<void>.value(),
-            returnValueForMissingStub: _i5.Future<void>.value(),
+            returnValue: _i6.Future<void>.value(),
+            returnValueForMissingStub: _i6.Future<void>.value(),
           )
-          as _i5.Future<void>);
+          as _i6.Future<void>);
 
   @override
-  _i5.Future<void> deleteFile(String? relativePath) =>
+  _i6.Future<void> deleteFile(String? relativePath) =>
       (super.noSuchMethod(
             Invocation.method(#deleteFile, [relativePath]),
-            returnValue: _i5.Future<void>.value(),
-            returnValueForMissingStub: _i5.Future<void>.value(),
+            returnValue: _i6.Future<void>.value(),
+            returnValueForMissingStub: _i6.Future<void>.value(),
           )
-          as _i5.Future<void>);
+          as _i6.Future<void>);
 
   @override
-  _i5.Future<List<String>> listFiles(String? directory) =>
+  _i6.Future<List<String>> listFiles(String? directory) =>
       (super.noSuchMethod(
             Invocation.method(#listFiles, [directory]),
-            returnValue: _i5.Future<List<String>>.value(<String>[]),
+            returnValue: _i6.Future<List<String>>.value(<String>[]),
           )
-          as _i5.Future<List<String>>);
+          as _i6.Future<List<String>>);
 
   @override
-  _i5.Future<String> saveAttachment(_i7.Uint8List? data, String? fileName) =>
+  _i6.Future<String> saveAttachment(_i8.Uint8List? data, String? fileName) =>
       (super.noSuchMethod(
             Invocation.method(#saveAttachment, [data, fileName]),
-            returnValue: _i5.Future<String>.value(
-              _i6.dummyValue<String>(
+            returnValue: _i6.Future<String>.value(
+              _i7.dummyValue<String>(
                 this,
                 Invocation.method(#saveAttachment, [data, fileName]),
               ),
             ),
           )
-          as _i5.Future<String>);
+          as _i6.Future<String>);
 
   @override
-  _i5.Future<_i7.Uint8List> readAttachment(String? relativePath) =>
+  _i6.Future<_i8.Uint8List> readAttachment(String? relativePath) =>
       (super.noSuchMethod(
             Invocation.method(#readAttachment, [relativePath]),
-            returnValue: _i5.Future<_i7.Uint8List>.value(_i7.Uint8List(0)),
+            returnValue: _i6.Future<_i8.Uint8List>.value(_i8.Uint8List(0)),
           )
-          as _i5.Future<_i7.Uint8List>);
+          as _i6.Future<_i8.Uint8List>);
 }
 
 /// A class which mocks [IRemoteApiSource].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockIRemoteApiSource extends _i1.Mock implements _i8.IRemoteApiSource {
+class MockIRemoteApiSource extends _i1.Mock implements _i9.IRemoteApiSource {
   MockIRemoteApiSource() {
     _i1.throwOnMissingStub(this);
   }
 
   @override
-  _i5.Future<List<_i9.ModelInfo>> fetchModels({
+  _i6.Future<List<_i10.ModelInfo>> fetchModels({
     required String? baseUrl,
     required String? apiKey,
     required String? modelsPath,
@@ -151,21 +158,21 @@ class MockIRemoteApiSource extends _i1.Mock implements _i8.IRemoteApiSource {
               #apiKey: apiKey,
               #modelsPath: modelsPath,
             }),
-            returnValue: _i5.Future<List<_i9.ModelInfo>>.value(
-              <_i9.ModelInfo>[],
+            returnValue: _i6.Future<List<_i10.ModelInfo>>.value(
+              <_i10.ModelInfo>[],
             ),
           )
-          as _i5.Future<List<_i9.ModelInfo>>);
+          as _i6.Future<List<_i10.ModelInfo>>);
 
   @override
-  _i5.Stream<_i10.ChatChunk> chatStream({
+  _i6.Stream<_i11.ChatChunk> chatStream({
     required String? taskId,
     required String? baseUrl,
     required String? apiKey,
     required String? chatPath,
     required String? apiMode,
     required String? model,
-    required List<_i11.ApiMessage>? context,
+    required List<_i12.ApiMessage>? context,
     bool? enableReasoning = false,
   }) =>
       (super.noSuchMethod(
@@ -179,9 +186,9 @@ class MockIRemoteApiSource extends _i1.Mock implements _i8.IRemoteApiSource {
               #context: context,
               #enableReasoning: enableReasoning,
             }),
-            returnValue: _i5.Stream<_i10.ChatChunk>.empty(),
+            returnValue: _i6.Stream<_i11.ChatChunk>.empty(),
           )
-          as _i5.Stream<_i10.ChatChunk>);
+          as _i6.Stream<_i11.ChatChunk>);
 
   @override
   void cancelRequest(String? taskId) => super.noSuchMethod(
@@ -193,116 +200,110 @@ class MockIRemoteApiSource extends _i1.Mock implements _i8.IRemoteApiSource {
 /// A class which mocks [IFileService].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockIFileService extends _i1.Mock implements _i12.IFileService {
+class MockIFileService extends _i1.Mock implements _i13.IFileService {
   MockIFileService() {
     _i1.throwOnMissingStub(this);
   }
 
   @override
-  _i5.Future<_i2.AppConfig> readConfig() =>
+  _i6.Future<_i2.AppConfigStore> readConfigStore() =>
       (super.noSuchMethod(
-            Invocation.method(#readConfig, []),
-            returnValue: _i5.Future<_i2.AppConfig>.value(
-              _FakeAppConfig_0(this, Invocation.method(#readConfig, [])),
+            Invocation.method(#readConfigStore, []),
+            returnValue: _i6.Future<_i2.AppConfigStore>.value(
+              _FakeAppConfigStore_0(
+                this,
+                Invocation.method(#readConfigStore, []),
+              ),
             ),
           )
-          as _i5.Future<_i2.AppConfig>);
+          as _i6.Future<_i2.AppConfigStore>);
 
   @override
-  _i5.Future<void> writeConfig(_i2.AppConfig? config) =>
+  _i6.Future<void> writeConfigStore(_i2.AppConfigStore? store) =>
       (super.noSuchMethod(
-            Invocation.method(#writeConfig, [config]),
-            returnValue: _i5.Future<void>.value(),
-            returnValueForMissingStub: _i5.Future<void>.value(),
+            Invocation.method(#writeConfigStore, [store]),
+            returnValue: _i6.Future<void>.value(),
+            returnValueForMissingStub: _i6.Future<void>.value(),
           )
-          as _i5.Future<void>);
+          as _i6.Future<void>);
 
   @override
-  _i5.Future<List<String>> getConversationFileList() =>
+  _i6.Future<List<String>> getConversationFileList() =>
       (super.noSuchMethod(
             Invocation.method(#getConversationFileList, []),
-            returnValue: _i5.Future<List<String>>.value(<String>[]),
+            returnValue: _i6.Future<List<String>>.value(<String>[]),
           )
-          as _i5.Future<List<String>>);
+          as _i6.Future<List<String>>);
 
   @override
-  _i5.Future<_i3.Session> readSession(String? fileName) =>
+  _i6.Future<_i3.Session> readSession(String? fileName) =>
       (super.noSuchMethod(
             Invocation.method(#readSession, [fileName]),
-            returnValue: _i5.Future<_i3.Session>.value(
+            returnValue: _i6.Future<_i3.Session>.value(
               _FakeSession_1(this, Invocation.method(#readSession, [fileName])),
             ),
           )
-          as _i5.Future<_i3.Session>);
+          as _i6.Future<_i3.Session>);
 
   @override
-  _i5.Future<void> writeSession(String? fileName, _i3.Session? session) =>
+  _i6.Future<void> writeSession(String? fileName, _i3.Session? session) =>
       (super.noSuchMethod(
             Invocation.method(#writeSession, [fileName, session]),
-            returnValue: _i5.Future<void>.value(),
-            returnValueForMissingStub: _i5.Future<void>.value(),
+            returnValue: _i6.Future<void>.value(),
+            returnValueForMissingStub: _i6.Future<void>.value(),
           )
-          as _i5.Future<void>);
+          as _i6.Future<void>);
 
   @override
-  _i5.Future<void> deleteSession(String? fileName) =>
+  _i6.Future<void> deleteSession(String? fileName) =>
       (super.noSuchMethod(
             Invocation.method(#deleteSession, [fileName]),
-            returnValue: _i5.Future<void>.value(),
-            returnValueForMissingStub: _i5.Future<void>.value(),
+            returnValue: _i6.Future<void>.value(),
+            returnValueForMissingStub: _i6.Future<void>.value(),
           )
-          as _i5.Future<void>);
+          as _i6.Future<void>);
 
   @override
-  _i5.Future<void> renameSession(String? oldName, String? newName) =>
-      (super.noSuchMethod(
-            Invocation.method(#renameSession, [oldName, newName]),
-            returnValue: _i5.Future<void>.value(),
-            returnValueForMissingStub: _i5.Future<void>.value(),
-          )
-          as _i5.Future<void>);
-
-  @override
-  _i5.Future<String> saveAttachment(_i7.Uint8List? data, String? fileName) =>
+  _i6.Future<String> saveAttachment(_i8.Uint8List? data, String? fileName) =>
       (super.noSuchMethod(
             Invocation.method(#saveAttachment, [data, fileName]),
-            returnValue: _i5.Future<String>.value(
-              _i6.dummyValue<String>(
+            returnValue: _i6.Future<String>.value(
+              _i7.dummyValue<String>(
                 this,
                 Invocation.method(#saveAttachment, [data, fileName]),
               ),
             ),
           )
-          as _i5.Future<String>);
+          as _i6.Future<String>);
 
   @override
-  _i5.Future<_i7.Uint8List> readAttachment(String? relativePath) =>
+  _i6.Future<_i8.Uint8List> readAttachment(String? relativePath) =>
       (super.noSuchMethod(
             Invocation.method(#readAttachment, [relativePath]),
-            returnValue: _i5.Future<_i7.Uint8List>.value(_i7.Uint8List(0)),
+            returnValue: _i6.Future<_i8.Uint8List>.value(_i8.Uint8List(0)),
           )
-          as _i5.Future<_i7.Uint8List>);
+          as _i6.Future<_i8.Uint8List>);
 
   @override
-  _i5.Future<void> deleteAttachment(String? relativePath) =>
+  _i6.Future<void> deleteAttachment(String? relativePath) =>
       (super.noSuchMethod(
             Invocation.method(#deleteAttachment, [relativePath]),
-            returnValue: _i5.Future<void>.value(),
-            returnValueForMissingStub: _i5.Future<void>.value(),
+            returnValue: _i6.Future<void>.value(),
+            returnValueForMissingStub: _i6.Future<void>.value(),
           )
-          as _i5.Future<void>);
+          as _i6.Future<void>);
 }
 
 /// A class which mocks [IApiService].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockIApiService extends _i1.Mock implements _i13.IApiService {
+class MockIApiService extends _i1.Mock implements _i14.IApiService {
   MockIApiService() {
     _i1.throwOnMissingStub(this);
   }
 
   @override
-  _i5.Future<List<_i9.ModelInfo>> fetchModels({
+  _i6.Future<List<_i10.ModelInfo>> fetchModels({
     required String? baseUrl,
     required String? apiKey,
     required String? modelsPath,
@@ -313,21 +314,21 @@ class MockIApiService extends _i1.Mock implements _i13.IApiService {
               #apiKey: apiKey,
               #modelsPath: modelsPath,
             }),
-            returnValue: _i5.Future<List<_i9.ModelInfo>>.value(
-              <_i9.ModelInfo>[],
+            returnValue: _i6.Future<List<_i10.ModelInfo>>.value(
+              <_i10.ModelInfo>[],
             ),
           )
-          as _i5.Future<List<_i9.ModelInfo>>);
+          as _i6.Future<List<_i10.ModelInfo>>);
 
   @override
-  _i5.Stream<_i10.ChatChunk> chatStream({
+  _i6.Stream<_i11.ChatChunk> chatStream({
     required String? taskId,
     required String? baseUrl,
     required String? apiKey,
     required String? chatPath,
     required String? apiMode,
     required String? model,
-    required List<_i11.ApiMessage>? context,
+    required List<_i12.ApiMessage>? context,
     bool? enableReasoning = false,
   }) =>
       (super.noSuchMethod(
@@ -341,9 +342,9 @@ class MockIApiService extends _i1.Mock implements _i13.IApiService {
               #context: context,
               #enableReasoning: enableReasoning,
             }),
-            returnValue: _i5.Stream<_i10.ChatChunk>.empty(),
+            returnValue: _i6.Stream<_i11.ChatChunk>.empty(),
           )
-          as _i5.Stream<_i10.ChatChunk>);
+          as _i6.Stream<_i11.ChatChunk>);
 
   @override
   void cancelRequest(String? taskId) => super.noSuchMethod(
@@ -355,36 +356,108 @@ class MockIApiService extends _i1.Mock implements _i13.IApiService {
 /// A class which mocks [IConfigService].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockIConfigService extends _i1.Mock implements _i14.IConfigService {
+class MockIConfigService extends _i1.Mock implements _i15.IConfigService {
   MockIConfigService() {
     _i1.throwOnMissingStub(this);
   }
 
   @override
-  _i5.Future<_i2.AppConfig> loadConfig() =>
+  _i6.Future<_i2.AppConfigStore> loadConfigStore() =>
       (super.noSuchMethod(
-            Invocation.method(#loadConfig, []),
-            returnValue: _i5.Future<_i2.AppConfig>.value(
-              _FakeAppConfig_0(this, Invocation.method(#loadConfig, [])),
+            Invocation.method(#loadConfigStore, []),
+            returnValue: _i6.Future<_i2.AppConfigStore>.value(
+              _FakeAppConfigStore_0(
+                this,
+                Invocation.method(#loadConfigStore, []),
+              ),
             ),
           )
-          as _i5.Future<_i2.AppConfig>);
+          as _i6.Future<_i2.AppConfigStore>);
 
   @override
-  _i5.Future<void> saveConfig(_i2.AppConfig? config) =>
+  _i6.Future<_i4.AppConfig> loadConfig() =>
+      (super.noSuchMethod(
+            Invocation.method(#loadConfig, []),
+            returnValue: _i6.Future<_i4.AppConfig>.value(
+              _FakeAppConfig_2(this, Invocation.method(#loadConfig, [])),
+            ),
+          )
+          as _i6.Future<_i4.AppConfig>);
+
+  @override
+  _i6.Future<void> saveConfig(_i4.AppConfig? config) =>
       (super.noSuchMethod(
             Invocation.method(#saveConfig, [config]),
-            returnValue: _i5.Future<void>.value(),
-            returnValueForMissingStub: _i5.Future<void>.value(),
+            returnValue: _i6.Future<void>.value(),
+            returnValueForMissingStub: _i6.Future<void>.value(),
           )
-          as _i5.Future<void>);
+          as _i6.Future<void>);
 
   @override
-  _i5.Future<void> refreshModels() =>
+  _i6.Future<void> refreshModels() =>
       (super.noSuchMethod(
             Invocation.method(#refreshModels, []),
-            returnValue: _i5.Future<void>.value(),
-            returnValueForMissingStub: _i5.Future<void>.value(),
+            returnValue: _i6.Future<void>.value(),
+            returnValueForMissingStub: _i6.Future<void>.value(),
           )
-          as _i5.Future<void>);
+          as _i6.Future<void>);
+
+  @override
+  _i6.Future<List<_i2.ConfigProfile>> getProfiles() =>
+      (super.noSuchMethod(
+            Invocation.method(#getProfiles, []),
+            returnValue: _i6.Future<List<_i2.ConfigProfile>>.value(
+              <_i2.ConfigProfile>[],
+            ),
+          )
+          as _i6.Future<List<_i2.ConfigProfile>>);
+
+  @override
+  _i6.Future<String> getActiveProfileId() =>
+      (super.noSuchMethod(
+            Invocation.method(#getActiveProfileId, []),
+            returnValue: _i6.Future<String>.value(
+              _i7.dummyValue<String>(
+                this,
+                Invocation.method(#getActiveProfileId, []),
+              ),
+            ),
+          )
+          as _i6.Future<String>);
+
+  @override
+  _i6.Future<void> switchProfile(String? profileId) =>
+      (super.noSuchMethod(
+            Invocation.method(#switchProfile, [profileId]),
+            returnValue: _i6.Future<void>.value(),
+            returnValueForMissingStub: _i6.Future<void>.value(),
+          )
+          as _i6.Future<void>);
+
+  @override
+  _i6.Future<void> createProfile(String? name) =>
+      (super.noSuchMethod(
+            Invocation.method(#createProfile, [name]),
+            returnValue: _i6.Future<void>.value(),
+            returnValueForMissingStub: _i6.Future<void>.value(),
+          )
+          as _i6.Future<void>);
+
+  @override
+  _i6.Future<void> renameProfile(String? profileId, String? name) =>
+      (super.noSuchMethod(
+            Invocation.method(#renameProfile, [profileId, name]),
+            returnValue: _i6.Future<void>.value(),
+            returnValueForMissingStub: _i6.Future<void>.value(),
+          )
+          as _i6.Future<void>);
+
+  @override
+  _i6.Future<void> deleteProfile(String? profileId) =>
+      (super.noSuchMethod(
+            Invocation.method(#deleteProfile, [profileId]),
+            returnValue: _i6.Future<void>.value(),
+            returnValueForMissingStub: _i6.Future<void>.value(),
+          )
+          as _i6.Future<void>);
 }

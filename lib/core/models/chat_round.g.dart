@@ -20,6 +20,7 @@ _$ChatRoundImpl _$$ChatRoundImplFromJson(Map<String, dynamic> json) =>
       assistantThinking: json['assistantThinking'] as String?,
       assistantContent: json['assistantContent'] as String?,
       isIncomplete: json['isIncomplete'] as bool? ?? false,
+      hasUnseenUpdate: json['hasUnseenUpdate'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$$ChatRoundImplToJson(_$ChatRoundImpl instance) =>
@@ -32,4 +33,5 @@ Map<String, dynamic> _$$ChatRoundImplToJson(_$ChatRoundImpl instance) =>
       'assistantThinking': instance.assistantThinking,
       'assistantContent': instance.assistantContent,
       'isIncomplete': instance.isIncomplete,
+      'hasUnseenUpdate': instance.hasUnseenUpdate,
     };

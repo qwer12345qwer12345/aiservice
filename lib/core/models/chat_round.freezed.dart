@@ -29,6 +29,7 @@ mixin _$ChatRound {
   String? get assistantThinking => throw _privateConstructorUsedError;
   String? get assistantContent => throw _privateConstructorUsedError;
   bool get isIncomplete => throw _privateConstructorUsedError;
+  bool get hasUnseenUpdate => throw _privateConstructorUsedError;
 
   /// Serializes this ChatRound to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -54,6 +55,7 @@ abstract class $ChatRoundCopyWith<$Res> {
     String? assistantThinking,
     String? assistantContent,
     bool isIncomplete,
+    bool hasUnseenUpdate,
   });
 }
 
@@ -80,6 +82,7 @@ class _$ChatRoundCopyWithImpl<$Res, $Val extends ChatRound>
     Object? assistantThinking = freezed,
     Object? assistantContent = freezed,
     Object? isIncomplete = null,
+    Object? hasUnseenUpdate = null,
   }) {
     return _then(
       _value.copyWith(
@@ -115,6 +118,10 @@ class _$ChatRoundCopyWithImpl<$Res, $Val extends ChatRound>
                 ? _value.isIncomplete
                 : isIncomplete // ignore: cast_nullable_to_non_nullable
                       as bool,
+            hasUnseenUpdate: null == hasUnseenUpdate
+                ? _value.hasUnseenUpdate
+                : hasUnseenUpdate // ignore: cast_nullable_to_non_nullable
+                      as bool,
           )
           as $Val,
     );
@@ -139,6 +146,7 @@ abstract class _$$ChatRoundImplCopyWith<$Res>
     String? assistantThinking,
     String? assistantContent,
     bool isIncomplete,
+    bool hasUnseenUpdate,
   });
 }
 
@@ -164,6 +172,7 @@ class __$$ChatRoundImplCopyWithImpl<$Res>
     Object? assistantThinking = freezed,
     Object? assistantContent = freezed,
     Object? isIncomplete = null,
+    Object? hasUnseenUpdate = null,
   }) {
     return _then(
       _$ChatRoundImpl(
@@ -199,6 +208,10 @@ class __$$ChatRoundImplCopyWithImpl<$Res>
             ? _value.isIncomplete
             : isIncomplete // ignore: cast_nullable_to_non_nullable
                   as bool,
+        hasUnseenUpdate: null == hasUnseenUpdate
+            ? _value.hasUnseenUpdate
+            : hasUnseenUpdate // ignore: cast_nullable_to_non_nullable
+                  as bool,
       ),
     );
   }
@@ -216,6 +229,7 @@ class _$ChatRoundImpl implements _ChatRound {
     this.assistantThinking,
     this.assistantContent,
     this.isIncomplete = false,
+    this.hasUnseenUpdate = false,
   }) : _userAttachments = userAttachments;
 
   factory _$ChatRoundImpl.fromJson(Map<String, dynamic> json) =>
@@ -245,10 +259,13 @@ class _$ChatRoundImpl implements _ChatRound {
   @override
   @JsonKey()
   final bool isIncomplete;
+  @override
+  @JsonKey()
+  final bool hasUnseenUpdate;
 
   @override
   String toString() {
-    return 'ChatRound(id: $id, parentId: $parentId, createdAt: $createdAt, userContent: $userContent, userAttachments: $userAttachments, assistantThinking: $assistantThinking, assistantContent: $assistantContent, isIncomplete: $isIncomplete)';
+    return 'ChatRound(id: $id, parentId: $parentId, createdAt: $createdAt, userContent: $userContent, userAttachments: $userAttachments, assistantThinking: $assistantThinking, assistantContent: $assistantContent, isIncomplete: $isIncomplete, hasUnseenUpdate: $hasUnseenUpdate)';
   }
 
   @override
@@ -272,7 +289,9 @@ class _$ChatRoundImpl implements _ChatRound {
             (identical(other.assistantContent, assistantContent) ||
                 other.assistantContent == assistantContent) &&
             (identical(other.isIncomplete, isIncomplete) ||
-                other.isIncomplete == isIncomplete));
+                other.isIncomplete == isIncomplete) &&
+            (identical(other.hasUnseenUpdate, hasUnseenUpdate) ||
+                other.hasUnseenUpdate == hasUnseenUpdate));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -287,6 +306,7 @@ class _$ChatRoundImpl implements _ChatRound {
     assistantThinking,
     assistantContent,
     isIncomplete,
+    hasUnseenUpdate,
   );
 
   /// Create a copy of ChatRound
@@ -313,6 +333,7 @@ abstract class _ChatRound implements ChatRound {
     final String? assistantThinking,
     final String? assistantContent,
     final bool isIncomplete,
+    final bool hasUnseenUpdate,
   }) = _$ChatRoundImpl;
 
   factory _ChatRound.fromJson(Map<String, dynamic> json) =
@@ -334,6 +355,8 @@ abstract class _ChatRound implements ChatRound {
   String? get assistantContent;
   @override
   bool get isIncomplete;
+  @override
+  bool get hasUnseenUpdate;
 
   /// Create a copy of ChatRound
   /// with the given fields replaced by the non-null parameter values.

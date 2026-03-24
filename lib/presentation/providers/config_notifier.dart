@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/app_config.dart';
+import '../../core/models/app_config_store.dart';
 import '../../di/providers.dart';
 
 class ConfigNotifier extends StateNotifier<AsyncValue<AppConfig>> {
@@ -92,4 +93,56 @@ class ConfigNotifier extends StateNotifier<AsyncValue<AppConfig>> {
 final configProvider =
     StateNotifierProvider<ConfigNotifier, AsyncValue<AppConfig>>((ref) {
   return ConfigNotifier(ref);
+});
+
+class ConfigProfilesNotifier
+    extends StateNotifier<AsyncValue<AppConfigStore>> {
+  final Ref ref;
+
+  ConfigProfilesNotifier(this.ref) : super(const AsyncValue.loading()) {
+    load();
+  }
+
+  Future<void> load() async {
+    try {
+      final repository = ref.read(configRepositoryProvider);
+      final store = await repository.getConfigStore();
+      state = AsyncValue.data(store);
+
+      final config = await repository.getConfig();
+      ref.read(configProvider.notifier).state = AsyncValue.data(config);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> switchProfile(String profileId) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.switchProfile(profileId);
+    await load();
+  }
+
+  Future<void> createProfile(String name) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.createProfile(name);
+    await load();
+  }
+
+  Future<void> renameProfile(String profileId, String name) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.renameProfile(profileId, name);
+    await load();
+  }
+
+  Future<void> deleteProfile(String profileId) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.deleteProfile(profileId);
+    await load();
+  }
+}
+
+final configProfilesProvider =
+    StateNotifierProvider<ConfigProfilesNotifier, AsyncValue<AppConfigStore>>(
+        (ref) {
+  return ConfigProfilesNotifier(ref);
 });

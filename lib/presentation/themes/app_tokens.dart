@@ -24,18 +24,16 @@ abstract class AppTokens {
   // Status
   static const Color success = Color(0xFF10B981);
   static const Color successSoft = Color(0xFFECFDF5);
-
   static const Color warning = Color(0xFFF59E0B);
   static const Color warningSoft = Color(0xFFFFFBEB);
-
   static const Color danger = Color(0xFFEF4444);
   static const Color dangerSoft = Color(0xFFFEF2F2);
-
   static const Color info = Color(0xFF3B82F6);
   static const Color infoSoft = Color(0xFFEFF6FF);
 
   // Chat specific
-  static const Color userBubble = Color(0xFF111827);
+  static const Color userBubble = Color(0xFFEAF4FF);
+  static const Color userBubbleText = Color(0xFF0F172A);
   static const Color aiBubble = Colors.white;
   static const Color thoughtBubble = Color(0xFFFFFBEB);
 

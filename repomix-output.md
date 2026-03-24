@@ -98,9 +98,13 @@ lib/presentation/pages/branch_tree_page.dart
 lib/presentation/pages/chat_page.dart
 lib/presentation/pages/home_page.dart
 lib/presentation/pages/settings_page.dart
+lib/presentation/pages/text_attachment_viewer_page.dart
+lib/presentation/providers/attachment_bytes_provider.dart
 lib/presentation/providers/chat_notifier.dart
 lib/presentation/providers/config_notifier.dart
+lib/presentation/providers/global_streaming_provider.dart
 lib/presentation/providers/input_draft_provider.dart
+lib/presentation/providers/session_card_provider.dart
 lib/presentation/providers/session_list_notifier.dart
 lib/presentation/themes/app_theme.dart
 lib/presentation/themes/app_tokens.dart
@@ -3456,128 +3460,6 @@ abstract class TimeFormatUtils {
 }
 ```
 
-## File: lib/data/data_sources/local_file_source.dart
-```dart
-import 'dart:io';
-import 'dart:typed_data';
-import 'package:path/path.dart' as path;
-import 'package:uuid/uuid.dart';
-import '../../core/errors/exceptions.dart';
-import '../../core/constants/app_constants.dart';
-abstract class ILocalFileSource {
-  Future<String> get basePath;
-  Future<void> initDirectories();
-  Future<String> readTextFile(String relativePath);
-  Future<void> writeTextFile(String relativePath, String content);
-  Future<void> deleteFile(String relativePath);
-  Future<List<String>> listFiles(String directory);
-  Future<String> saveAttachment(Uint8List data, String fileName);
-  Future<Uint8List> readAttachment(String relativePath);
-}
-class LocalFileSource implements ILocalFileSource {
-  final String _baseDir;
-  final Directory _directory;
-  LocalFileSource(this._baseDir) : _directory = Directory(_baseDir);
-  @override
-  Future<String> get basePath async => _baseDir;
-  @override
-  Future<void> initDirectories() async {
-    await _directory.create(recursive: true);
-    await Directory(path.join(_baseDir, AppConstants.dirConversations))
-        .create(recursive: true);
-    await Directory(path.join(_baseDir, AppConstants.dirAttachments))
-        .create(recursive: true);
-  }
-  @override
-  Future<String> readTextFile(String relativePath) async {
-    try {
-      final file = File(path.join(_baseDir, relativePath));
-      if (!await file.exists()) {
-        throw const FileException('文件不存在', code: 'FILE_NOT_FOUND');
-      }
-      return await file.readAsString();
-    } on FileSystemException catch (e) {
-      throw FileException('读取文件失败：${e.message}', code: 'READ_ERROR');
-    }
-  }
-  @override
-  Future<void> writeTextFile(String relativePath, String content) async {
-    try {
-      final file = File(path.join(_baseDir, relativePath));
-      final dir = file.parent;
-      if (!await dir.exists()) {
-        await dir.create(recursive: true);
-      }
-      await file.writeAsString(content, flush: true);
-    } on FileSystemException catch (e) {
-      throw FileException('写入文件失败：${e.message}', code: 'WRITE_ERROR');
-    }
-  }
-  @override
-  Future<void> deleteFile(String relativePath) async {
-    try {
-      final file = File(path.join(_baseDir, relativePath));
-      if (await file.exists()) {
-        await file.delete();
-      }
-    } on FileSystemException catch (e) {
-      throw FileException('删除文件失败：${e.message}', code: 'DELETE_ERROR');
-    }
-  }
-  @override
-  Future<List<String>> listFiles(String directory) async {
-    try {
-      final dir = Directory(path.join(_baseDir, directory));
-      if (!await dir.exists()) {
-        return [];
-      }
-      final entities = await dir.list().toList();
-      return entities
-          .whereType<File>()
-          .where((f) => f.path.endsWith(AppConstants.extJson))
-          .map((f) => path.basename(f.path))
-          .toList();
-    } on FileSystemException catch (e) {
-      throw FileException('列出文件失败：${e.message}', code: 'LIST_ERROR');
-    }
-  }
-  @override
-  Future<String> saveAttachment(Uint8List data, String fileName) async {
-    try {
-      final uuid = const Uuid().v4();
-      final ext = path.extension(fileName);
-      final newFileName = '$uuid$ext';
-      final relativePath =
-          '${AppConstants.dirAttachments}/$newFileName';
-      final filePath = path.join(_baseDir, relativePath);
-      final file = File(filePath);
-      await file.writeAsBytes(data, flush: true);
-      return relativePath;
-    } on FileSystemException catch (e) {
-      throw FileException(
-        '保存附件失败：${e.message}',
-        code: 'ATTACHMENT_SAVE_ERROR',
-      );
-    }
-  }
-  @override
-  Future<Uint8List> readAttachment(String relativePath) async {
-    try {
-      final file = File(path.join(_baseDir, relativePath));
-      if (!await file.exists()) {
-        throw const FileException('附件不存在', code: 'ATTACHMENT_NOT_FOUND');
-      }
-      return await file.readAsBytes();
-    } on FileSystemException catch (e) {
-      throw FileException(
-        '读取附件失败：${e.message}',
-        code: 'ATTACHMENT_READ_ERROR',
-      );
-    }
-  }
-}
-```
-
 ## File: lib/data/data_sources/remote_api_source.dart
 ```dart
 import 'dart:convert';
@@ -4106,135 +3988,6 @@ class ConfigRepository {
     final config = await getConfig();
     final models = config.availableModels ?? [];
     return models.map((m) => m.id).toList();
-  }
-}
-```
-
-## File: lib/data/repositories/conversation_repository.dart
-```dart
-import 'dart:typed_data';
-import 'package:synchronized/synchronized.dart';
-import '../../core/models/session.dart';
-import '../../core/models/chat_round.dart';
-import '../../core/interfaces/file_service.dart';
-import '../../core/utils/id_generator.dart';
-class ConversationRepository {
-  final IFileService _fileService;
-  // 针对特定文件名的异步互斥锁，防止并发任务覆盖存档
-  final Map<String, Lock> _locks = {};
-  ConversationRepository(this._fileService);
-  /// 互斥锁执行器，确保对同一个文件操作是顺序的
-  Future<T> _runWithLock<T>(String fileName, Future<T> Function() action) {
-    final lock = _locks.putIfAbsent(fileName, () => Lock());
-    return lock.synchronized(action);
-  }
-  Future<List<String>> getAllSessionFileNames() async {
-    return await _fileService.getConversationFileList();
-  }
-  Future<Session> getSession(String fileName) async {
-    return _runWithLock(fileName, () async {
-      return await _fileService.readSession(fileName);
-    });
-  }
-  Future<void> saveSession(String fileName, Session session) async {
-    return _runWithLock(fileName, () async {
-      await _fileService.writeSession(fileName, session);
-    });
-  }
-  Future<void> deleteSession(String fileName) async {
-    return _runWithLock(fileName, () async {
-      await _fileService.deleteSession(fileName);
-    });
-  }
-  Future<String> saveAttachment(Uint8List data, String fileName) async {
-    return await _fileService.saveAttachment(data, fileName);
-  }
-  Future<Uint8List> getAttachment(String relativePath) async {
-    return await _fileService.readAttachment(relativePath);
-  }
-  Future<void> deleteAttachment(String relativePath) async {
-    await _fileService.deleteAttachment(relativePath);
-  }
-  Future<Session> createSession({
-    required String fileName,
-    required String title,
-  }) async {
-    return _runWithLock(fileName, () async {
-      final now = DateTime.now().millisecondsSinceEpoch;
-      final session = Session(
-        id: fileName.replaceAll('.json', ''),
-        title: title,
-        createdAt: now,
-        updatedAt: now,
-        rounds: [],
-      );
-      await _fileService.writeSession(fileName, session);
-      return session;
-    });
-  }
-  Future<Session> createSessionWithGeneratedId({
-    required String title,
-  }) async {
-    final sessionId = IdGenerator.generate();
-    final fileName = '$sessionId.json';
-    return await createSession(
-      fileName: fileName,
-      title: title,
-    );
-  }
-  Future<void> updateSessionTitle(String fileName, String title) async {
-    return _runWithLock(fileName, () async {
-      final session = await _fileService.readSession(fileName);
-      final updatedSession = session.copyWith(
-        title: title,
-        updatedAt: DateTime.now().millisecondsSinceEpoch,
-      );
-      await _fileService.writeSession(fileName, updatedSession);
-    });
-  }
-  Future<List<Session>> getAllSessions() async {
-    final fileNames = await getAllSessionFileNames();
-    final sessions = <Session>[];
-    for (final fileName in fileNames) {
-      try {
-        final session = await getSession(fileName);
-        sessions.add(session);
-      } catch (_) {
-        // 忽略损坏/不可读的会话文件，避免整个列表崩掉
-      }
-    }
-    sessions.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-    return sessions;
-  }
-  Future<void> appendRound(String fileName, ChatRound round) async {
-    return _runWithLock(fileName, () async {
-      final session = await _fileService.readSession(fileName);
-      final updatedSession = session.copyWith(
-        rounds: [...session.rounds, round],
-        updatedAt: DateTime.now().millisecondsSinceEpoch,
-      );
-      await _fileService.writeSession(fileName, updatedSession);
-    });
-  }
-  Future<void> updateRound(
-    String fileName,
-    String roundId,
-    ChatRound updatedRound,
-  ) async {
-    return _runWithLock(fileName, () async {
-      final session = await _fileService.readSession(fileName);
-      final updatedRounds = session.rounds.map((round) {
-        if (round.id == roundId) {
-          return updatedRound;
-        }
-        return round;
-      }).toList();
-      final updatedSession = session.copyWith(
-        rounds: updatedRounds,
-        updatedAt: DateTime.now().millisecondsSinceEpoch,
-      );
-      await _fileService.writeSession(fileName, updatedSession);
-    });
   }
 }
 ```
@@ -5565,54 +5318,6 @@ class ChatContextBuilder {
 }
 ```
 
-## File: lib/domain/services/chat_round_factory.dart
-```dart
-import '../../core/models/attachment.dart';
-import '../../core/models/chat_round.dart';
-import '../../core/utils/id_generator.dart';
-class ChatRoundFactory {
-  static ChatRound createUserRound({
-    required String content,
-    required String? parentId,
-    required List<Attachment> attachments,
-  }) {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    return ChatRound(
-      id: IdGenerator.generate(),
-      parentId: parentId,
-      createdAt: now,
-      userContent: content,
-      userAttachments: attachments,
-      isIncomplete: true,
-    );
-  }
-  static ChatRound createRetryRound({
-    required ChatRound sourceRound,
-  }) {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    return ChatRound(
-      id: IdGenerator.generate(),
-      parentId: sourceRound.parentId,
-      createdAt: now,
-      userContent: sourceRound.userContent,
-      userAttachments: sourceRound.userAttachments,
-      isIncomplete: true,
-    );
-  }
-  static ChatRound completeRound({
-    required ChatRound round,
-    required String content,
-    required String reasoning,
-  }) {
-    return round.copyWith(
-      assistantThinking: reasoning.trim().isEmpty ? null : reasoning,
-      assistantContent: content.trim().isEmpty ? null : content,
-      isIncomplete: false,
-    );
-  }
-}
-```
-
 ## File: lib/domain/services/chat_stream_accumulator.dart
 ```dart
 import '../../core/models/chat_chunk.dart';
@@ -6661,1842 +6366,6 @@ class PendingAttachment {
 }
 ```
 
-## File: lib/presentation/pages/branch_tree_page.dart
-```dart
-import 'dart:convert';
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:graphview/GraphView.dart';
-import '../../core/models/chat_round.dart';
-import '../../core/models/session.dart';
-import '../../core/utils/time_format_utils.dart';
-import '../../di/providers.dart';
-import '../../domain/models/tree_node.dart';
-import '../../domain/services/tree_builder.dart';
-import '../providers/chat_notifier.dart';
-import '../themes/app_tokens.dart';
-import '../widgets/common/app_badge.dart';
-import '../widgets/common/app_page_scaffold.dart';
-class BranchTreePage extends ConsumerStatefulWidget {
-  final Session session;
-  final String fileName;
-  const BranchTreePage({
-    super.key,
-    required this.session,
-    required this.fileName,
-  });
-  @override
-  ConsumerState<BranchTreePage> createState() => _BranchTreePageState();
-}
-class _BranchTreePageState extends ConsumerState<BranchTreePage> {
-  final TransformationController _transformationController =
-      TransformationController();
-  Graph _graph = Graph()..isTree = true;
-  final BuchheimWalkerConfiguration _builder =
-      BuchheimWalkerConfiguration();
-  final Map<String, Node> _nodeMap = {};
-  final Map<Node, TreeNode> _graphNodeToTreeNodeMap = {};
-  List<TreeNode> _roots = [];
-  String _lastRootsSignature = '';
-  @override
-  void initState() {
-    super.initState();
-    _builder
-      ..siblingSeparation = 40
-      ..levelSeparation = 78
-      ..subtreeSeparation = 50
-      ..orientation = BuchheimWalkerConfiguration.ORIENTATION_TOP_BOTTOM;
-    _reloadTree(widget.session.rounds);
-  }
-  @override
-  void dispose() {
-    _transformationController.dispose();
-    super.dispose();
-  }
-  void _reloadTree(List<ChatRound> rounds) {
-    final roots = rounds.isEmpty ? <TreeNode>[] : TreeBuilder.buildTree(rounds);
-    final signature = _buildRootsSignature(roots);
-    setState(() {
-      _roots = roots;
-      _lastRootsSignature = signature;
-      _rebuildGraph(_roots);
-    });
-  }
-  String _buildRootsSignature(List<TreeNode> roots) {
-    dynamic toJsonNode(TreeNode node) {
-      return {
-        'id': node.id,
-        'children': node.children.map(toJsonNode).toList(),
-      };
-    }
-    return jsonEncode(roots.map(toJsonNode).toList());
-  }
-  void _rebuildGraph(List<TreeNode> roots) {
-    _graph = Graph()..isTree = true;
-    _nodeMap.clear();
-    _graphNodeToTreeNodeMap.clear();
-    for (final root in roots) {
-      _addTreeToGraph(root, null);
-    }
-  }
-  void _addTreeToGraph(TreeNode treeNode, TreeNode? parent) {
-    final currentNode = Node.Id(treeNode.id);
-    _nodeMap[treeNode.id] = currentNode;
-    _graphNodeToTreeNodeMap[currentNode] = treeNode;
-    _graph.addNode(currentNode);
-    if (parent != null) {
-      final parentNode = _nodeMap[parent.id];
-      if (parentNode != null) {
-        _graph.addEdge(parentNode, currentNode);
-      }
-    }
-    for (final child in treeNode.children) {
-      _addTreeToGraph(child, treeNode);
-    }
-  }
-  Future<void> _deleteNode(String nodeId) async {
-    final repository = ref.read(conversationRepositoryProvider);
-    final chatState = ref.read(chatProvider(widget.fileName));
-    final session = chatState.session ?? widget.session;
-    ChatRound? roundToDelete;
-    for (final round in session.rounds) {
-      if (round.id == nodeId) {
-        roundToDelete = round;
-        break;
-      }
-    }
-    if (roundToDelete == null) {
-      throw Exception('未找到要删除的节点');
-    }
-    final updatedRounds = session.rounds
-        .where((round) => round.id != nodeId)
-        .map((round) {
-          if (round.parentId == nodeId) {
-            return round.copyWith(parentId: roundToDelete!.parentId);
-          }
-          return round;
-        }).toList();
-    final updatedSession = session.copyWith(
-      rounds: updatedRounds,
-      updatedAt: DateTime.now().millisecondsSinceEpoch,
-    );
-    await repository.saveSession(widget.fileName, updatedSession);
-    _reloadTree(updatedRounds);
-    await ref.read(chatProvider(widget.fileName).notifier).loadSession();
-  }
-  @override
-  Widget build(BuildContext context) {
-    final chatNotifier = ref.read(chatProvider(widget.fileName).notifier);
-    return AppPageScaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              widget.session.title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              '对话分支结构',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
-      ),
-      body: _roots.isEmpty
-          ? _buildEmptyState(context)
-          : Column(
-              children: [
-                _GraphToolbar(
-                  onZoomIn: () {
-                    final current = _transformationController.value.clone();
-                    current.scale(1.1);
-                    _transformationController.value = current;
-                  },
-                  onZoomOut: () {
-                    final current = _transformationController.value.clone();
-                    current.scale(0.9);
-                    _transformationController.value = current;
-                  },
-                  onReset: () {
-                    _transformationController.value = Matrix4.identity();
-                  },
-                ),
-                Expanded(
-                  child: InteractiveViewer(
-                    constrained: false,
-                    boundaryMargin: const EdgeInsets.all(double.infinity),
-                    minScale: 0.1,
-                    maxScale: 3.0,
-                    transformationController: _transformationController,
-                    child: Container(
-                      padding: const EdgeInsets.all(32),
-                      color: AppTokens.bg,
-                      child: GraphView(
-                        key: ValueKey(_lastRootsSignature),
-                        graph: _graph,
-                        animated: false,
-                        algorithm: BuchheimWalkerAlgorithm(
-                          _builder,
-                          TreeEdgeRenderer(_builder),
-                        ),
-                        paint: Paint()
-                          ..color = const Color(0xFFD8DEE8)
-                          ..strokeWidth = 1.6
-                          ..style = PaintingStyle.stroke,
-                        builder: (Node node) {
-                          final treeNode = _graphNodeToTreeNodeMap[node];
-                          if (treeNode == null) {
-                            return const SizedBox.shrink();
-                          }
-                          return _GraphNodeCard(
-                            key: ValueKey(treeNode.id),
-                            treeNode: treeNode,
-                            onSwitch: () async {
-                              await chatNotifier.switchBranch(treeNode.id);
-                              if (context.mounted) {
-                                Navigator.of(context).pop();
-                              }
-                            },
-                            onDelete: () async {
-                              final confirmed =
-                                  await _showDeleteDialog(context, treeNode);
-                              if (!confirmed) return;
-                              try {
-                                await _deleteNode(treeNode.id);
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('节点已删除'),
-                                    ),
-                                  );
-                                }
-                              } catch (e) {
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('删除失败：$e'),
-                                    ),
-                                  );
-                                }
-                              }
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-    );
-  }
-  Widget _buildEmptyState(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: AppTokens.surface,
-            borderRadius: AppTokens.brLg,
-            border: Border.all(color: AppTokens.border),
-            boxShadow: AppTokens.shadowMd,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 68,
-                height: 68,
-                decoration: BoxDecoration(
-                  color: AppTokens.primarySoft,
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: const Icon(
-                  Icons.account_tree_outlined,
-                  size: 30,
-                  color: AppTokens.primary,
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                '暂无分支结构',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '当你对历史轮次重新生成回复时，这里会显示完整的分支关系。',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppTokens.textSecondary,
-                    ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-  Future<bool> _showDeleteDialog(
-    BuildContext context,
-    TreeNode node,
-  ) async {
-    return await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: AppTokens.brLg,
-            ),
-            title: Text(
-              '删除节点',
-              style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-            content: Text(
-              '确定删除这一轮对话吗？\n\n${node.round.userContent}',
-              style: Theme.of(ctx).textTheme.bodyMedium,
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppTokens.danger,
-                ),
-                child: const Text('删除'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-  }
-}
-class _GraphToolbar extends StatelessWidget {
-  final VoidCallback onZoomIn;
-  final VoidCallback onZoomOut;
-  final VoidCallback onReset;
-  const _GraphToolbar({
-    required this.onZoomIn,
-    required this.onZoomOut,
-    required this.onReset,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 10,
-        ),
-        decoration: BoxDecoration(
-          color: AppTokens.surface,
-          borderRadius: AppTokens.brLg,
-          border: Border.all(color: AppTokens.border),
-          boxShadow: AppTokens.shadowSm,
-        ),
-        child: Row(
-          children: [
-            const Icon(
-              Icons.tune_outlined,
-              size: 18,
-              color: AppTokens.textSecondary,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                '缩放、拖拽查看对话分支结构',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTokens.textSecondary,
-                    ),
-              ),
-            ),
-            _ToolbarIconButton(
-              icon: Icons.remove_rounded,
-              tooltip: '缩小',
-              onTap: onZoomOut,
-            ),
-            const SizedBox(width: 6),
-            _ToolbarIconButton(
-              icon: Icons.add_rounded,
-              tooltip: '放大',
-              onTap: onZoomIn,
-            ),
-            const SizedBox(width: 6),
-            _ToolbarTextButton(
-              icon: Icons.center_focus_strong_outlined,
-              label: '重置',
-              onTap: onReset,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-class _ToolbarIconButton extends StatelessWidget {
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-  const _ToolbarIconButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: AppTokens.brMd,
-        child: Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: AppTokens.surfaceSoft,
-            borderRadius: AppTokens.brMd,
-            border: Border.all(color: AppTokens.border),
-          ),
-          child: Icon(
-            icon,
-            size: 18,
-            color: AppTokens.textPrimary,
-          ),
-        ),
-      ),
-    );
-  }
-}
-class _ToolbarTextButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  const _ToolbarTextButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: AppTokens.brMd,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 10,
-        ),
-        decoration: BoxDecoration(
-          color: AppTokens.surfaceSoft,
-          borderRadius: AppTokens.brMd,
-          border: Border.all(color: AppTokens.border),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: AppTokens.textSecondary,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: AppTokens.textPrimary,
-                  ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-class _GraphNodeCard extends StatelessWidget {
-  final TreeNode treeNode;
-  final VoidCallback onSwitch;
-  final VoidCallback onDelete;
-  const _GraphNodeCard({
-    super.key,
-    required this.treeNode,
-    required this.onSwitch,
-    required this.onDelete,
-  });
-  @override
-  Widget build(BuildContext context) {
-    final isRoot = treeNode.parentId == null;
-    final isIncomplete = treeNode.round.isIncomplete;
-    return Material(
-      color: Colors.transparent,
-      child: Container(
-        width: 290,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppTokens.surface,
-          borderRadius: AppTokens.brLg,
-          border: Border.all(
-            color: isIncomplete
-                ? AppTokens.warning.withOpacity(0.25)
-                : AppTokens.border,
-          ),
-          boxShadow: AppTokens.shadowMd,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                AppBadge.primary(
-                  '深度 ${treeNode.depth + 1}',
-                  icon: Icons.layers_outlined,
-                ),
-                const SizedBox(width: 8),
-                if (isRoot)
-                  AppBadge.info(
-                    '根节点',
-                    icon: Icons.flag_outlined,
-                  ),
-                if (isIncomplete) ...[
-                  const SizedBox(width: 8),
-                  AppBadge.warning(
-                    '未完成',
-                    icon: Icons.hourglass_empty_outlined,
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              TimeFormatUtils.formatTimestamp(treeNode.round.createdAt),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontSize: 11,
-                    color: AppTokens.textSecondary,
-                  ),
-            ),
-            const SizedBox(height: 12),
-            _PreviewBlock(
-              label: 'YOU',
-              content: treeNode.round.userContent.trim().isEmpty
-                  ? '（空输入）'
-                  : treeNode.round.userContent,
-              labelColor: AppTokens.info,
-            ),
-            const SizedBox(height: 8),
-            _PreviewBlock(
-              label: 'AI',
-              content: (treeNode.round.assistantContent ?? '').trim().isEmpty
-                  ? '（等待回复）'
-                  : treeNode.round.assistantContent!,
-              labelColor: AppTokens.success,
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.tonal(
-                    onPressed: onSwitch,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppTokens.primarySoft,
-                      foregroundColor: AppTokens.primary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: AppTokens.brMd,
-                      ),
-                    ),
-                    child: const Text('切换到此分支'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                if (treeNode.parentId != null)
-                  InkWell(
-                    onTap: onDelete,
-                    borderRadius: AppTokens.brMd,
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: AppTokens.dangerSoft,
-                        borderRadius: AppTokens.brMd,
-                        border: Border.all(
-                          color: AppTokens.danger.withOpacity(0.15),
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.delete_outline,
-                        size: 20,
-                        color: AppTokens.danger,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-class _PreviewBlock extends StatelessWidget {
-  final String label;
-  final String content;
-  final Color labelColor;
-  const _PreviewBlock({
-    required this.label,
-    required this.content,
-    required this.labelColor,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: AppTokens.surfaceSoft,
-        borderRadius: AppTokens.brMd,
-        border: Border.all(color: AppTokens.border),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$label  ',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: labelColor,
-                ),
-          ),
-          Expanded(
-            child: Text(
-              content,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontSize: 12,
-                    height: 1.5,
-                    color: AppTokens.textPrimary,
-                  ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-```
-
-## File: lib/presentation/pages/chat_page.dart
-```dart
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/attachment.dart';
-import '../../core/utils/time_format_utils.dart';
-import '../models/pending_attachment.dart';
-import '../providers/chat_notifier.dart';
-import '../themes/app_tokens.dart';
-import '../widgets/attachment_list.dart';
-import '../widgets/input_bar.dart';
-import '../widgets/message_bubble.dart';
-import '../widgets/thought_bubble.dart';
-import '../widgets/common/app_card.dart';
-import '../widgets/common/app_badge.dart';
-import '../widgets/common/app_page_scaffold.dart';
-import 'branch_tree_page.dart';
-class ChatPage extends ConsumerStatefulWidget {
-  final String fileName;
-  final String? initialMessage;
-  final List<PendingAttachment>? initialAttachments;
-  const ChatPage({
-    super.key,
-    required this.fileName,
-    this.initialMessage,
-    this.initialAttachments,
-  });
-  @override
-  ConsumerState<ChatPage> createState() => _ChatPageState();
-}
-class _ChatPageState extends ConsumerState<ChatPage> {
-  final ScrollController _scrollController = ScrollController();
-  bool _initialMessageHandled = false;
-  @override
-  void initState() {
-    super.initState();
-    Future.microtask(() async {
-      await ref.read(chatProvider(widget.fileName).notifier).loadSession();
-      final message = widget.initialMessage?.trim() ?? '';
-      final attachments =
-          widget.initialAttachments ?? const <PendingAttachment>[];
-      final hasMessage = message.isNotEmpty;
-      final hasAttachments = attachments.isNotEmpty;
-      if (!_initialMessageHandled &&
-          (hasMessage || hasAttachments) &&
-          mounted) {
-        _initialMessageHandled = true;
-        await ref.read(chatProvider(widget.fileName).notifier).sendMessage(
-              message,
-              attachments: attachments,
-            );
-      }
-    });
-  }
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-  void _scrollToTop() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollController.hasClients) return;
-      _scrollController.jumpTo(0);
-    });
-  }
-  Future<void> _copyText(String text) async {
-    await Clipboard.setData(ClipboardData(text: text));
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('已复制到剪贴板')),
-    );
-  }
-  @override
-  Widget build(BuildContext context) {
-    final state = ref.watch(chatProvider(widget.fileName));
-    final notifier = ref.read(chatProvider(widget.fileName).notifier);
-    final hasPages =
-        state.pageList != null && state.pageList!.pages.isNotEmpty;
-    final currentPage = hasPages
-        ? state.pageList!.pages[state.pageList!.currentPageIndex]
-        : null;
-    final round = currentPage?.round;
-    final currentStreamStatus =
-        round != null ? state.activeStreams[round.id] : null;
-    final isViewingStreamingRound = currentStreamStatus != null;
-    return AppPageScaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              state.session?.title ?? '对话',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              'AI 对话工作台',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
-        actions: [
-          if (state.session != null)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: IconButton(
-                tooltip: '查看分支树',
-                icon: const Icon(Icons.account_tree_outlined),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => BranchTreePage(
-                        session: state.session!,
-                        fileName: widget.fileName,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: state.isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : state.session == null
-                    ? _buildErrorState(state.error ?? '会话不存在')
-                    : !hasPages && state.activeStreams.isEmpty
-                        ? _buildWelcomeEmpty(context)
-                        : ListView(
-                            controller: _scrollController,
-                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                            children: [
-                              if (round != null)
-                                _buildRoundCard(
-                                  context,
-                                  userContent: round.userContent,
-                                  attachments: round.userAttachments,
-                                  createdAt: round.createdAt,
-                                  onRetryReply: () =>
-                                      notifier.retryFromRound(round.id),
-                                  thinking: isViewingStreamingRound
-                                      ? currentStreamStatus.reasoning
-                                      : round.assistantThinking,
-                                  assistantContent: isViewingStreamingRound
-                                      ? currentStreamStatus.content
-                                      : round.assistantContent,
-                                  isStreaming: isViewingStreamingRound,
-                                ),
-                              if ((state.error ?? '').trim().isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 16),
-                                  child: _InlineErrorCard(
-                                    message: state.error!,
-                                  ),
-                                ),
-                            ],
-                          ),
-          ),
-          if (state.pageList != null && state.pageList!.totalPages > 0)
-            _PaginationBar(
-              currentIndex: state.pageList!.currentPageIndex,
-              totalPages: state.pageList!.totalPages,
-              onPrev: state.pageList!.currentPageIndex > 0
-                  ? () {
-                      notifier.changePage(
-                        state.pageList!.currentPageIndex - 1,
-                      );
-                      _scrollToTop();
-                    }
-                  : null,
-              onNext: state.pageList!.currentPageIndex <
-                      state.pageList!.totalPages - 1
-                  ? () {
-                      notifier.changePage(
-                        state.pageList!.currentPageIndex + 1,
-                      );
-                      _scrollToTop();
-                    }
-                  : null,
-            ),
-          InputBar(
-            hintText: '发送消息，或附加图片/文件...',
-            isStreaming: isViewingStreamingRound,
-            onStop: notifier.stopGeneration,
-            onSend: (text, attachments) {
-              notifier.sendMessage(text, attachments: attachments);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-  Widget _buildErrorState(String message) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: AppCard(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.error_outline,
-                size: 40,
-                color: AppTokens.danger,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '无法加载会话',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-  Widget _buildWelcomeEmpty(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: AppCard(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 68,
-                height: 68,
-                decoration: BoxDecoration(
-                  color: AppTokens.primarySoft,
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: const Icon(
-                  Icons.auto_awesome_outlined,
-                  size: 30,
-                  color: AppTokens.primary,
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                '开始一段新的对话',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                '你可以输入问题、上传图片或文件，并在不同分支中回看每一轮回复。',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppTokens.textSecondary,
-                    ),
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                alignment: WrapAlignment.center,
-                children: [
-                  AppBadge.primary(
-                    '多轮上下文',
-                    icon: Icons.chat_bubble_outline,
-                  ),
-                  AppBadge.info(
-                    '附件输入',
-                    icon: Icons.attach_file_outlined,
-                  ),
-                  AppBadge.warning(
-                    '分支切换',
-                    icon: Icons.account_tree_outlined,
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-  Widget _buildRoundCard(
-    BuildContext context, {
-    required String userContent,
-    required List<Attachment> attachments,
-    required int createdAt,
-    required VoidCallback onRetryReply,
-    String? thinking,
-    String? assistantContent,
-    bool isStreaming = false,
-  }) {
-    final hasUser = userContent.trim().isNotEmpty;
-    final hasAttachments = attachments.isNotEmpty;
-    final hasThinking = (thinking ?? '').trim().isNotEmpty;
-    final hasAssistant = (assistantContent ?? '').trim().isNotEmpty;
-    return AppCard(
-      padding: const EdgeInsets.all(AppTokens.space16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _RoundHeader(
-            createdAt: createdAt,
-            isStreaming: isStreaming,
-          ),
-          const SizedBox(height: AppTokens.space16),
-          const _SectionLabel(
-            icon: Icons.person_outline,
-            text: '你的输入',
-          ),
-          const SizedBox(height: AppTokens.space10),
-          if (hasUser)
-            MessageBubble(
-              content: userContent,
-              isUser: true,
-              onCopy: () => _copyText(userContent),
-              onRetryReply: onRetryReply,
-            ),
-          if (hasAttachments) ...[
-            if (hasUser) const SizedBox(height: AppTokens.space8),
-            AttachmentList(attachments: attachments),
-          ],
-          if (hasThinking) ...[
-            const SizedBox(height: AppTokens.space20),
-            const Divider(),
-            const SizedBox(height: AppTokens.space16),
-            const _SectionLabel(
-              icon: Icons.psychology_alt_outlined,
-              text: '推理过程',
-            ),
-            const SizedBox(height: AppTokens.space10),
-            ThoughtBubble(content: thinking!),
-          ],
-          if (hasAssistant || isStreaming) ...[
-            const SizedBox(height: AppTokens.space20),
-            const Divider(),
-            const SizedBox(height: AppTokens.space16),
-            Row(
-              children: [
-                const Expanded(
-                  child: _SectionLabel(
-                    icon: Icons.smart_toy_outlined,
-                    text: '回答',
-                  ),
-                ),
-                if (isStreaming)
-                  AppBadge.info(
-                    '生成中',
-                    icon: Icons.bolt_outlined,
-                  ),
-              ],
-            ),
-            const SizedBox(height: AppTokens.space10),
-            if (hasAssistant)
-              MessageBubble(
-                content: assistantContent!,
-                isUser: false,
-                onCopy: () => _copyText(assistantContent),
-                onRetryReply: onRetryReply,
-              )
-            else
-              _buildTypingPlaceholder(),
-          ],
-        ],
-      ),
-    );
-  }
-  Widget _buildTypingPlaceholder() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppTokens.space16),
-      decoration: BoxDecoration(
-        color: AppTokens.surfaceSoft,
-        borderRadius: AppTokens.brLg,
-        border: Border.all(color: AppTokens.border),
-      ),
-      child: Row(
-        children: [
-          const SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-          const SizedBox(width: AppTokens.space12),
-          Text(
-            '正在生成回答...',
-            style: const TextStyle(
-              color: AppTokens.textSecondary,
-              fontSize: 14,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-class _RoundHeader extends StatelessWidget {
-  final int createdAt;
-  final bool isStreaming;
-  const _RoundHeader({
-    required this.createdAt,
-    required this.isStreaming,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppTokens.space12,
-            vertical: AppTokens.space6,
-          ),
-          decoration: BoxDecoration(
-            color: AppTokens.surfaceMuted,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: AppTokens.border),
-          ),
-          child: Text(
-            TimeFormatUtils.formatTimestamp(createdAt),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-        ),
-        const Spacer(),
-        if (isStreaming)
-          AppBadge.info(
-            '实时生成',
-            icon: Icons.graphic_eq_outlined,
-          ),
-      ],
-    );
-  }
-}
-class _SectionLabel extends StatelessWidget {
-  final IconData icon;
-  final String text;
-  const _SectionLabel({
-    required this.icon,
-    required this.text,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          size: 17,
-          color: AppTokens.primary,
-        ),
-        const SizedBox(width: AppTokens.space6),
-        Text(
-          text,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: AppTokens.textPrimary,
-              ),
-        ),
-      ],
-    );
-  }
-}
-class _InlineErrorCard extends StatelessWidget {
-  final String message;
-  const _InlineErrorCard({
-    required this.message,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppTokens.space12),
-      decoration: BoxDecoration(
-        color: AppTokens.dangerSoft,
-        borderRadius: AppTokens.brMd,
-        border: Border.all(
-          color: AppTokens.danger.withOpacity(0.18),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Padding(
-            padding: EdgeInsets.only(top: 1),
-            child: Icon(
-              Icons.error_outline,
-              size: 16,
-              color: AppTokens.danger,
-            ),
-          ),
-          const SizedBox(width: AppTokens.space8),
-          Expanded(
-            child: Text(
-              message,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTokens.danger,
-                    height: 1.55,
-                  ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-class _PaginationBar extends StatelessWidget {
-  final int currentIndex;
-  final int totalPages;
-  final VoidCallback? onPrev;
-  final VoidCallback? onNext;
-  const _PaginationBar({
-    required this.currentIndex,
-    required this.totalPages,
-    required this.onPrev,
-    required this.onNext,
-  });
-  @override
-  Widget build(BuildContext context) {
-    final progress =
-        totalPages == 0 ? 0.0 : (currentIndex + 1).clamp(0, totalPages) / totalPages;
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppTokens.surface,
-        border: Border(
-          top: BorderSide(color: AppTokens.border),
-        ),
-      ),
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-      child: Row(
-        children: [
-          _PagerButton(
-            icon: Icons.chevron_left_rounded,
-            onTap: onPrev,
-          ),
-          const SizedBox(width: AppTokens.space10),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '第 ${currentIndex + 1} 页 / 共 $totalPages 页',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppTokens.textPrimary,
-                      ),
-                ),
-                const SizedBox(height: AppTokens.space8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 6,
-                    backgroundColor: AppTokens.surfaceMuted,
-                    valueColor:
-                        const AlwaysStoppedAnimation(AppTokens.primary),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: AppTokens.space10),
-          _PagerButton(
-            icon: Icons.chevron_right_rounded,
-            onTap: onNext,
-          ),
-        ],
-      ),
-    );
-  }
-}
-class _PagerButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback? onTap;
-  const _PagerButton({
-    required this.icon,
-    required this.onTap,
-  });
-  @override
-  Widget build(BuildContext context) {
-    final enabled = onTap != null;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: AppTokens.brMd,
-      child: Container(
-        width: 42,
-        height: 42,
-        decoration: BoxDecoration(
-          color: enabled ? AppTokens.surfaceSoft : AppTokens.surfaceMuted,
-          borderRadius: AppTokens.brMd,
-          border: Border.all(color: AppTokens.border),
-        ),
-        child: Icon(
-          icon,
-          color: enabled
-              ? AppTokens.textPrimary
-              : AppTokens.textTertiary,
-        ),
-      ),
-    );
-  }
-}
-```
-
-## File: lib/presentation/pages/home_page.dart
-```dart
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_slidable/flutter_slidable.dart';
-import '../../core/models/session.dart';
-import '../../core/utils/time_format_utils.dart';
-import '../providers/session_list_notifier.dart';
-import '../themes/app_tokens.dart';
-import '../widgets/common/app_badge.dart';
-import '../widgets/common/app_card.dart';
-import '../widgets/common/app_page_scaffold.dart';
-import '../widgets/input_bar.dart';
-import 'chat_page.dart';
-import 'settings_page.dart';
-class HomePage extends ConsumerWidget {
-  const HomePage({super.key});
-  Future<void> _showRenameDialog(
-    BuildContext context,
-    SessionListNotifier notifier,
-    Session session,
-  ) async {
-    final controller = TextEditingController(text: session.title);
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: AppTokens.brLg,
-        ),
-        title: Text(
-          '重命名会话',
-          style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-        ),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: '输入新的会话名称',
-          ),
-          onSubmitted: (value) => Navigator.of(ctx).pop(value.trim()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-            child: const Text('保存'),
-          ),
-        ],
-      ),
-    );
-    if (result != null && result.isNotEmpty && result != session.title) {
-      await notifier.updateSessionTitle('${session.id}.json', result);
-    }
-  }
-  Future<void> _showDeleteConfirmDialog(
-    BuildContext context,
-    SessionListNotifier notifier,
-    Session session,
-  ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: AppTokens.brLg,
-        ),
-        title: Text(
-          '删除会话',
-          style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-        ),
-        content: Text(
-          '确定要删除 “${session.title}” 吗？\n此操作无法撤销。',
-          style: Theme.of(ctx).textTheme.bodyMedium,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppTokens.danger,
-            ),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) {
-      await notifier.deleteSession('${session.id}.json');
-    }
-  }
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final sessionListState = ref.watch(sessionListProvider);
-    final notifier = ref.read(sessionListProvider.notifier);
-    return AppPageScaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'AI Chat',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              '你的对话工作区',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: IconButton(
-              tooltip: '设置',
-              icon: const Icon(Icons.settings_outlined),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const SettingsPage(),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: sessionListState.when(
-              loading: () => const Center(
-                child: CircularProgressIndicator(),
-              ),
-              error: (e, st) => _HomeErrorState(
-                message: '加载会话失败：$e',
-                onRetry: notifier.refresh,
-              ),
-              data: (sessions) {
-                if (sessions.isEmpty) {
-                  return const _HomeEmptyState();
-                }
-                return RefreshIndicator(
-                  onRefresh: notifier.refresh,
-                  child: ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                    children: [
-                      _HomeHeaderSummary(
-                        sessionCount: sessions.length,
-                      ),
-                      const SizedBox(height: AppTokens.space16),
-                      ...sessions.map((session) {
-                        final fileName = '${session.id}.json';
-                        return Padding(
-                          padding:
-                              const EdgeInsets.only(bottom: AppTokens.space12),
-                          child: Slidable(
-                            key: ValueKey(fileName),
-                            endActionPane: ActionPane(
-                              motion: const DrawerMotion(),
-                              extentRatio: 0.34,
-                              children: [
-                                CustomSlidableAction(
-                                  onPressed: (_) => _showRenameDialog(
-                                    context,
-                                    notifier,
-                                    session,
-                                  ),
-                                  backgroundColor: AppTokens.info,
-                                  borderRadius: AppTokens.brLg,
-                                  child: const Icon(
-                                    Icons.edit_outlined,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                CustomSlidableAction(
-                                  onPressed: (_) => _showDeleteConfirmDialog(
-                                    context,
-                                    notifier,
-                                    session,
-                                  ),
-                                  backgroundColor: AppTokens.danger,
-                                  borderRadius: AppTokens.brLg,
-                                  child: const Icon(
-                                    Icons.delete_outline,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            child: _SessionCard(
-                              session: session,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ChatPage(
-                                      fileName: fileName,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        );
-                      }),
-                      const SizedBox(height: 12),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-          InputBar(
-            hintText: '开启一个新对话...',
-            onSend: (content, attachments) async {
-              final newFileName = await notifier.createSession('新对话');
-              if (context.mounted) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ChatPage(
-                      fileName: newFileName,
-                      initialMessage: content,
-                      initialAttachments: attachments,
-                    ),
-                  ),
-                );
-              }
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-class _HomeHeaderSummary extends StatelessWidget {
-  final int sessionCount;
-  const _HomeHeaderSummary({
-    required this.sessionCount,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      padding: const EdgeInsets.all(18),
-      child: Row(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: AppTokens.primarySoft,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: const Icon(
-              Icons.forum_outlined,
-              color: AppTokens.primary,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: AppTokens.space12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '最近会话',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '共 $sessionCount 个会话，可左滑进行重命名或删除。',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
-            ),
-          ),
-          AppBadge.primary(
-            '$sessionCount',
-            icon: Icons.layers_outlined,
-          ),
-        ],
-      ),
-    );
-  }
-}
-class _HomeEmptyState extends StatelessWidget {
-  const _HomeEmptyState();
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: AppCard(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: AppTokens.primarySoft,
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: const Icon(
-                  Icons.auto_awesome_outlined,
-                  size: 32,
-                  color: AppTokens.primary,
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                '开始你的第一段对话',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                '在下方输入问题，系统会自动创建一个新会话。\n你也可以附加图片或文件开始交流。',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppTokens.textSecondary,
-                    ),
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                alignment: WrapAlignment.center,
-                children: [
-                  AppBadge.primary(
-                    '快速提问',
-                    icon: Icons.bolt_outlined,
-                  ),
-                  AppBadge.info(
-                    '支持附件',
-                    icon: Icons.attach_file_outlined,
-                  ),
-                  AppBadge.warning(
-                    '多分支对话',
-                    icon: Icons.account_tree_outlined,
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-class _HomeErrorState extends StatelessWidget {
-  final String message;
-  final Future<void> Function() onRetry;
-  const _HomeErrorState({
-    required this.message,
-    required this.onRetry,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: AppCard(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.error_outline,
-                size: 40,
-                color: AppTokens.danger,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '出现了一点问题',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh),
-                label: const Text('重试'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-class _SessionCard extends StatelessWidget {
-  final Session session;
-  final VoidCallback onTap;
-  const _SessionCard({
-    required this.session,
-    required this.onTap,
-  });
-  @override
-  Widget build(BuildContext context) {
-    final roundCount = session.rounds.length;
-    final updatedAt = TimeFormatUtils.formatTimestamp(session.updatedAt);
-    final preview = _buildLatestPreview(session);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: AppTokens.brLg,
-        child: AppCard(
-          padding: const EdgeInsets.all(16),
-          boxShadow: AppTokens.shadowSm,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: AppTokens.surfaceSoft,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTokens.border),
-                ),
-                child: const Icon(
-                  Icons.forum_outlined,
-                  color: AppTokens.textSecondary,
-                ),
-              ),
-              const SizedBox(width: AppTokens.space12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      session.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                    const SizedBox(height: 8),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _PreviewLine(
-                          label: 'YOU',
-                          text: preview.userPreview,
-                          color: AppTokens.info,
-                        ),
-                        const SizedBox(height: 4),
-                        _PreviewLine(
-                          label: 'AI',
-                          text: preview.aiPreview,
-                          color: AppTokens.success,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        AppBadge.info(
-                          '$roundCount 轮',
-                          icon: Icons.chat_bubble_outline,
-                        ),
-                        AppBadge.primary(
-                          updatedAt,
-                          icon: Icons.schedule_outlined,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppTokens.space8),
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: AppTokens.surfaceSoft,
-                  borderRadius: AppTokens.brMd,
-                  border: Border.all(color: AppTokens.border),
-                ),
-                child: const Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppTokens.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-  _SessionPreview _buildLatestPreview(Session session) {
-    if (session.rounds.isEmpty) {
-      return const _SessionPreview(
-        userPreview: '点击开始新的对话',
-        aiPreview: '等待助手回复',
-      );
-    }
-    final latest = session.rounds.last;
-    final user = latest.userContent.trim().isEmpty
-        ? '（空输入）'
-        : latest.userContent.trim();
-    final ai = (latest.assistantContent ?? '').trim().isEmpty
-        ? '（等待回复）'
-        : latest.assistantContent!.trim();
-    return _SessionPreview(
-      userPreview: user,
-      aiPreview: ai,
-    );
-  }
-}
-class _SessionPreview {
-  final String userPreview;
-  final String aiPreview;
-  const _SessionPreview({
-    required this.userPreview,
-    required this.aiPreview,
-  });
-}
-class _PreviewLine extends StatelessWidget {
-  final String label;
-  final String text;
-  final Color color;
-  const _PreviewLine({
-    required this.label,
-    required this.text,
-    required this.color,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '$label  ',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: color,
-              ),
-        ),
-        Expanded(
-          child: Text(
-            text,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontSize: 13,
-                  color: AppTokens.textSecondary,
-                  height: 1.4,
-                ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-```
-
 ## File: lib/presentation/pages/settings_page.dart
 ```dart
 import 'package:flutter/material.dart';
@@ -9150,252 +7019,71 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 }
 ```
 
-## File: lib/presentation/providers/chat_notifier.dart
+## File: lib/presentation/pages/text_attachment_viewer_page.dart
 ```dart
-import 'package:collection/collection.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/app_config.dart';
-import '../../core/models/chat_round.dart';
-import '../../core/models/api_message.dart';
-import '../../core/models/model_info.dart';
-import '../../domain/models/chat_page.dart';
-import '../../domain/services/attachment_preparer.dart';
-import '../../domain/services/branch_navigator.dart';
-import '../../domain/services/chat_context_builder.dart';
-import '../../domain/services/chat_round_factory.dart';
-import '../../domain/services/chat_stream_accumulator.dart';
-import '../../domain/services/chat_view_state_builder.dart';
-import '../../domain/states/chat_state.dart';
-import '../../di/providers.dart';
-import '../models/pending_attachment.dart';
-class ChatNotifier extends StateNotifier<ChatState> {
-  final Ref ref;
-  final String fileName;
-  ChatNotifier(this.ref, this.fileName) : super(ChatState.initial());
-  Future<void> loadSession() async {
-    state = state.copyWithLoading(true);
-    try {
-      final repository = ref.read(conversationRepositoryProvider);
-      final session = await repository.getSession(fileName);
-      final viewState = ChatViewStateBuilder.buildInitial(session);
-      state = state.copyWithSession(session).copyWith(
-            currentRoundId: viewState.currentRoundId,
-            pageList: viewState.pageList,
-            error: null,
-          );
-    } catch (e) {
-      state = state.copyWithError(e.toString());
-    }
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../themes/app_tokens.dart';
+import '../widgets/common/app_page_scaffold.dart';
+class TextAttachmentViewerPage extends StatelessWidget {
+  final String title;
+  final String content;
+  const TextAttachmentViewerPage({
+    super.key,
+    required this.title,
+    required this.content,
+  });
+  Future<void> _copyAll(BuildContext context) async {
+    await Clipboard.setData(ClipboardData(text: content));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('全文已复制')),
+    );
   }
-  ModelInfo? _findSelectedModelInfo(AppConfig config) {
-    final selectedId = config.selectedModel;
-    if (selectedId == null || selectedId.trim().isEmpty) return null;
-    final models = config.availableModels ?? const <ModelInfo>[];
-    return models.firstWhereOrNull((m) => m.id == selectedId);
-  }
-  bool _shouldEnableReasoning(AppConfig config) {
-    final selectedModel = _findSelectedModelInfo(config);
-    return selectedModel?.supportsReasoning == true;
-  }
-  void _validateRequestCapability({
-    required AppConfig config,
-    required List<PendingAttachment> attachments,
-  }) {
-    final selectedModel = _findSelectedModelInfo(config);
-    if (selectedModel == null) return;
-    final hasImage = attachments.any((a) => a.isImage);
-    if (hasImage && selectedModel.supportsVision != true) {
-      throw Exception('当前模型未声明支持图片输入');
-    }
-  }
-  Future<void> sendMessage(
-    String content, {
-    List<PendingAttachment>? attachments,
-  }) async {
-    if (state.session == null) {
-      state = state.copyWithError('会话未初始化');
-      return;
-    }
-    try {
-      final pendingAttachments = attachments ?? const <PendingAttachment>[];
-      final repository = ref.read(conversationRepositoryProvider);
-      final config = await ref.read(configRepositoryProvider).getConfig();
-      _validateRequestCapability(
-        config: config,
-        attachments: pendingAttachments,
-      );
-      final savedAttachments = await AttachmentPreparer.savePendingAttachments(
-        repository,
-        pendingAttachments,
-      );
-      final round = ChatRoundFactory.createUserRound(
-        content: content,
-        parentId: state.currentRoundId,
-        attachments: savedAttachments,
-      );
-      await _appendRoundAndEnterStreaming(round);
-      final updatedSession = await repository.getSession(fileName);
-      final contextRounds =
-          BranchNavigator.getCurrentBranchPath(updatedSession, round.id);
-      final apiContext = await ChatContextBuilder.buildFromRounds(
-        contextRounds,
-        repository,
-      );
-      _handleStreamTask(round, apiContext, config);
-    } catch (e) {
-      state = state.copyWithError(e.toString());
-    }
-  }
-  Future<void> retryFromRound(String roundId) async {
-    if (state.session == null) {
-      state = state.copyWithError('会话未初始化');
-      return;
-    }
-    try {
-      final repository = ref.read(conversationRepositoryProvider);
-      final config = await ref.read(configRepositoryProvider).getConfig();
-      final sourceRound =
-          state.session!.rounds.firstWhereOrNull((round) => round.id == roundId);
-      if (sourceRound == null) {
-        state = state.copyWithError('未找到要重新回复的对话');
-        return;
-      }
-      final selectedModel = _findSelectedModelInfo(config);
-      if (selectedModel != null) {
-        final hasImage = sourceRound.userAttachments.any((a) => a.isImage);
-        if (hasImage && selectedModel.supportsVision != true) {
-          state = state.copyWithError('当前模型未声明支持图片输入');
-          return;
-        }
-      }
-      final newRound = ChatRoundFactory.createRetryRound(
-        sourceRound: sourceRound,
-      );
-      await _appendRoundAndEnterStreaming(newRound);
-      final updatedSession = await repository.getSession(fileName);
-      final contextRounds =
-          BranchNavigator.getCurrentBranchPath(updatedSession, newRound.id);
-      final apiContext = await ChatContextBuilder.buildFromRounds(
-        contextRounds,
-        repository,
-      );
-      _handleStreamTask(newRound, apiContext, config);
-    } catch (e) {
-      state = state.copyWithError(e.toString());
-    }
-  }
-  Future<void> _appendRoundAndEnterStreaming(ChatRound round) async {
-    final repository = ref.read(conversationRepositoryProvider);
-    await repository.appendRound(fileName, round);
-    final updatedSession = await repository.getSession(fileName);
-    final viewState = ChatViewStateBuilder.buildForRound(updatedSession, round.id);
-    final newActiveStreams = Map<String, StreamStatus>.from(state.activeStreams);
-    newActiveStreams[round.id] = const StreamStatus();
-    state = state.copyWithSession(updatedSession).copyWith(
-          currentRoundId: viewState.currentRoundId,
-          pageList: viewState.pageList,
-          activeStreams: newActiveStreams,
-          error: null,
-        );
-  }
-  Future<void> _handleStreamTask(
-    ChatRound round,
-    List<ApiMessage> apiContext,
-    AppConfig config,
-  ) async {
-    final apiService = ref.read(apiServiceProvider);
-    final accumulator = ChatStreamAccumulator();
-    try {
-      final stream = apiService.chatStream(
-        taskId: round.id,
-        baseUrl: config.baseUrl,
-        apiKey: config.apiKey,
-        chatPath: config.chatPath,
-        apiMode: config.apiMode,
-        model: config.selectedModel ?? 'unknown-model',
-        context: apiContext,
-        enableReasoning: _shouldEnableReasoning(config),
-      );
-      await for (final chunk in stream) {
-        if (chunk.error != null) {
-          state = state.copyWithStreaming(round.id, error: chunk.error);
-          return;
-        }
-        if (!chunk.isDone) {
-          accumulator.add(chunk);
-          state = state.copyWithStreaming(
-            round.id,
-            content: accumulator.content,
-            reasoning: accumulator.reasoning,
-            isDone: false,
-          );
-        } else {
-          break;
-        }
-      }
-      final updatedRound = ChatRoundFactory.completeRound(
-        round: round,
-        content: accumulator.content,
-        reasoning: accumulator.reasoning,
-      );
-      final repository = ref.read(conversationRepositoryProvider);
-      await repository.updateRound(fileName, round.id, updatedRound);
-      final finalSession = await repository.getSession(fileName);
-      final finalPageList = _replaceRoundInCurrentPages(updatedRound);
-      state = state.copyWithStreaming(round.id, isDone: true).copyWith(
-            session: finalSession,
-            pageList: finalPageList,
-            error: null,
-          );
-    } catch (e) {
-      state = state.copyWithStreaming(round.id, error: e.toString());
-    }
-  }
-  ChatPageList? _replaceRoundInCurrentPages(ChatRound updatedRound) {
-    final currentPageList = state.pageList;
-    if (currentPageList == null) return null;
-    final updatedPages = currentPageList.pages.map((page) {
-      if (page.round.id == updatedRound.id) {
-        return page.copyWith(round: updatedRound);
-      }
-      return page;
-    }).toList();
-    return currentPageList.copyWith(pages: updatedPages);
-  }
-  void stopGeneration() {
-    if (state.pageList == null || state.pageList!.pages.isEmpty) return;
-    final viewingRound =
-        state.pageList!.pages[state.pageList!.currentPageIndex].round;
-    if (!state.activeStreams.containsKey(viewingRound.id)) return;
-    final apiService = ref.read(apiServiceProvider);
-    apiService.cancelRequest(viewingRound.id);
-  }
-  Future<void> switchBranch(String targetRoundId) async {
-    if (state.session == null) return;
-    final session = state.session!;
-    final newRoundId = BranchNavigator.switchBranch(session, targetRoundId);
-    final viewState = ChatViewStateBuilder.buildForRound(session, newRoundId);
-    state = state.copyWithCurrentRoundId(newRoundId).copyWith(
-          pageList: viewState.pageList,
-        );
-  }
-  void changePage(int pageIndex) {
-    if (state.pageList == null) return;
-    final pages = state.pageList!.pages;
-    if (pageIndex < 0 || pageIndex >= pages.length) return;
-    final targetPage = pages[pageIndex];
-    final newRoundId = targetPage.round.id;
-    state = state.copyWithCurrentRoundId(newRoundId).copyWith(
-          pageList: state.pageList!.copyWith(currentPageIndex: pageIndex),
-        );
+  @override
+  Widget build(BuildContext context) {
+    return AppPageScaffold(
+      appBar: AppBar(
+        title: Text(
+          title,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+        actions: [
+          IconButton(
+            tooltip: '复制全文',
+            onPressed: () => _copyAll(context),
+            icon: const Icon(Icons.content_copy_outlined),
+          ),
+        ],
+      ),
+      body: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTokens.surface,
+            borderRadius: AppTokens.brLg,
+            border: Border.all(color: AppTokens.border),
+            boxShadow: AppTokens.shadowSm,
+          ),
+          child: SelectableText(
+            content,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  height: 1.7,
+                  color: AppTokens.textPrimary,
+                  fontFamily: 'monospace',
+                ),
+          ),
+        ),
+      ),
+    );
   }
 }
-final chatProvider =
-    StateNotifierProvider.family<ChatNotifier, ChatState, String>(
-  (ref, fileName) {
-    return ChatNotifier(ref, fileName);
-  },
-);
 ```
 
 ## File: lib/presentation/providers/config_notifier.dart
@@ -9482,13 +7170,36 @@ final configProvider =
 });
 ```
 
-## File: lib/presentation/providers/input_draft_provider.dart
+## File: lib/presentation/providers/global_streaming_provider.dart
 ```dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/pending_attachment.dart';
-final globalInputDraftProvider = StateProvider<String>((ref) => '');
-final globalAttachmentDraftProvider =
-    StateProvider<List<PendingAttachment>>((ref) => []);
+final globalStreamingSessionsProvider =
+    StateProvider<Set<String>>((ref) => <String>{});
+```
+
+## File: lib/presentation/providers/session_card_provider.dart
+```dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/session.dart';
+import '../../di/providers.dart';
+final sessionFileNamesProvider = FutureProvider<List<String>>((ref) async {
+  final repository = ref.read(conversationRepositoryProvider);
+  final fileNames = await repository.getAllSessionFileNames();
+  final sessions = <Session>[];
+  for (final fileName in fileNames) {
+    try {
+      final session = await repository.getSession(fileName);
+      sessions.add(session);
+    } catch (_) {}
+  }
+  sessions.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+  return sessions.map((e) => '${e.id}.json').toList();
+});
+final sessionCardProvider =
+    FutureProvider.family<Session, String>((ref, fileName) async {
+  final repository = ref.read(conversationRepositoryProvider);
+  return repository.getSession(fileName);
+});
 ```
 
 ## File: lib/presentation/providers/session_list_notifier.dart
@@ -9833,85 +7544,6 @@ abstract class AppTokens {
 }
 ```
 
-## File: lib/presentation/widgets/attachment_list.dart
-```dart
-import 'package:flutter/material.dart';
-import '../../core/models/attachment.dart';
-import '../themes/app_tokens.dart';
-class AttachmentList extends StatelessWidget {
-  final List<Attachment> attachments;
-  const AttachmentList({
-    super.key,
-    required this.attachments,
-  });
-  @override
-  Widget build(BuildContext context) {
-    if (attachments.isEmpty) return const SizedBox.shrink();
-    return Wrap(
-      spacing: AppTokens.space8,
-      runSpacing: AppTokens.space8,
-      children: attachments.map((attachment) {
-        return _AttachmentChip(attachment: attachment);
-      }).toList(),
-    );
-  }
-}
-class _AttachmentChip extends StatelessWidget {
-  final Attachment attachment;
-  const _AttachmentChip({
-    required this.attachment,
-  });
-  @override
-  Widget build(BuildContext context) {
-    final icon =
-        attachment.isImage ? Icons.image_outlined : Icons.attach_file_outlined;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppTokens.space10,
-        vertical: AppTokens.space8,
-      ),
-      decoration: BoxDecoration(
-        color: AppTokens.surfaceSoft,
-        borderRadius: AppTokens.brMd,
-        border: Border.all(color: AppTokens.border),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              color: AppTokens.surface,
-              borderRadius: AppTokens.brSm,
-              border: Border.all(color: AppTokens.border),
-            ),
-            child: Icon(
-              icon,
-              size: 16,
-              color: AppTokens.textSecondary,
-            ),
-          ),
-          const SizedBox(width: AppTokens.space8),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 180),
-            child: Text(
-              attachment.name,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontSize: 13,
-                    color: AppTokens.textPrimary,
-                    fontWeight: FontWeight.w500,
-                  ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-```
-
 ## File: lib/presentation/widgets/common/app_badge.dart
 ```dart
 import 'package:flutter/material.dart';
@@ -10039,37 +7671,6 @@ class AppCard extends StatelessWidget {
         boxShadow: boxShadow ?? AppTokens.shadowMd,
       ),
       child: child,
-    );
-  }
-}
-```
-
-## File: lib/presentation/widgets/common/app_page_scaffold.dart
-```dart
-import 'package:flutter/material.dart';
-import '../../themes/app_tokens.dart';
-class AppPageScaffold extends StatelessWidget {
-  final PreferredSizeWidget? appBar;
-  final Widget body;
-  final Widget? bottomNavigationBar;
-  final Color? backgroundColor;
-  final bool useSafeArea;
-  const AppPageScaffold({
-    super.key,
-    this.appBar,
-    required this.body,
-    this.bottomNavigationBar,
-    this.backgroundColor,
-    this.useSafeArea = true,
-  });
-  @override
-  Widget build(BuildContext context) {
-    final content = useSafeArea ? SafeArea(child: body) : body;
-    return Scaffold(
-      backgroundColor: backgroundColor ?? AppTokens.bg,
-      appBar: appBar,
-      bottomNavigationBar: bottomNavigationBar,
-      body: content,
     );
   }
 }
@@ -10680,6 +8281,2581 @@ class _PrimaryActionButton extends StatelessWidget {
 }
 ```
 
+## File: lib/presentation/widgets/page_indicator.dart
+```dart
+import 'package:flutter/material.dart';
+class PageIndicator extends StatelessWidget {
+  final int currentPage;
+  final int totalPages;
+  const PageIndicator({
+    super.key,
+    required this.currentPage,
+    required this.totalPages,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            '${currentPage + 1} / $totalPages',
+            style: const TextStyle(fontSize: 14, color: Colors.grey),
+          ),
+        ],
+      ),
+    );
+  }
+}
+```
+
+## File: lib/presentation/widgets/thought_bubble.dart
+```dart
+import 'package:flutter/material.dart';
+import '../themes/app_tokens.dart';
+class ThoughtBubble extends StatelessWidget {
+  final String content;
+  const ThoughtBubble({
+    super.key,
+    required this.content,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final text = content.trim();
+    if (text.isEmpty) return const SizedBox.shrink();
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: AppTokens.space12),
+      padding: const EdgeInsets.all(AppTokens.space12),
+      decoration: BoxDecoration(
+        color: AppTokens.thoughtBubble,
+        borderRadius: AppTokens.brMd,
+        border: Border.all(
+          color: AppTokens.warning.withOpacity(0.18),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.psychology_alt_outlined,
+                size: 16,
+                color: AppTokens.warning,
+              ),
+              const SizedBox(width: AppTokens.space6),
+              Text(
+                '推理过程',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppTokens.warning,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppTokens.space8),
+          Text(
+            text,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontSize: 13,
+                  height: 1.65,
+                  color: AppTokens.textSecondary,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+```
+
+## File: lib/data/data_sources/local_file_source.dart
+```dart
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:crypto/crypto.dart';
+import 'package:path/path.dart' as path;
+import '../../core/constants/app_constants.dart';
+import '../../core/errors/exceptions.dart';
+abstract class ILocalFileSource {
+  Future<String> get basePath;
+  Future<void> initDirectories();
+  Future<String> readTextFile(String relativePath);
+  Future<void> writeTextFile(String relativePath, String content);
+  Future<void> deleteFile(String relativePath);
+  Future<List<String>> listFiles(String directory);
+  Future<String> saveAttachment(Uint8List data, String fileName);
+  Future<Uint8List> readAttachment(String relativePath);
+}
+class LocalFileSource implements ILocalFileSource {
+  final String _baseDir;
+  final Directory _directory;
+  LocalFileSource(this._baseDir) : _directory = Directory(_baseDir);
+  @override
+  Future<String> get basePath async => _baseDir;
+  @override
+  Future<void> initDirectories() async {
+    await _directory.create(recursive: true);
+    await Directory(path.join(_baseDir, AppConstants.dirConversations))
+        .create(recursive: true);
+    await Directory(path.join(_baseDir, AppConstants.dirAttachments))
+        .create(recursive: true);
+  }
+  @override
+  Future<String> readTextFile(String relativePath) async {
+    try {
+      final file = File(path.join(_baseDir, relativePath));
+      if (!await file.exists()) {
+        throw const FileException('文件不存在', code: 'FILE_NOT_FOUND');
+      }
+      return await file.readAsString();
+    } on FileSystemException catch (e) {
+      throw FileException('读取文件失败：${e.message}', code: 'READ_ERROR');
+    }
+  }
+  @override
+  Future<void> writeTextFile(String relativePath, String content) async {
+    try {
+      final file = File(path.join(_baseDir, relativePath));
+      final dir = file.parent;
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+      await file.writeAsString(content, flush: true);
+    } on FileSystemException catch (e) {
+      throw FileException('写入文件失败：${e.message}', code: 'WRITE_ERROR');
+    }
+  }
+  @override
+  Future<void> deleteFile(String relativePath) async {
+    try {
+      final file = File(path.join(_baseDir, relativePath));
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } on FileSystemException catch (e) {
+      throw FileException('删除文件失败：${e.message}', code: 'DELETE_ERROR');
+    }
+  }
+  @override
+  Future<List<String>> listFiles(String directory) async {
+    try {
+      final dir = Directory(path.join(_baseDir, directory));
+      if (!await dir.exists()) {
+        return [];
+      }
+      final entities = await dir.list().toList();
+      return entities
+          .whereType<File>()
+          .where((f) => f.path.endsWith(AppConstants.extJson))
+          .map((f) => path.basename(f.path))
+          .toList();
+    } on FileSystemException catch (e) {
+      throw FileException('列出文件失败：${e.message}', code: 'LIST_ERROR');
+    }
+  }
+  @override
+  Future<String> saveAttachment(Uint8List data, String fileName) async {
+    try {
+      final ext = path.extension(fileName).toLowerCase();
+      final hash = sha256.convert(data).toString();
+      final hashedFileName = '$hash$ext';
+      final relativePath = '${AppConstants.dirAttachments}/$hashedFileName';
+      final filePath = path.join(_baseDir, relativePath);
+      final file = File(filePath);
+      if (!await file.exists()) {
+        await file.writeAsBytes(data, flush: true);
+      }
+      return relativePath;
+    } on FileSystemException catch (e) {
+      throw FileException(
+        '保存附件失败：${e.message}',
+        code: 'ATTACHMENT_SAVE_ERROR',
+      );
+    }
+  }
+  @override
+  Future<Uint8List> readAttachment(String relativePath) async {
+    try {
+      final file = File(path.join(_baseDir, relativePath));
+      if (!await file.exists()) {
+        throw const FileException('附件不存在', code: 'ATTACHMENT_NOT_FOUND');
+      }
+      return await file.readAsBytes();
+    } on FileSystemException catch (e) {
+      throw FileException(
+        '读取附件失败：${e.message}',
+        code: 'ATTACHMENT_READ_ERROR',
+      );
+    }
+  }
+}
+```
+
+## File: lib/data/repositories/conversation_repository.dart
+```dart
+import 'dart:typed_data';
+import 'package:synchronized/synchronized.dart';
+import '../../core/interfaces/file_service.dart';
+import '../../core/models/chat_round.dart';
+import '../../core/models/session.dart';
+import '../../core/utils/id_generator.dart';
+class ConversationRepository {
+  final IFileService _fileService;
+  final Map<String, Lock> _locks = {};
+  ConversationRepository(this._fileService);
+  Future<T> _runWithLock<T>(String fileName, Future<T> Function() action) {
+    final lock = _locks.putIfAbsent(fileName, () => Lock());
+    return lock.synchronized(action);
+  }
+  Set<String> _collectAttachmentPaths(Session session) {
+    return session.rounds
+        .expand((round) => round.userAttachments)
+        .map((attachment) => attachment.relativePath)
+        .toSet();
+  }
+  Future<Set<String>> _findRemovableAttachmentPaths({
+    required String targetFileName,
+    required Set<String> candidatePaths,
+  }) async {
+    if (candidatePaths.isEmpty) return <String>{};
+    final allFileNames = await _fileService.getConversationFileList();
+    final otherFileNames =
+        allFileNames.where((name) => name != targetFileName).toList();
+    final referencedByOthers = <String>{};
+    for (final otherFileName in otherFileNames) {
+      try {
+        final otherSession = await _fileService.readSession(otherFileName);
+        for (final round in otherSession.rounds) {
+          for (final attachment in round.userAttachments) {
+            if (candidatePaths.contains(attachment.relativePath)) {
+              referencedByOthers.add(attachment.relativePath);
+            }
+          }
+        }
+      } catch (_) {
+        // 忽略损坏/不可读会话
+      }
+    }
+    return candidatePaths.difference(referencedByOthers);
+  }
+  Future<List<String>> getAllSessionFileNames() async {
+    return await _fileService.getConversationFileList();
+  }
+  Future<Session> getSession(String fileName) async {
+    return _runWithLock(fileName, () async {
+      return await _fileService.readSession(fileName);
+    });
+  }
+  Future<void> saveSession(String fileName, Session session) async {
+    return _runWithLock(fileName, () async {
+      await _fileService.writeSession(fileName, session);
+    });
+  }
+  Future<void> saveSessionAndCleanupOrphanAttachments(
+    String fileName,
+    Session oldSession,
+    Session newSession,
+  ) async {
+    return _runWithLock(fileName, () async {
+      final oldPaths = _collectAttachmentPaths(oldSession);
+      final newPaths = _collectAttachmentPaths(newSession);
+      final removedPaths = oldPaths.difference(newPaths);
+      final removablePaths = await _findRemovableAttachmentPaths(
+        targetFileName: fileName,
+        candidatePaths: removedPaths,
+      );
+      await _fileService.writeSession(fileName, newSession);
+      for (final relativePath in removablePaths) {
+        try {
+          await _fileService.deleteAttachment(relativePath);
+        } catch (_) {
+          // 忽略单个附件删除失败，避免整个流程失败
+        }
+      }
+    });
+  }
+  Future<void> deleteSession(String fileName) async {
+    return _runWithLock(fileName, () async {
+      Session? targetSession;
+      try {
+        targetSession = await _fileService.readSession(fileName);
+      } catch (_) {
+        targetSession = null;
+      }
+      if (targetSession != null) {
+        final targetAttachmentPaths = _collectAttachmentPaths(targetSession);
+        final removablePaths = await _findRemovableAttachmentPaths(
+          targetFileName: fileName,
+          candidatePaths: targetAttachmentPaths,
+        );
+        for (final relativePath in removablePaths) {
+          try {
+            await _fileService.deleteAttachment(relativePath);
+          } catch (_) {
+            // 忽略单个附件删除失败，避免整个会话删除失败
+          }
+        }
+      }
+      await _fileService.deleteSession(fileName);
+    });
+  }
+  Future<String> saveAttachment(Uint8List data, String fileName) async {
+    return await _fileService.saveAttachment(data, fileName);
+  }
+  Future<Uint8List> getAttachment(String relativePath) async {
+    return await _fileService.readAttachment(relativePath);
+  }
+  Future<void> deleteAttachment(String relativePath) async {
+    await _fileService.deleteAttachment(relativePath);
+  }
+  Future<Session> createSession({
+    required String fileName,
+    required String title,
+  }) async {
+    return _runWithLock(fileName, () async {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final session = Session(
+        id: fileName.replaceAll('.json', ''),
+        title: title,
+        createdAt: now,
+        updatedAt: now,
+        rounds: [],
+      );
+      await _fileService.writeSession(fileName, session);
+      return session;
+    });
+  }
+  Future<Session> createSessionWithGeneratedId({
+    required String title,
+  }) async {
+    final sessionId = IdGenerator.generate();
+    final fileName = '$sessionId.json';
+    return await createSession(
+      fileName: fileName,
+      title: title,
+    );
+  }
+  Future<void> updateSessionTitle(String fileName, String title) async {
+    return _runWithLock(fileName, () async {
+      final session = await _fileService.readSession(fileName);
+      final updatedSession = session.copyWith(
+        title: title,
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+      );
+      await _fileService.writeSession(fileName, updatedSession);
+    });
+  }
+  Future<List<Session>> getAllSessions() async {
+    final fileNames = await getAllSessionFileNames();
+    final sessions = <Session>[];
+    for (final fileName in fileNames) {
+      try {
+        final session = await getSession(fileName);
+        sessions.add(session);
+      } catch (_) {
+        // 忽略损坏/不可读的会话文件，避免整个列表崩掉
+      }
+    }
+    sessions.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return sessions;
+  }
+  Future<void> appendRound(String fileName, ChatRound round) async {
+    return _runWithLock(fileName, () async {
+      final session = await _fileService.readSession(fileName);
+      final updatedSession = session.copyWith(
+        rounds: [...session.rounds, round],
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+      );
+      await _fileService.writeSession(fileName, updatedSession);
+    });
+  }
+  Future<void> updateRound(
+    String fileName,
+    String roundId,
+    ChatRound updatedRound,
+  ) async {
+    return _runWithLock(fileName, () async {
+      final session = await _fileService.readSession(fileName);
+      final updatedRounds = session.rounds.map((round) {
+        if (round.id == roundId) {
+          return updatedRound;
+        }
+        return round;
+      }).toList();
+      final updatedSession = session.copyWith(
+        rounds: updatedRounds,
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+      );
+      await _fileService.writeSession(fileName, updatedSession);
+    });
+  }
+}
+```
+
+## File: lib/domain/services/chat_round_factory.dart
+```dart
+import '../../core/models/attachment.dart';
+import '../../core/models/chat_round.dart';
+import '../../core/utils/id_generator.dart';
+class ChatRoundFactory {
+  static ChatRound createUserRound({
+    required String content,
+    required String? parentId,
+    required List<Attachment> attachments,
+  }) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return ChatRound(
+      id: IdGenerator.generate(),
+      parentId: parentId,
+      createdAt: now,
+      userContent: content,
+      userAttachments: attachments,
+      isIncomplete: true,
+    );
+  }
+  static ChatRound createRetryRound({
+    required ChatRound sourceRound,
+  }) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return ChatRound(
+      id: IdGenerator.generate(),
+      parentId: sourceRound.parentId,
+      createdAt: now,
+      userContent: sourceRound.userContent,
+      userAttachments: sourceRound.userAttachments,
+      isIncomplete: true,
+    );
+  }
+  static ChatRound createEditedRetryRound({
+    required ChatRound sourceRound,
+    required String newContent,
+    required List<Attachment> attachments,
+  }) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return ChatRound(
+      id: IdGenerator.generate(),
+      parentId: sourceRound.parentId,
+      createdAt: now,
+      userContent: newContent,
+      userAttachments: attachments,
+      isIncomplete: true,
+    );
+  }
+  static ChatRound completeRound({
+    required ChatRound round,
+    required String content,
+    required String reasoning,
+  }) {
+    return round.copyWith(
+      assistantThinking: reasoning.trim().isEmpty ? null : reasoning,
+      assistantContent: content.trim().isEmpty ? null : content,
+      isIncomplete: false,
+    );
+  }
+}
+```
+
+## File: lib/presentation/pages/chat_page.dart
+```dart
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/attachment.dart';
+import '../../core/models/chat_round.dart';
+import '../../core/utils/time_format_utils.dart';
+import '../models/pending_attachment.dart';
+import '../providers/chat_notifier.dart';
+import '../providers/input_draft_provider.dart';
+import '../themes/app_tokens.dart';
+import '../widgets/attachment_list.dart';
+import '../widgets/input_bar.dart';
+import '../widgets/message_bubble.dart';
+import '../widgets/thought_bubble.dart';
+import '../widgets/common/app_card.dart';
+import '../widgets/common/app_page_scaffold.dart';
+import 'branch_tree_page.dart';
+class ChatPage extends ConsumerStatefulWidget {
+  final String fileName;
+  final String? initialMessage;
+  final List<PendingAttachment>? initialAttachments;
+  const ChatPage({
+    super.key,
+    required this.fileName,
+    this.initialMessage,
+    this.initialAttachments,
+  });
+  @override
+  ConsumerState<ChatPage> createState() => _ChatPageState();
+}
+class _ChatPageState extends ConsumerState<ChatPage> {
+  late final PageController _pageController;
+  bool _initialMessageHandled = false;
+  bool _isSyncingPageFromState = false;
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+    Future.microtask(() async {
+      await ref.read(chatProvider(widget.fileName).notifier).loadSession();
+      final message = widget.initialMessage?.trim() ?? '';
+      final attachments =
+          widget.initialAttachments ?? const <PendingAttachment>[];
+      final hasMessage = message.isNotEmpty;
+      final hasAttachments = attachments.isNotEmpty;
+      if (!_initialMessageHandled &&
+          (hasMessage || hasAttachments) &&
+          mounted) {
+        _initialMessageHandled = true;
+        await ref.read(chatProvider(widget.fileName).notifier).sendMessage(
+              message,
+              attachments: attachments,
+            );
+      }
+    });
+  }
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+  Future<void> _copyText(String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('已复制到剪贴板')),
+    );
+  }
+  void _enterEditMode(String roundId, String text) {
+    ref.read(globalInputDraftProvider.notifier).state = text;
+    ref.read(globalEditSourceRoundIdProvider.notifier).state = roundId;
+    FocusScope.of(context).unfocus();
+  }
+  void _cancelEditMode() {
+    ref.read(globalEditSourceRoundIdProvider.notifier).state = null;
+  }
+  void _syncPageController(int targetIndex) {
+    if (!_pageController.hasClients) return;
+    final currentPage = _pageController.page?.round() ?? _pageController.initialPage;
+    if (currentPage == targetIndex) return;
+    _isSyncingPageFromState = true;
+    _pageController
+        .animateToPage(
+          targetIndex,
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOutCubic,
+        )
+        .whenComplete(() {
+      _isSyncingPageFromState = false;
+    });
+  }
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(chatProvider(widget.fileName));
+    final notifier = ref.read(chatProvider(widget.fileName).notifier);
+    final editSourceRoundId = ref.watch(globalEditSourceRoundIdProvider);
+    final isEditMode = editSourceRoundId != null;
+    final hasPages =
+        state.pageList != null && state.pageList!.pages.isNotEmpty;
+    final currentIndex = hasPages ? state.pageList!.currentPageIndex : 0;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!hasPages) return;
+      if (_isSyncingPageFromState) return;
+      _syncPageController(currentIndex);
+    });
+    return AppPageScaffold(
+      appBar: AppBar(
+        title: Text(
+          state.session?.title ?? '对话',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+        actions: [
+          if (state.session != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: IconButton(
+                tooltip: isEditMode ? '编辑模式下不可切换页面' : '查看分支树',
+                icon: const Icon(Icons.account_tree_outlined),
+                onPressed: isEditMode
+                    ? null
+                    : () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => BranchTreePage(
+                              session: state.session!,
+                              fileName: widget.fileName,
+                            ),
+                          ),
+                        );
+                      },
+              ),
+            ),
+        ],
+      ),
+      body: Column(
+        children: [
+          if (state.pageList != null && state.pageList!.totalPages > 0)
+            _PaginationBar(
+              currentIndex: state.pageList!.currentPageIndex,
+              totalPages: state.pageList!.totalPages,
+              onPrev: isEditMode
+                  ? null
+                  : state.pageList!.currentPageIndex > 0
+                      ? () => _pageController.previousPage(
+                            duration: const Duration(milliseconds: 260),
+                            curve: Curves.easeOutCubic,
+                          )
+                      : null,
+              onNext: isEditMode
+                  ? null
+                  : state.pageList!.currentPageIndex <
+                          state.pageList!.totalPages - 1
+                      ? () => _pageController.nextPage(
+                            duration: const Duration(milliseconds: 260),
+                            curve: Curves.easeOutCubic,
+                          )
+                      : null,
+              isEditMode: isEditMode,
+            ),
+          if (isEditMode)
+            _EditModeBanner(
+              onCancel: _cancelEditMode,
+            ),
+          Expanded(
+            child: state.isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : state.session == null
+                    ? _buildErrorState(state.error ?? '会话不存在')
+                    : !hasPages && state.activeStreams.isEmpty
+                        ? _buildWelcomeEmpty(context)
+                        : PageView.builder(
+                            controller: _pageController,
+                            physics: isEditMode
+                                ? const NeverScrollableScrollPhysics()
+                                : const PageScrollPhysics(),
+                            itemCount: state.pageList?.pages.length ?? 0,
+                            onPageChanged: (index) {
+                              if (state.pageList == null) return;
+                              if (index == state.pageList!.currentPageIndex) {
+                                return;
+                              }
+                              notifier.changePage(index);
+                            },
+                            itemBuilder: (context, index) {
+                              final round = state.pageList!.pages[index].round;
+                              final canEdit =
+                                  !state.activeStreams.containsKey(round.id);
+                              return _ChatRoundPage(
+                                key: ValueKey(round.id),
+                                fileName: widget.fileName,
+                                round: round,
+                                canEdit: canEdit,
+                                errorMessage:
+                                    index == currentIndex ? state.error : null,
+                                onRetryReply: () =>
+                                    notifier.retryFromRound(round.id),
+                                onEdit: canEdit
+                                    ? () => _enterEditMode(
+                                          round.id,
+                                          round.userContent,
+                                        )
+                                    : null,
+                                onCopyText: _copyText,
+                              );
+                            },
+                          ),
+          ),
+          InputBar(
+            hintText: isEditMode ? '修改文本后发送（保留原附件）' : '发送消息',
+            isStreaming: hasPages
+                ? state.activeStreams.containsKey(
+                    state.pageList!.pages[state.pageList!.currentPageIndex].round.id,
+                  )
+                : false,
+            onStop: notifier.stopGeneration,
+            onSend: (text, attachments) async {
+              if (editSourceRoundId != null) {
+                await notifier.editAndResendFromRound(
+                  editSourceRoundId,
+                  text,
+                  attachments: attachments,
+                );
+                ref.read(globalEditSourceRoundIdProvider.notifier).state = null;
+                ref.read(globalInputDraftProvider.notifier).state = '';
+                ref.read(globalAttachmentDraftProvider.notifier).state = [];
+                return;
+              }
+              await notifier.sendMessage(text, attachments: attachments);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+  Widget _buildErrorState(String message) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: AppCard(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.error_outline,
+                size: 40,
+                color: AppTokens.danger,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '无法加载会话',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  Widget _buildWelcomeEmpty(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: AppCard(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 68,
+                height: 68,
+                decoration: BoxDecoration(
+                  color: AppTokens.primarySoft,
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: const Icon(
+                  Icons.auto_awesome_outlined,
+                  size: 30,
+                  color: AppTokens.primary,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                '开始一段新的对话',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                '你可以输入问题、上传图片或文件，并在不同分支中回看每一轮回复。',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppTokens.textSecondary,
+                    ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+class _ChatRoundPage extends StatelessWidget {
+  final String fileName;
+  final ChatRound round;
+  final bool canEdit;
+  final String? errorMessage;
+  final VoidCallback onRetryReply;
+  final VoidCallback? onEdit;
+  final Future<void> Function(String text) onCopyText;
+  const _ChatRoundPage({
+    super.key,
+    required this.fileName,
+    required this.round,
+    required this.canEdit,
+    required this.errorMessage,
+    required this.onRetryReply,
+    required this.onEdit,
+    required this.onCopyText,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final hasUser = round.userContent.trim().isNotEmpty;
+    final hasAttachments = round.userAttachments.isNotEmpty;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      children: [
+        AppCard(
+          padding: const EdgeInsets.all(AppTokens.space16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _RoundHeader(createdAt: round.createdAt),
+              const SizedBox(height: AppTokens.space16),
+              const _SectionLabel(
+                icon: Icons.person_outline,
+                text: '你的输入',
+              ),
+              const SizedBox(height: AppTokens.space10),
+              if (hasUser)
+                MessageBubble(
+                  content: round.userContent,
+                  isUser: true,
+                  onCopy: () => onCopyText(round.userContent),
+                  onRetryReply: onRetryReply,
+                  onEdit: onEdit,
+                ),
+              if (hasAttachments) ...[
+                if (hasUser) const SizedBox(height: AppTokens.space8),
+                AttachmentList(
+                  attachments: round.userAttachments,
+                  rightAligned: true,
+                ),
+              ],
+              _RoundAnswerSection(
+                fileName: fileName,
+                roundId: round.id,
+                savedThinking: round.assistantThinking,
+                savedAssistantContent: round.assistantContent,
+                onRetryReply: onRetryReply,
+                onCopyText: onCopyText,
+              ),
+            ],
+          ),
+        ),
+        if ((errorMessage ?? '').trim().isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 16),
+            child: _InlineErrorCard(message: errorMessage!),
+          ),
+      ],
+    );
+  }
+}
+class _RoundAnswerSection extends ConsumerWidget {
+  final String fileName;
+  final String roundId;
+  final String? savedThinking;
+  final String? savedAssistantContent;
+  final VoidCallback onRetryReply;
+  final Future<void> Function(String text) onCopyText;
+  const _RoundAnswerSection({
+    required this.fileName,
+    required this.roundId,
+    required this.savedThinking,
+    required this.savedAssistantContent,
+    required this.onRetryReply,
+    required this.onCopyText,
+  });
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(chatProvider(fileName));
+    final streamStatus = state.activeStreams[roundId];
+    final isStreaming = streamStatus != null;
+    final thinking = isStreaming ? streamStatus.reasoning : savedThinking;
+    final assistantContent =
+        isStreaming ? streamStatus.content : savedAssistantContent;
+    final hasThinking = (thinking ?? '').trim().isNotEmpty;
+    final hasAssistant = (assistantContent ?? '').trim().isNotEmpty;
+    if (!hasThinking && !hasAssistant && !isStreaming) {
+      return const SizedBox.shrink();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (hasThinking) ...[
+          const SizedBox(height: AppTokens.space20),
+          const Divider(),
+          const SizedBox(height: AppTokens.space16),
+          const _SectionLabel(
+            icon: Icons.psychology_alt_outlined,
+            text: '推理过程',
+          ),
+          const SizedBox(height: AppTokens.space10),
+          ThoughtBubble(content: thinking!),
+        ],
+        if (hasAssistant || isStreaming) ...[
+          const SizedBox(height: AppTokens.space20),
+          const Divider(),
+          const SizedBox(height: AppTokens.space16),
+          const _SectionLabel(
+            icon: Icons.smart_toy_outlined,
+            text: '回答',
+          ),
+          const SizedBox(height: AppTokens.space10),
+          if (hasAssistant)
+            MessageBubble(
+              content: assistantContent!,
+              isUser: false,
+              onCopy: () => onCopyText(assistantContent),
+              onRetryReply: onRetryReply,
+            )
+          else
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(AppTokens.space16),
+              decoration: BoxDecoration(
+                color: AppTokens.surfaceSoft,
+                borderRadius: AppTokens.brLg,
+                border: Border.all(color: AppTokens.border),
+              ),
+              child: Row(
+                children: const [
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: AppTokens.space12),
+                  Text(
+                    '正在生成回答...',
+                    style: TextStyle(
+                      color: AppTokens.textSecondary,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+}
+class _EditModeBanner extends StatelessWidget {
+  final VoidCallback onCancel;
+  const _EditModeBanner({
+    required this.onCancel,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 10,
+      ),
+      decoration: BoxDecoration(
+        color: AppTokens.warningSoft,
+        borderRadius: AppTokens.brMd,
+        border: Border.all(
+          color: AppTokens.warning.withOpacity(0.18),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.edit_outlined,
+            size: 16,
+            color: AppTokens.warning,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '正在编辑重试，发送前不可切换页面，发送时将保留原附件',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTokens.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+          ),
+          TextButton(
+            onPressed: onCancel,
+            child: const Text('取消编辑'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+class _RoundHeader extends StatelessWidget {
+  final int createdAt;
+  const _RoundHeader({
+    required this.createdAt,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppTokens.space12,
+            vertical: AppTokens.space6,
+          ),
+          decoration: BoxDecoration(
+            color: AppTokens.surfaceMuted,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: AppTokens.border),
+          ),
+          child: Text(
+            TimeFormatUtils.formatTimestamp(createdAt),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+class _SectionLabel extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _SectionLabel({
+    required this.icon,
+    required this.text,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 17,
+          color: AppTokens.primary,
+        ),
+        const SizedBox(width: AppTokens.space6),
+        Text(
+          text,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppTokens.textPrimary,
+              ),
+        ),
+      ],
+    );
+  }
+}
+class _InlineErrorCard extends StatelessWidget {
+  final String message;
+  const _InlineErrorCard({
+    required this.message,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppTokens.space12),
+      decoration: BoxDecoration(
+        color: AppTokens.dangerSoft,
+        borderRadius: AppTokens.brMd,
+        border: Border.all(
+          color: AppTokens.danger.withOpacity(0.18),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 1),
+            child: Icon(
+              Icons.error_outline,
+              size: 16,
+              color: AppTokens.danger,
+            ),
+          ),
+          const SizedBox(width: AppTokens.space8),
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTokens.danger,
+                    height: 1.55,
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+class _PaginationBar extends StatelessWidget {
+  final int currentIndex;
+  final int totalPages;
+  final VoidCallback? onPrev;
+  final VoidCallback? onNext;
+  final bool isEditMode;
+  const _PaginationBar({
+    required this.currentIndex,
+    required this.totalPages,
+    required this.onPrev,
+    required this.onNext,
+    required this.isEditMode,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final progress =
+        totalPages == 0 ? 0.0 : (currentIndex + 1).clamp(0, totalPages) / totalPages;
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppTokens.surface,
+        border: Border(
+          bottom: BorderSide(color: AppTokens.border),
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      child: Row(
+        children: [
+          _PagerButton(
+            icon: Icons.chevron_left_rounded,
+            onTap: onPrev,
+          ),
+          const SizedBox(width: AppTokens.space10),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  isEditMode
+                      ? '编辑中｜第 ${currentIndex + 1} 页 / 共 $totalPages 页'
+                      : '第 ${currentIndex + 1} 页 / 共 $totalPages 页',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppTokens.textPrimary,
+                      ),
+                ),
+                const SizedBox(height: AppTokens.space8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 6,
+                    backgroundColor: AppTokens.surfaceMuted,
+                    valueColor:
+                        const AlwaysStoppedAnimation(AppTokens.primary),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppTokens.space10),
+          _PagerButton(
+            icon: Icons.chevron_right_rounded,
+            onTap: onNext,
+          ),
+        ],
+      ),
+    );
+  }
+}
+class _PagerButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+  const _PagerButton({
+    required this.icon,
+    required this.onTap,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: AppTokens.brMd,
+      child: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: enabled ? AppTokens.surfaceSoft : AppTokens.surfaceMuted,
+          borderRadius: AppTokens.brMd,
+          border: Border.all(color: AppTokens.border),
+        ),
+        child: Icon(
+          icon,
+          color: enabled ? AppTokens.textPrimary : AppTokens.textTertiary,
+        ),
+      ),
+    );
+  }
+}
+```
+
+## File: lib/presentation/pages/home_page.dart
+```dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
+import '../../core/models/session.dart';
+import '../../core/utils/time_format_utils.dart';
+import '../providers/global_streaming_provider.dart';
+import '../providers/session_card_provider.dart';
+import '../providers/session_list_notifier.dart';
+import '../themes/app_tokens.dart';
+import '../widgets/common/app_badge.dart';
+import '../widgets/common/app_card.dart';
+import '../widgets/common/app_page_scaffold.dart';
+import '../widgets/input_bar.dart';
+import 'chat_page.dart';
+import 'settings_page.dart';
+class HomePage extends ConsumerWidget {
+  const HomePage({super.key});
+  Future<void> _showRenameDialog(
+    BuildContext context,
+    SessionListNotifier notifier,
+    Session session,
+    WidgetRef ref,
+  ) async {
+    final controller = TextEditingController(text: session.title);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: AppTokens.brLg,
+        ),
+        title: Text(
+          '重命名会话',
+          style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: '输入新的会话名称',
+          ),
+          onSubmitted: (value) => Navigator.of(ctx).pop(value.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    if (result != null && result.isNotEmpty && result != session.title) {
+      await notifier.updateSessionTitle('${session.id}.json', result);
+      ref.invalidate(sessionFileNamesProvider);
+      ref.invalidate(sessionCardProvider('${session.id}.json'));
+    }
+  }
+  Future<void> _showDeleteConfirmDialog(
+    BuildContext context,
+    SessionListNotifier notifier,
+    Session session,
+    WidgetRef ref,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: AppTokens.brLg,
+        ),
+        title: Text(
+          '删除会话',
+          style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+        content: Text(
+          '确定要删除 “${session.title}” 吗？\n此操作无法撤销。',
+          style: Theme.of(ctx).textTheme.bodyMedium,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppTokens.danger,
+            ),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await notifier.deleteSession('${session.id}.json');
+      ref.invalidate(sessionFileNamesProvider);
+      ref.invalidate(sessionCardProvider('${session.id}.json'));
+    }
+  }
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final notifier = ref.read(sessionListProvider.notifier);
+    final fileNamesAsync = ref.watch(sessionFileNamesProvider);
+    return AppPageScaffold(
+      appBar: AppBar(
+        title: Text(
+          'AI Chat',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: IconButton(
+              tooltip: '设置',
+              icon: const Icon(Icons.settings_outlined),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const SettingsPage(),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: fileNamesAsync.when(
+              loading: () => const Center(
+                child: CircularProgressIndicator(),
+              ),
+              error: (e, st) => _HomeErrorState(
+                message: '加载会话失败：$e',
+                onRetry: () async {
+                  ref.invalidate(sessionFileNamesProvider);
+                },
+              ),
+              data: (fileNames) {
+                if (fileNames.isEmpty) {
+                  return const _HomeEmptyState();
+                }
+                return RefreshIndicator(
+                  onRefresh: () async {
+                    ref.invalidate(sessionFileNamesProvider);
+                  },
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                    children: [
+                      ...fileNames.map((fileName) {
+                        return Padding(
+                          padding:
+                              const EdgeInsets.only(bottom: AppTokens.space12),
+                          child: _SessionCard(
+                            fileName: fileName,
+                            notifier: notifier,
+                            onRename: (session) =>
+                                _showRenameDialog(context, notifier, session, ref),
+                            onDelete: (session) =>
+                                _showDeleteConfirmDialog(context, notifier, session, ref),
+                          ),
+                        );
+                      }),
+                      const SizedBox(height: 12),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          InputBar(
+            hintText: '发送消息',
+            onSend: (content, attachments) async {
+              final newFileName = await notifier.createSession('新对话');
+              ref.invalidate(sessionFileNamesProvider);
+              ref.invalidate(sessionCardProvider(newFileName));
+              if (context.mounted) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ChatPage(
+                      fileName: newFileName,
+                      initialMessage: content,
+                      initialAttachments: attachments,
+                    ),
+                  ),
+                );
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+class _HomeEmptyState extends StatelessWidget {
+  const _HomeEmptyState();
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: AppCard(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: AppTokens.primarySoft,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: const Icon(
+                  Icons.auto_awesome_outlined,
+                  size: 32,
+                  color: AppTokens.primary,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                '开始你的第一段对话',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                '在下方输入问题，系统会自动创建一个新会话。\n你也可以附加图片或文件开始交流。',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppTokens.textSecondary,
+                    ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+class _HomeErrorState extends StatelessWidget {
+  final String message;
+  final Future<void> Function() onRetry;
+  const _HomeErrorState({
+    required this.message,
+    required this.onRetry,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: AppCard(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.error_outline,
+                size: 40,
+                color: AppTokens.danger,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '出现了一点问题',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh),
+                label: const Text('重试'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+class _SessionCard extends ConsumerWidget {
+  final String fileName;
+  final SessionListNotifier notifier;
+  final Future<void> Function(Session session) onRename;
+  final Future<void> Function(Session session) onDelete;
+  const _SessionCard({
+    required this.fileName,
+    required this.notifier,
+    required this.onRename,
+    required this.onDelete,
+  });
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sessionAsync = ref.watch(sessionCardProvider(fileName));
+    final streamingSessions = ref.watch(globalStreamingSessionsProvider);
+    final isStreaming = streamingSessions.contains(fileName);
+    return sessionAsync.when(
+      loading: () => AppCard(
+        padding: const EdgeInsets.all(16),
+        boxShadow: AppTokens.shadowSm,
+        child: const SizedBox(
+          height: 88,
+          child: Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      ),
+      error: (e, st) => AppCard(
+        padding: const EdgeInsets.all(16),
+        boxShadow: AppTokens.shadowSm,
+        child: Text(
+          '会话读取失败：$e',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppTokens.danger,
+              ),
+        ),
+      ),
+      data: (session) {
+        final roundCount = session.rounds.length;
+        final updatedAt = TimeFormatUtils.formatTimestamp(session.updatedAt);
+        final preview = _buildLatestPreview(session);
+        return Slidable(
+          key: ValueKey(fileName),
+          endActionPane: ActionPane(
+            motion: const DrawerMotion(),
+            extentRatio: 0.34,
+            children: [
+              CustomSlidableAction(
+                onPressed: (_) => onRename(session),
+                backgroundColor: AppTokens.info,
+                borderRadius: AppTokens.brLg,
+                child: const Icon(
+                  Icons.edit_outlined,
+                  color: Colors.white,
+                ),
+              ),
+              CustomSlidableAction(
+                onPressed: (_) => onDelete(session),
+                backgroundColor: AppTokens.danger,
+                borderRadius: AppTokens.brLg,
+                child: const Icon(
+                  Icons.delete_outline,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ChatPage(
+                      fileName: fileName,
+                    ),
+                  ),
+                );
+              },
+              borderRadius: AppTokens.brLg,
+              child: AppCard(
+                padding: const EdgeInsets.all(16),
+                boxShadow: AppTokens.shadowSm,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: AppTokens.surfaceSoft,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppTokens.border),
+                      ),
+                      child: const Icon(
+                        Icons.forum_outlined,
+                        color: AppTokens.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(width: AppTokens.space12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  session.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                ),
+                              ),
+                              if (isStreaming) ...[
+                                const SizedBox(width: 8),
+                                AppBadge.info(
+                                  '生成中',
+                                  icon: Icons.bolt_outlined,
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _PreviewLine(
+                                label: 'YOU',
+                                text: preview.userPreview,
+                                color: AppTokens.info,
+                              ),
+                              const SizedBox(height: 4),
+                              _PreviewLine(
+                                label: 'AI',
+                                text: preview.aiPreview,
+                                color: AppTokens.success,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              AppBadge.info(
+                                '$roundCount 轮',
+                                icon: Icons.chat_bubble_outline,
+                              ),
+                              AppBadge.primary(
+                                updatedAt,
+                                icon: Icons.schedule_outlined,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppTokens.space8),
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: AppTokens.surfaceSoft,
+                        borderRadius: AppTokens.brMd,
+                        border: Border.all(color: AppTokens.border),
+                      ),
+                      child: const Icon(
+                        Icons.chevron_right_rounded,
+                        color: AppTokens.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+  _SessionPreview _buildLatestPreview(Session session) {
+    if (session.rounds.isEmpty) {
+      return const _SessionPreview(
+        userPreview: '点击开始新的对话',
+        aiPreview: '等待助手回复',
+      );
+    }
+    final latest = session.rounds.last;
+    final user = latest.userContent.trim().isEmpty
+        ? '（空输入）'
+        : latest.userContent.trim();
+    final ai = (latest.assistantContent ?? '').trim().isEmpty
+        ? '（等待回复）'
+        : latest.assistantContent!.trim();
+    return _SessionPreview(
+      userPreview: user,
+      aiPreview: ai,
+    );
+  }
+}
+class _SessionPreview {
+  final String userPreview;
+  final String aiPreview;
+  const _SessionPreview({
+    required this.userPreview,
+    required this.aiPreview,
+  });
+}
+class _PreviewLine extends StatelessWidget {
+  final String label;
+  final String text;
+  final Color color;
+  const _PreviewLine({
+    required this.label,
+    required this.text,
+    required this.color,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$label  ',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+        ),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontSize: 13,
+                  color: AppTokens.textSecondary,
+                  height: 1.4,
+                ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+```
+
+## File: lib/presentation/providers/attachment_bytes_provider.dart
+```dart
+import 'dart:typed_data';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../di/providers.dart';
+final attachmentBytesProvider =
+    FutureProvider.autoDispose.family<Uint8List, String>(
+  (ref, relativePath) async {
+    final repository = ref.read(conversationRepositoryProvider);
+    return repository.getAttachment(relativePath);
+  },
+);
+```
+
+## File: lib/presentation/providers/chat_notifier.dart
+```dart
+import 'package:collection/collection.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/api_message.dart';
+import '../../core/models/app_config.dart';
+import '../../core/models/chat_round.dart';
+import '../../core/models/model_info.dart';
+import '../../di/providers.dart';
+import '../../domain/models/chat_page.dart';
+import '../../domain/services/attachment_preparer.dart';
+import '../../domain/services/branch_navigator.dart';
+import '../../domain/services/chat_context_builder.dart';
+import '../../domain/services/chat_round_factory.dart';
+import '../../domain/services/chat_stream_accumulator.dart';
+import '../../domain/services/chat_view_state_builder.dart';
+import '../../domain/states/chat_state.dart';
+import '../models/pending_attachment.dart';
+import 'global_streaming_provider.dart';
+import 'session_card_provider.dart';
+class ChatNotifier extends StateNotifier<ChatState> {
+  final Ref ref;
+  final String fileName;
+  ChatNotifier(this.ref, this.fileName) : super(ChatState.initial());
+  Future<void> loadSession() async {
+    state = state.copyWithLoading(true);
+    try {
+      final repository = ref.read(conversationRepositoryProvider);
+      final session = await repository.getSession(fileName);
+      final viewState = ChatViewStateBuilder.buildInitial(session);
+      state = state.copyWithSession(session).copyWith(
+            currentRoundId: viewState.currentRoundId,
+            pageList: viewState.pageList,
+            error: null,
+          );
+    } catch (e) {
+      state = state.copyWithError(e.toString());
+    }
+  }
+  void _markSessionStreaming(bool streaming) {
+    final notifier = ref.read(globalStreamingSessionsProvider.notifier);
+    final current = <String>{...notifier.state};
+    if (streaming) {
+      current.add(fileName);
+    } else {
+      current.remove(fileName);
+    }
+    notifier.state = current;
+  }
+  ModelInfo? _findSelectedModelInfo(AppConfig config) {
+    final selectedId = config.selectedModel;
+    if (selectedId == null || selectedId.trim().isEmpty) return null;
+    final models = config.availableModels ?? const <ModelInfo>[];
+    return models.firstWhereOrNull((m) => m.id == selectedId);
+  }
+  bool _shouldEnableReasoning(AppConfig config) {
+    final selectedModel = _findSelectedModelInfo(config);
+    return selectedModel?.supportsReasoning == true;
+  }
+  void _validateRequestCapability({
+    required AppConfig config,
+    required List<PendingAttachment> attachments,
+  }) {
+    final selectedModel = _findSelectedModelInfo(config);
+    if (selectedModel == null) return;
+    final hasImage = attachments.any((a) => a.isImage);
+    if (hasImage && selectedModel.supportsVision != true) {
+      throw Exception('当前模型未声明支持图片输入');
+    }
+  }
+  Future<void> sendMessage(
+    String content, {
+    List<PendingAttachment>? attachments,
+  }) async {
+    if (state.session == null) {
+      state = state.copyWithError('会话未初始化');
+      return;
+    }
+    try {
+      final pendingAttachments = attachments ?? const <PendingAttachment>[];
+      final repository = ref.read(conversationRepositoryProvider);
+      final config = await ref.read(configRepositoryProvider).getConfig();
+      _validateRequestCapability(
+        config: config,
+        attachments: pendingAttachments,
+      );
+      final savedAttachments = await AttachmentPreparer.savePendingAttachments(
+        repository,
+        pendingAttachments,
+      );
+      final round = ChatRoundFactory.createUserRound(
+        content: content,
+        parentId: state.currentRoundId,
+        attachments: savedAttachments,
+      );
+      await _appendRoundAndEnterStreaming(round);
+      final updatedSession = await repository.getSession(fileName);
+      final contextRounds =
+          BranchNavigator.getCurrentBranchPath(updatedSession, round.id);
+      final apiContext = await ChatContextBuilder.buildFromRounds(
+        contextRounds,
+        repository,
+      );
+      _handleStreamTask(round, apiContext, config);
+    } catch (e) {
+      state = state.copyWithError(e.toString());
+    }
+  }
+  Future<void> retryFromRound(String roundId) async {
+    if (state.session == null) {
+      state = state.copyWithError('会话未初始化');
+      return;
+    }
+    try {
+      final repository = ref.read(conversationRepositoryProvider);
+      final config = await ref.read(configRepositoryProvider).getConfig();
+      final sourceRound =
+          state.session!.rounds.firstWhereOrNull((round) => round.id == roundId);
+      if (sourceRound == null) {
+        state = state.copyWithError('未找到要重新回复的对话');
+        return;
+      }
+      final selectedModel = _findSelectedModelInfo(config);
+      if (selectedModel != null) {
+        final hasImage = sourceRound.userAttachments.any((a) => a.isImage);
+        if (hasImage && selectedModel.supportsVision != true) {
+          state = state.copyWithError('当前模型未声明支持图片输入');
+          return;
+        }
+      }
+      final newRound = ChatRoundFactory.createRetryRound(
+        sourceRound: sourceRound,
+      );
+      await _appendRoundAndEnterStreaming(newRound);
+      final updatedSession = await repository.getSession(fileName);
+      final contextRounds =
+          BranchNavigator.getCurrentBranchPath(updatedSession, newRound.id);
+      final apiContext = await ChatContextBuilder.buildFromRounds(
+        contextRounds,
+        repository,
+      );
+      _handleStreamTask(newRound, apiContext, config);
+    } catch (e) {
+      state = state.copyWithError(e.toString());
+    }
+  }
+  Future<void> editAndResendFromRound(
+    String roundId,
+    String newContent, {
+    List<PendingAttachment>? attachments,
+  }) async {
+    if (state.session == null) {
+      state = state.copyWithError('会话未初始化');
+      return;
+    }
+    try {
+      final repository = ref.read(conversationRepositoryProvider);
+      final config = await ref.read(configRepositoryProvider).getConfig();
+      final pendingAttachments = attachments ?? const <PendingAttachment>[];
+      _validateRequestCapability(
+        config: config,
+        attachments: pendingAttachments,
+      );
+      final sourceRound =
+          state.session!.rounds.firstWhereOrNull((round) => round.id == roundId);
+      if (sourceRound == null) {
+        state = state.copyWithError('未找到要编辑重试的对话');
+        return;
+      }
+      final selectedModel = _findSelectedModelInfo(config);
+      if (selectedModel != null) {
+        final hasImage = sourceRound.userAttachments.any((a) => a.isImage) ||
+            pendingAttachments.any((a) => a.isImage);
+        if (hasImage && selectedModel.supportsVision != true) {
+          state = state.copyWithError('当前模型未声明支持图片输入');
+          return;
+        }
+      }
+      final savedAttachments = await AttachmentPreparer.savePendingAttachments(
+        repository,
+        pendingAttachments,
+      );
+      final mergedAttachments = [
+        ...sourceRound.userAttachments,
+        ...savedAttachments,
+      ];
+      final newRound = ChatRoundFactory.createEditedRetryRound(
+        sourceRound: sourceRound,
+        newContent: newContent,
+        attachments: mergedAttachments,
+      );
+      await _appendRoundAndEnterStreaming(newRound);
+      final updatedSession = await repository.getSession(fileName);
+      final contextRounds =
+          BranchNavigator.getCurrentBranchPath(updatedSession, newRound.id);
+      final apiContext = await ChatContextBuilder.buildFromRounds(
+        contextRounds,
+        repository,
+      );
+      _handleStreamTask(newRound, apiContext, config);
+    } catch (e) {
+      state = state.copyWithError(e.toString());
+    }
+  }
+  Future<void> _appendRoundAndEnterStreaming(ChatRound round) async {
+    final repository = ref.read(conversationRepositoryProvider);
+    await repository.appendRound(fileName, round);
+    final updatedSession = await repository.getSession(fileName);
+    final viewState = ChatViewStateBuilder.buildForRound(updatedSession, round.id);
+    final newActiveStreams = Map<String, StreamStatus>.from(state.activeStreams);
+    newActiveStreams[round.id] = const StreamStatus();
+    _markSessionStreaming(true);
+    state = state.copyWithSession(updatedSession).copyWith(
+          currentRoundId: viewState.currentRoundId,
+          pageList: viewState.pageList,
+          activeStreams: newActiveStreams,
+          error: null,
+        );
+  }
+  Future<void> _handleStreamTask(
+    ChatRound round,
+    List<ApiMessage> apiContext,
+    AppConfig config,
+  ) async {
+    final apiService = ref.read(apiServiceProvider);
+    final accumulator = ChatStreamAccumulator();
+    try {
+      final stream = apiService.chatStream(
+        taskId: round.id,
+        baseUrl: config.baseUrl,
+        apiKey: config.apiKey,
+        chatPath: config.chatPath,
+        apiMode: config.apiMode,
+        model: config.selectedModel ?? 'unknown-model',
+        context: apiContext,
+        enableReasoning: _shouldEnableReasoning(config),
+      );
+      await for (final chunk in stream) {
+        if (chunk.error != null) {
+          _markSessionStreaming(false);
+          ref.invalidate(sessionCardProvider(fileName));
+          state = state.copyWithStreaming(round.id, error: chunk.error);
+          return;
+        }
+        if (!chunk.isDone) {
+          accumulator.add(chunk);
+          state = state.copyWithStreaming(
+            round.id,
+            content: accumulator.content,
+            reasoning: accumulator.reasoning,
+            isDone: false,
+          );
+        } else {
+          break;
+        }
+      }
+      final updatedRound = ChatRoundFactory.completeRound(
+        round: round,
+        content: accumulator.content,
+        reasoning: accumulator.reasoning,
+      );
+      final repository = ref.read(conversationRepositoryProvider);
+      await repository.updateRound(fileName, round.id, updatedRound);
+      final finalSession = await repository.getSession(fileName);
+      final finalPageList = _replaceRoundInCurrentPages(updatedRound);
+      _markSessionStreaming(false);
+      ref.invalidate(sessionCardProvider(fileName));
+      state = state.copyWithStreaming(round.id, isDone: true).copyWith(
+            session: finalSession,
+            pageList: finalPageList,
+            error: null,
+          );
+    } catch (e) {
+      _markSessionStreaming(false);
+      ref.invalidate(sessionCardProvider(fileName));
+      state = state.copyWithStreaming(round.id, error: e.toString());
+    }
+  }
+  ChatPageList? _replaceRoundInCurrentPages(ChatRound updatedRound) {
+    final currentPageList = state.pageList;
+    if (currentPageList == null) return null;
+    final updatedPages = currentPageList.pages.map((page) {
+      if (page.round.id == updatedRound.id) {
+        return page.copyWith(round: updatedRound);
+      }
+      return page;
+    }).toList();
+    return currentPageList.copyWith(pages: updatedPages);
+  }
+  void stopGeneration() {
+    if (state.pageList == null || state.pageList!.pages.isEmpty) return;
+    final viewingRound =
+        state.pageList!.pages[state.pageList!.currentPageIndex].round;
+    if (!state.activeStreams.containsKey(viewingRound.id)) return;
+    final apiService = ref.read(apiServiceProvider);
+    apiService.cancelRequest(viewingRound.id);
+    _markSessionStreaming(false);
+    ref.invalidate(sessionCardProvider(fileName));
+  }
+  Future<void> switchBranch(String targetRoundId) async {
+    if (state.session == null) return;
+    final session = state.session!;
+    final newRoundId = BranchNavigator.switchBranch(session, targetRoundId);
+    final viewState = ChatViewStateBuilder.buildForRound(session, newRoundId);
+    state = state.copyWithCurrentRoundId(newRoundId).copyWith(
+          pageList: viewState.pageList,
+        );
+  }
+  void changePage(int pageIndex) {
+    if (state.pageList == null) return;
+    final pages = state.pageList!.pages;
+    if (pageIndex < 0 || pageIndex >= pages.length) return;
+    final targetPage = pages[pageIndex];
+    final newRoundId = targetPage.round.id;
+    state = state.copyWithCurrentRoundId(newRoundId).copyWith(
+          pageList: state.pageList!.copyWith(currentPageIndex: pageIndex),
+        );
+  }
+}
+final chatProvider =
+    StateNotifierProvider.family<ChatNotifier, ChatState, String>(
+  (ref, fileName) {
+    return ChatNotifier(ref, fileName);
+  },
+);
+```
+
+## File: lib/presentation/providers/input_draft_provider.dart
+```dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/pending_attachment.dart';
+final globalInputDraftProvider = StateProvider<String>((ref) => '');
+final globalAttachmentDraftProvider =
+    StateProvider<List<PendingAttachment>>((ref) => []);
+final globalEditSourceRoundIdProvider =
+    StateProvider<String?>((ref) => null);
+```
+
+## File: lib/presentation/widgets/attachment_list.dart
+```dart
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import '../../core/models/attachment.dart';
+import '../pages/text_attachment_viewer_page.dart';
+import '../providers/attachment_bytes_provider.dart';
+import '../themes/app_tokens.dart';
+class AttachmentList extends ConsumerWidget {
+  final List<Attachment> attachments;
+  final bool rightAligned;
+  const AttachmentList({
+    super.key,
+    required this.attachments,
+    this.rightAligned = true,
+  });
+  bool _isTextAttachment(Attachment attachment) {
+    final lowerName = attachment.name.toLowerCase();
+    final mime = (attachment.mimeType ?? '').toLowerCase();
+    return mime.startsWith('text/') ||
+        mime == 'application/json' ||
+        lowerName.endsWith('.md') ||
+        lowerName.endsWith('.txt') ||
+        lowerName.endsWith('.json') ||
+        lowerName.endsWith('.dart') ||
+        lowerName.endsWith('.yaml') ||
+        lowerName.endsWith('.yml') ||
+        lowerName.endsWith('.log') ||
+        lowerName.endsWith('.csv');
+  }
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (attachments.isEmpty) return const SizedBox.shrink();
+    return Align(
+      alignment: rightAligned ? Alignment.centerRight : Alignment.centerLeft,
+      child: Wrap(
+        alignment: rightAligned ? WrapAlignment.end : WrapAlignment.start,
+        spacing: AppTokens.space8,
+        runSpacing: AppTokens.space8,
+        children: attachments.map((attachment) {
+          if (attachment.isImage) {
+            return _ImageAttachmentThumb(attachment: attachment);
+          }
+          return _FileAttachmentChip(
+            attachment: attachment,
+            isText: _isTextAttachment(attachment),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+class _AttachmentActionHelper {
+  static Future<void> shareAttachmentFromBytes(
+    BuildContext context,
+    Attachment attachment,
+    Uint8List bytes,
+  ) async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/${attachment.name}');
+      await file.writeAsBytes(bytes, flush: true);
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: attachment.name,
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('共享文件失败：$e')),
+      );
+    }
+  }
+  static Future<void> previewImage(
+    BuildContext context,
+    Uint8List bytes,
+  ) async {
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          insetPadding: const EdgeInsets.all(16),
+          backgroundColor: Colors.black,
+          child: Stack(
+            children: [
+              InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 4,
+                child: Center(
+                  child: Image.memory(
+                    bytes,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: IconButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  icon: const Icon(
+                    Icons.close,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+  static Future<void> openTextViewer(
+    BuildContext context,
+    String title,
+    Uint8List bytes,
+  ) async {
+    final text = utf8.decode(bytes, allowMalformed: true);
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TextAttachmentViewerPage(
+          title: title,
+          content: text,
+        ),
+      ),
+    );
+  }
+}
+class _ImageAttachmentThumb extends ConsumerWidget {
+  final Attachment attachment;
+  const _ImageAttachmentThumb({
+    required this.attachment,
+  });
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bytesAsync = ref.watch(
+      attachmentBytesProvider(attachment.relativePath),
+    );
+    return bytesAsync.when(
+      loading: () => Container(
+        width: 108,
+        height: 108,
+        decoration: BoxDecoration(
+          color: AppTokens.surfaceSoft,
+          borderRadius: AppTokens.brMd,
+          border: Border.all(color: AppTokens.border),
+        ),
+        child: const Center(
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      ),
+      error: (e, st) => Container(
+        width: 108,
+        height: 108,
+        decoration: BoxDecoration(
+          color: AppTokens.surfaceSoft,
+          borderRadius: AppTokens.brMd,
+          border: Border.all(color: AppTokens.border),
+        ),
+        child: const Center(
+          child: Icon(
+            Icons.broken_image_outlined,
+            color: AppTokens.textTertiary,
+          ),
+        ),
+      ),
+      data: (bytes) {
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => _AttachmentActionHelper.previewImage(context, bytes),
+            onLongPress: () => _AttachmentActionHelper.shareAttachmentFromBytes(
+              context,
+              attachment,
+              bytes,
+            ),
+            borderRadius: AppTokens.brMd,
+            child: Container(
+              width: 108,
+              height: 108,
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                borderRadius: AppTokens.brMd,
+                border: Border.all(color: AppTokens.border),
+                boxShadow: AppTokens.shadowSm,
+              ),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.memory(
+                    bytes,
+                    fit: BoxFit.cover,
+                    gaplessPlayback: true,
+                  ),
+                  Positioned(
+                    right: 6,
+                    bottom: 6,
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.45),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: const Icon(
+                        Icons.open_in_full_outlined,
+                        size: 14,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+class _FileAttachmentChip extends ConsumerWidget {
+  final Attachment attachment;
+  final bool isText;
+  const _FileAttachmentChip({
+    required this.attachment,
+    required this.isText,
+  });
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bytesAsync = ref.watch(
+      attachmentBytesProvider(attachment.relativePath),
+    );
+    final leadingIcon =
+        isText ? Icons.description_outlined : Icons.attach_file_outlined;
+    final trailingIcon =
+        isText ? Icons.open_in_new_outlined : Icons.more_horiz;
+    return bytesAsync.when(
+      loading: () => Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTokens.space10,
+          vertical: AppTokens.space8,
+        ),
+        decoration: BoxDecoration(
+          color: AppTokens.surfaceSoft,
+          borderRadius: AppTokens.brMd,
+          border: Border.all(color: AppTokens.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: AppTokens.surface,
+                borderRadius: AppTokens.brSm,
+                border: Border.all(color: AppTokens.border),
+              ),
+              child: Icon(
+                leadingIcon,
+                size: 16,
+                color: AppTokens.textSecondary,
+              ),
+            ),
+            const SizedBox(width: AppTokens.space8),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 180),
+              child: Text(
+                attachment.name,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontSize: 13,
+                      color: AppTokens.textPrimary,
+                      fontWeight: FontWeight.w500,
+                    ),
+              ),
+            ),
+            const SizedBox(width: AppTokens.space8),
+            const SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ],
+        ),
+      ),
+      error: (e, st) => Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onLongPress: null,
+          borderRadius: AppTokens.brMd,
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTokens.space10,
+              vertical: AppTokens.space8,
+            ),
+            decoration: BoxDecoration(
+              color: AppTokens.surfaceSoft,
+              borderRadius: AppTokens.brMd,
+              border: Border.all(color: AppTokens.border),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: AppTokens.surface,
+                    borderRadius: AppTokens.brSm,
+                    border: Border.all(color: AppTokens.border),
+                  ),
+                  child: const Icon(
+                    Icons.error_outline,
+                    size: 16,
+                    color: AppTokens.danger,
+                  ),
+                ),
+                const SizedBox(width: AppTokens.space8),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 180),
+                  child: Text(
+                    attachment.name,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontSize: 13,
+                          color: AppTokens.textPrimary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      data: (bytes) {
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () async {
+              if (isText) {
+                await _AttachmentActionHelper.openTextViewer(
+                  context,
+                  attachment.name,
+                  bytes,
+                );
+                return;
+              }
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('该文件暂不支持直接预览，请长按进行分享'),
+                ),
+              );
+            },
+            onLongPress: () => _AttachmentActionHelper.shareAttachmentFromBytes(
+              context,
+              attachment,
+              bytes,
+            ),
+            borderRadius: AppTokens.brMd,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppTokens.space10,
+                vertical: AppTokens.space8,
+              ),
+              decoration: BoxDecoration(
+                color: AppTokens.surfaceSoft,
+                borderRadius: AppTokens.brMd,
+                border: Border.all(color: AppTokens.border),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: AppTokens.surface,
+                      borderRadius: AppTokens.brSm,
+                      border: Border.all(color: AppTokens.border),
+                    ),
+                    child: Icon(
+                      leadingIcon,
+                      size: 16,
+                      color: AppTokens.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(width: AppTokens.space8),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 180),
+                    child: Text(
+                      attachment.name,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            fontSize: 13,
+                            color: AppTokens.textPrimary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                    ),
+                  ),
+                  const SizedBox(width: AppTokens.space6),
+                  Icon(
+                    trailingIcon,
+                    size: 15,
+                    color: AppTokens.textTertiary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+```
+
+## File: lib/presentation/widgets/common/app_page_scaffold.dart
+```dart
+import 'package:flutter/material.dart';
+import '../../themes/app_tokens.dart';
+class AppPageScaffold extends StatelessWidget {
+  final PreferredSizeWidget? appBar;
+  final Widget body;
+  final Widget? bottomNavigationBar;
+  final Color? backgroundColor;
+  final bool useSafeArea;
+  const AppPageScaffold({
+    super.key,
+    this.appBar,
+    required this.body,
+    this.bottomNavigationBar,
+    this.backgroundColor,
+    this.useSafeArea = true,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final content = useSafeArea ? SafeArea(child: body) : body;
+    return Scaffold(
+      backgroundColor: backgroundColor ?? AppTokens.bg,
+      appBar: appBar,
+      bottomNavigationBar: bottomNavigationBar,
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        child: content,
+      ),
+    );
+  }
+}
+```
+
 ## File: lib/presentation/widgets/message_bubble.dart
 ```dart
 import 'package:flutter/material.dart';
@@ -10690,12 +10866,14 @@ class MessageBubble extends StatelessWidget {
   final bool isUser;
   final VoidCallback? onCopy;
   final VoidCallback? onRetryReply;
+  final VoidCallback? onEdit;
   const MessageBubble({
     super.key,
     required this.content,
     required this.isUser,
     this.onCopy,
     this.onRetryReply,
+    this.onEdit,
   });
   @override
   Widget build(BuildContext context) {
@@ -10818,7 +10996,7 @@ class MessageBubble extends StatelessWidget {
                 ),
               ),
             ),
-            if (onCopy != null || onRetryReply != null) ...[
+            if (onCopy != null || onRetryReply != null || onEdit != null) ...[
               const SizedBox(height: AppTokens.space6),
               Row(
                 mainAxisSize: MainAxisSize.min,
@@ -10829,6 +11007,14 @@ class MessageBubble extends StatelessWidget {
                       tooltip: '复制',
                       onTap: onCopy!,
                     ),
+                  if (onEdit != null) ...[
+                    const SizedBox(width: AppTokens.space4),
+                    _ActionIconButton(
+                      icon: Icons.edit_outlined,
+                      tooltip: '编辑后发送',
+                      onTap: onEdit!,
+                    ),
+                  ],
                   if (onRetryReply != null) ...[
                     const SizedBox(width: AppTokens.space4),
                     _ActionIconButton(
@@ -10884,88 +11070,655 @@ class _ActionIconButton extends StatelessWidget {
 }
 ```
 
-## File: lib/presentation/widgets/page_indicator.dart
+## File: lib/presentation/pages/branch_tree_page.dart
 ```dart
+import 'dart:convert';
 import 'package:flutter/material.dart';
-class PageIndicator extends StatelessWidget {
-  final int currentPage;
-  final int totalPages;
-  const PageIndicator({
-    super.key,
-    required this.currentPage,
-    required this.totalPages,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            '${currentPage + 1} / $totalPages',
-            style: const TextStyle(fontSize: 14, color: Colors.grey),
-          ),
-        ],
-      ),
-    );
-  }
-}
-```
-
-## File: lib/presentation/widgets/thought_bubble.dart
-```dart
-import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:graphview/GraphView.dart';
+import '../../core/models/chat_round.dart';
+import '../../core/models/session.dart';
+import '../../core/utils/time_format_utils.dart';
+import '../../di/providers.dart';
+import '../../domain/models/tree_node.dart';
+import '../../domain/services/tree_builder.dart';
+import '../providers/chat_notifier.dart';
+import '../providers/global_streaming_provider.dart';
 import '../themes/app_tokens.dart';
-class ThoughtBubble extends StatelessWidget {
-  final String content;
-  const ThoughtBubble({
+import '../widgets/common/app_badge.dart';
+import '../widgets/common/app_page_scaffold.dart';
+class BranchTreePage extends ConsumerStatefulWidget {
+  final Session session;
+  final String fileName;
+  const BranchTreePage({
     super.key,
-    required this.content,
+    required this.session,
+    required this.fileName,
   });
   @override
+  ConsumerState<BranchTreePage> createState() => _BranchTreePageState();
+}
+class _BranchTreePageState extends ConsumerState<BranchTreePage> {
+  final TransformationController _transformationController =
+      TransformationController();
+  Graph _graph = Graph()..isTree = true;
+  final BuchheimWalkerConfiguration _builder =
+      BuchheimWalkerConfiguration();
+  final Map<String, Node> _nodeMap = {};
+  final Map<Node, TreeNode> _graphNodeToTreeNodeMap = {};
+  List<TreeNode> _roots = [];
+  String _lastRootsSignature = '';
+  @override
+  void initState() {
+    super.initState();
+    _builder
+      ..siblingSeparation = 40
+      ..levelSeparation = 78
+      ..subtreeSeparation = 50
+      ..orientation = BuchheimWalkerConfiguration.ORIENTATION_TOP_BOTTOM;
+    _reloadTree(widget.session.rounds);
+  }
+  @override
+  void dispose() {
+    _transformationController.dispose();
+    super.dispose();
+  }
+  void _reloadTree(List<ChatRound> rounds) {
+    final roots = rounds.isEmpty ? <TreeNode>[] : TreeBuilder.buildTree(rounds);
+    final signature = _buildRootsSignature(roots);
+    setState(() {
+      _roots = roots;
+      _lastRootsSignature = signature;
+      _rebuildGraph(_roots);
+    });
+  }
+  String _buildRootsSignature(List<TreeNode> roots) {
+    dynamic toJsonNode(TreeNode node) {
+      return {
+        'id': node.id,
+        'children': node.children.map(toJsonNode).toList(),
+      };
+    }
+    return jsonEncode(roots.map(toJsonNode).toList());
+  }
+  void _rebuildGraph(List<TreeNode> roots) {
+    _graph = Graph()..isTree = true;
+    _nodeMap.clear();
+    _graphNodeToTreeNodeMap.clear();
+    for (final root in roots) {
+      _addTreeToGraph(root, null);
+    }
+  }
+  void _addTreeToGraph(TreeNode treeNode, TreeNode? parent) {
+    final currentNode = Node.Id(treeNode.id);
+    _nodeMap[treeNode.id] = currentNode;
+    _graphNodeToTreeNodeMap[currentNode] = treeNode;
+    _graph.addNode(currentNode);
+    if (parent != null) {
+      final parentNode = _nodeMap[parent.id];
+      if (parentNode != null) {
+        _graph.addEdge(parentNode, currentNode);
+      }
+    }
+    for (final child in treeNode.children) {
+      _addTreeToGraph(child, treeNode);
+    }
+  }
+  Set<String> _collectSubtreeIds(TreeNode node) {
+    final ids = <String>{node.id};
+    for (final child in node.children) {
+      ids.addAll(_collectSubtreeIds(child));
+    }
+    return ids;
+  }
+  TreeNode? _findTreeNodeById(List<TreeNode> roots, String nodeId) {
+    for (final root in roots) {
+      final result = _findTreeNodeByIdRecursive(root, nodeId);
+      if (result != null) return result;
+    }
+    return null;
+  }
+  TreeNode? _findTreeNodeByIdRecursive(TreeNode node, String nodeId) {
+    if (node.id == nodeId) return node;
+    for (final child in node.children) {
+      final result = _findTreeNodeByIdRecursive(child, nodeId);
+      if (result != null) return result;
+    }
+    return null;
+  }
+  Future<void> _deleteNode(String nodeId) async {
+    final repository = ref.read(conversationRepositoryProvider);
+    final chatState = ref.read(chatProvider(widget.fileName));
+    final session = chatState.session ?? widget.session;
+    final roots = session.rounds.isEmpty
+        ? <TreeNode>[]
+        : TreeBuilder.buildTree(session.rounds);
+    final targetNode = _findTreeNodeById(roots, nodeId);
+    if (targetNode == null) {
+      throw Exception('未找到要删除的节点');
+    }
+    final idsToDelete = _collectSubtreeIds(targetNode);
+    final updatedRounds = session.rounds
+        .where((round) => !idsToDelete.contains(round.id))
+        .toList();
+    final updatedSession = session.copyWith(
+      rounds: updatedRounds,
+      updatedAt: DateTime.now().millisecondsSinceEpoch,
+    );
+    await repository.saveSessionAndCleanupOrphanAttachments(
+      widget.fileName,
+      session,
+      updatedSession,
+    );
+    _reloadTree(updatedRounds);
+    await ref.read(chatProvider(widget.fileName).notifier).loadSession();
+  }
+  @override
   Widget build(BuildContext context) {
-    final text = content.trim();
-    if (text.isEmpty) return const SizedBox.shrink();
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: AppTokens.space12),
-      padding: const EdgeInsets.all(AppTokens.space12),
-      decoration: BoxDecoration(
-        color: AppTokens.thoughtBubble,
-        borderRadius: AppTokens.brMd,
-        border: Border.all(
-          color: AppTokens.warning.withOpacity(0.18),
+    final chatNotifier = ref.read(chatProvider(widget.fileName).notifier);
+    final streamingSessions = ref.watch(globalStreamingSessionsProvider);
+    final isStreaming = streamingSessions.contains(widget.fileName);
+    return AppPageScaffold(
+      appBar: AppBar(
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                widget.session.title,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ),
+            if (isStreaming)
+              AppBadge.info(
+                '生成中',
+                icon: Icons.bolt_outlined,
+              ),
+          ],
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+      body: _roots.isEmpty
+          ? _buildEmptyState(context)
+          : Column(
+              children: [
+                _GraphToolbar(
+                  onZoomIn: () {
+                    final current = _transformationController.value.clone();
+                    current.scale(1.1);
+                    _transformationController.value = current;
+                  },
+                  onZoomOut: () {
+                    final current = _transformationController.value.clone();
+                    current.scale(0.9);
+                    _transformationController.value = current;
+                  },
+                  onReset: () {
+                    _transformationController.value = Matrix4.identity();
+                  },
+                ),
+                Expanded(
+                  child: InteractiveViewer(
+                    constrained: false,
+                    boundaryMargin: const EdgeInsets.all(double.infinity),
+                    minScale: 0.1,
+                    maxScale: 3.0,
+                    transformationController: _transformationController,
+                    child: Container(
+                      padding: const EdgeInsets.all(32),
+                      color: AppTokens.bg,
+                      child: GraphView(
+                        key: ValueKey(_lastRootsSignature),
+                        graph: _graph,
+                        animated: false,
+                        algorithm: BuchheimWalkerAlgorithm(
+                          _builder,
+                          TreeEdgeRenderer(_builder),
+                        ),
+                        paint: Paint()
+                          ..color = const Color(0xFFD8DEE8)
+                          ..strokeWidth = 1.6
+                          ..style = PaintingStyle.stroke,
+                        builder: (Node node) {
+                          final treeNode = _graphNodeToTreeNodeMap[node];
+                          if (treeNode == null) {
+                            return const SizedBox.shrink();
+                          }
+                          return _GraphNodeCard(
+                            key: ValueKey(treeNode.id),
+                            treeNode: treeNode,
+                            onSwitch: () async {
+                              await chatNotifier.switchBranch(treeNode.id);
+                              if (context.mounted) {
+                                Navigator.of(context).pop();
+                              }
+                            },
+                            onDelete: () async {
+                              final confirmed =
+                                  await _showDeleteDialog(context, treeNode);
+                              if (!confirmed) return;
+                              try {
+                                await _deleteNode(treeNode.id);
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('节点及其后续分支已删除'),
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('删除失败：$e'),
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+  Widget _buildEmptyState(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: AppTokens.surface,
+            borderRadius: AppTokens.brLg,
+            border: Border.all(color: AppTokens.border),
+            boxShadow: AppTokens.shadowMd,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.psychology_alt_outlined,
-                size: 16,
-                color: AppTokens.warning,
+              Container(
+                width: 68,
+                height: 68,
+                decoration: BoxDecoration(
+                  color: AppTokens.primarySoft,
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: const Icon(
+                  Icons.account_tree_outlined,
+                  size: 30,
+                  color: AppTokens.primary,
+                ),
               ),
-              const SizedBox(width: AppTokens.space6),
+              const SizedBox(height: 18),
               Text(
-                '推理过程',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTokens.warning,
+                '暂无分支结构',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '当你对历史轮次重新生成回复时，这里会显示完整的分支关系。',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppTokens.textSecondary,
                     ),
               ),
             ],
           ),
-          const SizedBox(height: AppTokens.space8),
-          Text(
-            text,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontSize: 13,
-                  height: 1.65,
-                  color: AppTokens.textSecondary,
+        ),
+      ),
+    );
+  }
+  Future<bool> _showDeleteDialog(
+    BuildContext context,
+    TreeNode node,
+  ) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: AppTokens.brLg,
+            ),
+            title: Text(
+              '删除节点',
+              style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            content: Text(
+              '确定删除这一轮及其后续全部分支吗？\n\n${node.round.userContent}',
+              style: Theme.of(ctx).textTheme.bodyMedium,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppTokens.danger,
                 ),
+                child: const Text('删除'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+}
+class _GraphToolbar extends StatelessWidget {
+  final VoidCallback onZoomIn;
+  final VoidCallback onZoomOut;
+  final VoidCallback onReset;
+  const _GraphToolbar({
+    required this.onZoomIn,
+    required this.onZoomOut,
+    required this.onReset,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
+        decoration: BoxDecoration(
+          color: AppTokens.surface,
+          borderRadius: AppTokens.brLg,
+          border: Border.all(color: AppTokens.border),
+          boxShadow: AppTokens.shadowSm,
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.tune_outlined,
+              size: 18,
+              color: AppTokens.textSecondary,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '缩放、拖拽查看对话分支结构',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppTokens.textSecondary,
+                    ),
+              ),
+            ),
+            _ToolbarIconButton(
+              icon: Icons.remove_rounded,
+              tooltip: '缩小',
+              onTap: onZoomOut,
+            ),
+            const SizedBox(width: 6),
+            _ToolbarIconButton(
+              icon: Icons.add_rounded,
+              tooltip: '放大',
+              onTap: onZoomIn,
+            ),
+            const SizedBox(width: 6),
+            _ToolbarTextButton(
+              icon: Icons.center_focus_strong_outlined,
+              label: '重置',
+              onTap: onReset,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+class _ToolbarIconButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+  const _ToolbarIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppTokens.brMd,
+        child: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: AppTokens.surfaceSoft,
+            borderRadius: AppTokens.brMd,
+            border: Border.all(color: AppTokens.border),
+          ),
+          child: Icon(
+            icon,
+            size: 18,
+            color: AppTokens.textPrimary,
+          ),
+        ),
+      ),
+    );
+  }
+}
+class _ToolbarTextButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  const _ToolbarTextButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: AppTokens.brMd,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
+        decoration: BoxDecoration(
+          color: AppTokens.surfaceSoft,
+          borderRadius: AppTokens.brMd,
+          border: Border.all(color: AppTokens.border),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: AppTokens.textSecondary,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppTokens.textPrimary,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+class _GraphNodeCard extends StatelessWidget {
+  final TreeNode treeNode;
+  final VoidCallback onSwitch;
+  final VoidCallback onDelete;
+  const _GraphNodeCard({
+    super.key,
+    required this.treeNode,
+    required this.onSwitch,
+    required this.onDelete,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final isRoot = treeNode.parentId == null;
+    final isIncomplete = treeNode.round.isIncomplete;
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        width: 290,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppTokens.surface,
+          borderRadius: AppTokens.brLg,
+          border: Border.all(
+            color: isIncomplete
+                ? AppTokens.warning.withOpacity(0.25)
+                : AppTokens.border,
+          ),
+          boxShadow: AppTokens.shadowMd,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                AppBadge.primary(
+                  '深度 ${treeNode.depth + 1}',
+                  icon: Icons.layers_outlined,
+                ),
+                const SizedBox(width: 8),
+                if (isRoot)
+                  AppBadge.info(
+                    '根节点',
+                    icon: Icons.flag_outlined,
+                  ),
+                if (isIncomplete) ...[
+                  const SizedBox(width: 8),
+                  AppBadge.warning(
+                    '未完成',
+                    icon: Icons.hourglass_empty_outlined,
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              TimeFormatUtils.formatTimestamp(treeNode.round.createdAt),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontSize: 11,
+                    color: AppTokens.textSecondary,
+                  ),
+            ),
+            const SizedBox(height: 12),
+            _PreviewBlock(
+              label: 'YOU',
+              content: treeNode.round.userContent.trim().isEmpty
+                  ? '（空输入）'
+                  : treeNode.round.userContent,
+              labelColor: AppTokens.info,
+            ),
+            const SizedBox(height: 8),
+            _PreviewBlock(
+              label: 'AI',
+              content: (treeNode.round.assistantContent ?? '').trim().isEmpty
+                  ? '（等待回复）'
+                  : treeNode.round.assistantContent!,
+              labelColor: AppTokens.success,
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.tonal(
+                    onPressed: onSwitch,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppTokens.primarySoft,
+                      foregroundColor: AppTokens.primary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: AppTokens.brMd,
+                      ),
+                    ),
+                    child: const Text('切换到此分支'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (treeNode.parentId != null)
+                  InkWell(
+                    onTap: onDelete,
+                    borderRadius: AppTokens.brMd,
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: AppTokens.dangerSoft,
+                        borderRadius: AppTokens.brMd,
+                        border: Border.all(
+                          color: AppTokens.danger.withOpacity(0.15),
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.delete_outline,
+                        size: 20,
+                        color: AppTokens.danger,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+class _PreviewBlock extends StatelessWidget {
+  final String label;
+  final String content;
+  final Color labelColor;
+  const _PreviewBlock({
+    required this.label,
+    required this.content,
+    required this.labelColor,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppTokens.surfaceSoft,
+        borderRadius: AppTokens.brMd,
+        border: Border.all(color: AppTokens.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$label  ',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: labelColor,
+                ),
+          ),
+          Expanded(
+            child: Text(
+              content,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontSize: 12,
+                    height: 1.5,
+                    color: AppTokens.textPrimary,
+                  ),
+            ),
           ),
         ],
       ),

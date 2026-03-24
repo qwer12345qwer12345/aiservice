@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import '../../core/interfaces/file_service.dart';
 import '../../core/models/session.dart';
 import '../../core/models/app_config.dart';
+import '../../core/models/app_config_store.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/json_utils.dart';
 import '../data_sources/local_file_source.dart';
@@ -12,15 +13,32 @@ class FileService implements IFileService {
   FileService(this._fileSource);
 
   @override
-  Future<AppConfig> readConfig() async {
+  Future<AppConfigStore> readConfigStore() async {
     final content = await _fileSource.readTextFile(AppConstants.fileConfig);
     final json = JsonUtils.decode(content);
-    return AppConfig.fromJson(json);
+
+    // 新格式：多配置存档
+    if (json.containsKey('profiles')) {
+      return AppConfigStore.fromJson(json);
+    }
+
+    // 兼容旧格式：单配置
+    final oldConfig = AppConfig.fromJson(json);
+    return AppConfigStore(
+      activeProfileId: 'default',
+      profiles: [
+        ConfigProfile(
+          id: 'default',
+          name: '默认配置',
+          config: oldConfig,
+        ),
+      ],
+    );
   }
 
   @override
-  Future<void> writeConfig(AppConfig config) async {
-    final json = config.toJson();
+  Future<void> writeConfigStore(AppConfigStore store) async {
+    final json = store.toJson();
     final content = JsonUtils.encode(json);
     await _fileSource.writeTextFile(AppConstants.fileConfig, content);
   }

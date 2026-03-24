@@ -50,6 +50,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
       ..levelSeparation = 78
       ..subtreeSeparation = 50
       ..orientation = BuchheimWalkerConfiguration.ORIENTATION_TOP_BOTTOM;
+
     _reloadTree(widget.session.rounds);
   }
 
@@ -62,6 +63,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   void _reloadTree(List<ChatRound> rounds) {
     final roots = rounds.isEmpty ? <TreeNode>[] : TreeBuilder.buildTree(rounds);
     final signature = _buildRootsSignature(roots);
+
     setState(() {
       _roots = roots;
       _lastRootsSignature = signature;
@@ -73,6 +75,11 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     dynamic toJsonNode(TreeNode node) {
       return {
         'id': node.id,
+        'preview': node.preview,
+        'assistantContent': node.round.assistantContent,
+        'assistantThinking': node.round.assistantThinking,
+        'isIncomplete': node.round.isIncomplete,
+        'hasUnseenUpdate': node.round.hasUnseenUpdate,
         'children': node.children.map(toJsonNode).toList(),
       };
     }
@@ -84,6 +91,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     _graph = Graph()..isTree = true;
     _nodeMap.clear();
     _graphNodeToTreeNodeMap.clear();
+
     for (final root in roots) {
       _addTreeToGraph(root, null);
     }
@@ -169,6 +177,21 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
 
   @override
   Widget build(BuildContext context) {
+    final chatState = ref.watch(chatProvider(widget.fileName));
+    final session = chatState.session ?? widget.session;
+
+    final latestRoots = session.rounds.isEmpty
+        ? <TreeNode>[]
+        : TreeBuilder.buildTree(session.rounds);
+    final latestSignature = _buildRootsSignature(latestRoots);
+
+    if (latestSignature != _lastRootsSignature) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _reloadTree(session.rounds);
+      });
+    }
+
     final chatNotifier = ref.read(chatProvider(widget.fileName).notifier);
     final streamingSessions = ref.watch(globalStreamingSessionsProvider);
     final isStreaming = streamingSessions.contains(widget.fileName);
@@ -179,7 +202,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
           children: [
             Expanded(
               child: Text(
-                widget.session.title,
+                session.title,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
@@ -539,6 +562,7 @@ class _GraphNodeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isRoot = treeNode.parentId == null;
     final isIncomplete = treeNode.round.isIncomplete;
+    final hasUnseenUpdate = treeNode.round.hasUnseenUpdate;
 
     return Material(
       color: Colors.transparent,
@@ -558,25 +582,29 @@ class _GraphNodeCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 AppBadge.primary(
                   '深度 ${treeNode.depth + 1}',
                   icon: Icons.layers_outlined,
                 ),
-                const SizedBox(width: 8),
                 if (isRoot)
                   AppBadge.info(
                     '根节点',
                     icon: Icons.flag_outlined,
                   ),
-                if (isIncomplete) ...[
-                  const SizedBox(width: 8),
+                if (isIncomplete)
                   AppBadge.warning(
                     '未完成',
                     icon: Icons.hourglass_empty_outlined,
                   ),
-                ],
+                if (hasUnseenUpdate)
+                  AppBadge.warning(
+                    '未查看',
+                    icon: Icons.mark_chat_unread_outlined,
+                  ),
               ],
             ),
             const SizedBox(height: 10),
@@ -620,27 +648,26 @@ class _GraphNodeCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                if (treeNode.parentId != null)
-                  InkWell(
-                    onTap: onDelete,
-                    borderRadius: AppTokens.brMd,
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: AppTokens.dangerSoft,
-                        borderRadius: AppTokens.brMd,
-                        border: Border.all(
-                          color: AppTokens.danger.withOpacity(0.15),
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.delete_outline,
-                        size: 20,
-                        color: AppTokens.danger,
+                InkWell(
+                  onTap: onDelete,
+                  borderRadius: AppTokens.brMd,
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: AppTokens.dangerSoft,
+                      borderRadius: AppTokens.brMd,
+                      border: Border.all(
+                        color: AppTokens.danger.withOpacity(0.15),
                       ),
                     ),
+                    child: const Icon(
+                      Icons.delete_outline,
+                      size: 20,
+                      color: AppTokens.danger,
+                    ),
                   ),
+                ),
               ],
             ),
           ],

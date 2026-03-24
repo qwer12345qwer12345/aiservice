@@ -18,6 +18,7 @@ _$SessionImpl _$$SessionImplFromJson(Map<String, dynamic> json) =>
       config: json['config'] == null
           ? null
           : SessionConfig.fromJson(json['config'] as Map<String, dynamic>),
+      hasUnseenUpdate: json['hasUnseenUpdate'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$$SessionImplToJson(_$SessionImpl instance) =>
@@ -28,6 +29,7 @@ Map<String, dynamic> _$$SessionImplToJson(_$SessionImpl instance) =>
       'updatedAt': instance.updatedAt,
       'rounds': instance.rounds,
       'config': instance.config,
+      'hasUnseenUpdate': instance.hasUnseenUpdate,
     };
 
 _$SessionConfigImpl _$$SessionConfigImplFromJson(Map<String, dynamic> json) =>

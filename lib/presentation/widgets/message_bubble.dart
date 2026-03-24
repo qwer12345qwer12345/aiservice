@@ -21,9 +21,10 @@ class MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bubbleColor = isUser ? AppTokens.userBubble : AppTokens.aiBubble;
-    final borderColor = isUser ? Colors.transparent : AppTokens.border;
+    final borderColor =
+        isUser ? const Color(0xFFC9E0FF) : AppTokens.border;
     final textColor =
-        isUser ? AppTokens.textOnPrimary : AppTokens.textPrimary;
+        isUser ? AppTokens.userBubbleText : AppTokens.textPrimary;
 
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -88,18 +89,18 @@ class MessageBubble extends StatelessWidget {
                     fontFamily: 'monospace',
                     color: textColor,
                     backgroundColor: isUser
-                        ? Colors.white.withOpacity(0.10)
+                        ? const Color(0xFFDCEEFF)
                         : AppTokens.surfaceMuted,
                   ),
                   codeblockPadding: const EdgeInsets.all(12),
                   codeblockDecoration: BoxDecoration(
                     color: isUser
-                        ? Colors.white.withOpacity(0.08)
+                        ? const Color(0xFFDCEEFF)
                         : AppTokens.surfaceSoft,
                     borderRadius: AppTokens.brSm,
                     border: Border.all(
                       color: isUser
-                          ? Colors.white.withOpacity(0.08)
+                          ? const Color(0xFFC9E0FF)
                           : AppTokens.border,
                     ),
                   ),
@@ -114,24 +115,24 @@ class MessageBubble extends StatelessWidget {
                     color: textColor,
                   ),
                   a: TextStyle(
-                    color: isUser ? Colors.white : AppTokens.primary,
+                    color: isUser ? AppTokens.info : AppTokens.primary,
                     decoration: TextDecoration.underline,
                   ),
                   blockquote: TextStyle(
                     color: isUser
-                        ? Colors.white.withOpacity(0.85)
+                        ? AppTokens.userBubbleText
                         : AppTokens.textSecondary,
                     height: 1.6,
                   ),
                   blockquoteDecoration: BoxDecoration(
                     color: isUser
-                        ? Colors.white.withOpacity(0.06)
+                        ? const Color(0xFFDCEEFF)
                         : AppTokens.surfaceMuted,
                     borderRadius: AppTokens.brSm,
                     border: Border(
                       left: BorderSide(
                         color: isUser
-                            ? Colors.white.withOpacity(0.20)
+                            ? const Color(0xFF9FCBFF)
                             : AppTokens.borderStrong,
                         width: 3,
                       ),

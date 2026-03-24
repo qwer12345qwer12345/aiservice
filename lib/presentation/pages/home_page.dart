@@ -56,6 +56,7 @@ class HomePage extends ConsumerWidget {
         ],
       ),
     );
+
     if (result != null && result.isNotEmpty && result != session.title) {
       await notifier.updateSessionTitle('${session.id}.json', result);
       ref.invalidate(sessionFileNamesProvider);
@@ -70,36 +71,38 @@ class HomePage extends ConsumerWidget {
     WidgetRef ref,
   ) async {
     final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: AppTokens.brLg,
-        ),
-        title: Text(
-          '删除会话',
-          style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-        ),
-        content: Text(
-          '确定要删除 “${session.title}” 吗？\n此操作无法撤销。',
-          style: Theme.of(ctx).textTheme.bodyMedium,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppTokens.danger,
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: AppTokens.brLg,
             ),
-            child: const Text('删除'),
+            title: Text(
+              '删除会话',
+              style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            content: Text(
+              '确定要删除 “${session.title}” 吗？\n此操作无法撤销。',
+              style: Theme.of(ctx).textTheme.bodyMedium,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppTokens.danger,
+                ),
+                child: const Text('删除'),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
+        ) ??
+        false;
+
     if (confirmed == true) {
       await notifier.deleteSession('${session.id}.json');
       ref.invalidate(sessionFileNamesProvider);
@@ -326,7 +329,9 @@ class _SessionCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final sessionAsync = ref.watch(sessionCardProvider(fileName));
     final streamingSessions = ref.watch(globalStreamingSessionsProvider);
+    final streamingPreviewMap = ref.watch(globalStreamingPreviewProvider);
     final isStreaming = streamingSessions.contains(fileName);
+    final streamingPreview = streamingPreviewMap[fileName];
 
     return sessionAsync.when(
       loading: () => AppCard(
@@ -352,7 +357,19 @@ class _SessionCard extends ConsumerWidget {
       data: (session) {
         final roundCount = session.rounds.length;
         final updatedAt = TimeFormatUtils.formatTimestamp(session.updatedAt);
-        final preview = _buildLatestPreview(session);
+
+        final preview = streamingPreview != null
+            ? _SessionPreview(
+                userPreview: session.rounds.isEmpty
+                    ? '点击开始新的对话'
+                    : session.rounds.last.userContent.trim().isEmpty
+                        ? '（空输入）'
+                        : session.rounds.last.userContent,
+                aiPreview: streamingPreview.content.trim().isEmpty
+                    ? '正在生成...'
+                    : streamingPreview.content,
+              )
+            : _buildLatestPreview(session);
 
         return Slidable(
           key: ValueKey(fileName),
@@ -441,6 +458,13 @@ class _SessionCard extends ConsumerWidget {
                                   icon: Icons.bolt_outlined,
                                 ),
                               ],
+                              if (session.hasUnseenUpdate) ...[
+                                const SizedBox(width: 8),
+                                AppBadge.warning(
+                                  '未查看',
+                                  icon: Icons.mark_chat_unread_outlined,
+                                ),
+                              ],
                             ],
                           ),
                           const SizedBox(height: 8),
@@ -509,6 +533,7 @@ class _SessionCard extends ConsumerWidget {
         aiPreview: '等待助手回复',
       );
     }
+
     final latest = session.rounds.last;
     final user = latest.userContent.trim().isEmpty
         ? '（空输入）'
@@ -516,6 +541,7 @@ class _SessionCard extends ConsumerWidget {
     final ai = (latest.assistantContent ?? '').trim().isEmpty
         ? '（等待回复）'
         : latest.assistantContent!.trim();
+
     return _SessionPreview(
       userPreview: user,
       aiPreview: ai,

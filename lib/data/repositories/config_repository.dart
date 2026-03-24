@@ -1,4 +1,5 @@
 import '../../core/models/app_config.dart';
+import '../../core/models/app_config_store.dart';
 import '../../core/interfaces/config_service.dart';
 
 class ConfigRepository {
@@ -8,6 +9,34 @@ class ConfigRepository {
 
   Future<AppConfig> getConfig() async {
     return await _configService.loadConfig();
+  }
+
+  Future<AppConfigStore> getConfigStore() async {
+    return await _configService.loadConfigStore();
+  }
+
+  Future<List<ConfigProfile>> getProfiles() async {
+    return await _configService.getProfiles();
+  }
+
+  Future<String> getActiveProfileId() async {
+    return await _configService.getActiveProfileId();
+  }
+
+  Future<void> switchProfile(String profileId) async {
+    await _configService.switchProfile(profileId);
+  }
+
+  Future<void> createProfile(String name) async {
+    await _configService.createProfile(name);
+  }
+
+  Future<void> renameProfile(String profileId, String name) async {
+    await _configService.renameProfile(profileId, name);
+  }
+
+  Future<void> deleteProfile(String profileId) async {
+    await _configService.deleteProfile(profileId);
   }
 
   Future<void> saveConfig(AppConfig config) async {

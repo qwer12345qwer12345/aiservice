@@ -15,6 +15,7 @@ class ChatRound with _$ChatRound {
     String? assistantThinking,
     String? assistantContent,
     @Default(false) bool isIncomplete,
+    @Default(false) bool hasUnseenUpdate,
   }) = _ChatRound;
 
   factory ChatRound.fromJson(Map<String, dynamic> json) =>
