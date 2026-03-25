@@ -3,11 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../core/models/session.dart';
 import '../../core/utils/time_format_utils.dart';
+import '../providers/global_streaming_provider.dart';
 import '../providers/home_session_list_provider.dart';
 import '../providers/session_list_notifier.dart';
-import '../themes/app_tokens.dart';
-import '../widgets/common/app_badge.dart';
-import '../widgets/common/app_card.dart';
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/input_bar.dart';
 import 'chat_page.dart';
@@ -25,15 +23,7 @@ class HomePage extends ConsumerWidget {
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: AppTokens.brLg,
-        ),
-        title: Text(
-          '重命名会话',
-          style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-        ),
+        title: const Text('重命名会话'),
         content: TextField(
           controller: controller,
           autofocus: true,
@@ -54,7 +44,6 @@ class HomePage extends ConsumerWidget {
         ],
       ),
     );
-
     if (result != null && result.isNotEmpty && result != session.title) {
       await notifier.updateSessionTitle('${session.id}.json', result);
     }
@@ -65,22 +54,12 @@ class HomePage extends ConsumerWidget {
     SessionListNotifier notifier,
     Session session,
   ) async {
+    final colorScheme = Theme.of(context).colorScheme;
     final confirmed = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: AppTokens.brLg,
-            ),
-            title: Text(
-              '删除会话',
-              style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-            content: Text(
-              '确定要删除 “${session.title}” 吗？\n此操作无法撤销。',
-              style: Theme.of(ctx).textTheme.bodyMedium,
-            ),
+            title: const Text('删除会话'),
+            content: Text('确定要删除 “${session.title}” 吗？\n此操作无法撤销。'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(false),
@@ -89,7 +68,8 @@ class HomePage extends ConsumerWidget {
               FilledButton(
                 onPressed: () => Navigator.of(ctx).pop(true),
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppTokens.danger,
+                  backgroundColor: colorScheme.error,
+                  foregroundColor: colorScheme.onError,
                 ),
                 child: const Text('删除'),
               ),
@@ -97,7 +77,6 @@ class HomePage extends ConsumerWidget {
           ),
         ) ??
         false;
-
     if (confirmed == true) {
       await notifier.deleteSession('${session.id}.json');
     }
@@ -110,27 +89,19 @@ class HomePage extends ConsumerWidget {
 
     return AppPageScaffold(
       appBar: AppBar(
-        title: Text(
-          'AI Chat',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-        ),
+        title: const Text('AI Chat'),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: IconButton(
-              tooltip: '设置',
-              icon: const Icon(Icons.settings_outlined),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const SettingsPage(),
-                  ),
-                );
-              },
-            ),
+          IconButton(
+            tooltip: '设置',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const SettingsPage(),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -151,29 +122,21 @@ class HomePage extends ConsumerWidget {
                 if (items.isEmpty) {
                   return const _HomeEmptyState();
                 }
-
-                return ListView(
+                return ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                  children: [
-                    ...items.map((item) {
-                      return Padding(
-                        padding:
-                            const EdgeInsets.only(bottom: AppTokens.space12),
-                        child: _SessionCard(
-                          item: item,
-                          notifier: notifier,
-                          onRename: (session) =>
-                              _showRenameDialog(context, notifier, session),
-                          onDelete: (session) => _showDeleteConfirmDialog(
-                            context,
-                            notifier,
-                            session,
-                          ),
-                        ),
-                      );
-                    }),
-                    const SizedBox(height: 12),
-                  ],
+                  itemCount: items.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    return _SessionCard(
+                      item: item,
+                      notifier: notifier,
+                      onRename: (session) =>
+                          _showRenameDialog(context, notifier, session),
+                      onDelete: (session) =>
+                          _showDeleteConfirmDialog(context, notifier, session),
+                    );
+                  },
                 );
               },
             ),
@@ -211,42 +174,27 @@ class _HomeEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: AppCard(
+      child: Card(
+        child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: AppTokens.primarySoft,
-                  borderRadius: BorderRadius.circular(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 360),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Icon(Icons.auto_awesome_outlined, size: 40),
+                SizedBox(height: 16),
+                Text(
+                  '开始你的第一段对话',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
                 ),
-                child: const Icon(
-                  Icons.auto_awesome_outlined,
-                  size: 32,
-                  color: AppTokens.primary,
+                SizedBox(height: 8),
+                Text(
+                  '在下方输入问题，系统会自动创建一个新会话。\n你也可以附加图片或文件开始交流。',
+                  textAlign: TextAlign.center,
                 ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                '开始你的第一段对话',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                '在下方输入问题，系统会自动创建一个新会话。\n你也可以附加图片或文件开始交流。',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppTokens.textSecondary,
-                    ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -265,38 +213,39 @@ class _HomeErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: AppCard(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.error_outline,
-                size: 40,
-                color: AppTokens.danger,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '出现了一点问题',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh),
-                label: const Text('重试'),
-              ),
-            ],
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 360),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 40,
+                  color: colorScheme.error,
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  '出现了一点问题',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('重试'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -304,7 +253,7 @@ class _HomeErrorState extends StatelessWidget {
   }
 }
 
-class _SessionCard extends StatelessWidget {
+class _SessionCard extends ConsumerStatefulWidget {
   final HomeSessionItem item;
   final SessionListNotifier notifier;
   final Future<void> Function(Session session) onRename;
@@ -318,10 +267,75 @@ class _SessionCard extends StatelessWidget {
   });
 
   @override
+  ConsumerState<_SessionCard> createState() => _SessionCardState();
+}
+
+class _SessionCardState extends ConsumerState<_SessionCard> {
+  bool _requested = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _ensurePreviewLoaded();
+  }
+
+  @override
+  void didUpdateWidget(covariant _SessionCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.item.previewRoundId != widget.item.previewRoundId ||
+        oldWidget.item.session.id != widget.item.session.id) {
+      _requested = false;
+      _ensurePreviewLoaded();
+    }
+  }
+
+  void _ensurePreviewLoaded() {
+    final previewRoundId = widget.item.previewRoundId;
+    if (_requested || previewRoundId == null) return;
+    _requested = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      final fileName = '${widget.item.session.id}.json';
+      final previewRound = widget.item.session.rounds.firstWhere(
+        (r) => r.id == previewRoundId,
+        orElse: () => widget.item.session.rounds.last,
+      );
+
+      ref
+          .read(globalStreamCacheProvider.notifier)
+          .ensureRoundLoaded(fileName, previewRound);
+    });
+  }
+
+  Widget _buildMetaChip(String label, {IconData? icon}) {
+    return Chip(
+      avatar: icon == null ? null : Icon(icon, size: 16),
+      label: Text(label),
+      visualDensity: VisualDensity.compact,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final session = item.session;
+    final session = widget.item.session;
     final fileName = '${session.id}.json';
-    final updatedAt = TimeFormatUtils.formatTimestamp(item.updatedAt);
+    final updatedAt = TimeFormatUtils.formatTimestamp(widget.item.updatedAt);
+    final previewRoundId = widget.item.previewRoundId;
+    final stream = previewRoundId == null
+        ? null
+        : ref.watch(
+            roundStreamProvider((fileName: fileName, roundId: previewRoundId)),
+          );
+
+    final aiPreview = stream == null
+        ? '加载中...'
+        : stream.content.trim().isEmpty
+            ? (stream.isStreaming ? '正在生成...' : '（等待回复）')
+            : stream.content;
+
+    final isStreaming = stream?.isStreaming == true;
 
     return Slidable(
       key: ValueKey(fileName),
@@ -330,150 +344,80 @@ class _SessionCard extends StatelessWidget {
         extentRatio: 0.34,
         children: [
           CustomSlidableAction(
-            onPressed: (_) => onRename(session),
-            backgroundColor: AppTokens.info,
-            borderRadius: AppTokens.brLg,
+            onPressed: (_) => widget.onRename(session),
+            backgroundColor: Theme.of(context).colorScheme.secondary,
             child: const Icon(
               Icons.edit_outlined,
               color: Colors.white,
             ),
           ),
           CustomSlidableAction(
-            onPressed: (_) => onDelete(session),
-            backgroundColor: AppTokens.danger,
-            borderRadius: AppTokens.brLg,
-            child: const Icon(
+            onPressed: (_) => widget.onDelete(session),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            child: Icon(
               Icons.delete_outline,
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onError,
             ),
           ),
         ],
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
+      child: Card(
+        child: ListTile(
           onTap: () async {
             await Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => ChatPage(
-                  fileName: fileName,
-                ),
+                builder: (_) => ChatPage(fileName: fileName),
               ),
             );
             if (context.mounted) {
-              await notifier.refresh();
+              await widget.notifier.refresh();
             }
           },
-          borderRadius: AppTokens.brLg,
-          child: AppCard(
-            padding: const EdgeInsets.all(16),
-            boxShadow: AppTokens.shadowSm,
-            child: Row(
+          leading: const Icon(Icons.forum_outlined),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  session.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (isStreaming) ...[
+                const SizedBox(width: 8),
+                _buildMetaChip('生成中', icon: Icons.bolt_outlined),
+              ],
+              if (widget.item.hasUnseen) ...[
+                const SizedBox(width: 8),
+                _buildMetaChip('未查看', icon: Icons.mark_chat_unread_outlined),
+              ],
+            ],
+          ),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: AppTokens.surfaceSoft,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppTokens.border),
-                  ),
-                  child: const Icon(
-                    Icons.forum_outlined,
-                    color: AppTokens.textSecondary,
-                  ),
-                ),
-                const SizedBox(width: AppTokens.space12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              session.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                            ),
-                          ),
-                          if (item.isStreaming) ...[
-                            const SizedBox(width: 8),
-                            AppBadge.info(
-                              '生成中',
-                              icon: Icons.bolt_outlined,
-                            ),
-                          ],
-                          if (item.hasUnseen) ...[
-                            const SizedBox(width: 8),
-                            AppBadge.warning(
-                              '未查看',
-                              icon: Icons.mark_chat_unread_outlined,
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _PreviewLine(
-                            label: 'YOU',
-                            text: item.userPreview,
-                            color: AppTokens.info,
-                          ),
-                          const SizedBox(height: 4),
-                          _PreviewLine(
-                            label: 'AI',
-                            text: item.aiPreview,
-                            color: AppTokens.success,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          AppBadge.info(
-                            '${item.roundCount} 轮',
-                            icon: Icons.chat_bubble_outline,
-                          ),
-                          AppBadge.primary(
-                            updatedAt,
-                            icon: Icons.schedule_outlined,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: AppTokens.space8),
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: AppTokens.surfaceSoft,
-                    borderRadius: AppTokens.brMd,
-                    border: Border.all(color: AppTokens.border),
-                  ),
-                  child: const Icon(
-                    Icons.chevron_right_rounded,
-                    color: AppTokens.textSecondary,
-                  ),
+                _PreviewLine(label: 'YOU', text: widget.item.userPreview),
+                const SizedBox(height: 4),
+                _PreviewLine(label: 'AI', text: aiPreview),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _buildMetaChip(
+                      '${widget.item.roundCount} 轮',
+                      icon: Icons.chat_bubble_outline,
+                    ),
+                    _buildMetaChip(updatedAt, icon: Icons.schedule_outlined),
+                  ],
                 ),
               ],
             ),
           ),
+          trailing: const Icon(Icons.chevron_right_rounded),
         ),
       ),
     );
@@ -483,37 +427,30 @@ class _SessionCard extends StatelessWidget {
 class _PreviewLine extends StatelessWidget {
   final String label;
   final String text;
-  final Color color;
 
   const _PreviewLine({
     required this.label,
     required this.text,
-    required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           '$label  ',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: color,
-              ),
+          style: textTheme.bodySmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
         ),
         Expanded(
           child: Text(
             text,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontSize: 13,
-                  color: AppTokens.textSecondary,
-                  height: 1.4,
-                ),
+            style: textTheme.bodySmall,
           ),
         ),
       ],

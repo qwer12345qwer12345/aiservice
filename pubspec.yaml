@@ -67,6 +67,8 @@ dev_dependencies:
   synchronized: ^3.3.0
 
   crypto: ^3.0.3
+
+  fluttertoast: ^8.2.6
 flutter:
   uses-material-design: true
 

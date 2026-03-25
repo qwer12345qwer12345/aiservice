@@ -48,16 +48,4 @@ class ChatRoundFactory {
       isIncomplete: true,
     );
   }
-
-  static ChatRound completeRound({
-    required ChatRound round,
-    required String content,
-    required String reasoning,
-  }) {
-    return round.copyWith(
-      assistantThinking: reasoning.trim().isEmpty ? null : reasoning,
-      assistantContent: content.trim().isEmpty ? null : content,
-      isIncomplete: false,
-    );
-  }
 }

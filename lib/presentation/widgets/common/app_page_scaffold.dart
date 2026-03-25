@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../themes/app_tokens.dart';
 
 class AppPageScaffold extends StatelessWidget {
   final PreferredSizeWidget? appBar;
@@ -22,7 +21,7 @@ class AppPageScaffold extends StatelessWidget {
     final content = useSafeArea ? SafeArea(child: body) : body;
 
     return Scaffold(
-      backgroundColor: backgroundColor ?? AppTokens.bg,
+      backgroundColor: backgroundColor,
       appBar: appBar,
       bottomNavigationBar: bottomNavigationBar,
       body: GestureDetector(

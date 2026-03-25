@@ -45,6 +45,9 @@ lib/core/interfaces/file_service.dart
 lib/core/models/api_message.dart
 lib/core/models/api_message.freezed.dart
 lib/core/models/api_message.g.dart
+lib/core/models/app_config_store.dart
+lib/core/models/app_config_store.freezed.dart
+lib/core/models/app_config_store.g.dart
 lib/core/models/app_config.dart
 lib/core/models/app_config.freezed.dart
 lib/core/models/app_config.g.dart
@@ -63,6 +66,7 @@ lib/core/models/session.dart
 lib/core/models/session.freezed.dart
 lib/core/models/session.g.dart
 lib/core/models/sse_event.dart
+lib/core/utils/app_route_observer.dart
 lib/core/utils/file_name_utils.dart
 lib/core/utils/id_generator.dart
 lib/core/utils/json_utils.dart
@@ -103,6 +107,7 @@ lib/presentation/providers/attachment_bytes_provider.dart
 lib/presentation/providers/chat_notifier.dart
 lib/presentation/providers/config_notifier.dart
 lib/presentation/providers/global_streaming_provider.dart
+lib/presentation/providers/home_session_list_provider.dart
 lib/presentation/providers/input_draft_provider.dart
 lib/presentation/providers/session_card_provider.dart
 lib/presentation/providers/session_list_notifier.dart
@@ -113,6 +118,7 @@ lib/presentation/widgets/common/app_badge.dart
 lib/presentation/widgets/common/app_card.dart
 lib/presentation/widgets/common/app_page_scaffold.dart
 lib/presentation/widgets/common/app_section.dart
+lib/presentation/widgets/common/app_toast.dart
 lib/presentation/widgets/input_bar.dart
 lib/presentation/widgets/message_bubble.dart
 lib/presentation/widgets/page_indicator.dart
@@ -120,6 +126,32 @@ lib/presentation/widgets/thought_bubble.dart
 ```
 
 # Files
+
+## File: lib/presentation/widgets/common/app_toast.dart
+```dart
+import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+abstract class AppToast {
+  static Future<void> show(
+    String message, {
+    ToastGravity gravity = ToastGravity.CENTER,
+    Toast toastLength = Toast.LENGTH_SHORT,
+    Color backgroundColor = const Color(0xE6111827),
+    Color textColor = Colors.white,
+    double fontSize = 14,
+  }) async {
+    await Fluttertoast.cancel();
+    await Fluttertoast.showToast(
+      msg: message,
+      toastLength: toastLength,
+      gravity: gravity,
+      backgroundColor: backgroundColor,
+      textColor: textColor,
+      fontSize: fontSize,
+    );
+  }
+}
+```
 
 ## File: lib/core/constants/app_constants.dart
 ```dart
@@ -194,37 +226,6 @@ abstract class IApiService {
     bool enableReasoning = false,
   });
   void cancelRequest(String taskId); // 支持取消指定的任务
-}
-```
-
-## File: lib/core/interfaces/config_service.dart
-```dart
-import '../models/app_config.dart';
-abstract class IConfigService {
-  Future<AppConfig> loadConfig();
-  Future<void> saveConfig(AppConfig config);
-  Future<void> refreshModels(); // 触发模型列表刷新
-}
-```
-
-## File: lib/core/interfaces/file_service.dart
-```dart
-import 'dart:typed_data';
-import '../models/session.dart';
-import '../models/app_config.dart';
-abstract class IFileService {
-  // 配置
-  Future<AppConfig> readConfig();
-  Future<void> writeConfig(AppConfig config);
-  // 会话
-  Future<List<String>> getConversationFileList(); // 获取文件名列表
-  Future<Session> readSession(String fileName);   // 读取会话
-  Future<void> writeSession(String fileName, Session session); // 保存会话
-  Future<void> deleteSession(String fileName);    // 删除会话
-  // 附件
-  Future<String> saveAttachment(Uint8List data, String fileName); // 返回相对路径
-  Future<Uint8List> readAttachment(String relativePath);
-  Future<void> deleteAttachment(String relativePath);
 }
 ```
 
@@ -1149,6 +1150,433 @@ Map<String, dynamic> _$$ApiMessageImplToJson(_$ApiMessageImpl instance) =>
     };
 ```
 
+## File: lib/core/models/app_config_store.dart
+```dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+import 'app_config.dart';
+part 'app_config_store.freezed.dart';
+part 'app_config_store.g.dart';
+@freezed
+class ConfigProfile with _$ConfigProfile {
+  const factory ConfigProfile({
+    required String id,
+    required String name,
+    required AppConfig config,
+  }) = _ConfigProfile;
+  factory ConfigProfile.fromJson(Map<String, dynamic> json) =>
+      _$ConfigProfileFromJson(json);
+}
+@freezed
+class AppConfigStore with _$AppConfigStore {
+  const factory AppConfigStore({
+    required String activeProfileId,
+    @Default([]) List<ConfigProfile> profiles,
+  }) = _AppConfigStore;
+  factory AppConfigStore.fromJson(Map<String, dynamic> json) =>
+      _$AppConfigStoreFromJson(json);
+  factory AppConfigStore.defaultStore() => AppConfigStore(
+        activeProfileId: 'default',
+        profiles: [
+          ConfigProfile(
+            id: 'default',
+            name: '默认配置',
+            config: AppConfig.defaultConfig(),
+          ),
+        ],
+      );
+}
+```
+
+## File: lib/core/models/app_config_store.freezed.dart
+```dart
+// coverage:ignore-file
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint
+// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
+part of 'app_config_store.dart';
+// **************************************************************************
+// FreezedGenerator
+// **************************************************************************
+T _$identity<T>(T value) => value;
+final _privateConstructorUsedError = UnsupportedError(
+  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
+);
+ConfigProfile _$ConfigProfileFromJson(Map<String, dynamic> json) {
+  return _ConfigProfile.fromJson(json);
+}
+/// @nodoc
+mixin _$ConfigProfile {
+  String get id => throw _privateConstructorUsedError;
+  String get name => throw _privateConstructorUsedError;
+  AppConfig get config => throw _privateConstructorUsedError;
+  /// Serializes this ConfigProfile to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+  /// Create a copy of ConfigProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $ConfigProfileCopyWith<ConfigProfile> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+/// @nodoc
+abstract class $ConfigProfileCopyWith<$Res> {
+  factory $ConfigProfileCopyWith(
+    ConfigProfile value,
+    $Res Function(ConfigProfile) then,
+  ) = _$ConfigProfileCopyWithImpl<$Res, ConfigProfile>;
+  @useResult
+  $Res call({String id, String name, AppConfig config});
+  $AppConfigCopyWith<$Res> get config;
+}
+/// @nodoc
+class _$ConfigProfileCopyWithImpl<$Res, $Val extends ConfigProfile>
+    implements $ConfigProfileCopyWith<$Res> {
+  _$ConfigProfileCopyWithImpl(this._value, this._then);
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+  /// Create a copy of ConfigProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? id = null, Object? name = null, Object? config = null}) {
+    return _then(
+      _value.copyWith(
+            id: null == id
+                ? _value.id
+                : id // ignore: cast_nullable_to_non_nullable
+                      as String,
+            name: null == name
+                ? _value.name
+                : name // ignore: cast_nullable_to_non_nullable
+                      as String,
+            config: null == config
+                ? _value.config
+                : config // ignore: cast_nullable_to_non_nullable
+                      as AppConfig,
+          )
+          as $Val,
+    );
+  }
+  /// Create a copy of ConfigProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $AppConfigCopyWith<$Res> get config {
+    return $AppConfigCopyWith<$Res>(_value.config, (value) {
+      return _then(_value.copyWith(config: value) as $Val);
+    });
+  }
+}
+/// @nodoc
+abstract class _$$ConfigProfileImplCopyWith<$Res>
+    implements $ConfigProfileCopyWith<$Res> {
+  factory _$$ConfigProfileImplCopyWith(
+    _$ConfigProfileImpl value,
+    $Res Function(_$ConfigProfileImpl) then,
+  ) = __$$ConfigProfileImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({String id, String name, AppConfig config});
+  @override
+  $AppConfigCopyWith<$Res> get config;
+}
+/// @nodoc
+class __$$ConfigProfileImplCopyWithImpl<$Res>
+    extends _$ConfigProfileCopyWithImpl<$Res, _$ConfigProfileImpl>
+    implements _$$ConfigProfileImplCopyWith<$Res> {
+  __$$ConfigProfileImplCopyWithImpl(
+    _$ConfigProfileImpl _value,
+    $Res Function(_$ConfigProfileImpl) _then,
+  ) : super(_value, _then);
+  /// Create a copy of ConfigProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? id = null, Object? name = null, Object? config = null}) {
+    return _then(
+      _$ConfigProfileImpl(
+        id: null == id
+            ? _value.id
+            : id // ignore: cast_nullable_to_non_nullable
+                  as String,
+        name: null == name
+            ? _value.name
+            : name // ignore: cast_nullable_to_non_nullable
+                  as String,
+        config: null == config
+            ? _value.config
+            : config // ignore: cast_nullable_to_non_nullable
+                  as AppConfig,
+      ),
+    );
+  }
+}
+/// @nodoc
+@JsonSerializable()
+class _$ConfigProfileImpl implements _ConfigProfile {
+  const _$ConfigProfileImpl({
+    required this.id,
+    required this.name,
+    required this.config,
+  });
+  factory _$ConfigProfileImpl.fromJson(Map<String, dynamic> json) =>
+      _$$ConfigProfileImplFromJson(json);
+  @override
+  final String id;
+  @override
+  final String name;
+  @override
+  final AppConfig config;
+  @override
+  String toString() {
+    return 'ConfigProfile(id: $id, name: $name, config: $config)';
+  }
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$ConfigProfileImpl &&
+            (identical(other.id, id) || other.id == id) &&
+            (identical(other.name, name) || other.name == name) &&
+            (identical(other.config, config) || other.config == config));
+  }
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(runtimeType, id, name, config);
+  /// Create a copy of ConfigProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$ConfigProfileImplCopyWith<_$ConfigProfileImpl> get copyWith =>
+      __$$ConfigProfileImplCopyWithImpl<_$ConfigProfileImpl>(this, _$identity);
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$ConfigProfileImplToJson(this);
+  }
+}
+abstract class _ConfigProfile implements ConfigProfile {
+  const factory _ConfigProfile({
+    required final String id,
+    required final String name,
+    required final AppConfig config,
+  }) = _$ConfigProfileImpl;
+  factory _ConfigProfile.fromJson(Map<String, dynamic> json) =
+      _$ConfigProfileImpl.fromJson;
+  @override
+  String get id;
+  @override
+  String get name;
+  @override
+  AppConfig get config;
+  /// Create a copy of ConfigProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$ConfigProfileImplCopyWith<_$ConfigProfileImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+AppConfigStore _$AppConfigStoreFromJson(Map<String, dynamic> json) {
+  return _AppConfigStore.fromJson(json);
+}
+/// @nodoc
+mixin _$AppConfigStore {
+  String get activeProfileId => throw _privateConstructorUsedError;
+  List<ConfigProfile> get profiles => throw _privateConstructorUsedError;
+  /// Serializes this AppConfigStore to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+  /// Create a copy of AppConfigStore
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $AppConfigStoreCopyWith<AppConfigStore> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+/// @nodoc
+abstract class $AppConfigStoreCopyWith<$Res> {
+  factory $AppConfigStoreCopyWith(
+    AppConfigStore value,
+    $Res Function(AppConfigStore) then,
+  ) = _$AppConfigStoreCopyWithImpl<$Res, AppConfigStore>;
+  @useResult
+  $Res call({String activeProfileId, List<ConfigProfile> profiles});
+}
+/// @nodoc
+class _$AppConfigStoreCopyWithImpl<$Res, $Val extends AppConfigStore>
+    implements $AppConfigStoreCopyWith<$Res> {
+  _$AppConfigStoreCopyWithImpl(this._value, this._then);
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+  /// Create a copy of AppConfigStore
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? activeProfileId = null, Object? profiles = null}) {
+    return _then(
+      _value.copyWith(
+            activeProfileId: null == activeProfileId
+                ? _value.activeProfileId
+                : activeProfileId // ignore: cast_nullable_to_non_nullable
+                      as String,
+            profiles: null == profiles
+                ? _value.profiles
+                : profiles // ignore: cast_nullable_to_non_nullable
+                      as List<ConfigProfile>,
+          )
+          as $Val,
+    );
+  }
+}
+/// @nodoc
+abstract class _$$AppConfigStoreImplCopyWith<$Res>
+    implements $AppConfigStoreCopyWith<$Res> {
+  factory _$$AppConfigStoreImplCopyWith(
+    _$AppConfigStoreImpl value,
+    $Res Function(_$AppConfigStoreImpl) then,
+  ) = __$$AppConfigStoreImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({String activeProfileId, List<ConfigProfile> profiles});
+}
+/// @nodoc
+class __$$AppConfigStoreImplCopyWithImpl<$Res>
+    extends _$AppConfigStoreCopyWithImpl<$Res, _$AppConfigStoreImpl>
+    implements _$$AppConfigStoreImplCopyWith<$Res> {
+  __$$AppConfigStoreImplCopyWithImpl(
+    _$AppConfigStoreImpl _value,
+    $Res Function(_$AppConfigStoreImpl) _then,
+  ) : super(_value, _then);
+  /// Create a copy of AppConfigStore
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? activeProfileId = null, Object? profiles = null}) {
+    return _then(
+      _$AppConfigStoreImpl(
+        activeProfileId: null == activeProfileId
+            ? _value.activeProfileId
+            : activeProfileId // ignore: cast_nullable_to_non_nullable
+                  as String,
+        profiles: null == profiles
+            ? _value._profiles
+            : profiles // ignore: cast_nullable_to_non_nullable
+                  as List<ConfigProfile>,
+      ),
+    );
+  }
+}
+/// @nodoc
+@JsonSerializable()
+class _$AppConfigStoreImpl implements _AppConfigStore {
+  const _$AppConfigStoreImpl({
+    required this.activeProfileId,
+    final List<ConfigProfile> profiles = const [],
+  }) : _profiles = profiles;
+  factory _$AppConfigStoreImpl.fromJson(Map<String, dynamic> json) =>
+      _$$AppConfigStoreImplFromJson(json);
+  @override
+  final String activeProfileId;
+  final List<ConfigProfile> _profiles;
+  @override
+  @JsonKey()
+  List<ConfigProfile> get profiles {
+    if (_profiles is EqualUnmodifiableListView) return _profiles;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_profiles);
+  }
+  @override
+  String toString() {
+    return 'AppConfigStore(activeProfileId: $activeProfileId, profiles: $profiles)';
+  }
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$AppConfigStoreImpl &&
+            (identical(other.activeProfileId, activeProfileId) ||
+                other.activeProfileId == activeProfileId) &&
+            const DeepCollectionEquality().equals(other._profiles, _profiles));
+  }
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(
+    runtimeType,
+    activeProfileId,
+    const DeepCollectionEquality().hash(_profiles),
+  );
+  /// Create a copy of AppConfigStore
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$AppConfigStoreImplCopyWith<_$AppConfigStoreImpl> get copyWith =>
+      __$$AppConfigStoreImplCopyWithImpl<_$AppConfigStoreImpl>(
+        this,
+        _$identity,
+      );
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$AppConfigStoreImplToJson(this);
+  }
+}
+abstract class _AppConfigStore implements AppConfigStore {
+  const factory _AppConfigStore({
+    required final String activeProfileId,
+    final List<ConfigProfile> profiles,
+  }) = _$AppConfigStoreImpl;
+  factory _AppConfigStore.fromJson(Map<String, dynamic> json) =
+      _$AppConfigStoreImpl.fromJson;
+  @override
+  String get activeProfileId;
+  @override
+  List<ConfigProfile> get profiles;
+  /// Create a copy of AppConfigStore
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$AppConfigStoreImplCopyWith<_$AppConfigStoreImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+```
+
+## File: lib/core/models/app_config_store.g.dart
+```dart
+// GENERATED CODE - DO NOT MODIFY BY HAND
+part of 'app_config_store.dart';
+// **************************************************************************
+// JsonSerializableGenerator
+// **************************************************************************
+_$ConfigProfileImpl _$$ConfigProfileImplFromJson(Map<String, dynamic> json) =>
+    _$ConfigProfileImpl(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      config: AppConfig.fromJson(json['config'] as Map<String, dynamic>),
+    );
+Map<String, dynamic> _$$ConfigProfileImplToJson(_$ConfigProfileImpl instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'name': instance.name,
+      'config': instance.config,
+    };
+_$AppConfigStoreImpl _$$AppConfigStoreImplFromJson(Map<String, dynamic> json) =>
+    _$AppConfigStoreImpl(
+      activeProfileId: json['activeProfileId'] as String,
+      profiles:
+          (json['profiles'] as List<dynamic>?)
+              ?.map((e) => ConfigProfile.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const [],
+    );
+Map<String, dynamic> _$$AppConfigStoreImplToJson(
+  _$AppConfigStoreImpl instance,
+) => <String, dynamic>{
+  'activeProfileId': instance.activeProfileId,
+  'profiles': instance.profiles,
+};
+```
+
 ## File: lib/core/models/app_config.dart
 ```dart
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -2047,384 +2475,6 @@ abstract class _ChatChunk implements ChatChunk {
 }
 ```
 
-## File: lib/core/models/chat_round.dart
-```dart
-import 'package:freezed_annotation/freezed_annotation.dart';
-import 'attachment.dart';
-part 'chat_round.freezed.dart';
-part 'chat_round.g.dart';
-@freezed
-class ChatRound with _$ChatRound {
-  const factory ChatRound({
-    required String id,
-    String? parentId,
-    required int createdAt,
-    required String userContent,
-    @Default([]) List<Attachment> userAttachments,
-    String? assistantThinking,
-    String? assistantContent,
-    @Default(false) bool isIncomplete,
-  }) = _ChatRound;
-  factory ChatRound.fromJson(Map<String, dynamic> json) =>
-      _$ChatRoundFromJson(json);
-}
-```
-
-## File: lib/core/models/chat_round.freezed.dart
-```dart
-// coverage:ignore-file
-// GENERATED CODE - DO NOT MODIFY BY HAND
-// ignore_for_file: type=lint
-// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
-part of 'chat_round.dart';
-// **************************************************************************
-// FreezedGenerator
-// **************************************************************************
-T _$identity<T>(T value) => value;
-final _privateConstructorUsedError = UnsupportedError(
-  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
-);
-ChatRound _$ChatRoundFromJson(Map<String, dynamic> json) {
-  return _ChatRound.fromJson(json);
-}
-/// @nodoc
-mixin _$ChatRound {
-  String get id => throw _privateConstructorUsedError;
-  String? get parentId => throw _privateConstructorUsedError;
-  int get createdAt => throw _privateConstructorUsedError;
-  String get userContent => throw _privateConstructorUsedError;
-  List<Attachment> get userAttachments => throw _privateConstructorUsedError;
-  String? get assistantThinking => throw _privateConstructorUsedError;
-  String? get assistantContent => throw _privateConstructorUsedError;
-  bool get isIncomplete => throw _privateConstructorUsedError;
-  /// Serializes this ChatRound to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-  /// Create a copy of ChatRound
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $ChatRoundCopyWith<ChatRound> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-/// @nodoc
-abstract class $ChatRoundCopyWith<$Res> {
-  factory $ChatRoundCopyWith(ChatRound value, $Res Function(ChatRound) then) =
-      _$ChatRoundCopyWithImpl<$Res, ChatRound>;
-  @useResult
-  $Res call({
-    String id,
-    String? parentId,
-    int createdAt,
-    String userContent,
-    List<Attachment> userAttachments,
-    String? assistantThinking,
-    String? assistantContent,
-    bool isIncomplete,
-  });
-}
-/// @nodoc
-class _$ChatRoundCopyWithImpl<$Res, $Val extends ChatRound>
-    implements $ChatRoundCopyWith<$Res> {
-  _$ChatRoundCopyWithImpl(this._value, this._then);
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-  /// Create a copy of ChatRound
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? id = null,
-    Object? parentId = freezed,
-    Object? createdAt = null,
-    Object? userContent = null,
-    Object? userAttachments = null,
-    Object? assistantThinking = freezed,
-    Object? assistantContent = freezed,
-    Object? isIncomplete = null,
-  }) {
-    return _then(
-      _value.copyWith(
-            id: null == id
-                ? _value.id
-                : id // ignore: cast_nullable_to_non_nullable
-                      as String,
-            parentId: freezed == parentId
-                ? _value.parentId
-                : parentId // ignore: cast_nullable_to_non_nullable
-                      as String?,
-            createdAt: null == createdAt
-                ? _value.createdAt
-                : createdAt // ignore: cast_nullable_to_non_nullable
-                      as int,
-            userContent: null == userContent
-                ? _value.userContent
-                : userContent // ignore: cast_nullable_to_non_nullable
-                      as String,
-            userAttachments: null == userAttachments
-                ? _value.userAttachments
-                : userAttachments // ignore: cast_nullable_to_non_nullable
-                      as List<Attachment>,
-            assistantThinking: freezed == assistantThinking
-                ? _value.assistantThinking
-                : assistantThinking // ignore: cast_nullable_to_non_nullable
-                      as String?,
-            assistantContent: freezed == assistantContent
-                ? _value.assistantContent
-                : assistantContent // ignore: cast_nullable_to_non_nullable
-                      as String?,
-            isIncomplete: null == isIncomplete
-                ? _value.isIncomplete
-                : isIncomplete // ignore: cast_nullable_to_non_nullable
-                      as bool,
-          )
-          as $Val,
-    );
-  }
-}
-/// @nodoc
-abstract class _$$ChatRoundImplCopyWith<$Res>
-    implements $ChatRoundCopyWith<$Res> {
-  factory _$$ChatRoundImplCopyWith(
-    _$ChatRoundImpl value,
-    $Res Function(_$ChatRoundImpl) then,
-  ) = __$$ChatRoundImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({
-    String id,
-    String? parentId,
-    int createdAt,
-    String userContent,
-    List<Attachment> userAttachments,
-    String? assistantThinking,
-    String? assistantContent,
-    bool isIncomplete,
-  });
-}
-/// @nodoc
-class __$$ChatRoundImplCopyWithImpl<$Res>
-    extends _$ChatRoundCopyWithImpl<$Res, _$ChatRoundImpl>
-    implements _$$ChatRoundImplCopyWith<$Res> {
-  __$$ChatRoundImplCopyWithImpl(
-    _$ChatRoundImpl _value,
-    $Res Function(_$ChatRoundImpl) _then,
-  ) : super(_value, _then);
-  /// Create a copy of ChatRound
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? id = null,
-    Object? parentId = freezed,
-    Object? createdAt = null,
-    Object? userContent = null,
-    Object? userAttachments = null,
-    Object? assistantThinking = freezed,
-    Object? assistantContent = freezed,
-    Object? isIncomplete = null,
-  }) {
-    return _then(
-      _$ChatRoundImpl(
-        id: null == id
-            ? _value.id
-            : id // ignore: cast_nullable_to_non_nullable
-                  as String,
-        parentId: freezed == parentId
-            ? _value.parentId
-            : parentId // ignore: cast_nullable_to_non_nullable
-                  as String?,
-        createdAt: null == createdAt
-            ? _value.createdAt
-            : createdAt // ignore: cast_nullable_to_non_nullable
-                  as int,
-        userContent: null == userContent
-            ? _value.userContent
-            : userContent // ignore: cast_nullable_to_non_nullable
-                  as String,
-        userAttachments: null == userAttachments
-            ? _value._userAttachments
-            : userAttachments // ignore: cast_nullable_to_non_nullable
-                  as List<Attachment>,
-        assistantThinking: freezed == assistantThinking
-            ? _value.assistantThinking
-            : assistantThinking // ignore: cast_nullable_to_non_nullable
-                  as String?,
-        assistantContent: freezed == assistantContent
-            ? _value.assistantContent
-            : assistantContent // ignore: cast_nullable_to_non_nullable
-                  as String?,
-        isIncomplete: null == isIncomplete
-            ? _value.isIncomplete
-            : isIncomplete // ignore: cast_nullable_to_non_nullable
-                  as bool,
-      ),
-    );
-  }
-}
-/// @nodoc
-@JsonSerializable()
-class _$ChatRoundImpl implements _ChatRound {
-  const _$ChatRoundImpl({
-    required this.id,
-    this.parentId,
-    required this.createdAt,
-    required this.userContent,
-    final List<Attachment> userAttachments = const [],
-    this.assistantThinking,
-    this.assistantContent,
-    this.isIncomplete = false,
-  }) : _userAttachments = userAttachments;
-  factory _$ChatRoundImpl.fromJson(Map<String, dynamic> json) =>
-      _$$ChatRoundImplFromJson(json);
-  @override
-  final String id;
-  @override
-  final String? parentId;
-  @override
-  final int createdAt;
-  @override
-  final String userContent;
-  final List<Attachment> _userAttachments;
-  @override
-  @JsonKey()
-  List<Attachment> get userAttachments {
-    if (_userAttachments is EqualUnmodifiableListView) return _userAttachments;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableListView(_userAttachments);
-  }
-  @override
-  final String? assistantThinking;
-  @override
-  final String? assistantContent;
-  @override
-  @JsonKey()
-  final bool isIncomplete;
-  @override
-  String toString() {
-    return 'ChatRound(id: $id, parentId: $parentId, createdAt: $createdAt, userContent: $userContent, userAttachments: $userAttachments, assistantThinking: $assistantThinking, assistantContent: $assistantContent, isIncomplete: $isIncomplete)';
-  }
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$ChatRoundImpl &&
-            (identical(other.id, id) || other.id == id) &&
-            (identical(other.parentId, parentId) ||
-                other.parentId == parentId) &&
-            (identical(other.createdAt, createdAt) ||
-                other.createdAt == createdAt) &&
-            (identical(other.userContent, userContent) ||
-                other.userContent == userContent) &&
-            const DeepCollectionEquality().equals(
-              other._userAttachments,
-              _userAttachments,
-            ) &&
-            (identical(other.assistantThinking, assistantThinking) ||
-                other.assistantThinking == assistantThinking) &&
-            (identical(other.assistantContent, assistantContent) ||
-                other.assistantContent == assistantContent) &&
-            (identical(other.isIncomplete, isIncomplete) ||
-                other.isIncomplete == isIncomplete));
-  }
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  int get hashCode => Object.hash(
-    runtimeType,
-    id,
-    parentId,
-    createdAt,
-    userContent,
-    const DeepCollectionEquality().hash(_userAttachments),
-    assistantThinking,
-    assistantContent,
-    isIncomplete,
-  );
-  /// Create a copy of ChatRound
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$ChatRoundImplCopyWith<_$ChatRoundImpl> get copyWith =>
-      __$$ChatRoundImplCopyWithImpl<_$ChatRoundImpl>(this, _$identity);
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$ChatRoundImplToJson(this);
-  }
-}
-abstract class _ChatRound implements ChatRound {
-  const factory _ChatRound({
-    required final String id,
-    final String? parentId,
-    required final int createdAt,
-    required final String userContent,
-    final List<Attachment> userAttachments,
-    final String? assistantThinking,
-    final String? assistantContent,
-    final bool isIncomplete,
-  }) = _$ChatRoundImpl;
-  factory _ChatRound.fromJson(Map<String, dynamic> json) =
-      _$ChatRoundImpl.fromJson;
-  @override
-  String get id;
-  @override
-  String? get parentId;
-  @override
-  int get createdAt;
-  @override
-  String get userContent;
-  @override
-  List<Attachment> get userAttachments;
-  @override
-  String? get assistantThinking;
-  @override
-  String? get assistantContent;
-  @override
-  bool get isIncomplete;
-  /// Create a copy of ChatRound
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$ChatRoundImplCopyWith<_$ChatRoundImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-```
-
-## File: lib/core/models/chat_round.g.dart
-```dart
-// GENERATED CODE - DO NOT MODIFY BY HAND
-part of 'chat_round.dart';
-// **************************************************************************
-// JsonSerializableGenerator
-// **************************************************************************
-_$ChatRoundImpl _$$ChatRoundImplFromJson(Map<String, dynamic> json) =>
-    _$ChatRoundImpl(
-      id: json['id'] as String,
-      parentId: json['parentId'] as String?,
-      createdAt: (json['createdAt'] as num).toInt(),
-      userContent: json['userContent'] as String,
-      userAttachments:
-          (json['userAttachments'] as List<dynamic>?)
-              ?.map((e) => Attachment.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          const [],
-      assistantThinking: json['assistantThinking'] as String?,
-      assistantContent: json['assistantContent'] as String?,
-      isIncomplete: json['isIncomplete'] as bool? ?? false,
-    );
-Map<String, dynamic> _$$ChatRoundImplToJson(_$ChatRoundImpl instance) =>
-    <String, dynamic>{
-      'id': instance.id,
-      'parentId': instance.parentId,
-      'createdAt': instance.createdAt,
-      'userContent': instance.userContent,
-      'userAttachments': instance.userAttachments,
-      'assistantThinking': instance.assistantThinking,
-      'assistantContent': instance.assistantContent,
-      'isIncomplete': instance.isIncomplete,
-    };
-```
-
 ## File: lib/core/models/model_info.dart
 ```dart
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -2746,535 +2796,6 @@ Map<String, dynamic> _$$ModelInfoImplToJson(_$ModelInfoImpl instance) =>
     };
 ```
 
-## File: lib/core/models/session.dart
-```dart
-import 'package:freezed_annotation/freezed_annotation.dart';
-import 'chat_round.dart';
-part 'session.freezed.dart';
-part 'session.g.dart';
-@freezed
-class Session with _$Session {
-  const factory Session({
-    required String id,
-    required String title,
-    required int createdAt,
-    required int updatedAt,
-    required List<ChatRound> rounds,
-    SessionConfig? config,
-  }) = _Session;
-  factory Session.fromJson(Map<String, dynamic> json) => _$SessionFromJson(json);
-}
-@freezed
-class SessionConfig with _$SessionConfig {
-  const factory SessionConfig({
-    String? model,
-    double? temperature,
-    bool? enableReasoning,
-  }) = _SessionConfig;
-  factory SessionConfig.fromJson(Map<String, dynamic> json) =>
-      _$SessionConfigFromJson(json);
-}
-```
-
-## File: lib/core/models/session.freezed.dart
-```dart
-// coverage:ignore-file
-// GENERATED CODE - DO NOT MODIFY BY HAND
-// ignore_for_file: type=lint
-// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
-part of 'session.dart';
-// **************************************************************************
-// FreezedGenerator
-// **************************************************************************
-T _$identity<T>(T value) => value;
-final _privateConstructorUsedError = UnsupportedError(
-  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
-);
-Session _$SessionFromJson(Map<String, dynamic> json) {
-  return _Session.fromJson(json);
-}
-/// @nodoc
-mixin _$Session {
-  String get id => throw _privateConstructorUsedError;
-  String get title => throw _privateConstructorUsedError;
-  int get createdAt => throw _privateConstructorUsedError;
-  int get updatedAt => throw _privateConstructorUsedError;
-  List<ChatRound> get rounds => throw _privateConstructorUsedError;
-  SessionConfig? get config => throw _privateConstructorUsedError;
-  /// Serializes this Session to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-  /// Create a copy of Session
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $SessionCopyWith<Session> get copyWith => throw _privateConstructorUsedError;
-}
-/// @nodoc
-abstract class $SessionCopyWith<$Res> {
-  factory $SessionCopyWith(Session value, $Res Function(Session) then) =
-      _$SessionCopyWithImpl<$Res, Session>;
-  @useResult
-  $Res call({
-    String id,
-    String title,
-    int createdAt,
-    int updatedAt,
-    List<ChatRound> rounds,
-    SessionConfig? config,
-  });
-  $SessionConfigCopyWith<$Res>? get config;
-}
-/// @nodoc
-class _$SessionCopyWithImpl<$Res, $Val extends Session>
-    implements $SessionCopyWith<$Res> {
-  _$SessionCopyWithImpl(this._value, this._then);
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-  /// Create a copy of Session
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? id = null,
-    Object? title = null,
-    Object? createdAt = null,
-    Object? updatedAt = null,
-    Object? rounds = null,
-    Object? config = freezed,
-  }) {
-    return _then(
-      _value.copyWith(
-            id: null == id
-                ? _value.id
-                : id // ignore: cast_nullable_to_non_nullable
-                      as String,
-            title: null == title
-                ? _value.title
-                : title // ignore: cast_nullable_to_non_nullable
-                      as String,
-            createdAt: null == createdAt
-                ? _value.createdAt
-                : createdAt // ignore: cast_nullable_to_non_nullable
-                      as int,
-            updatedAt: null == updatedAt
-                ? _value.updatedAt
-                : updatedAt // ignore: cast_nullable_to_non_nullable
-                      as int,
-            rounds: null == rounds
-                ? _value.rounds
-                : rounds // ignore: cast_nullable_to_non_nullable
-                      as List<ChatRound>,
-            config: freezed == config
-                ? _value.config
-                : config // ignore: cast_nullable_to_non_nullable
-                      as SessionConfig?,
-          )
-          as $Val,
-    );
-  }
-  /// Create a copy of Session
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @pragma('vm:prefer-inline')
-  $SessionConfigCopyWith<$Res>? get config {
-    if (_value.config == null) {
-      return null;
-    }
-    return $SessionConfigCopyWith<$Res>(_value.config!, (value) {
-      return _then(_value.copyWith(config: value) as $Val);
-    });
-  }
-}
-/// @nodoc
-abstract class _$$SessionImplCopyWith<$Res> implements $SessionCopyWith<$Res> {
-  factory _$$SessionImplCopyWith(
-    _$SessionImpl value,
-    $Res Function(_$SessionImpl) then,
-  ) = __$$SessionImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({
-    String id,
-    String title,
-    int createdAt,
-    int updatedAt,
-    List<ChatRound> rounds,
-    SessionConfig? config,
-  });
-  @override
-  $SessionConfigCopyWith<$Res>? get config;
-}
-/// @nodoc
-class __$$SessionImplCopyWithImpl<$Res>
-    extends _$SessionCopyWithImpl<$Res, _$SessionImpl>
-    implements _$$SessionImplCopyWith<$Res> {
-  __$$SessionImplCopyWithImpl(
-    _$SessionImpl _value,
-    $Res Function(_$SessionImpl) _then,
-  ) : super(_value, _then);
-  /// Create a copy of Session
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? id = null,
-    Object? title = null,
-    Object? createdAt = null,
-    Object? updatedAt = null,
-    Object? rounds = null,
-    Object? config = freezed,
-  }) {
-    return _then(
-      _$SessionImpl(
-        id: null == id
-            ? _value.id
-            : id // ignore: cast_nullable_to_non_nullable
-                  as String,
-        title: null == title
-            ? _value.title
-            : title // ignore: cast_nullable_to_non_nullable
-                  as String,
-        createdAt: null == createdAt
-            ? _value.createdAt
-            : createdAt // ignore: cast_nullable_to_non_nullable
-                  as int,
-        updatedAt: null == updatedAt
-            ? _value.updatedAt
-            : updatedAt // ignore: cast_nullable_to_non_nullable
-                  as int,
-        rounds: null == rounds
-            ? _value._rounds
-            : rounds // ignore: cast_nullable_to_non_nullable
-                  as List<ChatRound>,
-        config: freezed == config
-            ? _value.config
-            : config // ignore: cast_nullable_to_non_nullable
-                  as SessionConfig?,
-      ),
-    );
-  }
-}
-/// @nodoc
-@JsonSerializable()
-class _$SessionImpl implements _Session {
-  const _$SessionImpl({
-    required this.id,
-    required this.title,
-    required this.createdAt,
-    required this.updatedAt,
-    required final List<ChatRound> rounds,
-    this.config,
-  }) : _rounds = rounds;
-  factory _$SessionImpl.fromJson(Map<String, dynamic> json) =>
-      _$$SessionImplFromJson(json);
-  @override
-  final String id;
-  @override
-  final String title;
-  @override
-  final int createdAt;
-  @override
-  final int updatedAt;
-  final List<ChatRound> _rounds;
-  @override
-  List<ChatRound> get rounds {
-    if (_rounds is EqualUnmodifiableListView) return _rounds;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableListView(_rounds);
-  }
-  @override
-  final SessionConfig? config;
-  @override
-  String toString() {
-    return 'Session(id: $id, title: $title, createdAt: $createdAt, updatedAt: $updatedAt, rounds: $rounds, config: $config)';
-  }
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$SessionImpl &&
-            (identical(other.id, id) || other.id == id) &&
-            (identical(other.title, title) || other.title == title) &&
-            (identical(other.createdAt, createdAt) ||
-                other.createdAt == createdAt) &&
-            (identical(other.updatedAt, updatedAt) ||
-                other.updatedAt == updatedAt) &&
-            const DeepCollectionEquality().equals(other._rounds, _rounds) &&
-            (identical(other.config, config) || other.config == config));
-  }
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  int get hashCode => Object.hash(
-    runtimeType,
-    id,
-    title,
-    createdAt,
-    updatedAt,
-    const DeepCollectionEquality().hash(_rounds),
-    config,
-  );
-  /// Create a copy of Session
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$SessionImplCopyWith<_$SessionImpl> get copyWith =>
-      __$$SessionImplCopyWithImpl<_$SessionImpl>(this, _$identity);
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$SessionImplToJson(this);
-  }
-}
-abstract class _Session implements Session {
-  const factory _Session({
-    required final String id,
-    required final String title,
-    required final int createdAt,
-    required final int updatedAt,
-    required final List<ChatRound> rounds,
-    final SessionConfig? config,
-  }) = _$SessionImpl;
-  factory _Session.fromJson(Map<String, dynamic> json) = _$SessionImpl.fromJson;
-  @override
-  String get id;
-  @override
-  String get title;
-  @override
-  int get createdAt;
-  @override
-  int get updatedAt;
-  @override
-  List<ChatRound> get rounds;
-  @override
-  SessionConfig? get config;
-  /// Create a copy of Session
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$SessionImplCopyWith<_$SessionImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-SessionConfig _$SessionConfigFromJson(Map<String, dynamic> json) {
-  return _SessionConfig.fromJson(json);
-}
-/// @nodoc
-mixin _$SessionConfig {
-  String? get model => throw _privateConstructorUsedError;
-  double? get temperature => throw _privateConstructorUsedError;
-  bool? get enableReasoning => throw _privateConstructorUsedError;
-  /// Serializes this SessionConfig to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-  /// Create a copy of SessionConfig
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $SessionConfigCopyWith<SessionConfig> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-/// @nodoc
-abstract class $SessionConfigCopyWith<$Res> {
-  factory $SessionConfigCopyWith(
-    SessionConfig value,
-    $Res Function(SessionConfig) then,
-  ) = _$SessionConfigCopyWithImpl<$Res, SessionConfig>;
-  @useResult
-  $Res call({String? model, double? temperature, bool? enableReasoning});
-}
-/// @nodoc
-class _$SessionConfigCopyWithImpl<$Res, $Val extends SessionConfig>
-    implements $SessionConfigCopyWith<$Res> {
-  _$SessionConfigCopyWithImpl(this._value, this._then);
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-  /// Create a copy of SessionConfig
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? model = freezed,
-    Object? temperature = freezed,
-    Object? enableReasoning = freezed,
-  }) {
-    return _then(
-      _value.copyWith(
-            model: freezed == model
-                ? _value.model
-                : model // ignore: cast_nullable_to_non_nullable
-                      as String?,
-            temperature: freezed == temperature
-                ? _value.temperature
-                : temperature // ignore: cast_nullable_to_non_nullable
-                      as double?,
-            enableReasoning: freezed == enableReasoning
-                ? _value.enableReasoning
-                : enableReasoning // ignore: cast_nullable_to_non_nullable
-                      as bool?,
-          )
-          as $Val,
-    );
-  }
-}
-/// @nodoc
-abstract class _$$SessionConfigImplCopyWith<$Res>
-    implements $SessionConfigCopyWith<$Res> {
-  factory _$$SessionConfigImplCopyWith(
-    _$SessionConfigImpl value,
-    $Res Function(_$SessionConfigImpl) then,
-  ) = __$$SessionConfigImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({String? model, double? temperature, bool? enableReasoning});
-}
-/// @nodoc
-class __$$SessionConfigImplCopyWithImpl<$Res>
-    extends _$SessionConfigCopyWithImpl<$Res, _$SessionConfigImpl>
-    implements _$$SessionConfigImplCopyWith<$Res> {
-  __$$SessionConfigImplCopyWithImpl(
-    _$SessionConfigImpl _value,
-    $Res Function(_$SessionConfigImpl) _then,
-  ) : super(_value, _then);
-  /// Create a copy of SessionConfig
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? model = freezed,
-    Object? temperature = freezed,
-    Object? enableReasoning = freezed,
-  }) {
-    return _then(
-      _$SessionConfigImpl(
-        model: freezed == model
-            ? _value.model
-            : model // ignore: cast_nullable_to_non_nullable
-                  as String?,
-        temperature: freezed == temperature
-            ? _value.temperature
-            : temperature // ignore: cast_nullable_to_non_nullable
-                  as double?,
-        enableReasoning: freezed == enableReasoning
-            ? _value.enableReasoning
-            : enableReasoning // ignore: cast_nullable_to_non_nullable
-                  as bool?,
-      ),
-    );
-  }
-}
-/// @nodoc
-@JsonSerializable()
-class _$SessionConfigImpl implements _SessionConfig {
-  const _$SessionConfigImpl({
-    this.model,
-    this.temperature,
-    this.enableReasoning,
-  });
-  factory _$SessionConfigImpl.fromJson(Map<String, dynamic> json) =>
-      _$$SessionConfigImplFromJson(json);
-  @override
-  final String? model;
-  @override
-  final double? temperature;
-  @override
-  final bool? enableReasoning;
-  @override
-  String toString() {
-    return 'SessionConfig(model: $model, temperature: $temperature, enableReasoning: $enableReasoning)';
-  }
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$SessionConfigImpl &&
-            (identical(other.model, model) || other.model == model) &&
-            (identical(other.temperature, temperature) ||
-                other.temperature == temperature) &&
-            (identical(other.enableReasoning, enableReasoning) ||
-                other.enableReasoning == enableReasoning));
-  }
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  int get hashCode =>
-      Object.hash(runtimeType, model, temperature, enableReasoning);
-  /// Create a copy of SessionConfig
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$SessionConfigImplCopyWith<_$SessionConfigImpl> get copyWith =>
-      __$$SessionConfigImplCopyWithImpl<_$SessionConfigImpl>(this, _$identity);
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$SessionConfigImplToJson(this);
-  }
-}
-abstract class _SessionConfig implements SessionConfig {
-  const factory _SessionConfig({
-    final String? model,
-    final double? temperature,
-    final bool? enableReasoning,
-  }) = _$SessionConfigImpl;
-  factory _SessionConfig.fromJson(Map<String, dynamic> json) =
-      _$SessionConfigImpl.fromJson;
-  @override
-  String? get model;
-  @override
-  double? get temperature;
-  @override
-  bool? get enableReasoning;
-  /// Create a copy of SessionConfig
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$SessionConfigImplCopyWith<_$SessionConfigImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-```
-
-## File: lib/core/models/session.g.dart
-```dart
-// GENERATED CODE - DO NOT MODIFY BY HAND
-part of 'session.dart';
-// **************************************************************************
-// JsonSerializableGenerator
-// **************************************************************************
-_$SessionImpl _$$SessionImplFromJson(Map<String, dynamic> json) =>
-    _$SessionImpl(
-      id: json['id'] as String,
-      title: json['title'] as String,
-      createdAt: (json['createdAt'] as num).toInt(),
-      updatedAt: (json['updatedAt'] as num).toInt(),
-      rounds: (json['rounds'] as List<dynamic>)
-          .map((e) => ChatRound.fromJson(e as Map<String, dynamic>))
-          .toList(),
-      config: json['config'] == null
-          ? null
-          : SessionConfig.fromJson(json['config'] as Map<String, dynamic>),
-    );
-Map<String, dynamic> _$$SessionImplToJson(_$SessionImpl instance) =>
-    <String, dynamic>{
-      'id': instance.id,
-      'title': instance.title,
-      'createdAt': instance.createdAt,
-      'updatedAt': instance.updatedAt,
-      'rounds': instance.rounds,
-      'config': instance.config,
-    };
-_$SessionConfigImpl _$$SessionConfigImplFromJson(Map<String, dynamic> json) =>
-    _$SessionConfigImpl(
-      model: json['model'] as String?,
-      temperature: (json['temperature'] as num?)?.toDouble(),
-      enableReasoning: json['enableReasoning'] as bool?,
-    );
-Map<String, dynamic> _$$SessionConfigImplToJson(_$SessionConfigImpl instance) =>
-    <String, dynamic>{
-      'model': instance.model,
-      'temperature': instance.temperature,
-      'enableReasoning': instance.enableReasoning,
-    };
-```
-
 ## File: lib/core/models/sse_event.dart
 ```dart
 class SseEvent {
@@ -3289,6 +2810,13 @@ class SseEvent {
   @override
   String toString() => 'SseEvent(id: $id, event: $event, data: $data)';
 }
+```
+
+## File: lib/core/utils/app_route_observer.dart
+```dart
+import 'package:flutter/material.dart';
+final RouteObserver<ModalRoute<void>> appRouteObserver =
+    RouteObserver<ModalRoute<void>>();
 ```
 
 ## File: lib/core/utils/file_name_utils.dart
@@ -3928,70 +3456,6 @@ class SseEventDecoder {
 }
 ```
 
-## File: lib/data/repositories/config_repository.dart
-```dart
-import '../../core/models/app_config.dart';
-import '../../core/interfaces/config_service.dart';
-class ConfigRepository {
-  final IConfigService _configService;
-  ConfigRepository(this._configService);
-  Future<AppConfig> getConfig() async {
-    return await _configService.loadConfig();
-  }
-  Future<void> saveConfig(AppConfig config) async {
-    await _configService.saveConfig(config);
-  }
-  Future<void> saveFullConfig(AppConfig config) async {
-    await saveConfig(config);
-  }
-  Future<void> saveAndRefreshModels(AppConfig config) async {
-    final clearedConfig = config.copyWith(
-      availableModels: [],
-    );
-    await _configService.saveConfig(clearedConfig);
-    await _configService.refreshModels();
-  }
-  Future<void> updateApiKey(String apiKey) async {
-    final config = await getConfig();
-    final updated = config.copyWith(apiKey: apiKey);
-    await saveConfig(updated);
-  }
-  Future<void> updateBaseUrl(String baseUrl) async {
-    final config = await getConfig();
-    final updated = config.copyWith(baseUrl: baseUrl);
-    await saveConfig(updated);
-  }
-  Future<void> updateModelsPath(String modelsPath) async {
-    final config = await getConfig();
-    final updated = config.copyWith(modelsPath: modelsPath);
-    await saveConfig(updated);
-  }
-  Future<void> updateChatPath(String chatPath) async {
-    final config = await getConfig();
-    final updated = config.copyWith(chatPath: chatPath);
-    await saveConfig(updated);
-  }
-  Future<void> updateApiMode(String apiMode) async {
-    final config = await getConfig();
-    final updated = config.copyWith(apiMode: apiMode);
-    await saveConfig(updated);
-  }
-  Future<void> updateSelectedModel(String? model) async {
-    final config = await getConfig();
-    final updated = config.copyWith(selectedModel: model);
-    await saveConfig(updated);
-  }
-  Future<void> refreshModels() async {
-    await _configService.refreshModels();
-  }
-  Future<List<String>> getAvailableModelIds() async {
-    final config = await getConfig();
-    final models = config.availableModels ?? [];
-    return models.map((m) => m.id).toList();
-  }
-}
-```
-
 ## File: lib/data/services/api_service.dart
 ```dart
 import '../../core/interfaces/api_service.dart';
@@ -4039,110 +3503,6 @@ class ApiService implements IApiService {
   @override
   void cancelRequest(String taskId) {
     _apiSource.cancelRequest(taskId);
-  }
-}
-```
-
-## File: lib/data/services/config_service.dart
-```dart
-import '../../core/interfaces/config_service.dart';
-import '../../core/models/app_config.dart';
-import '../../core/interfaces/file_service.dart';
-import '../../core/interfaces/api_service.dart';
-class ConfigService implements IConfigService {
-  final IFileService _fileService;
-  final IApiService _apiService;
-  AppConfig? _cachedConfig;
-  ConfigService(this._fileService, this._apiService);
-  @override
-  Future<AppConfig> loadConfig() async {
-    try {
-      _cachedConfig = await _fileService.readConfig();
-    } catch (_) {
-      _cachedConfig = AppConfig.defaultConfig();
-      await _fileService.writeConfig(_cachedConfig!);
-    }
-    return _cachedConfig!;
-  }
-  @override
-  Future<void> saveConfig(AppConfig config) async {
-    await _fileService.writeConfig(config);
-    _cachedConfig = config;
-  }
-  @override
-  Future<void> refreshModels() async {
-    if (_cachedConfig == null) {
-      await loadConfig();
-    }
-    final models = await _apiService.fetchModels(
-      baseUrl: _cachedConfig!.baseUrl,
-      apiKey: _cachedConfig!.apiKey,
-      modelsPath: _cachedConfig!.modelsPath,
-    );
-    _cachedConfig = _cachedConfig!.copyWith(availableModels: models);
-    await _fileService.writeConfig(_cachedConfig!);
-  }
-}
-```
-
-## File: lib/data/services/file_service.dart
-```dart
-import 'dart:typed_data';
-import '../../core/interfaces/file_service.dart';
-import '../../core/models/session.dart';
-import '../../core/models/app_config.dart';
-import '../../core/constants/app_constants.dart';
-import '../../core/utils/json_utils.dart';
-import '../data_sources/local_file_source.dart';
-class FileService implements IFileService {
-  final ILocalFileSource _fileSource;
-  FileService(this._fileSource);
-  @override
-  Future<AppConfig> readConfig() async {
-    final content = await _fileSource.readTextFile(AppConstants.fileConfig);
-    final json = JsonUtils.decode(content);
-    return AppConfig.fromJson(json);
-  }
-  @override
-  Future<void> writeConfig(AppConfig config) async {
-    final json = config.toJson();
-    final content = JsonUtils.encode(json);
-    await _fileSource.writeTextFile(AppConstants.fileConfig, content);
-  }
-  @override
-  Future<List<String>> getConversationFileList() async {
-    return await _fileSource.listFiles(AppConstants.dirConversations);
-  }
-  @override
-  Future<Session> readSession(String fileName) async {
-    final relativePath = '${AppConstants.dirConversations}/$fileName';
-    final content = await _fileSource.readTextFile(relativePath);
-    final json = JsonUtils.decode(content);
-    return Session.fromJson(json);
-  }
-  @override
-  Future<void> writeSession(String fileName, Session session) async {
-    final relativePath = '${AppConstants.dirConversations}/$fileName';
-    final json = session.toJson();
-    final content = JsonUtils.encode(json);
-    await _fileSource.writeTextFile(relativePath, content);
-  }
-  @override
-  Future<void> deleteSession(String fileName) async {
-    final relativePath = '${AppConstants.dirConversations}/$fileName';
-    await _fileSource.deleteFile(relativePath);
-  }
-  @override
-  Future<String> saveAttachment(Uint8List data, String fileName) async {
-    return await _fileSource.saveAttachment(data, fileName);
-  }
-  @override
-  Future<Uint8List> readAttachment(String relativePath) async {
-    return await _fileSource.readAttachment(relativePath);
-  }
-  @override
-  Future<void> deleteAttachment(String relativePath) async {
-    await _fileSource.deleteFile(relativePath);
   }
 }
 ```
@@ -5766,14 +5126,12 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 import '../../core/models/session.dart';
 import '../models/chat_page.dart';
 part 'chat_state.freezed.dart';
-/// 独立的流状态记录
 @freezed
 class StreamStatus with _$StreamStatus {
   const factory StreamStatus({
     @Default('') String content,
     @Default('') String reasoning,
-    @Default(false) bool isDone,
-    String? error,
+    @Default(false) bool isStreaming,
   }) = _StreamStatus;
 }
 @freezed
@@ -5782,12 +5140,10 @@ class ChatState with _$ChatState {
     Session? session,
     String? currentRoundId,
     ChatPageList? pageList,
-    @Default({}) Map<String, StreamStatus> activeStreams,
     String? error,
     @Default(false) bool isLoading,
   }) = _ChatState;
   factory ChatState.initial() => const ChatState(
-        activeStreams: {},
         error: null,
         isLoading: false,
       );
@@ -5801,30 +5157,6 @@ extension ChatStateX on ChatState {
   }
   ChatState copyWithCurrentRoundId(String roundId) {
     return copyWith(currentRoundId: roundId);
-  }
-  /// 更新或移除指定 roundId 的流状态
-  ChatState copyWithStreaming(
-    String roundId, {
-    String? content,
-    String? reasoning,
-    bool isDone = false,
-    String? error,
-  }) {
-    final newStreams = Map<String, StreamStatus>.from(activeStreams);
-    if (isDone || error != null) {
-      // 完成或报错时移除该流，实际内容由 session.rounds 接管
-      newStreams.remove(roundId);
-    } else {
-      final current = newStreams[roundId] ?? const StreamStatus();
-      newStreams[roundId] = current.copyWith(
-        content: content ?? current.content,
-        reasoning: reasoning ?? current.reasoning,
-      );
-    }
-    return copyWith(
-      activeStreams: newStreams,
-      error: error ?? this.error,
-    );
   }
   ChatState copyWithError(String error) {
     return copyWith(
@@ -5856,8 +5188,7 @@ final _privateConstructorUsedError = UnsupportedError(
 mixin _$StreamStatus {
   String get content => throw _privateConstructorUsedError;
   String get reasoning => throw _privateConstructorUsedError;
-  bool get isDone => throw _privateConstructorUsedError;
-  String? get error => throw _privateConstructorUsedError;
+  bool get isStreaming => throw _privateConstructorUsedError;
   /// Create a copy of StreamStatus
   /// with the given fields replaced by the non-null parameter values.
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -5871,7 +5202,7 @@ abstract class $StreamStatusCopyWith<$Res> {
     $Res Function(StreamStatus) then,
   ) = _$StreamStatusCopyWithImpl<$Res, StreamStatus>;
   @useResult
-  $Res call({String content, String reasoning, bool isDone, String? error});
+  $Res call({String content, String reasoning, bool isStreaming});
 }
 /// @nodoc
 class _$StreamStatusCopyWithImpl<$Res, $Val extends StreamStatus>
@@ -5888,8 +5219,7 @@ class _$StreamStatusCopyWithImpl<$Res, $Val extends StreamStatus>
   $Res call({
     Object? content = null,
     Object? reasoning = null,
-    Object? isDone = null,
-    Object? error = freezed,
+    Object? isStreaming = null,
   }) {
     return _then(
       _value.copyWith(
@@ -5901,14 +5231,10 @@ class _$StreamStatusCopyWithImpl<$Res, $Val extends StreamStatus>
                 ? _value.reasoning
                 : reasoning // ignore: cast_nullable_to_non_nullable
                       as String,
-            isDone: null == isDone
-                ? _value.isDone
-                : isDone // ignore: cast_nullable_to_non_nullable
+            isStreaming: null == isStreaming
+                ? _value.isStreaming
+                : isStreaming // ignore: cast_nullable_to_non_nullable
                       as bool,
-            error: freezed == error
-                ? _value.error
-                : error // ignore: cast_nullable_to_non_nullable
-                      as String?,
           )
           as $Val,
     );
@@ -5923,7 +5249,7 @@ abstract class _$$StreamStatusImplCopyWith<$Res>
   ) = __$$StreamStatusImplCopyWithImpl<$Res>;
   @override
   @useResult
-  $Res call({String content, String reasoning, bool isDone, String? error});
+  $Res call({String content, String reasoning, bool isStreaming});
 }
 /// @nodoc
 class __$$StreamStatusImplCopyWithImpl<$Res>
@@ -5940,8 +5266,7 @@ class __$$StreamStatusImplCopyWithImpl<$Res>
   $Res call({
     Object? content = null,
     Object? reasoning = null,
-    Object? isDone = null,
-    Object? error = freezed,
+    Object? isStreaming = null,
   }) {
     return _then(
       _$StreamStatusImpl(
@@ -5953,14 +5278,10 @@ class __$$StreamStatusImplCopyWithImpl<$Res>
             ? _value.reasoning
             : reasoning // ignore: cast_nullable_to_non_nullable
                   as String,
-        isDone: null == isDone
-            ? _value.isDone
-            : isDone // ignore: cast_nullable_to_non_nullable
+        isStreaming: null == isStreaming
+            ? _value.isStreaming
+            : isStreaming // ignore: cast_nullable_to_non_nullable
                   as bool,
-        error: freezed == error
-            ? _value.error
-            : error // ignore: cast_nullable_to_non_nullable
-                  as String?,
       ),
     );
   }
@@ -5970,8 +5291,7 @@ class _$StreamStatusImpl implements _StreamStatus {
   const _$StreamStatusImpl({
     this.content = '',
     this.reasoning = '',
-    this.isDone = false,
-    this.error,
+    this.isStreaming = false,
   });
   @override
   @JsonKey()
@@ -5981,12 +5301,10 @@ class _$StreamStatusImpl implements _StreamStatus {
   final String reasoning;
   @override
   @JsonKey()
-  final bool isDone;
-  @override
-  final String? error;
+  final bool isStreaming;
   @override
   String toString() {
-    return 'StreamStatus(content: $content, reasoning: $reasoning, isDone: $isDone, error: $error)';
+    return 'StreamStatus(content: $content, reasoning: $reasoning, isStreaming: $isStreaming)';
   }
   @override
   bool operator ==(Object other) {
@@ -5996,12 +5314,11 @@ class _$StreamStatusImpl implements _StreamStatus {
             (identical(other.content, content) || other.content == content) &&
             (identical(other.reasoning, reasoning) ||
                 other.reasoning == reasoning) &&
-            (identical(other.isDone, isDone) || other.isDone == isDone) &&
-            (identical(other.error, error) || other.error == error));
+            (identical(other.isStreaming, isStreaming) ||
+                other.isStreaming == isStreaming));
   }
   @override
-  int get hashCode =>
-      Object.hash(runtimeType, content, reasoning, isDone, error);
+  int get hashCode => Object.hash(runtimeType, content, reasoning, isStreaming);
   /// Create a copy of StreamStatus
   /// with the given fields replaced by the non-null parameter values.
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -6014,17 +5331,14 @@ abstract class _StreamStatus implements StreamStatus {
   const factory _StreamStatus({
     final String content,
     final String reasoning,
-    final bool isDone,
-    final String? error,
+    final bool isStreaming,
   }) = _$StreamStatusImpl;
   @override
   String get content;
   @override
   String get reasoning;
   @override
-  bool get isDone;
-  @override
-  String? get error;
+  bool get isStreaming;
   /// Create a copy of StreamStatus
   /// with the given fields replaced by the non-null parameter values.
   @override
@@ -6037,8 +5351,6 @@ mixin _$ChatState {
   Session? get session => throw _privateConstructorUsedError;
   String? get currentRoundId => throw _privateConstructorUsedError;
   ChatPageList? get pageList => throw _privateConstructorUsedError;
-  Map<String, StreamStatus> get activeStreams =>
-      throw _privateConstructorUsedError;
   String? get error => throw _privateConstructorUsedError;
   bool get isLoading => throw _privateConstructorUsedError;
   /// Create a copy of ChatState
@@ -6056,7 +5368,6 @@ abstract class $ChatStateCopyWith<$Res> {
     Session? session,
     String? currentRoundId,
     ChatPageList? pageList,
-    Map<String, StreamStatus> activeStreams,
     String? error,
     bool isLoading,
   });
@@ -6079,7 +5390,6 @@ class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
     Object? session = freezed,
     Object? currentRoundId = freezed,
     Object? pageList = freezed,
-    Object? activeStreams = null,
     Object? error = freezed,
     Object? isLoading = null,
   }) {
@@ -6097,10 +5407,6 @@ class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
                 ? _value.pageList
                 : pageList // ignore: cast_nullable_to_non_nullable
                       as ChatPageList?,
-            activeStreams: null == activeStreams
-                ? _value.activeStreams
-                : activeStreams // ignore: cast_nullable_to_non_nullable
-                      as Map<String, StreamStatus>,
             error: freezed == error
                 ? _value.error
                 : error // ignore: cast_nullable_to_non_nullable
@@ -6151,7 +5457,6 @@ abstract class _$$ChatStateImplCopyWith<$Res>
     Session? session,
     String? currentRoundId,
     ChatPageList? pageList,
-    Map<String, StreamStatus> activeStreams,
     String? error,
     bool isLoading,
   });
@@ -6176,7 +5481,6 @@ class __$$ChatStateImplCopyWithImpl<$Res>
     Object? session = freezed,
     Object? currentRoundId = freezed,
     Object? pageList = freezed,
-    Object? activeStreams = null,
     Object? error = freezed,
     Object? isLoading = null,
   }) {
@@ -6194,10 +5498,6 @@ class __$$ChatStateImplCopyWithImpl<$Res>
             ? _value.pageList
             : pageList // ignore: cast_nullable_to_non_nullable
                   as ChatPageList?,
-        activeStreams: null == activeStreams
-            ? _value._activeStreams
-            : activeStreams // ignore: cast_nullable_to_non_nullable
-                  as Map<String, StreamStatus>,
         error: freezed == error
             ? _value.error
             : error // ignore: cast_nullable_to_non_nullable
@@ -6216,24 +5516,15 @@ class _$ChatStateImpl implements _ChatState {
     this.session,
     this.currentRoundId,
     this.pageList,
-    final Map<String, StreamStatus> activeStreams = const {},
     this.error,
     this.isLoading = false,
-  }) : _activeStreams = activeStreams;
+  });
   @override
   final Session? session;
   @override
   final String? currentRoundId;
   @override
   final ChatPageList? pageList;
-  final Map<String, StreamStatus> _activeStreams;
-  @override
-  @JsonKey()
-  Map<String, StreamStatus> get activeStreams {
-    if (_activeStreams is EqualUnmodifiableMapView) return _activeStreams;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableMapView(_activeStreams);
-  }
   @override
   final String? error;
   @override
@@ -6241,7 +5532,7 @@ class _$ChatStateImpl implements _ChatState {
   final bool isLoading;
   @override
   String toString() {
-    return 'ChatState(session: $session, currentRoundId: $currentRoundId, pageList: $pageList, activeStreams: $activeStreams, error: $error, isLoading: $isLoading)';
+    return 'ChatState(session: $session, currentRoundId: $currentRoundId, pageList: $pageList, error: $error, isLoading: $isLoading)';
   }
   @override
   bool operator ==(Object other) {
@@ -6253,10 +5544,6 @@ class _$ChatStateImpl implements _ChatState {
                 other.currentRoundId == currentRoundId) &&
             (identical(other.pageList, pageList) ||
                 other.pageList == pageList) &&
-            const DeepCollectionEquality().equals(
-              other._activeStreams,
-              _activeStreams,
-            ) &&
             (identical(other.error, error) || other.error == error) &&
             (identical(other.isLoading, isLoading) ||
                 other.isLoading == isLoading));
@@ -6267,7 +5554,6 @@ class _$ChatStateImpl implements _ChatState {
     session,
     currentRoundId,
     pageList,
-    const DeepCollectionEquality().hash(_activeStreams),
     error,
     isLoading,
   );
@@ -6284,7 +5570,6 @@ abstract class _ChatState implements ChatState {
     final Session? session,
     final String? currentRoundId,
     final ChatPageList? pageList,
-    final Map<String, StreamStatus> activeStreams,
     final String? error,
     final bool isLoading,
   }) = _$ChatStateImpl;
@@ -6295,8 +5580,6 @@ abstract class _ChatState implements ChatState {
   @override
   ChatPageList? get pageList;
   @override
-  Map<String, StreamStatus> get activeStreams;
-  @override
   String? get error;
   @override
   bool get isLoading;
@@ -6306,45 +5589,6 @@ abstract class _ChatState implements ChatState {
   @JsonKey(includeFromJson: false, includeToJson: false)
   _$$ChatStateImplCopyWith<_$ChatStateImpl> get copyWith =>
       throw _privateConstructorUsedError;
-}
-```
-
-## File: lib/main.dart
-```dart
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'di/providers.dart';
-import 'presentation/pages/home_page.dart';
-import 'presentation/themes/app_theme.dart';
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  final container = ProviderContainer();
-  // 初始化应用
-  await container.read(initProvider.notifier).initialize();
-  // 检查初始化是否成功
-  final initState = container.read(initProvider);
-  if (initState.status != InitStatus.success) {
-    throw Exception('应用初始化失败：${initState.errorMessage}');
-  }
-  runApp(
-    UncontrolledProviderScope(
-      container: container,
-      child: const MyApp(),
-    ),
-  );
-}
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'AI Chat',
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
-      home: const HomePage(),
-    );
-  }
 }
 ```
 
@@ -6366,665 +5610,12 @@ class PendingAttachment {
 }
 ```
 
-## File: lib/presentation/pages/settings_page.dart
-```dart
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/app_config.dart';
-import '../../core/models/model_info.dart';
-import '../providers/config_notifier.dart';
-import '../themes/app_tokens.dart';
-import '../widgets/common/app_badge.dart';
-import '../widgets/common/app_page_scaffold.dart';
-import '../widgets/common/app_section.dart';
-class SettingsPage extends ConsumerStatefulWidget {
-  const SettingsPage({super.key});
-  @override
-  ConsumerState<SettingsPage> createState() => _SettingsPageState();
-}
-class _SettingsPageState extends ConsumerState<SettingsPage> {
-  static const String _defaultModelsPath = 'v1/models';
-  final _baseUrlController = TextEditingController();
-  final _apiKeyController = TextEditingController();
-  final _modelsPathController = TextEditingController();
-  final _chatPathController = TextEditingController();
-  bool _initialized = false;
-  bool _isRefreshingModels = false;
-  String? _selectedModel;
-  String _apiMode = 'chat_completions';
-  List<ModelInfo> _models = const [];
-  @override
-  void dispose() {
-    _baseUrlController.dispose();
-    _apiKeyController.dispose();
-    _modelsPathController.dispose();
-    _chatPathController.dispose();
-    super.dispose();
-  }
-  String _defaultChatPathForApiMode(String apiMode) {
-    switch (apiMode) {
-      case 'responses':
-        return 'v1/responses';
-      case 'chat_completions':
-      default:
-        return 'v1/chat/completions';
-    }
-  }
-  void _applyConfig(AppConfig config) {
-    _baseUrlController.text = config.baseUrl;
-    _apiKeyController.text = config.apiKey;
-    _modelsPathController.text = config.modelsPath;
-    _chatPathController.text = config.chatPath;
-    _selectedModel = config.selectedModel;
-    _apiMode = config.apiMode;
-    _models = config.availableModels ?? const [];
-    _initialized = true;
-  }
-  ModelInfo? _selectedModelInfo() {
-    final selectedId = _selectedModel;
-    if (selectedId == null || selectedId.trim().isEmpty) return null;
-    for (final model in _models) {
-      if (model.id == selectedId) return model;
-    }
-    return null;
-  }
-  String _getSelectedModelDisplayText(List<ModelInfo> models) {
-    if (_selectedModel == null || _selectedModel!.trim().isEmpty) {
-      return '请选择模型';
-    }
-    for (final model in models) {
-      if (model.id == _selectedModel) {
-        final name = (model.name ?? '').trim();
-        return name.isNotEmpty ? name : model.id;
-      }
-    }
-    return _selectedModel!;
-  }
-  List<Widget> _buildModelBadges(ModelInfo model) {
-    final widgets = <Widget>[];
-    if (model.supportsVision == true) {
-      widgets.add(
-        AppBadge.info(
-          'Vision',
-          icon: Icons.image_outlined,
-        ),
-      );
-    }
-    if (model.supportsReasoning == true) {
-      widgets.add(
-        AppBadge.warning(
-          'Reasoning',
-          icon: Icons.psychology_alt_outlined,
-        ),
-      );
-    }
-    return widgets;
-  }
-  Widget _buildSelectedModelSupportsCard() {
-    final model = _selectedModelInfo();
-    if (model == null) return const SizedBox.shrink();
-    final badges = _buildModelBadges(model);
-    if (badges.isEmpty) return const SizedBox.shrink();
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(top: AppTokens.space12),
-      padding: const EdgeInsets.all(AppTokens.space12),
-      decoration: BoxDecoration(
-        color: AppTokens.surfaceSoft,
-        borderRadius: AppTokens.brMd,
-        border: Border.all(color: AppTokens.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '模型能力',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppTokens.textPrimary,
-                ),
-          ),
-          const SizedBox(height: AppTokens.space8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: badges,
-          ),
-        ],
-      ),
-    );
-  }
-  void _updateSelectedModelOverride({
-    bool? overrideVision,
-    bool? overrideReasoning,
-  }) {
-    final selected = _selectedModelInfo();
-    if (selected == null) return;
-    final updated = selected.copyWith(
-      overrideSupportsVision:
-          overrideVision ?? selected.overrideSupportsVision,
-      overrideSupportsReasoning:
-          overrideReasoning ?? selected.overrideSupportsReasoning,
-      supportsVision: overrideVision ?? selected.supportsVision,
-      supportsReasoning: overrideReasoning ?? selected.supportsReasoning,
-    );
-    setState(() {
-      _models = _models.map((m) {
-        if (m.id == selected.id) return updated;
-        return m;
-      }).toList();
-    });
-  }
-  Future<void> _confirmRestoreDefaults() async {
-    final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: AppTokens.brLg,
-            ),
-            title: Text(
-              '恢复默认设置',
-              style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-            content: Text(
-              '确定要恢复默认设置吗？\n\n这将重置模型路径、聊天路径、API 模式、当前模型选择，以及模型能力的手动覆盖。',
-              style: Theme.of(ctx).textTheme.bodyMedium,
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppTokens.danger,
-                ),
-                child: const Text('恢复默认'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-    if (!confirmed) return;
-    await _restoreAllDefaultsAndSave();
-  }
-  Future<void> _restoreAllDefaultsAndSave() async {
-    final current = ref.read(configProvider).value;
-    if (current == null) return;
-    final restoredModels = _models
-        .map(
-          (model) => model.copyWith(
-            overrideSupportsVision: null,
-            overrideSupportsReasoning: null,
-          ),
-        )
-        .toList();
-    final restoredConfig = current.copyWith(
-      modelsPath: _defaultModelsPath,
-      chatPath: _defaultChatPathForApiMode('chat_completions'),
-      apiMode: 'chat_completions',
-      selectedModel: null,
-      availableModels: restoredModels,
-    );
-    try {
-      await ref.read(configProvider.notifier).saveFullConfig(restoredConfig);
-      setState(() {
-        _apiMode = restoredConfig.apiMode;
-        _selectedModel = restoredConfig.selectedModel;
-        _models = restoredModels;
-        _modelsPathController.text = restoredConfig.modelsPath;
-        _chatPathController.text = restoredConfig.chatPath;
-      });
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已恢复默认设置')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('恢复默认失败：$e')),
-      );
-    }
-  }
-  Future<void> _saveSettings() async {
-    final current = ref.read(configProvider).value;
-    if (current == null) return;
-    final updated = current.copyWith(
-      baseUrl: _baseUrlController.text.trim(),
-      apiKey: _apiKeyController.text.trim(),
-      modelsPath: _modelsPathController.text.trim().isEmpty
-          ? _defaultModelsPath
-          : _modelsPathController.text.trim(),
-      chatPath: _chatPathController.text.trim().isEmpty
-          ? _defaultChatPathForApiMode(_apiMode)
-          : _chatPathController.text.trim(),
-      selectedModel: (_selectedModel?.trim().isEmpty ?? true)
-          ? null
-          : _selectedModel!.trim(),
-      apiMode: _apiMode,
-      availableModels: _models,
-    );
-    try {
-      await ref.read(configProvider.notifier).saveFullConfig(updated);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('设置已保存')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('保存失败：$e')),
-      );
-    }
-  }
-  Future<void> _refreshModels() async {
-    final current = ref.read(configProvider).value;
-    if (current == null) return;
-    final previousOverrides = {
-      for (final model in _models) model.id: model,
-    };
-    final draft = current.copyWith(
-      baseUrl: _baseUrlController.text.trim(),
-      apiKey: _apiKeyController.text.trim(),
-      modelsPath: _modelsPathController.text.trim().isEmpty
-          ? _defaultModelsPath
-          : _modelsPathController.text.trim(),
-      chatPath: _chatPathController.text.trim().isEmpty
-          ? _defaultChatPathForApiMode(_apiMode)
-          : _chatPathController.text.trim(),
-      selectedModel: (_selectedModel?.trim().isEmpty ?? true)
-          ? null
-          : _selectedModel!.trim(),
-      apiMode: _apiMode,
-      availableModels: _models,
-    );
-    setState(() {
-      _isRefreshingModels = true;
-    });
-    try {
-      await ref.read(configProvider.notifier).saveAndRefreshModels(draft);
-      final refreshed = ref.read(configProvider).value;
-      if (refreshed != null) {
-        final mergedModels = (refreshed.availableModels ?? const [])
-            .map((model) {
-          final old = previousOverrides[model.id];
-          if (old == null) return model;
-          return model.copyWith(
-            overrideSupportsVision: old.overrideSupportsVision,
-            overrideSupportsReasoning: old.overrideSupportsReasoning,
-            supportsVision: old.overrideSupportsVision ?? model.supportsVision,
-            supportsReasoning:
-                old.overrideSupportsReasoning ?? model.supportsReasoning,
-          );
-        }).toList();
-        setState(() {
-          _models = mergedModels;
-          final exists = _models.any((m) => m.id == _selectedModel);
-          if (!exists) {
-            _selectedModel = _models.isNotEmpty ? _models.first.id : null;
-          }
-        });
-      }
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('模型列表已同步')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('同步模型失败：$e')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isRefreshingModels = false;
-        });
-      }
-    }
-  }
-  Widget _buildManualCapabilityEditor() {
-    final model = _selectedModelInfo();
-    if (model == null) return const SizedBox.shrink();
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(top: AppTokens.space12),
-      padding: const EdgeInsets.all(AppTokens.space12),
-      decoration: BoxDecoration(
-        color: AppTokens.surfaceSoft,
-        borderRadius: AppTokens.brMd,
-        border: Border.all(color: AppTokens.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '手动覆盖模型能力',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppTokens.textPrimary,
-                ),
-          ),
-          const SizedBox(height: AppTokens.space8),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('支持 Vision'),
-            subtitle: const Text('用于图片输入能力声明'),
-            value: model.supportsVision == true,
-            activeColor: AppTokens.primary,
-            onChanged: (value) {
-              _updateSelectedModelOverride(overrideVision: value);
-            },
-          ),
-          const Divider(),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('支持 Reasoning'),
-            subtitle: const Text('用于推理过程能力声明'),
-            value: model.supportsReasoning == true,
-            activeColor: AppTokens.primary,
-            onChanged: (value) {
-              _updateSelectedModelOverride(overrideReasoning: value);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-  @override
-  Widget build(BuildContext context) {
-    final configState = ref.watch(configProvider);
-    ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
-      next.whenData((config) {
-        if (!_initialized) {
-          setState(() {
-            _applyConfig(config);
-          });
-        }
-      });
-    });
-    final isBusy = configState.isLoading || _isRefreshingModels;
-    final models = _models;
-    return AppPageScaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '设置',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              '连接、模型与能力配置',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
-      ),
-      body: configState.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator(),
-        ),
-        error: (e, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text('加载配置失败：$e'),
-          ),
-        ),
-        data: (config) {
-          if (!_initialized) {
-            _applyConfig(config);
-          }
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                AppSection(
-                  title: '连接配置',
-                  subtitle: '用于配置 API 服务地址与接口路径。',
-                  children: [
-                    TextField(
-                      controller: _baseUrlController,
-                      enabled: !isBusy,
-                      decoration: const InputDecoration(
-                        labelText: 'Base URL',
-                        hintText: 'https://api.openai.com',
-                      ),
-                    ),
-                    const SizedBox(height: AppTokens.space12),
-                    TextField(
-                      controller: _apiKeyController,
-                      enabled: !isBusy,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: 'API Key',
-                        hintText: '输入 API Key',
-                      ),
-                    ),
-                    const SizedBox(height: AppTokens.space12),
-                    TextField(
-                      controller: _modelsPathController,
-                      enabled: !isBusy,
-                      decoration: const InputDecoration(
-                        labelText: 'Models Path',
-                        hintText: _defaultModelsPath,
-                      ),
-                    ),
-                    const SizedBox(height: AppTokens.space12),
-                    TextField(
-                      controller: _chatPathController,
-                      enabled: !isBusy,
-                      decoration: InputDecoration(
-                        labelText: 'Chat Path',
-                        hintText: _defaultChatPathForApiMode(_apiMode),
-                      ),
-                    ),
-                    const SizedBox(height: AppTokens.space12),
-                    DropdownButtonFormField<String>(
-                      value: _apiMode,
-                      decoration: const InputDecoration(
-                        labelText: 'API Mode',
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'chat_completions',
-                          child: Text('chat_completions'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'responses',
-                          child: Text('responses'),
-                        ),
-                      ],
-                      onChanged: isBusy
-                          ? null
-                          : (value) {
-                              if (value == null) return;
-                              setState(() {
-                                _apiMode = value;
-                                if (_chatPathController.text.trim().isEmpty ||
-                                    _chatPathController.text ==
-                                        _defaultChatPathForApiMode(
-                                            'chat_completions') ||
-                                    _chatPathController.text ==
-                                        _defaultChatPathForApiMode('responses')) {
-                                  _chatPathController.text =
-                                      _defaultChatPathForApiMode(value);
-                                }
-                              });
-                            },
-                    ),
-                  ],
-                ),
-                AppSection(
-                  title: '模型配置',
-                  subtitle: '选择当前模型，并同步远端模型列表。',
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: SearchAnchor(
-                            builder: (context, controller) {
-                              return GestureDetector(
-                                onTap: isBusy
-                                    ? null
-                                    : () {
-                                        controller.openView();
-                                      },
-                                child: InputDecorator(
-                                  decoration: InputDecoration(
-                                    labelText: '当前模型',
-                                    enabled: !isBusy,
-                                    suffixIcon: const Icon(
-                                      Icons.arrow_drop_down,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    _getSelectedModelDisplayText(models),
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: isBusy
-                                          ? AppTokens.textTertiary
-                                          : AppTokens.textPrimary,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                            suggestionsBuilder: (context, controller) {
-                              final query =
-                                  controller.text.trim().toLowerCase();
-                              final filteredModels = models.where((model) {
-                                final id = model.id.toLowerCase();
-                                final name = (model.name ?? '').toLowerCase();
-                                return query.isEmpty ||
-                                    id.contains(query) ||
-                                    name.contains(query);
-                              }).toList();
-                              if (filteredModels.isEmpty) {
-                                return const [
-                                  ListTile(
-                                    title: Text('没有匹配的模型'),
-                                  ),
-                                ];
-                              }
-                              return filteredModels.map((model) {
-                                final isSelected = model.id == _selectedModel;
-                                final title =
-                                    (model.name ?? '').trim().isNotEmpty
-                                        ? model.name!
-                                        : model.id;
-                                final showSubtitle =
-                                    (model.name ?? '').trim().isNotEmpty &&
-                                        model.name != model.id;
-                                final badges = _buildModelBadges(model);
-                                return ListTile(
-                                  title: Text(
-                                    title,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  subtitle: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      if (showSubtitle) Text(model.id),
-                                      if (badges.isNotEmpty) ...[
-                                        const SizedBox(height: 6),
-                                        Wrap(
-                                          spacing: 6,
-                                          runSpacing: 6,
-                                          children: badges,
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                  trailing: isSelected
-                                      ? const Icon(
-                                          Icons.check,
-                                          color: AppTokens.primary,
-                                        )
-                                      : null,
-                                  onTap: () {
-                                    setState(() {
-                                      _selectedModel = model.id;
-                                    });
-                                    controller.closeView(model.id);
-                                  },
-                                );
-                              }).toList();
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: AppTokens.space12),
-                        SizedBox(
-                          height: 56,
-                          child: FilledButton(
-                            onPressed: isBusy ? null : _refreshModels,
-                            child: _isRefreshingModels
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Text('同步模型'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    _buildSelectedModelSupportsCard(),
-                    _buildManualCapabilityEditor(),
-                  ],
-                ),
-                AppSection(
-                  title: '操作',
-                  subtitle: '保存当前配置，应用到后续对话请求。',
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed:
-                                isBusy ? null : _confirmRestoreDefaults,
-                            child: const Text('恢复默认'),
-                          ),
-                        ),
-                        const SizedBox(width: AppTokens.space12),
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: isBusy ? null : _saveSettings,
-                            child: const Text('保存设置'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-```
-
 ## File: lib/presentation/pages/text_attachment_viewer_page.dart
 ```dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../themes/app_tokens.dart';
 import '../widgets/common/app_page_scaffold.dart';
+import '../widgets/common/app_toast.dart';
 class TextAttachmentViewerPage extends StatelessWidget {
   final String title;
   final String content;
@@ -7033,51 +5624,40 @@ class TextAttachmentViewerPage extends StatelessWidget {
     required this.title,
     required this.content,
   });
-  Future<void> _copyAll(BuildContext context) async {
+  Future<void> _copyAll() async {
     await Clipboard.setData(ClipboardData(text: content));
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('全文已复制')),
-    );
+    await AppToast.show('全文已复制');
   }
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return AppPageScaffold(
       appBar: AppBar(
         title: Text(
           title,
           overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+          style: textTheme.titleMedium,
         ),
         actions: [
           IconButton(
             tooltip: '复制全文',
-            onPressed: () => _copyAll(context),
+            onPressed: _copyAll,
             icon: const Icon(Icons.content_copy_outlined),
           ),
         ],
       ),
-      body: Container(
-        width: double.infinity,
+      body: Padding(
         padding: const EdgeInsets.all(16),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppTokens.surface,
-            borderRadius: AppTokens.brLg,
-            border: Border.all(color: AppTokens.border),
-            boxShadow: AppTokens.shadowSm,
-          ),
-          child: SelectableText(
-            content,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  height: 1.7,
-                  color: AppTokens.textPrimary,
-                  fontFamily: 'monospace',
-                ),
+        child: Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: SelectableText(
+              content,
+              style: textTheme.bodyMedium?.copyWith(
+                fontFamily: 'monospace',
+              ),
+            ),
           ),
         ),
       ),
@@ -7086,95 +5666,64 @@ class TextAttachmentViewerPage extends StatelessWidget {
 }
 ```
 
-## File: lib/presentation/providers/config_notifier.dart
+## File: lib/presentation/providers/home_session_list_provider.dart
 ```dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/app_config.dart';
-import '../../di/providers.dart';
-class ConfigNotifier extends StateNotifier<AsyncValue<AppConfig>> {
-  final Ref ref;
-  ConfigNotifier(this.ref) : super(const AsyncValue.loading()) {
-    _loadInitialConfig();
-  }
-  Future<void> _loadInitialConfig() async {
-    try {
-      final repository = ref.read(configRepositoryProvider);
-      final config = await repository.getConfig();
-      state = AsyncValue.data(config);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
-  }
-  Future<AppConfig> _fetchLatestConfig() async {
-    final repository = ref.read(configRepositoryProvider);
-    return await repository.getConfig();
-  }
-  Future<void> _reloadConfigWithoutLoading() async {
-    final config = await _fetchLatestConfig();
-    state = AsyncValue.data(config);
-  }
-  Future<void> updateApiKey(String apiKey) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.updateApiKey(apiKey);
-    await _reloadConfigWithoutLoading();
-  }
-  Future<void> updateBaseUrl(String baseUrl) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.updateBaseUrl(baseUrl);
-    await _reloadConfigWithoutLoading();
-  }
-  Future<void> updateModelsPath(String modelsPath) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.updateModelsPath(modelsPath);
-    await _reloadConfigWithoutLoading();
-  }
-  Future<void> updateChatPath(String chatPath) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.updateChatPath(chatPath);
-    await _reloadConfigWithoutLoading();
-  }
-  Future<void> updateApiMode(String apiMode) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.updateApiMode(apiMode);
-    await _reloadConfigWithoutLoading();
-  }
-  Future<void> updateSelectedModel(String? model) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.updateSelectedModel(model);
-    await _reloadConfigWithoutLoading();
-  }
-  Future<void> saveFullConfig(AppConfig config) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.saveFullConfig(config);
-    state = AsyncValue.data(config);
-  }
-  Future<void> saveAndRefreshModels(AppConfig config) async {
-    final repository = ref.read(configRepositoryProvider);
-    state = AsyncValue.data(
-      config.copyWith(
-        availableModels: [],
-      ),
-    );
-    await repository.saveAndRefreshModels(config);
-    await _reloadConfigWithoutLoading();
-  }
-  Future<void> refreshModels() async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.refreshModels();
-    await _reloadConfigWithoutLoading();
-  }
+import '../../core/models/session.dart';
+import '../../domain/services/branch_navigator.dart';
+import 'session_list_notifier.dart';
+class HomeSessionItem {
+  final Session session;
+  final bool hasUnseen;
+  final String userPreview;
+  final int roundCount;
+  final int updatedAt;
+  final String? previewRoundId;
+  const HomeSessionItem({
+    required this.session,
+    required this.hasUnseen,
+    required this.userPreview,
+    required this.roundCount,
+    required this.updatedAt,
+    required this.previewRoundId,
+  });
 }
-final configProvider =
-    StateNotifierProvider<ConfigNotifier, AsyncValue<AppConfig>>((ref) {
-  return ConfigNotifier(ref);
+final homeSessionListProvider =
+    Provider<AsyncValue<List<HomeSessionItem>>>((ref) {
+  final sessionsAsync = ref.watch(sessionListProvider);
+  return sessionsAsync.whenData((sessions) {
+    final items = sessions.map((session) {
+      final hasUnseen = session.rounds.any((r) => r.hasUnseenUpdate);
+      final roundCount = session.rounds.length;
+      final previewRoundId = session.rounds.isEmpty
+          ? null
+          : BranchNavigator.getAllBranchLeaves(session).isNotEmpty
+              ? BranchNavigator.getAllBranchLeaves(session).last.id
+              : session.rounds.last.id;
+      final previewRound = previewRoundId == null
+          ? null
+          : session.rounds.firstWhere(
+              (r) => r.id == previewRoundId,
+              orElse: () => session.rounds.last,
+            );
+      final userPreview = previewRound == null
+          ? '点击开始新的对话'
+          : previewRound.userContent.trim().isEmpty
+              ? '（空输入）'
+              : previewRound.userContent.trim();
+      return HomeSessionItem(
+        session: session,
+        hasUnseen: hasUnseen,
+        userPreview: userPreview,
+        roundCount: roundCount,
+        updatedAt: session.updatedAt,
+        previewRoundId: previewRoundId,
+      );
+    }).toList();
+    items.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return items;
+  });
 });
-```
-
-## File: lib/presentation/providers/global_streaming_provider.dart
-```dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-final globalStreamingSessionsProvider =
-    StateProvider<Set<String>>((ref) => <String>{});
 ```
 
 ## File: lib/presentation/providers/session_card_provider.dart
@@ -7202,417 +5751,143 @@ final sessionCardProvider =
 });
 ```
 
-## File: lib/presentation/providers/session_list_notifier.dart
-```dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/session.dart';
-import '../../di/providers.dart';
-class SessionListNotifier extends StateNotifier<AsyncValue<List<Session>>> {
-  final Ref ref;
-  SessionListNotifier(this.ref) : super(const AsyncValue.loading()) {
-    _loadSessions();
-  }
-  Future<void> _loadSessions() async {
-    state = const AsyncValue.loading();
-    try {
-      final repository = ref.read(conversationRepositoryProvider);
-      final sessions = await repository.getAllSessions();
-      state = AsyncValue.data(sessions);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
-  }
-  Future<void> refresh() async {
-    await _loadSessions();
-  }
-  Future<void> deleteSession(String fileName) async {
-    try {
-      final repository = ref.read(conversationRepositoryProvider);
-      await repository.deleteSession(fileName);
-      await _loadSessions();
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
-  }
-  Future<void> updateSessionTitle(String fileName, String newTitle) async {
-    try {
-      final repository = ref.read(conversationRepositoryProvider);
-      final cleanTitle = newTitle.trim();
-      if (cleanTitle.isEmpty) return;
-      await repository.updateSessionTitle(fileName, cleanTitle);
-      await _loadSessions();
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
-  }
-  Future<String> createSession(String title) async {
-    final repository = ref.read(conversationRepositoryProvider);
-    final cleanTitle = title.trim().isEmpty ? '新对话' : title.trim();
-    final session = await repository.createSessionWithGeneratedId(
-      title: cleanTitle,
-    );
-    await _loadSessions();
-    return '${session.id}.json';
-  }
-}
-final sessionListProvider =
-    StateNotifierProvider<SessionListNotifier, AsyncValue<List<Session>>>((ref) {
-  return SessionListNotifier(ref);
-});
-```
-
 ## File: lib/presentation/themes/app_theme.dart
 ```dart
 import 'package:flutter/material.dart';
-import 'app_tokens.dart';
+import 'package:flutter/services.dart';
 class AppTheme {
+  static const Color _seedColor = Colors.blueGrey;
   static ThemeData get lightTheme {
     final colorScheme = ColorScheme.fromSeed(
-      seedColor: AppTokens.primary,
+      seedColor: _seedColor,
       brightness: Brightness.light,
-      primary: AppTokens.primary,
-      surface: AppTokens.surface,
     );
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: AppTokens.bg,
-      canvasColor: AppTokens.bg,
-      dividerColor: AppTokens.border,
-      splashFactory: InkRipple.splashFactory,
       appBarTheme: const AppBarTheme(
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.dark,
+          statusBarBrightness: Brightness.light,
+          systemNavigationBarIconBrightness: Brightness.dark,
+        ),
+      ),
+      cardTheme: const CardThemeData(
         elevation: 0,
-        backgroundColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        foregroundColor: AppTokens.textPrimary,
-        centerTitle: false,
       ),
-      textTheme: const TextTheme(
-        headlineSmall: TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.w700,
-          color: AppTokens.textPrimary,
-          letterSpacing: -0.4,
-        ),
-        titleLarge: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
-          color: AppTokens.textPrimary,
-          letterSpacing: -0.2,
-        ),
-        titleMedium: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          color: AppTokens.textPrimary,
-        ),
-        bodyLarge: TextStyle(
-          fontSize: 15,
-          height: 1.65,
-          color: AppTokens.textPrimary,
-        ),
-        bodyMedium: TextStyle(
-          fontSize: 14,
-          height: 1.6,
-          color: AppTokens.textPrimary,
-        ),
-        bodySmall: TextStyle(
-          fontSize: 12,
-          height: 1.45,
-          color: AppTokens.textSecondary,
-        ),
-        labelLarge: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: AppTokens.textPrimary,
-        ),
-      ),
-      cardTheme: CardThemeData(
-        color: AppTokens.surface,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: AppTokens.brLg,
-          side: const BorderSide(color: AppTokens.border),
-        ),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: AppTokens.surface,
-        hintStyle: const TextStyle(
-          color: AppTokens.textTertiary,
-          fontSize: 14,
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: AppTokens.brMd,
-          borderSide: const BorderSide(color: AppTokens.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: AppTokens.brMd,
-          borderSide: const BorderSide(color: AppTokens.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: AppTokens.brMd,
-          borderSide: const BorderSide(
-            color: AppTokens.primary,
-            width: 1.4,
-          ),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: AppTokens.brMd,
-          borderSide: const BorderSide(color: AppTokens.danger),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: AppTokens.brMd,
-          borderSide: const BorderSide(
-            color: AppTokens.danger,
-            width: 1.4,
-          ),
-        ),
+      inputDecorationTheme: const InputDecorationTheme(
+        border: OutlineInputBorder(),
       ),
       filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          elevation: 0,
-          backgroundColor: AppTokens.primary,
-          foregroundColor: AppTokens.textOnPrimary,
-          minimumSize: const Size(0, 48),
-          padding: const EdgeInsets.symmetric(
-            horizontal: 18,
-            vertical: 14,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: AppTokens.brMd,
-          ),
-        ),
+        style: FilledButton.styleFrom(),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          elevation: 0,
-          foregroundColor: AppTokens.textPrimary,
-          side: const BorderSide(color: AppTokens.border),
-          minimumSize: const Size(0, 48),
-          padding: const EdgeInsets.symmetric(
-            horizontal: 18,
-            vertical: 14,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: AppTokens.brMd,
-          ),
-        ),
+        style: OutlinedButton.styleFrom(),
       ),
       textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          foregroundColor: AppTokens.primary,
-          shape: RoundedRectangleBorder(
-            borderRadius: AppTokens.brSm,
-          ),
-        ),
+        style: TextButton.styleFrom(),
       ),
-      iconButtonTheme: IconButtonThemeData(
-        style: IconButton.styleFrom(
-          foregroundColor: AppTokens.textPrimary,
-          backgroundColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: AppTokens.brSm,
-          ),
-        ),
-      ),
-      chipTheme: ChipThemeData(
-        backgroundColor: AppTokens.surfaceMuted,
-        selectedColor: AppTokens.primarySoft,
-        side: const BorderSide(color: AppTokens.border),
-        shape: RoundedRectangleBorder(
-          borderRadius: AppTokens.brSm,
-        ),
-        labelStyle: const TextStyle(
-          fontSize: 13,
-          color: AppTokens.textPrimary,
-          fontWeight: FontWeight.w500,
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      ),
-      snackBarTheme: SnackBarThemeData(
+      snackBarTheme: const SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: AppTokens.textPrimary,
-        contentTextStyle: const TextStyle(
-          color: Colors.white,
-          fontSize: 14,
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: AppTokens.brMd,
-        ),
-      ),
-      progressIndicatorTheme: const ProgressIndicatorThemeData(
-        color: AppTokens.primary,
-      ),
-      dividerTheme: const DividerThemeData(
-        color: AppTokens.border,
-        thickness: 1,
-        space: 1,
       ),
     );
   }
   static ThemeData get darkTheme {
-    return lightTheme.copyWith(
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: AppTokens.primary,
-        brightness: Brightness.dark,
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: _seedColor,
+      brightness: Brightness.dark,
+    );
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: colorScheme,
+      appBarTheme: const AppBarTheme(
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+          statusBarBrightness: Brightness.dark,
+          systemNavigationBarIconBrightness: Brightness.light,
+        ),
+      ),
+      cardTheme: const CardThemeData(
+        elevation: 0,
+      ),
+      inputDecorationTheme: const InputDecorationTheme(
+        border: OutlineInputBorder(),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(),
+      ),
+      snackBarTheme: const SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }
-}
-```
-
-## File: lib/presentation/themes/app_tokens.dart
-```dart
-import 'package:flutter/material.dart';
-abstract class AppTokens {
-  // Brand
-  static const Color primary = Color(0xFF4F46E5);
-  static const Color primarySoft = Color(0xFFEEF2FF);
-  // Background / Surface
-  static const Color bg = Color(0xFFF5F7FB);
-  static const Color surface = Colors.white;
-  static const Color surfaceSoft = Color(0xFFF8FAFC);
-  static const Color surfaceMuted = Color(0xFFF3F4F6);
-  // Text
-  static const Color textPrimary = Color(0xFF111827);
-  static const Color textSecondary = Color(0xFF6B7280);
-  static const Color textTertiary = Color(0xFF9CA3AF);
-  static const Color textOnPrimary = Colors.white;
-  // Border
-  static const Color border = Color(0xFFE5E7EB);
-  static const Color borderStrong = Color(0xFFD1D5DB);
-  // Status
-  static const Color success = Color(0xFF10B981);
-  static const Color successSoft = Color(0xFFECFDF5);
-  static const Color warning = Color(0xFFF59E0B);
-  static const Color warningSoft = Color(0xFFFFFBEB);
-  static const Color danger = Color(0xFFEF4444);
-  static const Color dangerSoft = Color(0xFFFEF2F2);
-  static const Color info = Color(0xFF3B82F6);
-  static const Color infoSoft = Color(0xFFEFF6FF);
-  // Chat specific
-  static const Color userBubble = Color(0xFF111827);
-  static const Color aiBubble = Colors.white;
-  static const Color thoughtBubble = Color(0xFFFFFBEB);
-  // Radius
-  static const double radiusSm = 14;
-  static const double radiusMd = 18;
-  static const double radiusLg = 24;
-  static const double radiusXl = 28;
-  // Spacing
-  static const double space4 = 4;
-  static const double space6 = 6;
-  static const double space8 = 8;
-  static const double space10 = 10;
-  static const double space12 = 12;
-  static const double space14 = 14;
-  static const double space16 = 16;
-  static const double space20 = 20;
-  static const double space24 = 24;
-  static const double space32 = 32;
-  // Border radius helpers
-  static BorderRadius get brSm => BorderRadius.circular(radiusSm);
-  static BorderRadius get brMd => BorderRadius.circular(radiusMd);
-  static BorderRadius get brLg => BorderRadius.circular(radiusLg);
-  static BorderRadius get brXl => BorderRadius.circular(radiusXl);
-  // Shadows
-  static List<BoxShadow> get shadowSm => [
-        BoxShadow(
-          color: Colors.black.withValues(alpha: 0.03),
-          blurRadius: 10,
-          offset: const Offset(0, 4),
-        ),
-      ];
-  static List<BoxShadow> get shadowMd => [
-        BoxShadow(
-          color: Colors.black.withValues(alpha: 0.04),
-          blurRadius: 18,
-          offset: const Offset(0, 8),
-        ),
-      ];
-  static List<BoxShadow> get shadowLg => [
-        BoxShadow(
-          color: Colors.black.withValues(alpha: 0.05),
-          blurRadius: 24,
-          offset: const Offset(0, 12),
-        ),
-      ];
 }
 ```
 
 ## File: lib/presentation/widgets/common/app_badge.dart
 ```dart
 import 'package:flutter/material.dart';
-import '../../themes/app_tokens.dart';
 class AppBadge extends StatelessWidget {
   final String text;
   final Color color;
-  final Color backgroundColor;
   final IconData? icon;
   const AppBadge({
     super.key,
     required this.text,
     required this.color,
-    required this.backgroundColor,
     this.icon,
   });
-  factory AppBadge.primary(String text, {IconData? icon}) {
+  factory AppBadge.primary(BuildContext context, String text, {IconData? icon}) {
     return AppBadge(
       text: text,
-      color: AppTokens.primary,
-      backgroundColor: AppTokens.primarySoft,
+      color: Theme.of(context).colorScheme.primary,
       icon: icon,
     );
   }
-  factory AppBadge.success(String text, {IconData? icon}) {
+  factory AppBadge.success(BuildContext context, String text, {IconData? icon}) {
     return AppBadge(
       text: text,
-      color: AppTokens.success,
-      backgroundColor: AppTokens.successSoft,
+      color: Colors.green,
       icon: icon,
     );
   }
-  factory AppBadge.warning(String text, {IconData? icon}) {
+  factory AppBadge.warning(BuildContext context, String text, {IconData? icon}) {
     return AppBadge(
       text: text,
-      color: AppTokens.warning,
-      backgroundColor: AppTokens.warningSoft,
+      color: Colors.orange,
       icon: icon,
     );
   }
-  factory AppBadge.info(String text, {IconData? icon}) {
+  factory AppBadge.info(BuildContext context, String text, {IconData? icon}) {
     return AppBadge(
       text: text,
-      color: AppTokens.info,
-      backgroundColor: AppTokens.infoSoft,
+      color: Theme.of(context).colorScheme.secondary,
       icon: icon,
     );
   }
-  factory AppBadge.danger(String text, {IconData? icon}) {
+  factory AppBadge.danger(BuildContext context, String text, {IconData? icon}) {
     return AppBadge(
       text: text,
-      color: AppTokens.danger,
-      backgroundColor: AppTokens.dangerSoft,
+      color: Theme.of(context).colorScheme.error,
       icon: icon,
     );
   }
   @override
   Widget build(BuildContext context) {
+    final backgroundColor = color.withValues(alpha: 0.12);
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 6,
-      ),
-      decoration: BoxDecoration(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: ShapeDecoration(
         color: backgroundColor,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: color.withValues(alpha: 0.20),
-        ),
+        shape: const StadiumBorder(),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -7624,9 +5899,8 @@ class AppBadge extends StatelessWidget {
           Text(
             text,
             style: TextStyle(
-              fontSize: 11,
-              height: 1.1,
-              fontWeight: FontWeight.w700,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
               color: color,
             ),
           ),
@@ -7640,37 +5914,33 @@ class AppBadge extends StatelessWidget {
 ## File: lib/presentation/widgets/common/app_card.dart
 ```dart
 import 'package:flutter/material.dart';
-import '../../themes/app_tokens.dart';
 class AppCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
   final EdgeInsetsGeometry? margin;
   final Color? color;
-  final BorderRadius? borderRadius;
-  final List<BoxShadow>? boxShadow;
-  final Border? border;
+  final ShapeBorder? shape;
+  final double? elevation;
   const AppCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(AppTokens.space16),
+    this.padding = const EdgeInsets.all(16),
     this.margin,
     this.color,
-    this.borderRadius,
-    this.boxShadow,
-    this.border,
+    this.shape,
+    this.elevation,
   });
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return Card(
       margin: margin,
-      padding: padding,
-      decoration: BoxDecoration(
-        color: color ?? AppTokens.surface,
-        borderRadius: borderRadius ?? AppTokens.brLg,
-        border: border ?? Border.all(color: AppTokens.border),
-        boxShadow: boxShadow ?? AppTokens.shadowMd,
+      color: color,
+      shape: shape,
+      elevation: elevation,
+      child: Padding(
+        padding: padding,
+        child: child,
       ),
-      child: child,
     );
   }
 }
@@ -7679,7 +5949,6 @@ class AppCard extends StatelessWidget {
 ## File: lib/presentation/widgets/common/app_section.dart
 ```dart
 import 'package:flutter/material.dart';
-import '../../themes/app_tokens.dart';
 import 'app_card.dart';
 class AppSection extends StatelessWidget {
   final String title;
@@ -7695,25 +5964,18 @@ class AppSection extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return AppCard(
-      margin: margin ?? const EdgeInsets.only(bottom: AppTokens.space16),
+      margin: margin ?? const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
+          Text(title, style: textTheme.titleMedium),
           if (subtitle != null) ...[
-            const SizedBox(height: AppTokens.space6),
-            Text(
-              subtitle!,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+            const SizedBox(height: 8),
+            Text(subtitle!, style: textTheme.bodySmall),
           ],
-          const SizedBox(height: AppTokens.space16),
+          const SizedBox(height: 16),
           ...children,
         ],
       ),
@@ -7731,7 +5993,6 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/utils/id_generator.dart';
 import '../models/pending_attachment.dart';
 import '../providers/input_draft_provider.dart';
-import '../themes/app_tokens.dart';
 class InputBar extends ConsumerStatefulWidget {
   final void Function(String text, List<PendingAttachment> attachments) onSend;
   final VoidCallback? onStop;
@@ -7752,10 +6013,8 @@ class InputBar extends ConsumerStatefulWidget {
 class _InputBarState extends ConsumerState<InputBar> {
   late final TextEditingController _controller;
   late final ProviderSubscription<String> _draftSubscription;
-  final GlobalKey _addButtonKey = GlobalKey();
   final ImagePicker _imagePicker = ImagePicker();
   bool _isSyncingText = false;
-  OverlayEntry? _attachmentMenuOverlay;
   @override
   void initState() {
     super.initState();
@@ -7772,7 +6031,6 @@ class _InputBarState extends ConsumerState<InputBar> {
   }
   @override
   void dispose() {
-    _removeAttachmentMenu();
     _draftSubscription.close();
     _controller.removeListener(_handleControllerChanged);
     _controller.dispose();
@@ -7876,77 +6134,47 @@ class _InputBarState extends ConsumerState<InputBar> {
     final notifier = ref.read(globalAttachmentDraftProvider.notifier);
     notifier.state = [...notifier.state, attachment];
   }
-  void _removeAttachmentMenu() {
-    _attachmentMenuOverlay?.remove();
-    _attachmentMenuOverlay = null;
-  }
-  void _toggleAttachmentMenu() {
-    if (!widget.enabled) return;
-    if (_attachmentMenuOverlay != null) {
-      _removeAttachmentMenu();
-      return;
-    }
-    final buttonContext = _addButtonKey.currentContext;
-    if (buttonContext == null) return;
-    final buttonRenderBox = buttonContext.findRenderObject() as RenderBox;
-    final overlayRenderBox =
-        Overlay.of(context).context.findRenderObject() as RenderBox;
-    final buttonOffset = buttonRenderBox.localToGlobal(
-      Offset.zero,
-      ancestor: overlayRenderBox,
-    );
-    final buttonSize = buttonRenderBox.size;
-    const menuWidth = 148.0;
-    const menuItemHeight = 48.0;
-    const menuPadding = 8.0;
-    final menuHeight = menuPadding * 2 + menuItemHeight * 2;
-    final left = buttonOffset.dx;
-    final top = buttonOffset.dy - menuHeight - 10;
-    _attachmentMenuOverlay = OverlayEntry(
-      builder: (context) {
-        return Stack(
-          children: [
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onTap: _removeAttachmentMenu,
-                child: const SizedBox.expand(),
-              ),
-            ),
-            Positioned(
-              left: left,
-              top: top < 0 ? buttonOffset.dy + buttonSize.height + 10 : top,
-              child: Material(
-                color: Colors.transparent,
-                child: _AttachmentPopupMenu(
-                  width: menuWidth,
-                  onFileTap: () async {
-                    _removeAttachmentMenu();
-                    await _pickFileAttachment();
-                  },
-                  onGalleryTap: () async {
-                    _removeAttachmentMenu();
-                    await _pickImageFromGallery();
-                  },
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-    Overlay.of(context).insert(_attachmentMenuOverlay!);
-  }
   void _removeAttachment(String id) {
     final notifier = ref.read(globalAttachmentDraftProvider.notifier);
     notifier.state = notifier.state.where((item) => item.id != id).toList();
+  }
+  Future<void> _showAddAttachmentSheet() async {
+    if (!widget.enabled) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.attach_file_outlined),
+                title: const Text('文件'),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  await _pickFileAttachment();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: const Text('相册'),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  await _pickImageFromGallery();
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
   void _handleSend() {
     if (!widget.enabled) return;
     final content = _controller.text.trim();
     final attachments = ref.read(globalAttachmentDraftProvider);
     if (content.isEmpty && attachments.isEmpty) return;
-    _removeAttachmentMenu();
     widget.onSend(content, attachments);
     _clearDraft();
     _clearAttachmentDraft();
@@ -7958,86 +6186,39 @@ class _InputBarState extends ConsumerState<InputBar> {
     final hasAttachments = attachments.isNotEmpty;
     final canSend = (hasText || hasAttachments) && widget.enabled;
     final showStopButton = widget.isStreaming && widget.onStop != null;
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOut,
-      padding: EdgeInsets.only(bottom: bottomInset > 0 ? bottomInset : 0),
-      child: SafeArea(
-        top: false,
-        child: Container(
-          decoration: const BoxDecoration(
-            color: AppTokens.surface,
-            border: Border(
-              top: BorderSide(color: AppTokens.border),
-            ),
-          ),
-          padding: const EdgeInsets.fromLTRB(
-            AppTokens.space12,
-            AppTokens.space10,
-            AppTokens.space12,
-            AppTokens.space12,
-          ),
+    return SafeArea(
+      top: false,
+      child: Material(
+        elevation: 1,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (attachments.isNotEmpty)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: AppTokens.space10),
+                  padding: const EdgeInsets.only(bottom: 8),
                   child: Align(
                     alignment: Alignment.centerLeft,
                     child: Wrap(
-                      spacing: AppTokens.space8,
-                      runSpacing: AppTokens.space8,
+                      spacing: 8,
+                      runSpacing: 8,
                       children: attachments.map((attachment) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppTokens.space10,
-                            vertical: AppTokens.space8,
+                        return InputChip(
+                          avatar: Icon(
+                            attachment.isImage
+                                ? Icons.image_outlined
+                                : Icons.attach_file_outlined,
+                            size: 18,
                           ),
-                          decoration: BoxDecoration(
-                            color: AppTokens.surfaceSoft,
-                            borderRadius: AppTokens.brMd,
-                            border: Border.all(color: AppTokens.border),
+                          label: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 180),
+                            child: Text(
+                              attachment.name,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                attachment.isImage
-                                    ? Icons.image_outlined
-                                    : Icons.attach_file_outlined,
-                                size: 16,
-                                color: AppTokens.textSecondary,
-                              ),
-                              const SizedBox(width: AppTokens.space6),
-                              ConstrainedBox(
-                                constraints:
-                                    const BoxConstraints(maxWidth: 180),
-                                child: Text(
-                                  attachment.name,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
-                                      ?.copyWith(
-                                        fontSize: 13,
-                                        color: AppTokens.textPrimary,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                ),
-                              ),
-                              const SizedBox(width: AppTokens.space6),
-                              GestureDetector(
-                                onTap: () => _removeAttachment(attachment.id),
-                                child: const Icon(
-                                  Icons.close,
-                                  size: 16,
-                                  color: AppTokens.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
+                          onDeleted: () => _removeAttachment(attachment.id),
                         );
                       }).toList(),
                     ),
@@ -8046,233 +6227,42 @@ class _InputBarState extends ConsumerState<InputBar> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  _SideActionButton(
-                    key: _addButtonKey,
-                    icon: Icons.add,
+                  IconButton(
                     tooltip: '添加附件',
-                    onTap: widget.enabled ? _toggleAttachmentMenu : null,
+                    onPressed: widget.enabled ? _showAddAttachmentSheet : null,
+                    icon: const Icon(Icons.add),
                   ),
-                  const SizedBox(width: AppTokens.space8),
+                  const SizedBox(width: 8),
                   Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppTokens.surfaceSoft,
-                        borderRadius: AppTokens.brLg,
-                        border: Border.all(color: AppTokens.border),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppTokens.space12,
-                        vertical: AppTokens.space12,
-                      ),
-                      child: TextField(
-                        controller: _controller,
-                        minLines: 1,
-                        maxLines: 6,
-                        enabled: widget.enabled,
-                        keyboardType: TextInputType.multiline,
-                        textInputAction: TextInputAction.newline,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppTokens.textPrimary,
-                            ),
-                        decoration: InputDecoration(
-                          hintText: widget.hintText,
-                          isCollapsed: true,
-                          filled: false,
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          disabledBorder: InputBorder.none,
-                          errorBorder: InputBorder.none,
-                          focusedErrorBorder: InputBorder.none,
-                          contentPadding: EdgeInsets.zero,
-                          hintStyle: const TextStyle(
-                            color: AppTokens.textTertiary,
-                          ),
-                        ),
+                    child: TextField(
+                      controller: _controller,
+                      minLines: 1,
+                      maxLines: 6,
+                      enabled: widget.enabled,
+                      keyboardType: TextInputType.multiline,
+                      textInputAction: TextInputAction.newline,
+                      decoration: InputDecoration(
+                        hintText: widget.hintText,
+                        isDense: true,
                       ),
                     ),
                   ),
-                  const SizedBox(width: AppTokens.space8),
+                  const SizedBox(width: 8),
                   if (showStopButton)
-                    _PrimaryActionButton(
-                      icon: Icons.stop_rounded,
+                    IconButton.filledTonal(
                       tooltip: '停止生成',
-                      onTap: widget.enabled
-                          ? () {
-                              _removeAttachmentMenu();
-                              widget.onStop?.call();
-                            }
-                          : null,
-                      isDanger: true,
+                      onPressed: widget.enabled ? widget.onStop : null,
+                      icon: const Icon(Icons.stop_rounded),
                     )
                   else
-                    _PrimaryActionButton(
-                      icon: Icons.arrow_upward_rounded,
+                    IconButton.filled(
                       tooltip: '发送',
-                      onTap: canSend ? _handleSend : null,
+                      onPressed: canSend ? _handleSend : null,
+                      icon: const Icon(Icons.arrow_upward_rounded),
                     ),
                 ],
               ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-class _AttachmentPopupMenu extends StatelessWidget {
-  final double width;
-  final VoidCallback onFileTap;
-  final VoidCallback onGalleryTap;
-  const _AttachmentPopupMenu({
-    required this.width,
-    required this.onFileTap,
-    required this.onGalleryTap,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: width,
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: AppTokens.surface,
-        borderRadius: AppTokens.brLg,
-        border: Border.all(color: AppTokens.border),
-        boxShadow: AppTokens.shadowLg,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _AttachmentMenuItem(
-            icon: Icons.attach_file_outlined,
-            label: '文件',
-            onTap: onFileTap,
-          ),
-          const SizedBox(height: 6),
-          _AttachmentMenuItem(
-            icon: Icons.photo_library_outlined,
-            label: '相册',
-            onTap: onGalleryTap,
-          ),
-        ],
-      ),
-    );
-  }
-}
-class _AttachmentMenuItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  const _AttachmentMenuItem({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: AppTokens.brMd,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 12,
-        ),
-        decoration: BoxDecoration(
-          color: AppTokens.surfaceSoft,
-          borderRadius: AppTokens.brMd,
-          border: Border.all(color: AppTokens.border),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 18,
-              color: AppTokens.textPrimary,
-            ),
-            const SizedBox(width: 10),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: AppTokens.textPrimary,
-                  ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-class _SideActionButton extends StatelessWidget {
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback? onTap;
-  const _SideActionButton({
-    super.key,
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: AppTokens.brMd,
-        child: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: AppTokens.surfaceSoft,
-            borderRadius: AppTokens.brMd,
-            border: Border.all(color: AppTokens.border),
-          ),
-          child: Icon(
-            icon,
-            size: 20,
-            color: onTap == null
-                ? AppTokens.textTertiary
-                : AppTokens.textSecondary,
-          ),
-        ),
-      ),
-    );
-  }
-}
-class _PrimaryActionButton extends StatelessWidget {
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback? onTap;
-  final bool isDanger;
-  const _PrimaryActionButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-    this.isDanger = false,
-  });
-  @override
-  Widget build(BuildContext context) {
-    final bg = isDanger ? AppTokens.danger : AppTokens.primary;
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: AppTokens.brMd,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: onTap == null ? AppTokens.border : bg,
-            borderRadius: AppTokens.brMd,
-            boxShadow: onTap == null ? [] : AppTokens.shadowSm,
-          ),
-          child: Icon(
-            icon,
-            size: 20,
-            color: Colors.white,
           ),
         ),
       ),
@@ -8313,7 +6303,6 @@ class PageIndicator extends StatelessWidget {
 ## File: lib/presentation/widgets/thought_bubble.dart
 ```dart
 import 'package:flutter/material.dart';
-import '../themes/app_tokens.dart';
 class ThoughtBubble extends StatelessWidget {
   final String content;
   const ThoughtBubble({
@@ -8324,51 +6313,1046 @@ class ThoughtBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = content.trim();
     if (text.isEmpty) return const SizedBox.shrink();
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: AppTokens.space12),
-      padding: const EdgeInsets.all(AppTokens.space12),
-      decoration: BoxDecoration(
-        color: AppTokens.thoughtBubble,
-        borderRadius: AppTokens.brMd,
-        border: Border.all(
-          color: AppTokens.warning.withOpacity(0.18),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.psychology_alt_outlined,
-                size: 16,
-                color: AppTokens.warning,
-              ),
-              const SizedBox(width: AppTokens.space6),
-              Text(
-                '推理过程',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTokens.warning,
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppTokens.space8),
-          Text(
-            text,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontSize: 13,
-                  height: 1.65,
-                  color: AppTokens.textSecondary,
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Card(
+      color: colorScheme.surfaceContainerHigh,
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.psychology_alt_outlined,
+                  size: 16,
+                  color: colorScheme.primary,
                 ),
-          ),
-        ],
+                const SizedBox(width: 6),
+                Text(
+                  '推理过程',
+                  style: textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.primary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              text,
+              style: textTheme.bodySmall?.copyWith(
+                fontSize: 13,
+                height: 1.65,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
+```
+
+## File: lib/core/interfaces/config_service.dart
+```dart
+import '../models/app_config.dart';
+import '../models/app_config_store.dart';
+abstract class IConfigService {
+  Future<AppConfigStore> loadConfigStore();
+  Future<AppConfig> loadConfig();
+  Future<void> saveConfig(AppConfig config);
+  Future<void> refreshModels();
+  Future<List<ConfigProfile>> getProfiles();
+  Future<String> getActiveProfileId();
+  Future<void> switchProfile(String profileId);
+  Future<void> createProfile(String name);
+  Future<void> renameProfile(String profileId, String name);
+  Future<void> deleteProfile(String profileId);
+}
+```
+
+## File: lib/core/interfaces/file_service.dart
+```dart
+import 'dart:typed_data';
+import '../models/session.dart';
+import '../models/app_config_store.dart';
+abstract class IFileService {
+  // 配置
+  Future<AppConfigStore> readConfigStore();
+  Future<void> writeConfigStore(AppConfigStore store);
+  // 会话
+  Future<List<String>> getConversationFileList();
+  Future<Session> readSession(String fileName);
+  Future<void> writeSession(String fileName, Session session);
+  Future<void> deleteSession(String fileName);
+  // 附件
+  Future<String> saveAttachment(Uint8List data, String fileName);
+  Future<Uint8List> readAttachment(String relativePath);
+  Future<void> deleteAttachment(String relativePath);
+}
+```
+
+## File: lib/core/models/chat_round.dart
+```dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+import 'attachment.dart';
+part 'chat_round.freezed.dart';
+part 'chat_round.g.dart';
+@freezed
+class ChatRound with _$ChatRound {
+  const factory ChatRound({
+    required String id,
+    String? parentId,
+    required int createdAt,
+    required String userContent,
+    @Default([]) List<Attachment> userAttachments,
+    String? assistantThinking,
+    String? assistantContent,
+    @Default(false) bool isIncomplete,
+    @Default(false) bool hasUnseenUpdate,
+  }) = _ChatRound;
+  factory ChatRound.fromJson(Map<String, dynamic> json) =>
+      _$ChatRoundFromJson(json);
+}
+```
+
+## File: lib/core/models/chat_round.freezed.dart
+```dart
+// coverage:ignore-file
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint
+// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
+part of 'chat_round.dart';
+// **************************************************************************
+// FreezedGenerator
+// **************************************************************************
+T _$identity<T>(T value) => value;
+final _privateConstructorUsedError = UnsupportedError(
+  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
+);
+ChatRound _$ChatRoundFromJson(Map<String, dynamic> json) {
+  return _ChatRound.fromJson(json);
+}
+/// @nodoc
+mixin _$ChatRound {
+  String get id => throw _privateConstructorUsedError;
+  String? get parentId => throw _privateConstructorUsedError;
+  int get createdAt => throw _privateConstructorUsedError;
+  String get userContent => throw _privateConstructorUsedError;
+  List<Attachment> get userAttachments => throw _privateConstructorUsedError;
+  String? get assistantThinking => throw _privateConstructorUsedError;
+  String? get assistantContent => throw _privateConstructorUsedError;
+  bool get isIncomplete => throw _privateConstructorUsedError;
+  bool get hasUnseenUpdate => throw _privateConstructorUsedError;
+  /// Serializes this ChatRound to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+  /// Create a copy of ChatRound
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $ChatRoundCopyWith<ChatRound> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+/// @nodoc
+abstract class $ChatRoundCopyWith<$Res> {
+  factory $ChatRoundCopyWith(ChatRound value, $Res Function(ChatRound) then) =
+      _$ChatRoundCopyWithImpl<$Res, ChatRound>;
+  @useResult
+  $Res call({
+    String id,
+    String? parentId,
+    int createdAt,
+    String userContent,
+    List<Attachment> userAttachments,
+    String? assistantThinking,
+    String? assistantContent,
+    bool isIncomplete,
+    bool hasUnseenUpdate,
+  });
+}
+/// @nodoc
+class _$ChatRoundCopyWithImpl<$Res, $Val extends ChatRound>
+    implements $ChatRoundCopyWith<$Res> {
+  _$ChatRoundCopyWithImpl(this._value, this._then);
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+  /// Create a copy of ChatRound
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? parentId = freezed,
+    Object? createdAt = null,
+    Object? userContent = null,
+    Object? userAttachments = null,
+    Object? assistantThinking = freezed,
+    Object? assistantContent = freezed,
+    Object? isIncomplete = null,
+    Object? hasUnseenUpdate = null,
+  }) {
+    return _then(
+      _value.copyWith(
+            id: null == id
+                ? _value.id
+                : id // ignore: cast_nullable_to_non_nullable
+                      as String,
+            parentId: freezed == parentId
+                ? _value.parentId
+                : parentId // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            createdAt: null == createdAt
+                ? _value.createdAt
+                : createdAt // ignore: cast_nullable_to_non_nullable
+                      as int,
+            userContent: null == userContent
+                ? _value.userContent
+                : userContent // ignore: cast_nullable_to_non_nullable
+                      as String,
+            userAttachments: null == userAttachments
+                ? _value.userAttachments
+                : userAttachments // ignore: cast_nullable_to_non_nullable
+                      as List<Attachment>,
+            assistantThinking: freezed == assistantThinking
+                ? _value.assistantThinking
+                : assistantThinking // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            assistantContent: freezed == assistantContent
+                ? _value.assistantContent
+                : assistantContent // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            isIncomplete: null == isIncomplete
+                ? _value.isIncomplete
+                : isIncomplete // ignore: cast_nullable_to_non_nullable
+                      as bool,
+            hasUnseenUpdate: null == hasUnseenUpdate
+                ? _value.hasUnseenUpdate
+                : hasUnseenUpdate // ignore: cast_nullable_to_non_nullable
+                      as bool,
+          )
+          as $Val,
+    );
+  }
+}
+/// @nodoc
+abstract class _$$ChatRoundImplCopyWith<$Res>
+    implements $ChatRoundCopyWith<$Res> {
+  factory _$$ChatRoundImplCopyWith(
+    _$ChatRoundImpl value,
+    $Res Function(_$ChatRoundImpl) then,
+  ) = __$$ChatRoundImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({
+    String id,
+    String? parentId,
+    int createdAt,
+    String userContent,
+    List<Attachment> userAttachments,
+    String? assistantThinking,
+    String? assistantContent,
+    bool isIncomplete,
+    bool hasUnseenUpdate,
+  });
+}
+/// @nodoc
+class __$$ChatRoundImplCopyWithImpl<$Res>
+    extends _$ChatRoundCopyWithImpl<$Res, _$ChatRoundImpl>
+    implements _$$ChatRoundImplCopyWith<$Res> {
+  __$$ChatRoundImplCopyWithImpl(
+    _$ChatRoundImpl _value,
+    $Res Function(_$ChatRoundImpl) _then,
+  ) : super(_value, _then);
+  /// Create a copy of ChatRound
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? parentId = freezed,
+    Object? createdAt = null,
+    Object? userContent = null,
+    Object? userAttachments = null,
+    Object? assistantThinking = freezed,
+    Object? assistantContent = freezed,
+    Object? isIncomplete = null,
+    Object? hasUnseenUpdate = null,
+  }) {
+    return _then(
+      _$ChatRoundImpl(
+        id: null == id
+            ? _value.id
+            : id // ignore: cast_nullable_to_non_nullable
+                  as String,
+        parentId: freezed == parentId
+            ? _value.parentId
+            : parentId // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        createdAt: null == createdAt
+            ? _value.createdAt
+            : createdAt // ignore: cast_nullable_to_non_nullable
+                  as int,
+        userContent: null == userContent
+            ? _value.userContent
+            : userContent // ignore: cast_nullable_to_non_nullable
+                  as String,
+        userAttachments: null == userAttachments
+            ? _value._userAttachments
+            : userAttachments // ignore: cast_nullable_to_non_nullable
+                  as List<Attachment>,
+        assistantThinking: freezed == assistantThinking
+            ? _value.assistantThinking
+            : assistantThinking // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        assistantContent: freezed == assistantContent
+            ? _value.assistantContent
+            : assistantContent // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        isIncomplete: null == isIncomplete
+            ? _value.isIncomplete
+            : isIncomplete // ignore: cast_nullable_to_non_nullable
+                  as bool,
+        hasUnseenUpdate: null == hasUnseenUpdate
+            ? _value.hasUnseenUpdate
+            : hasUnseenUpdate // ignore: cast_nullable_to_non_nullable
+                  as bool,
+      ),
+    );
+  }
+}
+/// @nodoc
+@JsonSerializable()
+class _$ChatRoundImpl implements _ChatRound {
+  const _$ChatRoundImpl({
+    required this.id,
+    this.parentId,
+    required this.createdAt,
+    required this.userContent,
+    final List<Attachment> userAttachments = const [],
+    this.assistantThinking,
+    this.assistantContent,
+    this.isIncomplete = false,
+    this.hasUnseenUpdate = false,
+  }) : _userAttachments = userAttachments;
+  factory _$ChatRoundImpl.fromJson(Map<String, dynamic> json) =>
+      _$$ChatRoundImplFromJson(json);
+  @override
+  final String id;
+  @override
+  final String? parentId;
+  @override
+  final int createdAt;
+  @override
+  final String userContent;
+  final List<Attachment> _userAttachments;
+  @override
+  @JsonKey()
+  List<Attachment> get userAttachments {
+    if (_userAttachments is EqualUnmodifiableListView) return _userAttachments;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_userAttachments);
+  }
+  @override
+  final String? assistantThinking;
+  @override
+  final String? assistantContent;
+  @override
+  @JsonKey()
+  final bool isIncomplete;
+  @override
+  @JsonKey()
+  final bool hasUnseenUpdate;
+  @override
+  String toString() {
+    return 'ChatRound(id: $id, parentId: $parentId, createdAt: $createdAt, userContent: $userContent, userAttachments: $userAttachments, assistantThinking: $assistantThinking, assistantContent: $assistantContent, isIncomplete: $isIncomplete, hasUnseenUpdate: $hasUnseenUpdate)';
+  }
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$ChatRoundImpl &&
+            (identical(other.id, id) || other.id == id) &&
+            (identical(other.parentId, parentId) ||
+                other.parentId == parentId) &&
+            (identical(other.createdAt, createdAt) ||
+                other.createdAt == createdAt) &&
+            (identical(other.userContent, userContent) ||
+                other.userContent == userContent) &&
+            const DeepCollectionEquality().equals(
+              other._userAttachments,
+              _userAttachments,
+            ) &&
+            (identical(other.assistantThinking, assistantThinking) ||
+                other.assistantThinking == assistantThinking) &&
+            (identical(other.assistantContent, assistantContent) ||
+                other.assistantContent == assistantContent) &&
+            (identical(other.isIncomplete, isIncomplete) ||
+                other.isIncomplete == isIncomplete) &&
+            (identical(other.hasUnseenUpdate, hasUnseenUpdate) ||
+                other.hasUnseenUpdate == hasUnseenUpdate));
+  }
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(
+    runtimeType,
+    id,
+    parentId,
+    createdAt,
+    userContent,
+    const DeepCollectionEquality().hash(_userAttachments),
+    assistantThinking,
+    assistantContent,
+    isIncomplete,
+    hasUnseenUpdate,
+  );
+  /// Create a copy of ChatRound
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$ChatRoundImplCopyWith<_$ChatRoundImpl> get copyWith =>
+      __$$ChatRoundImplCopyWithImpl<_$ChatRoundImpl>(this, _$identity);
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$ChatRoundImplToJson(this);
+  }
+}
+abstract class _ChatRound implements ChatRound {
+  const factory _ChatRound({
+    required final String id,
+    final String? parentId,
+    required final int createdAt,
+    required final String userContent,
+    final List<Attachment> userAttachments,
+    final String? assistantThinking,
+    final String? assistantContent,
+    final bool isIncomplete,
+    final bool hasUnseenUpdate,
+  }) = _$ChatRoundImpl;
+  factory _ChatRound.fromJson(Map<String, dynamic> json) =
+      _$ChatRoundImpl.fromJson;
+  @override
+  String get id;
+  @override
+  String? get parentId;
+  @override
+  int get createdAt;
+  @override
+  String get userContent;
+  @override
+  List<Attachment> get userAttachments;
+  @override
+  String? get assistantThinking;
+  @override
+  String? get assistantContent;
+  @override
+  bool get isIncomplete;
+  @override
+  bool get hasUnseenUpdate;
+  /// Create a copy of ChatRound
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$ChatRoundImplCopyWith<_$ChatRoundImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+```
+
+## File: lib/core/models/chat_round.g.dart
+```dart
+// GENERATED CODE - DO NOT MODIFY BY HAND
+part of 'chat_round.dart';
+// **************************************************************************
+// JsonSerializableGenerator
+// **************************************************************************
+_$ChatRoundImpl _$$ChatRoundImplFromJson(Map<String, dynamic> json) =>
+    _$ChatRoundImpl(
+      id: json['id'] as String,
+      parentId: json['parentId'] as String?,
+      createdAt: (json['createdAt'] as num).toInt(),
+      userContent: json['userContent'] as String,
+      userAttachments:
+          (json['userAttachments'] as List<dynamic>?)
+              ?.map((e) => Attachment.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const [],
+      assistantThinking: json['assistantThinking'] as String?,
+      assistantContent: json['assistantContent'] as String?,
+      isIncomplete: json['isIncomplete'] as bool? ?? false,
+      hasUnseenUpdate: json['hasUnseenUpdate'] as bool? ?? false,
+    );
+Map<String, dynamic> _$$ChatRoundImplToJson(_$ChatRoundImpl instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'parentId': instance.parentId,
+      'createdAt': instance.createdAt,
+      'userContent': instance.userContent,
+      'userAttachments': instance.userAttachments,
+      'assistantThinking': instance.assistantThinking,
+      'assistantContent': instance.assistantContent,
+      'isIncomplete': instance.isIncomplete,
+      'hasUnseenUpdate': instance.hasUnseenUpdate,
+    };
+```
+
+## File: lib/core/models/session.dart
+```dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+import 'chat_round.dart';
+part 'session.freezed.dart';
+part 'session.g.dart';
+@freezed
+class Session with _$Session {
+  const factory Session({
+    required String id,
+    required String title,
+    required int createdAt,
+    required int updatedAt,
+    required List<ChatRound> rounds,
+    SessionConfig? config,
+    @Default(false) bool hasUnseenUpdate,
+  }) = _Session;
+  factory Session.fromJson(Map<String, dynamic> json) => _$SessionFromJson(json);
+}
+@freezed
+class SessionConfig with _$SessionConfig {
+  const factory SessionConfig({
+    String? model,
+    double? temperature,
+    bool? enableReasoning,
+  }) = _SessionConfig;
+  factory SessionConfig.fromJson(Map<String, dynamic> json) =>
+      _$SessionConfigFromJson(json);
+}
+```
+
+## File: lib/core/models/session.freezed.dart
+```dart
+// coverage:ignore-file
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint
+// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
+part of 'session.dart';
+// **************************************************************************
+// FreezedGenerator
+// **************************************************************************
+T _$identity<T>(T value) => value;
+final _privateConstructorUsedError = UnsupportedError(
+  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
+);
+Session _$SessionFromJson(Map<String, dynamic> json) {
+  return _Session.fromJson(json);
+}
+/// @nodoc
+mixin _$Session {
+  String get id => throw _privateConstructorUsedError;
+  String get title => throw _privateConstructorUsedError;
+  int get createdAt => throw _privateConstructorUsedError;
+  int get updatedAt => throw _privateConstructorUsedError;
+  List<ChatRound> get rounds => throw _privateConstructorUsedError;
+  SessionConfig? get config => throw _privateConstructorUsedError;
+  bool get hasUnseenUpdate => throw _privateConstructorUsedError;
+  /// Serializes this Session to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+  /// Create a copy of Session
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $SessionCopyWith<Session> get copyWith => throw _privateConstructorUsedError;
+}
+/// @nodoc
+abstract class $SessionCopyWith<$Res> {
+  factory $SessionCopyWith(Session value, $Res Function(Session) then) =
+      _$SessionCopyWithImpl<$Res, Session>;
+  @useResult
+  $Res call({
+    String id,
+    String title,
+    int createdAt,
+    int updatedAt,
+    List<ChatRound> rounds,
+    SessionConfig? config,
+    bool hasUnseenUpdate,
+  });
+  $SessionConfigCopyWith<$Res>? get config;
+}
+/// @nodoc
+class _$SessionCopyWithImpl<$Res, $Val extends Session>
+    implements $SessionCopyWith<$Res> {
+  _$SessionCopyWithImpl(this._value, this._then);
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+  /// Create a copy of Session
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? title = null,
+    Object? createdAt = null,
+    Object? updatedAt = null,
+    Object? rounds = null,
+    Object? config = freezed,
+    Object? hasUnseenUpdate = null,
+  }) {
+    return _then(
+      _value.copyWith(
+            id: null == id
+                ? _value.id
+                : id // ignore: cast_nullable_to_non_nullable
+                      as String,
+            title: null == title
+                ? _value.title
+                : title // ignore: cast_nullable_to_non_nullable
+                      as String,
+            createdAt: null == createdAt
+                ? _value.createdAt
+                : createdAt // ignore: cast_nullable_to_non_nullable
+                      as int,
+            updatedAt: null == updatedAt
+                ? _value.updatedAt
+                : updatedAt // ignore: cast_nullable_to_non_nullable
+                      as int,
+            rounds: null == rounds
+                ? _value.rounds
+                : rounds // ignore: cast_nullable_to_non_nullable
+                      as List<ChatRound>,
+            config: freezed == config
+                ? _value.config
+                : config // ignore: cast_nullable_to_non_nullable
+                      as SessionConfig?,
+            hasUnseenUpdate: null == hasUnseenUpdate
+                ? _value.hasUnseenUpdate
+                : hasUnseenUpdate // ignore: cast_nullable_to_non_nullable
+                      as bool,
+          )
+          as $Val,
+    );
+  }
+  /// Create a copy of Session
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $SessionConfigCopyWith<$Res>? get config {
+    if (_value.config == null) {
+      return null;
+    }
+    return $SessionConfigCopyWith<$Res>(_value.config!, (value) {
+      return _then(_value.copyWith(config: value) as $Val);
+    });
+  }
+}
+/// @nodoc
+abstract class _$$SessionImplCopyWith<$Res> implements $SessionCopyWith<$Res> {
+  factory _$$SessionImplCopyWith(
+    _$SessionImpl value,
+    $Res Function(_$SessionImpl) then,
+  ) = __$$SessionImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({
+    String id,
+    String title,
+    int createdAt,
+    int updatedAt,
+    List<ChatRound> rounds,
+    SessionConfig? config,
+    bool hasUnseenUpdate,
+  });
+  @override
+  $SessionConfigCopyWith<$Res>? get config;
+}
+/// @nodoc
+class __$$SessionImplCopyWithImpl<$Res>
+    extends _$SessionCopyWithImpl<$Res, _$SessionImpl>
+    implements _$$SessionImplCopyWith<$Res> {
+  __$$SessionImplCopyWithImpl(
+    _$SessionImpl _value,
+    $Res Function(_$SessionImpl) _then,
+  ) : super(_value, _then);
+  /// Create a copy of Session
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? title = null,
+    Object? createdAt = null,
+    Object? updatedAt = null,
+    Object? rounds = null,
+    Object? config = freezed,
+    Object? hasUnseenUpdate = null,
+  }) {
+    return _then(
+      _$SessionImpl(
+        id: null == id
+            ? _value.id
+            : id // ignore: cast_nullable_to_non_nullable
+                  as String,
+        title: null == title
+            ? _value.title
+            : title // ignore: cast_nullable_to_non_nullable
+                  as String,
+        createdAt: null == createdAt
+            ? _value.createdAt
+            : createdAt // ignore: cast_nullable_to_non_nullable
+                  as int,
+        updatedAt: null == updatedAt
+            ? _value.updatedAt
+            : updatedAt // ignore: cast_nullable_to_non_nullable
+                  as int,
+        rounds: null == rounds
+            ? _value._rounds
+            : rounds // ignore: cast_nullable_to_non_nullable
+                  as List<ChatRound>,
+        config: freezed == config
+            ? _value.config
+            : config // ignore: cast_nullable_to_non_nullable
+                  as SessionConfig?,
+        hasUnseenUpdate: null == hasUnseenUpdate
+            ? _value.hasUnseenUpdate
+            : hasUnseenUpdate // ignore: cast_nullable_to_non_nullable
+                  as bool,
+      ),
+    );
+  }
+}
+/// @nodoc
+@JsonSerializable()
+class _$SessionImpl implements _Session {
+  const _$SessionImpl({
+    required this.id,
+    required this.title,
+    required this.createdAt,
+    required this.updatedAt,
+    required final List<ChatRound> rounds,
+    this.config,
+    this.hasUnseenUpdate = false,
+  }) : _rounds = rounds;
+  factory _$SessionImpl.fromJson(Map<String, dynamic> json) =>
+      _$$SessionImplFromJson(json);
+  @override
+  final String id;
+  @override
+  final String title;
+  @override
+  final int createdAt;
+  @override
+  final int updatedAt;
+  final List<ChatRound> _rounds;
+  @override
+  List<ChatRound> get rounds {
+    if (_rounds is EqualUnmodifiableListView) return _rounds;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_rounds);
+  }
+  @override
+  final SessionConfig? config;
+  @override
+  @JsonKey()
+  final bool hasUnseenUpdate;
+  @override
+  String toString() {
+    return 'Session(id: $id, title: $title, createdAt: $createdAt, updatedAt: $updatedAt, rounds: $rounds, config: $config, hasUnseenUpdate: $hasUnseenUpdate)';
+  }
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$SessionImpl &&
+            (identical(other.id, id) || other.id == id) &&
+            (identical(other.title, title) || other.title == title) &&
+            (identical(other.createdAt, createdAt) ||
+                other.createdAt == createdAt) &&
+            (identical(other.updatedAt, updatedAt) ||
+                other.updatedAt == updatedAt) &&
+            const DeepCollectionEquality().equals(other._rounds, _rounds) &&
+            (identical(other.config, config) || other.config == config) &&
+            (identical(other.hasUnseenUpdate, hasUnseenUpdate) ||
+                other.hasUnseenUpdate == hasUnseenUpdate));
+  }
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(
+    runtimeType,
+    id,
+    title,
+    createdAt,
+    updatedAt,
+    const DeepCollectionEquality().hash(_rounds),
+    config,
+    hasUnseenUpdate,
+  );
+  /// Create a copy of Session
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$SessionImplCopyWith<_$SessionImpl> get copyWith =>
+      __$$SessionImplCopyWithImpl<_$SessionImpl>(this, _$identity);
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$SessionImplToJson(this);
+  }
+}
+abstract class _Session implements Session {
+  const factory _Session({
+    required final String id,
+    required final String title,
+    required final int createdAt,
+    required final int updatedAt,
+    required final List<ChatRound> rounds,
+    final SessionConfig? config,
+    final bool hasUnseenUpdate,
+  }) = _$SessionImpl;
+  factory _Session.fromJson(Map<String, dynamic> json) = _$SessionImpl.fromJson;
+  @override
+  String get id;
+  @override
+  String get title;
+  @override
+  int get createdAt;
+  @override
+  int get updatedAt;
+  @override
+  List<ChatRound> get rounds;
+  @override
+  SessionConfig? get config;
+  @override
+  bool get hasUnseenUpdate;
+  /// Create a copy of Session
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$SessionImplCopyWith<_$SessionImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+SessionConfig _$SessionConfigFromJson(Map<String, dynamic> json) {
+  return _SessionConfig.fromJson(json);
+}
+/// @nodoc
+mixin _$SessionConfig {
+  String? get model => throw _privateConstructorUsedError;
+  double? get temperature => throw _privateConstructorUsedError;
+  bool? get enableReasoning => throw _privateConstructorUsedError;
+  /// Serializes this SessionConfig to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+  /// Create a copy of SessionConfig
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $SessionConfigCopyWith<SessionConfig> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+/// @nodoc
+abstract class $SessionConfigCopyWith<$Res> {
+  factory $SessionConfigCopyWith(
+    SessionConfig value,
+    $Res Function(SessionConfig) then,
+  ) = _$SessionConfigCopyWithImpl<$Res, SessionConfig>;
+  @useResult
+  $Res call({String? model, double? temperature, bool? enableReasoning});
+}
+/// @nodoc
+class _$SessionConfigCopyWithImpl<$Res, $Val extends SessionConfig>
+    implements $SessionConfigCopyWith<$Res> {
+  _$SessionConfigCopyWithImpl(this._value, this._then);
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+  /// Create a copy of SessionConfig
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? model = freezed,
+    Object? temperature = freezed,
+    Object? enableReasoning = freezed,
+  }) {
+    return _then(
+      _value.copyWith(
+            model: freezed == model
+                ? _value.model
+                : model // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            temperature: freezed == temperature
+                ? _value.temperature
+                : temperature // ignore: cast_nullable_to_non_nullable
+                      as double?,
+            enableReasoning: freezed == enableReasoning
+                ? _value.enableReasoning
+                : enableReasoning // ignore: cast_nullable_to_non_nullable
+                      as bool?,
+          )
+          as $Val,
+    );
+  }
+}
+/// @nodoc
+abstract class _$$SessionConfigImplCopyWith<$Res>
+    implements $SessionConfigCopyWith<$Res> {
+  factory _$$SessionConfigImplCopyWith(
+    _$SessionConfigImpl value,
+    $Res Function(_$SessionConfigImpl) then,
+  ) = __$$SessionConfigImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({String? model, double? temperature, bool? enableReasoning});
+}
+/// @nodoc
+class __$$SessionConfigImplCopyWithImpl<$Res>
+    extends _$SessionConfigCopyWithImpl<$Res, _$SessionConfigImpl>
+    implements _$$SessionConfigImplCopyWith<$Res> {
+  __$$SessionConfigImplCopyWithImpl(
+    _$SessionConfigImpl _value,
+    $Res Function(_$SessionConfigImpl) _then,
+  ) : super(_value, _then);
+  /// Create a copy of SessionConfig
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? model = freezed,
+    Object? temperature = freezed,
+    Object? enableReasoning = freezed,
+  }) {
+    return _then(
+      _$SessionConfigImpl(
+        model: freezed == model
+            ? _value.model
+            : model // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        temperature: freezed == temperature
+            ? _value.temperature
+            : temperature // ignore: cast_nullable_to_non_nullable
+                  as double?,
+        enableReasoning: freezed == enableReasoning
+            ? _value.enableReasoning
+            : enableReasoning // ignore: cast_nullable_to_non_nullable
+                  as bool?,
+      ),
+    );
+  }
+}
+/// @nodoc
+@JsonSerializable()
+class _$SessionConfigImpl implements _SessionConfig {
+  const _$SessionConfigImpl({
+    this.model,
+    this.temperature,
+    this.enableReasoning,
+  });
+  factory _$SessionConfigImpl.fromJson(Map<String, dynamic> json) =>
+      _$$SessionConfigImplFromJson(json);
+  @override
+  final String? model;
+  @override
+  final double? temperature;
+  @override
+  final bool? enableReasoning;
+  @override
+  String toString() {
+    return 'SessionConfig(model: $model, temperature: $temperature, enableReasoning: $enableReasoning)';
+  }
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$SessionConfigImpl &&
+            (identical(other.model, model) || other.model == model) &&
+            (identical(other.temperature, temperature) ||
+                other.temperature == temperature) &&
+            (identical(other.enableReasoning, enableReasoning) ||
+                other.enableReasoning == enableReasoning));
+  }
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode =>
+      Object.hash(runtimeType, model, temperature, enableReasoning);
+  /// Create a copy of SessionConfig
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$SessionConfigImplCopyWith<_$SessionConfigImpl> get copyWith =>
+      __$$SessionConfigImplCopyWithImpl<_$SessionConfigImpl>(this, _$identity);
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$SessionConfigImplToJson(this);
+  }
+}
+abstract class _SessionConfig implements SessionConfig {
+  const factory _SessionConfig({
+    final String? model,
+    final double? temperature,
+    final bool? enableReasoning,
+  }) = _$SessionConfigImpl;
+  factory _SessionConfig.fromJson(Map<String, dynamic> json) =
+      _$SessionConfigImpl.fromJson;
+  @override
+  String? get model;
+  @override
+  double? get temperature;
+  @override
+  bool? get enableReasoning;
+  /// Create a copy of SessionConfig
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$SessionConfigImplCopyWith<_$SessionConfigImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+```
+
+## File: lib/core/models/session.g.dart
+```dart
+// GENERATED CODE - DO NOT MODIFY BY HAND
+part of 'session.dart';
+// **************************************************************************
+// JsonSerializableGenerator
+// **************************************************************************
+_$SessionImpl _$$SessionImplFromJson(Map<String, dynamic> json) =>
+    _$SessionImpl(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      createdAt: (json['createdAt'] as num).toInt(),
+      updatedAt: (json['updatedAt'] as num).toInt(),
+      rounds: (json['rounds'] as List<dynamic>)
+          .map((e) => ChatRound.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      config: json['config'] == null
+          ? null
+          : SessionConfig.fromJson(json['config'] as Map<String, dynamic>),
+      hasUnseenUpdate: json['hasUnseenUpdate'] as bool? ?? false,
+    );
+Map<String, dynamic> _$$SessionImplToJson(_$SessionImpl instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'title': instance.title,
+      'createdAt': instance.createdAt,
+      'updatedAt': instance.updatedAt,
+      'rounds': instance.rounds,
+      'config': instance.config,
+      'hasUnseenUpdate': instance.hasUnseenUpdate,
+    };
+_$SessionConfigImpl _$$SessionConfigImplFromJson(Map<String, dynamic> json) =>
+    _$SessionConfigImpl(
+      model: json['model'] as String?,
+      temperature: (json['temperature'] as num?)?.toDouble(),
+      enableReasoning: json['enableReasoning'] as bool?,
+    );
+Map<String, dynamic> _$$SessionConfigImplToJson(_$SessionConfigImpl instance) =>
+    <String, dynamic>{
+      'model': instance.model,
+      'temperature': instance.temperature,
+      'enableReasoning': instance.enableReasoning,
+    };
 ```
 
 ## File: lib/data/data_sources/local_file_source.dart
@@ -8490,6 +7474,92 @@ class LocalFileSource implements ILocalFileSource {
         code: 'ATTACHMENT_READ_ERROR',
       );
     }
+  }
+}
+```
+
+## File: lib/data/repositories/config_repository.dart
+```dart
+import '../../core/models/app_config.dart';
+import '../../core/models/app_config_store.dart';
+import '../../core/interfaces/config_service.dart';
+class ConfigRepository {
+  final IConfigService _configService;
+  ConfigRepository(this._configService);
+  Future<AppConfig> getConfig() async {
+    return await _configService.loadConfig();
+  }
+  Future<AppConfigStore> getConfigStore() async {
+    return await _configService.loadConfigStore();
+  }
+  Future<List<ConfigProfile>> getProfiles() async {
+    return await _configService.getProfiles();
+  }
+  Future<String> getActiveProfileId() async {
+    return await _configService.getActiveProfileId();
+  }
+  Future<void> switchProfile(String profileId) async {
+    await _configService.switchProfile(profileId);
+  }
+  Future<void> createProfile(String name) async {
+    await _configService.createProfile(name);
+  }
+  Future<void> renameProfile(String profileId, String name) async {
+    await _configService.renameProfile(profileId, name);
+  }
+  Future<void> deleteProfile(String profileId) async {
+    await _configService.deleteProfile(profileId);
+  }
+  Future<void> saveConfig(AppConfig config) async {
+    await _configService.saveConfig(config);
+  }
+  Future<void> saveFullConfig(AppConfig config) async {
+    await saveConfig(config);
+  }
+  Future<void> saveAndRefreshModels(AppConfig config) async {
+    final clearedConfig = config.copyWith(
+      availableModels: [],
+    );
+    await _configService.saveConfig(clearedConfig);
+    await _configService.refreshModels();
+  }
+  Future<void> updateApiKey(String apiKey) async {
+    final config = await getConfig();
+    final updated = config.copyWith(apiKey: apiKey);
+    await saveConfig(updated);
+  }
+  Future<void> updateBaseUrl(String baseUrl) async {
+    final config = await getConfig();
+    final updated = config.copyWith(baseUrl: baseUrl);
+    await saveConfig(updated);
+  }
+  Future<void> updateModelsPath(String modelsPath) async {
+    final config = await getConfig();
+    final updated = config.copyWith(modelsPath: modelsPath);
+    await saveConfig(updated);
+  }
+  Future<void> updateChatPath(String chatPath) async {
+    final config = await getConfig();
+    final updated = config.copyWith(chatPath: chatPath);
+    await saveConfig(updated);
+  }
+  Future<void> updateApiMode(String apiMode) async {
+    final config = await getConfig();
+    final updated = config.copyWith(apiMode: apiMode);
+    await saveConfig(updated);
+  }
+  Future<void> updateSelectedModel(String? model) async {
+    final config = await getConfig();
+    final updated = config.copyWith(selectedModel: model);
+    await saveConfig(updated);
+  }
+  Future<void> refreshModels() async {
+    await _configService.refreshModels();
+  }
+  Future<List<String>> getAvailableModelIds() async {
+    final config = await getConfig();
+    final models = config.availableModels ?? [];
+    return models.map((m) => m.id).toList();
   }
 }
 ```
@@ -8695,6 +7765,226 @@ class ConversationRepository {
 }
 ```
 
+## File: lib/data/services/config_service.dart
+```dart
+import '../../core/interfaces/config_service.dart';
+import '../../core/models/app_config.dart';
+import '../../core/models/app_config_store.dart';
+import '../../core/interfaces/file_service.dart';
+import '../../core/interfaces/api_service.dart';
+import '../../core/utils/id_generator.dart';
+class ConfigService implements IConfigService {
+  final IFileService _fileService;
+  final IApiService _apiService;
+  AppConfigStore? _cachedStore;
+  ConfigService(this._fileService, this._apiService);
+  ConfigProfile _getActiveProfile(AppConfigStore store) {
+    for (final profile in store.profiles) {
+      if (profile.id == store.activeProfileId) {
+        return profile;
+      }
+    }
+    return store.profiles.first;
+  }
+  AppConfigStore _ensureNonEmptyStore(AppConfigStore store) {
+    if (store.profiles.isNotEmpty) return store;
+    return AppConfigStore.defaultStore();
+  }
+  @override
+  Future<AppConfigStore> loadConfigStore() async {
+    try {
+      _cachedStore = await _fileService.readConfigStore();
+      _cachedStore = _ensureNonEmptyStore(_cachedStore!);
+    } catch (_) {
+      _cachedStore = AppConfigStore.defaultStore();
+      await _fileService.writeConfigStore(_cachedStore!);
+    }
+    return _cachedStore!;
+  }
+  @override
+  Future<AppConfig> loadConfig() async {
+    if (_cachedStore == null) {
+      await loadConfigStore();
+    }
+    return _getActiveProfile(_cachedStore!).config;
+  }
+  @override
+  Future<void> saveConfig(AppConfig config) async {
+    if (_cachedStore == null) {
+      await loadConfigStore();
+    }
+    final store = _cachedStore!;
+    final updatedProfiles = store.profiles.map((profile) {
+      if (profile.id == store.activeProfileId) {
+        return profile.copyWith(config: config);
+      }
+      return profile;
+    }).toList();
+    _cachedStore = store.copyWith(profiles: updatedProfiles);
+    await _fileService.writeConfigStore(_cachedStore!);
+  }
+  @override
+  Future<void> refreshModels() async {
+    if (_cachedStore == null) {
+      await loadConfigStore();
+    }
+    final activeConfig = await loadConfig();
+    final models = await _apiService.fetchModels(
+      baseUrl: activeConfig.baseUrl,
+      apiKey: activeConfig.apiKey,
+      modelsPath: activeConfig.modelsPath,
+    );
+    final updatedConfig = activeConfig.copyWith(availableModels: models);
+    await saveConfig(updatedConfig);
+  }
+  @override
+  Future<List<ConfigProfile>> getProfiles() async {
+    final store = await loadConfigStore();
+    return store.profiles;
+  }
+  @override
+  Future<String> getActiveProfileId() async {
+    final store = await loadConfigStore();
+    return store.activeProfileId;
+  }
+  @override
+  Future<void> switchProfile(String profileId) async {
+    final store = await loadConfigStore();
+    final exists = store.profiles.any((p) => p.id == profileId);
+    if (!exists) return;
+    _cachedStore = store.copyWith(activeProfileId: profileId);
+    await _fileService.writeConfigStore(_cachedStore!);
+  }
+  @override
+  Future<void> createProfile(String name) async {
+    final store = await loadConfigStore();
+    final activeConfig = _getActiveProfile(store).config;
+    final newId = IdGenerator.generate();
+    final cleanName = name.trim().isEmpty ? '新配置' : name.trim();
+    final newProfile = ConfigProfile(
+      id: newId,
+      name: cleanName,
+      config: activeConfig,
+    );
+    _cachedStore = store.copyWith(
+      activeProfileId: newId,
+      profiles: [...store.profiles, newProfile],
+    );
+    await _fileService.writeConfigStore(_cachedStore!);
+  }
+  @override
+  Future<void> renameProfile(String profileId, String name) async {
+    final store = await loadConfigStore();
+    final cleanName = name.trim();
+    if (cleanName.isEmpty) return;
+    final updatedProfiles = store.profiles.map((profile) {
+      if (profile.id == profileId) {
+        return profile.copyWith(name: cleanName);
+      }
+      return profile;
+    }).toList();
+    _cachedStore = store.copyWith(profiles: updatedProfiles);
+    await _fileService.writeConfigStore(_cachedStore!);
+  }
+  @override
+  Future<void> deleteProfile(String profileId) async {
+    final store = await loadConfigStore();
+    if (store.profiles.length <= 1) {
+      return;
+    }
+    final updatedProfiles =
+        store.profiles.where((p) => p.id != profileId).toList();
+    if (updatedProfiles.isEmpty) return;
+    final newActiveId = store.activeProfileId == profileId
+        ? updatedProfiles.first.id
+        : store.activeProfileId;
+    _cachedStore = store.copyWith(
+      activeProfileId: newActiveId,
+      profiles: updatedProfiles,
+    );
+    await _fileService.writeConfigStore(_cachedStore!);
+  }
+}
+```
+
+## File: lib/data/services/file_service.dart
+```dart
+import 'dart:typed_data';
+import '../../core/interfaces/file_service.dart';
+import '../../core/models/session.dart';
+import '../../core/models/app_config.dart';
+import '../../core/models/app_config_store.dart';
+import '../../core/constants/app_constants.dart';
+import '../../core/utils/json_utils.dart';
+import '../data_sources/local_file_source.dart';
+class FileService implements IFileService {
+  final ILocalFileSource _fileSource;
+  FileService(this._fileSource);
+  @override
+  Future<AppConfigStore> readConfigStore() async {
+    final content = await _fileSource.readTextFile(AppConstants.fileConfig);
+    final json = JsonUtils.decode(content);
+    // 新格式：多配置存档
+    if (json.containsKey('profiles')) {
+      return AppConfigStore.fromJson(json);
+    }
+    // 兼容旧格式：单配置
+    final oldConfig = AppConfig.fromJson(json);
+    return AppConfigStore(
+      activeProfileId: 'default',
+      profiles: [
+        ConfigProfile(
+          id: 'default',
+          name: '默认配置',
+          config: oldConfig,
+        ),
+      ],
+    );
+  }
+  @override
+  Future<void> writeConfigStore(AppConfigStore store) async {
+    final json = store.toJson();
+    final content = JsonUtils.encode(json);
+    await _fileSource.writeTextFile(AppConstants.fileConfig, content);
+  }
+  @override
+  Future<List<String>> getConversationFileList() async {
+    return await _fileSource.listFiles(AppConstants.dirConversations);
+  }
+  @override
+  Future<Session> readSession(String fileName) async {
+    final relativePath = '${AppConstants.dirConversations}/$fileName';
+    final content = await _fileSource.readTextFile(relativePath);
+    final json = JsonUtils.decode(content);
+    return Session.fromJson(json);
+  }
+  @override
+  Future<void> writeSession(String fileName, Session session) async {
+    final relativePath = '${AppConstants.dirConversations}/$fileName';
+    final json = session.toJson();
+    final content = JsonUtils.encode(json);
+    await _fileSource.writeTextFile(relativePath, content);
+  }
+  @override
+  Future<void> deleteSession(String fileName) async {
+    final relativePath = '${AppConstants.dirConversations}/$fileName';
+    await _fileSource.deleteFile(relativePath);
+  }
+  @override
+  Future<String> saveAttachment(Uint8List data, String fileName) async {
+    return await _fileSource.saveAttachment(data, fileName);
+  }
+  @override
+  Future<Uint8List> readAttachment(String relativePath) async {
+    return await _fileSource.readAttachment(relativePath);
+  }
+  @override
+  Future<void> deleteAttachment(String relativePath) async {
+    await _fileSource.deleteFile(relativePath);
+  }
+}
+```
+
 ## File: lib/domain/services/chat_round_factory.dart
 ```dart
 import '../../core/models/attachment.dart';
@@ -8744,15 +8034,1354 @@ class ChatRoundFactory {
       isIncomplete: true,
     );
   }
-  static ChatRound completeRound({
-    required ChatRound round,
-    required String content,
-    required String reasoning,
+}
+```
+
+## File: lib/presentation/pages/settings_page.dart
+```dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/app_config.dart';
+import '../../core/models/app_config_store.dart';
+import '../../core/models/model_info.dart';
+import '../providers/config_notifier.dart';
+import '../widgets/common/app_page_scaffold.dart';
+import '../widgets/common/app_section.dart';
+import '../widgets/common/app_toast.dart';
+class SettingsPage extends ConsumerStatefulWidget {
+  const SettingsPage({super.key});
+  @override
+  ConsumerState<SettingsPage> createState() => _SettingsPageState();
+}
+class _SettingsPageState extends ConsumerState<SettingsPage> {
+  static const String _defaultModelsPath = 'v1/models';
+  final _baseUrlController = TextEditingController();
+  final _apiKeyController = TextEditingController();
+  final _modelsPathController = TextEditingController();
+  final _chatPathController = TextEditingController();
+  bool _initialized = false;
+  bool _isRefreshingModels = false;
+  String? _selectedModel;
+  String _apiMode = 'chat_completions';
+  List<ModelInfo> _models = const [];
+  @override
+  void dispose() {
+    _baseUrlController.dispose();
+    _apiKeyController.dispose();
+    _modelsPathController.dispose();
+    _chatPathController.dispose();
+    super.dispose();
+  }
+  String _defaultChatPathForApiMode(String apiMode) {
+    switch (apiMode) {
+      case 'responses':
+        return 'v1/responses';
+      case 'chat_completions':
+      default:
+        return 'v1/chat/completions';
+    }
+  }
+  void _applyConfig(AppConfig config) {
+    _baseUrlController.text = config.baseUrl;
+    _apiKeyController.text = config.apiKey;
+    _modelsPathController.text = config.modelsPath;
+    _chatPathController.text = config.chatPath;
+    _selectedModel = config.selectedModel;
+    _apiMode = config.apiMode;
+    _models = config.availableModels ?? const [];
+    _initialized = true;
+  }
+  ModelInfo? _selectedModelInfo() {
+    final selectedId = _selectedModel;
+    if (selectedId == null || selectedId.trim().isEmpty) return null;
+    for (final model in _models) {
+      if (model.id == selectedId) return model;
+    }
+    return null;
+  }
+  String _getSelectedModelDisplayText(List<ModelInfo> models) {
+    if (_selectedModel == null || _selectedModel!.trim().isEmpty) {
+      return '请选择模型';
+    }
+    for (final model in models) {
+      if (model.id == _selectedModel) {
+        final name = (model.name ?? '').trim();
+        return name.isNotEmpty ? name : model.id;
+      }
+    }
+    return _selectedModel!;
+  }
+  List<Widget> _buildModelChips(ModelInfo model) {
+    final widgets = <Widget>[];
+    if (model.supportsVision == true) {
+      widgets.add(
+        const Chip(
+          avatar: Icon(Icons.image_outlined, size: 16),
+          label: Text('Vision'),
+          visualDensity: VisualDensity.compact,
+        ),
+      );
+    }
+    if (model.supportsReasoning == true) {
+      widgets.add(
+        const Chip(
+          avatar: Icon(Icons.psychology_alt_outlined, size: 16),
+          label: Text('Reasoning'),
+          visualDensity: VisualDensity.compact,
+        ),
+      );
+    }
+    return widgets;
+  }
+  Widget _buildSelectedModelSupportsCard() {
+    final model = _selectedModelInfo();
+    if (model == null) return const SizedBox.shrink();
+    final chips = _buildModelChips(model);
+    if (chips.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: chips,
+        ),
+      ),
+    );
+  }
+  void _updateSelectedModelOverride({
+    bool? overrideVision,
+    bool? overrideReasoning,
   }) {
-    return round.copyWith(
-      assistantThinking: reasoning.trim().isEmpty ? null : reasoning,
-      assistantContent: content.trim().isEmpty ? null : content,
-      isIncomplete: false,
+    final selected = _selectedModelInfo();
+    if (selected == null) return;
+    final updated = selected.copyWith(
+      overrideSupportsVision:
+          overrideVision ?? selected.overrideSupportsVision,
+      overrideSupportsReasoning:
+          overrideReasoning ?? selected.overrideSupportsReasoning,
+      supportsVision: overrideVision ?? selected.supportsVision,
+      supportsReasoning: overrideReasoning ?? selected.supportsReasoning,
+    );
+    setState(() {
+      _models = _models.map((m) {
+        if (m.id == selected.id) return updated;
+        return m;
+      }).toList();
+    });
+  }
+  Future<void> _saveSettings() async {
+    final current = ref.read(configProvider).value;
+    if (current == null) return;
+    final updated = current.copyWith(
+      baseUrl: _baseUrlController.text.trim(),
+      apiKey: _apiKeyController.text.trim(),
+      modelsPath: _modelsPathController.text.trim().isEmpty
+          ? _defaultModelsPath
+          : _modelsPathController.text.trim(),
+      chatPath: _chatPathController.text.trim().isEmpty
+          ? _defaultChatPathForApiMode(_apiMode)
+          : _chatPathController.text.trim(),
+      selectedModel: (_selectedModel?.trim().isEmpty ?? true)
+          ? null
+          : _selectedModel!.trim(),
+      apiMode: _apiMode,
+      availableModels: _models,
+    );
+    try {
+      await ref.read(configProvider.notifier).saveFullConfig(updated);
+      await ref.read(configProfilesProvider.notifier).load();
+      await AppToast.show('设置已保存');
+    } catch (e) {
+      await AppToast.show('保存失败：$e');
+    }
+  }
+  Future<void> _refreshModels() async {
+    final current = ref.read(configProvider).value;
+    if (current == null) return;
+    final previousOverrides = {
+      for (final model in _models) model.id: model,
+    };
+    final draft = current.copyWith(
+      baseUrl: _baseUrlController.text.trim(),
+      apiKey: _apiKeyController.text.trim(),
+      modelsPath: _modelsPathController.text.trim().isEmpty
+          ? _defaultModelsPath
+          : _modelsPathController.text.trim(),
+      chatPath: _chatPathController.text.trim().isEmpty
+          ? _defaultChatPathForApiMode(_apiMode)
+          : _chatPathController.text.trim(),
+      selectedModel: (_selectedModel?.trim().isEmpty ?? true)
+          ? null
+          : _selectedModel!.trim(),
+      apiMode: _apiMode,
+      availableModels: _models,
+    );
+    setState(() {
+      _isRefreshingModels = true;
+    });
+    try {
+      await ref.read(configProvider.notifier).saveAndRefreshModels(draft);
+      final refreshed = ref.read(configProvider).value;
+      if (refreshed != null) {
+        final mergedModels = (refreshed.availableModels ?? const []).map((model) {
+          final old = previousOverrides[model.id];
+          if (old == null) return model;
+          return model.copyWith(
+            overrideSupportsVision: old.overrideSupportsVision,
+            overrideSupportsReasoning: old.overrideSupportsReasoning,
+            supportsVision: old.overrideSupportsVision ?? model.supportsVision,
+            supportsReasoning:
+                old.overrideSupportsReasoning ?? model.supportsReasoning,
+          );
+        }).toList();
+        setState(() {
+          _models = mergedModels;
+          final exists = _models.any((m) => m.id == _selectedModel);
+          if (!exists) {
+            _selectedModel = _models.isNotEmpty ? _models.first.id : null;
+          }
+        });
+      }
+      await ref.read(configProfilesProvider.notifier).load();
+      await AppToast.show('模型列表已同步');
+    } catch (e) {
+      await AppToast.show('同步模型失败：$e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRefreshingModels = false;
+        });
+      }
+    }
+  }
+  Widget _buildManualCapabilityEditor() {
+    final model = _selectedModelInfo();
+    if (model == null) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 12),
+        const Text(
+          '手动覆盖模型能力',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('支持 Vision'),
+          subtitle: const Text('用于图片输入能力声明'),
+          value: model.supportsVision == true,
+          onChanged: (value) {
+            _updateSelectedModelOverride(overrideVision: value);
+          },
+        ),
+        const Divider(),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('支持 Reasoning'),
+          subtitle: const Text('用于推理过程能力声明'),
+          value: model.supportsReasoning == true,
+          onChanged: (value) {
+            _updateSelectedModelOverride(overrideReasoning: value);
+          },
+        ),
+      ],
+    );
+  }
+  Future<void> _showCreateProfileDialog() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('新建配置存档'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: '输入配置名称',
+          ),
+          onSubmitted: (value) => Navigator.of(ctx).pop(value.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            child: const Text('创建'),
+          ),
+        ],
+      ),
+    );
+    if (result == null) return;
+    await ref.read(configProfilesProvider.notifier).createProfile(result);
+    _initialized = false;
+  }
+  Future<void> _showRenameProfileDialog(ConfigProfile profile) async {
+    final controller = TextEditingController(text: profile.name);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('重命名配置存档'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: '输入配置名称',
+          ),
+          onSubmitted: (value) => Navigator.of(ctx).pop(value.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    if (result == null || result.isEmpty) return;
+    await ref
+        .read(configProfilesProvider.notifier)
+        .renameProfile(profile.id, result);
+  }
+  Future<void> _deleteProfile(ConfigProfile profile, int profileCount) async {
+    if (profileCount <= 1) {
+      await AppToast.show('至少保留一个配置存档');
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('删除配置存档'),
+            content: Text('确定删除“${profile.name}”吗？'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('删除'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed) return;
+    await ref.read(configProfilesProvider.notifier).deleteProfile(profile.id);
+    _initialized = false;
+  }
+  Future<void> _confirmRestoreDefaults() async {
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('恢复默认设置'),
+            content: const Text(
+              '确定要将当前配置存档恢复为默认设置吗？\n\n仅会影响当前选中的配置存档，不会影响其他配置存档。',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('恢复默认'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed) return;
+    await _restoreCurrentProfileDefaults();
+  }
+  Future<void> _restoreCurrentProfileDefaults() async {
+    try {
+      final defaultConfig = AppConfig.defaultConfig();
+      await ref.read(configProvider.notifier).saveFullConfig(defaultConfig);
+      await ref.read(configProfilesProvider.notifier).load();
+      setState(() {
+        _applyConfig(defaultConfig);
+      });
+    } catch (e) {
+      await AppToast.show('恢复默认失败：$e');
+    }
+  }
+  @override
+  Widget build(BuildContext context) {
+    final configState = ref.watch(configProvider);
+    final profilesState = ref.watch(configProfilesProvider);
+    ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
+      next.whenData((config) {
+        if (!_initialized) {
+          setState(() {
+            _applyConfig(config);
+          });
+        }
+      });
+    });
+    final isBusy = configState.isLoading || _isRefreshingModels;
+    return AppPageScaffold(
+      appBar: AppBar(
+        title: const Text('设置'),
+      ),
+      body: profilesState.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text('加载配置存档失败：$e'),
+          ),
+        ),
+        data: (store) {
+          final activeProfile = store.profiles.firstWhere(
+            (p) => p.id == store.activeProfileId,
+          );
+          return configState.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text('加载配置失败：$e'),
+              ),
+            ),
+            data: (config) {
+              if (!_initialized) {
+                _applyConfig(config);
+              }
+              final models = _models;
+              return ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  AppSection(
+                    title: '配置存档',
+                    subtitle: '可保存多套 API 与模型配置，并快速切换。',
+                    children: [
+                      DropdownButtonFormField<String>(
+                        value: store.activeProfileId,
+                        decoration: const InputDecoration(
+                          labelText: '当前配置存档',
+                        ),
+                        items: store.profiles.map((profile) {
+                          return DropdownMenuItem(
+                            value: profile.id,
+                            child: Text(profile.name),
+                          );
+                        }).toList(),
+                        onChanged: isBusy
+                            ? null
+                            : (value) async {
+                                if (value == null) return;
+                                await ref
+                                    .read(configProfilesProvider.notifier)
+                                    .switchProfile(value);
+                                _initialized = false;
+                              },
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          OutlinedButton(
+                            onPressed: isBusy ? null : _showCreateProfileDialog,
+                            child: const Text('新建'),
+                          ),
+                          OutlinedButton(
+                            onPressed: isBusy
+                                ? null
+                                : () => _showRenameProfileDialog(activeProfile),
+                            child: const Text('重命名'),
+                          ),
+                          OutlinedButton(
+                            onPressed: isBusy
+                                ? null
+                                : () => _deleteProfile(
+                                      activeProfile,
+                                      store.profiles.length,
+                                    ),
+                            child: const Text('删除'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  AppSection(
+                    title: '连接配置',
+                    subtitle: '用于配置 API 服务地址与接口路径。',
+                    children: [
+                      TextField(
+                        controller: _baseUrlController,
+                        enabled: !isBusy,
+                        decoration: const InputDecoration(
+                          labelText: 'Base URL',
+                          hintText: 'https://api.openai.com',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _apiKeyController,
+                        enabled: !isBusy,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'API Key',
+                          hintText: '输入 API Key',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _modelsPathController,
+                        enabled: !isBusy,
+                        decoration: const InputDecoration(
+                          labelText: 'Models Path',
+                          hintText: _defaultModelsPath,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _chatPathController,
+                        enabled: !isBusy,
+                        decoration: InputDecoration(
+                          labelText: 'Chat Path',
+                          hintText: _defaultChatPathForApiMode(_apiMode),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: _apiMode,
+                        decoration: const InputDecoration(
+                          labelText: 'API Mode',
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'chat_completions',
+                            child: Text('chat_completions'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'responses',
+                            child: Text('responses'),
+                          ),
+                        ],
+                        onChanged: isBusy
+                            ? null
+                            : (value) {
+                                if (value == null) return;
+                                setState(() {
+                                  _apiMode = value;
+                                  if (_chatPathController.text.trim().isEmpty ||
+                                      _chatPathController.text ==
+                                          _defaultChatPathForApiMode(
+                                              'chat_completions') ||
+                                      _chatPathController.text ==
+                                          _defaultChatPathForApiMode(
+                                              'responses')) {
+                                    _chatPathController.text =
+                                        _defaultChatPathForApiMode(value);
+                                  }
+                                });
+                              },
+                      ),
+                    ],
+                  ),
+                  AppSection(
+                    title: '模型配置',
+                    subtitle: '选择当前模型，并同步远端模型列表。',
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: SearchAnchor(
+                              builder: (context, controller) {
+                                return GestureDetector(
+                                  onTap: isBusy
+                                      ? null
+                                      : () {
+                                          controller.openView();
+                                        },
+                                  child: InputDecorator(
+                                    decoration: const InputDecoration(
+                                      labelText: '当前模型',
+                                      suffixIcon: Icon(Icons.arrow_drop_down),
+                                    ),
+                                    child: Text(
+                                      _getSelectedModelDisplayText(models),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                );
+                              },
+                              suggestionsBuilder: (context, controller) {
+                                final query =
+                                    controller.text.trim().toLowerCase();
+                                final filteredModels = models.where((model) {
+                                  final id = model.id.toLowerCase();
+                                  final name =
+                                      (model.name ?? '').toLowerCase();
+                                  return query.isEmpty ||
+                                      id.contains(query) ||
+                                      name.contains(query);
+                                }).toList();
+                                if (filteredModels.isEmpty) {
+                                  return const [
+                                    ListTile(title: Text('没有匹配的模型')),
+                                  ];
+                                }
+                                return filteredModels.map((model) {
+                                  final isSelected = model.id == _selectedModel;
+                                  final title =
+                                      (model.name ?? '').trim().isNotEmpty
+                                          ? model.name!
+                                          : model.id;
+                                  final showSubtitle =
+                                      (model.name ?? '').trim().isNotEmpty &&
+                                          model.name != model.id;
+                                  final chips = _buildModelChips(model);
+                                  return ListTile(
+                                    title: Text(
+                                      title,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    subtitle: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        if (showSubtitle) Text(model.id),
+                                        if (chips.isNotEmpty) ...[
+                                          const SizedBox(height: 6),
+                                          Wrap(
+                                            spacing: 6,
+                                            runSpacing: 6,
+                                            children: chips,
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                    trailing: isSelected
+                                        ? const Icon(Icons.check)
+                                        : null,
+                                    onTap: () {
+                                      setState(() {
+                                        _selectedModel = model.id;
+                                      });
+                                      controller.closeView(model.id);
+                                    },
+                                  );
+                                }).toList();
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          FilledButton(
+                            onPressed: isBusy ? null : _refreshModels,
+                            child: _isRefreshingModels
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text('同步模型'),
+                          ),
+                        ],
+                      ),
+                      _buildSelectedModelSupportsCard(),
+                      _buildManualCapabilityEditor(),
+                    ],
+                  ),
+                  AppSection(
+                    title: '操作',
+                    subtitle: '保存或重置当前配置存档。',
+                    children: [
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          OutlinedButton(
+                            onPressed: isBusy ? null : _confirmRestoreDefaults,
+                            child: const Text('恢复默认'),
+                          ),
+                          FilledButton(
+                            onPressed: isBusy ? null : _saveSettings,
+                            child: const Text('保存设置'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+```
+
+## File: lib/presentation/providers/attachment_bytes_provider.dart
+```dart
+import 'dart:typed_data';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../di/providers.dart';
+final attachmentBytesProvider =
+    FutureProvider.autoDispose.family<Uint8List, String>(
+  (ref, relativePath) async {
+    final repository = ref.read(conversationRepositoryProvider);
+    return repository.getAttachment(relativePath);
+  },
+);
+```
+
+## File: lib/presentation/providers/config_notifier.dart
+```dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/app_config.dart';
+import '../../core/models/app_config_store.dart';
+import '../../di/providers.dart';
+class ConfigNotifier extends StateNotifier<AsyncValue<AppConfig>> {
+  final Ref ref;
+  ConfigNotifier(this.ref) : super(const AsyncValue.loading()) {
+    _loadInitialConfig();
+  }
+  Future<void> _loadInitialConfig() async {
+    try {
+      final repository = ref.read(configRepositoryProvider);
+      final config = await repository.getConfig();
+      state = AsyncValue.data(config);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+  Future<AppConfig> _fetchLatestConfig() async {
+    final repository = ref.read(configRepositoryProvider);
+    return await repository.getConfig();
+  }
+  Future<void> _reloadConfigWithoutLoading() async {
+    final config = await _fetchLatestConfig();
+    state = AsyncValue.data(config);
+  }
+  Future<void> updateApiKey(String apiKey) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.updateApiKey(apiKey);
+    await _reloadConfigWithoutLoading();
+  }
+  Future<void> updateBaseUrl(String baseUrl) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.updateBaseUrl(baseUrl);
+    await _reloadConfigWithoutLoading();
+  }
+  Future<void> updateModelsPath(String modelsPath) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.updateModelsPath(modelsPath);
+    await _reloadConfigWithoutLoading();
+  }
+  Future<void> updateChatPath(String chatPath) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.updateChatPath(chatPath);
+    await _reloadConfigWithoutLoading();
+  }
+  Future<void> updateApiMode(String apiMode) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.updateApiMode(apiMode);
+    await _reloadConfigWithoutLoading();
+  }
+  Future<void> updateSelectedModel(String? model) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.updateSelectedModel(model);
+    await _reloadConfigWithoutLoading();
+  }
+  Future<void> saveFullConfig(AppConfig config) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.saveFullConfig(config);
+    state = AsyncValue.data(config);
+  }
+  Future<void> saveAndRefreshModels(AppConfig config) async {
+    final repository = ref.read(configRepositoryProvider);
+    state = AsyncValue.data(
+      config.copyWith(
+        availableModels: [],
+      ),
+    );
+    await repository.saveAndRefreshModels(config);
+    await _reloadConfigWithoutLoading();
+  }
+  Future<void> refreshModels() async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.refreshModels();
+    await _reloadConfigWithoutLoading();
+  }
+}
+final configProvider =
+    StateNotifierProvider<ConfigNotifier, AsyncValue<AppConfig>>((ref) {
+  return ConfigNotifier(ref);
+});
+class ConfigProfilesNotifier
+    extends StateNotifier<AsyncValue<AppConfigStore>> {
+  final Ref ref;
+  ConfigProfilesNotifier(this.ref) : super(const AsyncValue.loading()) {
+    load();
+  }
+  Future<void> load() async {
+    try {
+      final repository = ref.read(configRepositoryProvider);
+      final store = await repository.getConfigStore();
+      state = AsyncValue.data(store);
+      final config = await repository.getConfig();
+      ref.read(configProvider.notifier).state = AsyncValue.data(config);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+  Future<void> switchProfile(String profileId) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.switchProfile(profileId);
+    await load();
+  }
+  Future<void> createProfile(String name) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.createProfile(name);
+    await load();
+  }
+  Future<void> renameProfile(String profileId, String name) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.renameProfile(profileId, name);
+    await load();
+  }
+  Future<void> deleteProfile(String profileId) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.deleteProfile(profileId);
+    await load();
+  }
+}
+final configProfilesProvider =
+    StateNotifierProvider<ConfigProfilesNotifier, AsyncValue<AppConfigStore>>(
+        (ref) {
+  return ConfigProfilesNotifier(ref);
+});
+```
+
+## File: lib/presentation/providers/global_streaming_provider.dart
+```dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/chat_round.dart';
+import '../../domain/states/chat_state.dart';
+typedef SessionStreamMap = Map<String, StreamStatus>;
+typedef GlobalStreamMap = Map<String, SessionStreamMap>;
+class GlobalStreamCacheNotifier extends StateNotifier<GlobalStreamMap> {
+  GlobalStreamCacheNotifier() : super(const {});
+  StreamStatus? getRoundStream(String fileName, String roundId) {
+    return state[fileName]?[roundId];
+  }
+  bool hasRoundStream(String fileName, String roundId) {
+    return state[fileName]?.containsKey(roundId) ?? false;
+  }
+  void setRoundStream(
+    String fileName,
+    String roundId,
+    StreamStatus status,
+  ) {
+    final sessionMap = Map<String, StreamStatus>.from(state[fileName] ?? {});
+    sessionMap[roundId] = status;
+    state = {
+      ...state,
+      fileName: sessionMap,
+    };
+  }
+  void updateRoundStream(
+    String fileName,
+    String roundId, {
+    String? content,
+    String? reasoning,
+    bool? isStreaming,
+  }) {
+    final sessionMap = Map<String, StreamStatus>.from(state[fileName] ?? {});
+    final current = sessionMap[roundId] ?? const StreamStatus();
+    sessionMap[roundId] = current.copyWith(
+      content: content ?? current.content,
+      reasoning: reasoning ?? current.reasoning,
+      isStreaming: isStreaming ?? current.isStreaming,
+    );
+    state = {
+      ...state,
+      fileName: sessionMap,
+    };
+  }
+  void ensureRoundLoaded(String fileName, ChatRound round) {
+    if (hasRoundStream(fileName, round.id)) return;
+    final sessionMap = Map<String, StreamStatus>.from(state[fileName] ?? {});
+    sessionMap[round.id] = StreamStatus(
+      content: round.assistantContent ?? '',
+      reasoning: round.assistantThinking ?? '',
+      isStreaming: false,
+    );
+    state = {
+      ...state,
+      fileName: sessionMap,
+    };
+  }
+  void ensureRoundsLoaded(String fileName, List<ChatRound> rounds) {
+    if (rounds.isEmpty) return;
+    final sessionMap = Map<String, StreamStatus>.from(state[fileName] ?? {});
+    var changed = false;
+    for (final round in rounds) {
+      if (sessionMap.containsKey(round.id)) continue;
+      sessionMap[round.id] = StreamStatus(
+        content: round.assistantContent ?? '',
+        reasoning: round.assistantThinking ?? '',
+        isStreaming: false,
+      );
+      changed = true;
+    }
+    if (!changed) return;
+    state = {
+      ...state,
+      fileName: sessionMap,
+    };
+  }
+  void clearNonStreamingForSession(String fileName) {
+    final sessionMap = state[fileName];
+    if (sessionMap == null) return;
+    final retained = <String, StreamStatus>{};
+    for (final entry in sessionMap.entries) {
+      if (entry.value.isStreaming) {
+        retained[entry.key] = entry.value;
+      }
+    }
+    state = {
+      ...state,
+      fileName: retained,
+    };
+  }
+  void clearSession(String fileName) {
+    final next = Map<String, SessionStreamMap>.from(state);
+    next.remove(fileName);
+    state = next;
+  }
+}
+final globalStreamCacheProvider =
+    StateNotifierProvider<GlobalStreamCacheNotifier, GlobalStreamMap>((ref) {
+  return GlobalStreamCacheNotifier();
+});
+final sessionStreamMapProvider =
+    Provider.family<SessionStreamMap, String>((ref, fileName) {
+  final globalMap = ref.watch(globalStreamCacheProvider);
+  return globalMap[fileName] ?? const {};
+});
+final roundStreamProvider =
+    Provider.family<StreamStatus?, ({String fileName, String roundId})>(
+  (ref, args) {
+    final sessionMap = ref.watch(sessionStreamMapProvider(args.fileName));
+    return sessionMap[args.roundId];
+  },
+);
+```
+
+## File: lib/presentation/providers/input_draft_provider.dart
+```dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/pending_attachment.dart';
+final globalInputDraftProvider = StateProvider<String>((ref) => '');
+final globalAttachmentDraftProvider =
+    StateProvider<List<PendingAttachment>>((ref) => []);
+final globalEditSourceRoundIdProvider =
+    StateProvider<String?>((ref) => null);
+```
+
+## File: lib/presentation/providers/session_list_notifier.dart
+```dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/session.dart';
+import '../../di/providers.dart';
+class SessionListNotifier extends StateNotifier<AsyncValue<List<Session>>> {
+  final Ref ref;
+  SessionListNotifier(this.ref) : super(const AsyncValue.loading()) {
+    _loadSessions(initial: true);
+  }
+  Future<void> _loadSessions({bool initial = false}) async {
+    if (initial || !state.hasValue) {
+      state = const AsyncValue.loading();
+    }
+    try {
+      final repository = ref.read(conversationRepositoryProvider);
+      final sessions = await repository.getAllSessions();
+      state = AsyncValue.data(sessions);
+    } catch (e, st) {
+      if (initial || !state.hasValue) {
+        state = AsyncValue.error(e, st);
+      }
+    }
+  }
+  Future<void> refresh() async {
+    await _loadSessions(initial: false);
+  }
+  Future<void> deleteSession(String fileName) async {
+    try {
+      final repository = ref.read(conversationRepositoryProvider);
+      await repository.deleteSession(fileName);
+      await _loadSessions(initial: false);
+    } catch (e, st) {
+      if (!state.hasValue) {
+        state = AsyncValue.error(e, st);
+      }
+    }
+  }
+  Future<void> updateSessionTitle(String fileName, String newTitle) async {
+    try {
+      final repository = ref.read(conversationRepositoryProvider);
+      final cleanTitle = newTitle.trim();
+      if (cleanTitle.isEmpty) return;
+      await repository.updateSessionTitle(fileName, cleanTitle);
+      await _loadSessions(initial: false);
+    } catch (e, st) {
+      if (!state.hasValue) {
+        state = AsyncValue.error(e, st);
+      }
+    }
+  }
+  Future<String> createSession(String title) async {
+    final repository = ref.read(conversationRepositoryProvider);
+    final cleanTitle = title.trim().isEmpty ? '新对话' : title.trim();
+    final session = await repository.createSessionWithGeneratedId(
+      title: cleanTitle,
+    );
+    await _loadSessions(initial: false);
+    return '${session.id}.json';
+  }
+}
+final sessionListProvider =
+    StateNotifierProvider<SessionListNotifier, AsyncValue<List<Session>>>((ref) {
+  return SessionListNotifier(ref);
+});
+```
+
+## File: lib/presentation/themes/app_tokens.dart
+```dart
+abstract class AppTokens {
+  const AppTokens._();
+  static const double spaceXs = 4;
+  static const double spaceSm = 8;
+  static const double spaceMd = 12;
+  static const double spaceLg = 16;
+  static const double spaceXl = 24;
+}
+```
+
+## File: lib/presentation/widgets/attachment_list.dart
+```dart
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import '../../core/models/attachment.dart';
+import '../pages/text_attachment_viewer_page.dart';
+import '../providers/attachment_bytes_provider.dart';
+import 'common/app_toast.dart';
+class AttachmentList extends ConsumerWidget {
+  final List<Attachment> attachments;
+  final bool rightAligned;
+  const AttachmentList({
+    super.key,
+    required this.attachments,
+    this.rightAligned = true,
+  });
+  bool _isTextAttachment(Attachment attachment) {
+    final lowerName = attachment.name.toLowerCase();
+    final mime = (attachment.mimeType ?? '').toLowerCase();
+    return mime.startsWith('text/') ||
+        mime == 'application/json' ||
+        lowerName.endsWith('.md') ||
+        lowerName.endsWith('.txt') ||
+        lowerName.endsWith('.json') ||
+        lowerName.endsWith('.dart') ||
+        lowerName.endsWith('.yaml') ||
+        lowerName.endsWith('.yml') ||
+        lowerName.endsWith('.log') ||
+        lowerName.endsWith('.csv');
+  }
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (attachments.isEmpty) return const SizedBox.shrink();
+    return Align(
+      alignment: rightAligned ? Alignment.centerRight : Alignment.centerLeft,
+      child: Wrap(
+        alignment: rightAligned ? WrapAlignment.end : WrapAlignment.start,
+        spacing: 8,
+        runSpacing: 8,
+        children: attachments.map((attachment) {
+          if (attachment.isImage) {
+            return _ImageAttachmentThumb(attachment: attachment);
+          }
+          return _FileAttachmentChip(
+            attachment: attachment,
+            isText: _isTextAttachment(attachment),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+class _AttachmentActionHelper {
+  static Future<void> shareAttachmentFromBytes(
+    Attachment attachment,
+    Uint8List bytes,
+  ) async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/${attachment.name}');
+      await file.writeAsBytes(bytes, flush: true);
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: attachment.name,
+      );
+    } catch (e) {
+      await AppToast.show('共享文件失败：$e');
+    }
+  }
+  static Future<void> previewImage(
+    BuildContext context,
+    Uint8List bytes,
+  ) async {
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          child: Stack(
+            children: [
+              InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 4,
+                child: Center(
+                  child: Image.memory(
+                    bytes,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: IconButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  icon: const Icon(Icons.close),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+  static Future<void> openTextViewer(
+    BuildContext context,
+    String title,
+    Uint8List bytes,
+  ) async {
+    final text = utf8.decode(bytes, allowMalformed: true);
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TextAttachmentViewerPage(
+          title: title,
+          content: text,
+        ),
+      ),
+    );
+  }
+}
+class _ImageAttachmentThumb extends ConsumerWidget {
+  final Attachment attachment;
+  const _ImageAttachmentThumb({
+    required this.attachment,
+  });
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bytesAsync = ref.watch(
+      attachmentBytesProvider(attachment.relativePath),
+    );
+    return bytesAsync.when(
+      loading: () => const SizedBox(
+        width: 108,
+        height: 108,
+        child: Center(
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ),
+      error: (e, st) => const SizedBox(
+        width: 108,
+        height: 108,
+        child: Center(
+          child: Icon(Icons.broken_image_outlined),
+        ),
+      ),
+      data: (bytes) {
+        return InkWell(
+          onTap: () => _AttachmentActionHelper.previewImage(context, bytes),
+          onLongPress: () =>
+              _AttachmentActionHelper.shareAttachmentFromBytes(
+            attachment,
+            bytes,
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              width: 108,
+              height: 108,
+              child: Image.memory(
+                bytes,
+                fit: BoxFit.cover,
+                gaplessPlayback: true,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+class _FileAttachmentChip extends ConsumerWidget {
+  final Attachment attachment;
+  final bool isText;
+  const _FileAttachmentChip({
+    required this.attachment,
+    required this.isText,
+  });
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bytesAsync = ref.watch(
+      attachmentBytesProvider(attachment.relativePath),
+    );
+    final leadingIcon =
+        isText ? Icons.description_outlined : Icons.attach_file_outlined;
+    return bytesAsync.when(
+      loading: () => Chip(
+        avatar: Icon(leadingIcon, size: 18),
+        label: Text(
+          attachment.name,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+      error: (e, st) => Chip(
+        avatar: const Icon(Icons.error_outline, size: 18),
+        label: Text(
+          attachment.name,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+      data: (bytes) {
+        return InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () async {
+            if (isText) {
+              await _AttachmentActionHelper.openTextViewer(
+                context,
+                attachment.name,
+                bytes,
+              );
+              return;
+            }
+            await AppToast.show('该文件暂不支持直接预览，请长按进行分享');
+          },
+          onLongPress: () =>
+              _AttachmentActionHelper.shareAttachmentFromBytes(
+            attachment,
+            bytes,
+          ),
+          child: Chip(
+            avatar: Icon(leadingIcon, size: 18),
+            label: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 180),
+              child: Text(
+                attachment.name,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+```
+
+## File: lib/presentation/widgets/common/app_page_scaffold.dart
+```dart
+import 'package:flutter/material.dart';
+class AppPageScaffold extends StatelessWidget {
+  final PreferredSizeWidget? appBar;
+  final Widget body;
+  final Widget? bottomNavigationBar;
+  final Color? backgroundColor;
+  final bool useSafeArea;
+  const AppPageScaffold({
+    super.key,
+    this.appBar,
+    required this.body,
+    this.bottomNavigationBar,
+    this.backgroundColor,
+    this.useSafeArea = true,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final content = useSafeArea ? SafeArea(child: body) : body;
+    return Scaffold(
+      backgroundColor: backgroundColor,
+      appBar: appBar,
+      bottomNavigationBar: bottomNavigationBar,
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        child: content,
+      ),
+    );
+  }
+}
+```
+
+## File: lib/main.dart
+```dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'core/utils/app_route_observer.dart';
+import 'di/providers.dart';
+import 'presentation/pages/home_page.dart';
+import 'presentation/themes/app_theme.dart';
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final container = ProviderContainer();
+  await container.read(initProvider.notifier).initialize();
+  final initState = container.read(initProvider);
+  if (initState.status != InitStatus.success) {
+    throw Exception('应用初始化失败：${initState.errorMessage}');
+  }
+  runApp(
+    UncontrolledProviderScope(
+      container: container,
+      child: const MyApp(),
+    ),
+  );
+}
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'AI Chat',
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.system,
+      navigatorObservers: [appRouteObserver],
+      home: const HomePage(),
     );
   }
 }
@@ -8763,19 +9392,21 @@ class ChatRoundFactory {
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/attachment.dart';
 import '../../core/models/chat_round.dart';
+import '../../core/utils/app_route_observer.dart';
 import '../../core/utils/time_format_utils.dart';
+import '../../domain/states/chat_state.dart';
 import '../models/pending_attachment.dart';
 import '../providers/chat_notifier.dart';
+import '../providers/global_streaming_provider.dart';
 import '../providers/input_draft_provider.dart';
-import '../themes/app_tokens.dart';
 import '../widgets/attachment_list.dart';
 import '../widgets/input_bar.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/thought_bubble.dart';
 import '../widgets/common/app_card.dart';
 import '../widgets/common/app_page_scaffold.dart';
+import '../widgets/common/app_toast.dart';
 import 'branch_tree_page.dart';
 class ChatPage extends ConsumerStatefulWidget {
   final String fileName;
@@ -8790,43 +9421,106 @@ class ChatPage extends ConsumerStatefulWidget {
   @override
   ConsumerState<ChatPage> createState() => _ChatPageState();
 }
-class _ChatPageState extends ConsumerState<ChatPage> {
+class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
   late final PageController _pageController;
+  late final ProviderSubscription<ChatState> _chatSubscription;
   bool _initialMessageHandled = false;
-  bool _isSyncingPageFromState = false;
+  bool _isMarkingSeen = false;
+  bool _isRouteVisible = false;
+  ModalRoute<dynamic>? _route;
   @override
   void initState() {
     super.initState();
     _pageController = PageController();
+    _chatSubscription = ref.listenManual<ChatState>(
+      chatProvider(widget.fileName),
+      (previous, next) {
+        final prevIndex = previous?.pageList?.currentPageIndex;
+        final nextIndex = next.pageList?.currentPageIndex;
+        if (next.pageList == null || next.pageList!.pages.isEmpty) return;
+        if (!_pageController.hasClients) return;
+        if (nextIndex == null) return;
+        if (prevIndex == nextIndex) return;
+        final currentPage =
+            _pageController.page?.round() ?? _pageController.initialPage;
+        if (currentPage == nextIndex) return;
+        _pageController.jumpToPage(nextIndex);
+      },
+    );
     Future.microtask(() async {
-      await ref.read(chatProvider(widget.fileName).notifier).loadSession();
+      final notifier = ref.read(chatProvider(widget.fileName).notifier);
+      await notifier.loadSession();
+      final state = ref.read(chatProvider(widget.fileName));
+      final initialIndex = state.pageList?.currentPageIndex;
+      if (initialIndex != null && _pageController.hasClients) {
+        _pageController.jumpToPage(initialIndex);
+      }
+      final currentRoundId = state.currentRoundId;
+      if (currentRoundId != null) {
+        await notifier.ensureRoundLoaded(currentRoundId);
+      }
       final message = widget.initialMessage?.trim() ?? '';
-      final attachments =
-          widget.initialAttachments ?? const <PendingAttachment>[];
+      final attachments = widget.initialAttachments ?? const <PendingAttachment>[];
       final hasMessage = message.isNotEmpty;
       final hasAttachments = attachments.isNotEmpty;
-      if (!_initialMessageHandled &&
-          (hasMessage || hasAttachments) &&
-          mounted) {
+      if (!_initialMessageHandled && (hasMessage || hasAttachments) && mounted) {
         _initialMessageHandled = true;
-        await ref.read(chatProvider(widget.fileName).notifier).sendMessage(
-              message,
-              attachments: attachments,
-            );
+        await notifier.sendMessage(
+          message,
+          attachments: attachments,
+        );
       }
     });
   }
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null && route != _route) {
+      if (_route != null) {
+        appRouteObserver.unsubscribe(this);
+      }
+      _route = route;
+      appRouteObserver.subscribe(this, route as PageRoute);
+    }
+  }
+  @override
   void dispose() {
+    if (_isInEditMode()) {
+      _cancelEditMode();
+    }
+    _chatSubscription.close();
+    appRouteObserver.unsubscribe(this);
     _pageController.dispose();
     super.dispose();
   }
+  @override
+  void didPush() {
+    _isRouteVisible = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await _syncSeenWithVisiblePage();
+    });
+  }
+  @override
+  void didPopNext() {
+    _isRouteVisible = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await _syncSeenWithVisiblePage();
+    });
+  }
+  @override
+  void didPushNext() {
+    _isRouteVisible = false;
+  }
+  @override
+  void didPop() {
+    _isRouteVisible = false;
+  }
   Future<void> _copyText(String text) async {
     await Clipboard.setData(ClipboardData(text: text));
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('已复制到剪贴板')),
-    );
+    await AppToast.show('已复制到剪贴板');
   }
   void _enterEditMode(String roundId, String text) {
     ref.read(globalInputDraftProvider.notifier).state = text;
@@ -8835,21 +9529,32 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
   void _cancelEditMode() {
     ref.read(globalEditSourceRoundIdProvider.notifier).state = null;
+    ref.read(globalInputDraftProvider.notifier).state = '';
+    ref.read(globalAttachmentDraftProvider.notifier).state = [];
   }
-  void _syncPageController(int targetIndex) {
+  bool _isInEditMode() {
+    return ref.read(globalEditSourceRoundIdProvider) != null;
+  }
+  Future<void> _syncSeenWithVisiblePage() async {
+    if (!_isRouteVisible) return;
+    if (_isMarkingSeen) return;
     if (!_pageController.hasClients) return;
-    final currentPage = _pageController.page?.round() ?? _pageController.initialPage;
-    if (currentPage == targetIndex) return;
-    _isSyncingPageFromState = true;
-    _pageController
-        .animateToPage(
-          targetIndex,
-          duration: const Duration(milliseconds: 260),
-          curve: Curves.easeOutCubic,
-        )
-        .whenComplete(() {
-      _isSyncingPageFromState = false;
-    });
+    final state = ref.read(chatProvider(widget.fileName));
+    final pageList = state.pageList;
+    if (pageList == null || pageList.pages.isEmpty) return;
+    final page = _pageController.page;
+    final index = (page?.round() ?? pageList.currentPageIndex)
+        .clamp(0, pageList.pages.length - 1);
+    final round = pageList.pages[index].round;
+    if (!round.hasUnseenUpdate) return;
+    _isMarkingSeen = true;
+    try {
+      await ref
+          .read(chatProvider(widget.fileName).notifier)
+          .markRoundSeen(round.id);
+    } finally {
+      _isMarkingSeen = false;
+    }
   }
   @override
   Widget build(BuildContext context) {
@@ -8857,43 +9562,40 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final notifier = ref.read(chatProvider(widget.fileName).notifier);
     final editSourceRoundId = ref.watch(globalEditSourceRoundIdProvider);
     final isEditMode = editSourceRoundId != null;
-    final hasPages =
-        state.pageList != null && state.pageList!.pages.isNotEmpty;
-    final currentIndex = hasPages ? state.pageList!.currentPageIndex : 0;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (!hasPages) return;
-      if (_isSyncingPageFromState) return;
-      _syncPageController(currentIndex);
-    });
+    final hasPages = state.pageList != null && state.pageList!.pages.isNotEmpty;
+    final textTheme = Theme.of(context).textTheme;
+    final currentRoundId = state.currentRoundId;
+    final currentStream = currentRoundId == null
+        ? null
+        : ref.watch(
+            roundStreamProvider(
+              (fileName: widget.fileName, roundId: currentRoundId),
+            ),
+          );
+    final currentIsStreaming = currentStream?.isStreaming == true;
     return AppPageScaffold(
       appBar: AppBar(
         title: Text(
           state.session?.title ?? '对话',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+          style: textTheme.titleMedium,
         ),
         actions: [
           if (state.session != null)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: IconButton(
-                tooltip: isEditMode ? '编辑模式下不可切换页面' : '查看分支树',
-                icon: const Icon(Icons.account_tree_outlined),
-                onPressed: isEditMode
-                    ? null
-                    : () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => BranchTreePage(
-                              session: state.session!,
-                              fileName: widget.fileName,
-                            ),
+            IconButton(
+              tooltip: isEditMode ? '编辑模式下不可切换页面' : '查看分支树',
+              icon: const Icon(Icons.account_tree_outlined),
+              onPressed: isEditMode
+                  ? null
+                  : () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => BranchTreePage(
+                            fileName: widget.fileName,
+                            initialFocusRoundId: state.currentRoundId,
                           ),
-                        );
-                      },
-              ),
+                        ),
+                      );
+                    },
             ),
         ],
       ),
@@ -8931,7 +9633,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 ? const Center(child: CircularProgressIndicator())
                 : state.session == null
                     ? _buildErrorState(state.error ?? '会话不存在')
-                    : !hasPages && state.activeStreams.isEmpty
+                    : !hasPages
                         ? _buildWelcomeEmpty(context)
                         : PageView.builder(
                             controller: _pageController,
@@ -8939,24 +9641,29 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                                 ? const NeverScrollableScrollPhysics()
                                 : const PageScrollPhysics(),
                             itemCount: state.pageList?.pages.length ?? 0,
-                            onPageChanged: (index) {
+                            onPageChanged: (index) async {
                               if (state.pageList == null) return;
-                              if (index == state.pageList!.currentPageIndex) {
-                                return;
+                              if (index != state.pageList!.currentPageIndex) {
+                                notifier.changePage(index);
                               }
-                              notifier.changePage(index);
+                              final round =
+                                  state.pageList!.pages[index].round;
+                              await notifier.ensureRoundLoaded(round.id);
+                              await _syncSeenWithVisiblePage();
                             },
                             itemBuilder: (context, index) {
                               final round = state.pageList!.pages[index].round;
-                              final canEdit =
-                                  !state.activeStreams.containsKey(round.id);
+                              final stream = ref.watch(
+                                roundStreamProvider(
+                                  (fileName: widget.fileName, roundId: round.id),
+                                ),
+                              );
+                              final canEdit = stream?.isStreaming != true;
                               return _ChatRoundPage(
                                 key: ValueKey(round.id),
                                 fileName: widget.fileName,
                                 round: round,
                                 canEdit: canEdit,
-                                errorMessage:
-                                    index == currentIndex ? state.error : null,
                                 onRetryReply: () =>
                                     notifier.retryFromRound(round.id),
                                 onEdit: canEdit
@@ -8972,11 +9679,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           ),
           InputBar(
             hintText: isEditMode ? '修改文本后发送（保留原附件）' : '发送消息',
-            isStreaming: hasPages
-                ? state.activeStreams.containsKey(
-                    state.pageList!.pages[state.pageList!.currentPageIndex].round.id,
-                  )
-                : false,
+            isStreaming: currentIsStreaming,
             onStop: notifier.stopGeneration,
             onSend: (text, attachments) async {
               if (editSourceRoundId != null) {
@@ -8985,9 +9688,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   text,
                   attachments: attachments,
                 );
-                ref.read(globalEditSourceRoundIdProvider.notifier).state = null;
-                ref.read(globalInputDraftProvider.notifier).state = '';
-                ref.read(globalAttachmentDraftProvider.notifier).state = [];
+                _cancelEditMode();
                 return;
               }
               await notifier.sendMessage(text, attachments: attachments);
@@ -8998,6 +9699,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     );
   }
   Widget _buildErrorState(String message) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -9005,23 +9708,21 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
+              Icon(
                 Icons.error_outline,
                 size: 40,
-                color: AppTokens.danger,
+                color: colorScheme.error,
               ),
               const SizedBox(height: 12),
               Text(
                 '无法加载会话',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+                style: textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
               Text(
                 message,
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall,
+                style: textTheme.bodySmall,
               ),
             ],
           ),
@@ -9030,6 +9731,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     );
   }
   Widget _buildWelcomeEmpty(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -9038,33 +9741,21 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 68,
-                height: 68,
-                decoration: BoxDecoration(
-                  color: AppTokens.primarySoft,
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: const Icon(
-                  Icons.auto_awesome_outlined,
-                  size: 30,
-                  color: AppTokens.primary,
-                ),
+              Icon(
+                Icons.auto_awesome_outlined,
+                size: 36,
+                color: colorScheme.primary,
               ),
               const SizedBox(height: 18),
               Text(
                 '开始一段新的对话',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+                style: textTheme.titleLarge,
               ),
               const SizedBox(height: 10),
               Text(
                 '你可以输入问题、上传图片或文件，并在不同分支中回看每一轮回复。',
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppTokens.textSecondary,
-                    ),
+                style: textTheme.bodyMedium,
               ),
             ],
           ),
@@ -9077,7 +9768,6 @@ class _ChatRoundPage extends StatelessWidget {
   final String fileName;
   final ChatRound round;
   final bool canEdit;
-  final String? errorMessage;
   final VoidCallback onRetryReply;
   final VoidCallback? onEdit;
   final Future<void> Function(String text) onCopyText;
@@ -9086,7 +9776,6 @@ class _ChatRoundPage extends StatelessWidget {
     required this.fileName,
     required this.round,
     required this.canEdit,
-    required this.errorMessage,
     required this.onRetryReply,
     required this.onEdit,
     required this.onCopyText,
@@ -9099,17 +9788,17 @@ class _ChatRoundPage extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       children: [
         AppCard(
-          padding: const EdgeInsets.all(AppTokens.space16),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _RoundHeader(createdAt: round.createdAt),
-              const SizedBox(height: AppTokens.space16),
+              const SizedBox(height: 16),
               const _SectionLabel(
                 icon: Icons.person_outline,
                 text: '你的输入',
               ),
-              const SizedBox(height: AppTokens.space10),
+              const SizedBox(height: 10),
               if (hasUser)
                 MessageBubble(
                   content: round.userContent,
@@ -9119,7 +9808,7 @@ class _ChatRoundPage extends StatelessWidget {
                   onEdit: onEdit,
                 ),
               if (hasAttachments) ...[
-                if (hasUser) const SizedBox(height: AppTokens.space8),
+                if (hasUser) const SizedBox(height: 8),
                 AttachmentList(
                   attachments: round.userAttachments,
                   rightAligned: true,
@@ -9128,19 +9817,12 @@ class _ChatRoundPage extends StatelessWidget {
               _RoundAnswerSection(
                 fileName: fileName,
                 roundId: round.id,
-                savedThinking: round.assistantThinking,
-                savedAssistantContent: round.assistantContent,
                 onRetryReply: onRetryReply,
                 onCopyText: onCopyText,
               ),
             ],
           ),
         ),
-        if ((errorMessage ?? '').trim().isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 16),
-            child: _InlineErrorCard(message: errorMessage!),
-          ),
       ],
     );
   }
@@ -9148,28 +9830,27 @@ class _ChatRoundPage extends StatelessWidget {
 class _RoundAnswerSection extends ConsumerWidget {
   final String fileName;
   final String roundId;
-  final String? savedThinking;
-  final String? savedAssistantContent;
   final VoidCallback onRetryReply;
   final Future<void> Function(String text) onCopyText;
   const _RoundAnswerSection({
     required this.fileName,
     required this.roundId,
-    required this.savedThinking,
-    required this.savedAssistantContent,
     required this.onRetryReply,
     required this.onCopyText,
   });
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(chatProvider(fileName));
-    final streamStatus = state.activeStreams[roundId];
-    final isStreaming = streamStatus != null;
-    final thinking = isStreaming ? streamStatus.reasoning : savedThinking;
-    final assistantContent =
-        isStreaming ? streamStatus.content : savedAssistantContent;
-    final hasThinking = (thinking ?? '').trim().isNotEmpty;
-    final hasAssistant = (assistantContent ?? '').trim().isNotEmpty;
+    final stream = ref.watch(
+      roundStreamProvider((fileName: fileName, roundId: roundId)),
+    );
+    if (stream == null) {
+      return const SizedBox.shrink();
+    }
+    final thinking = stream.reasoning;
+    final assistantContent = stream.content;
+    final hasThinking = thinking.trim().isNotEmpty;
+    final hasAssistant = assistantContent.trim().isNotEmpty;
+    final isStreaming = stream.isStreaming;
     if (!hasThinking && !hasAssistant && !isStreaming) {
       return const SizedBox.shrink();
     }
@@ -9177,57 +9858,48 @@ class _RoundAnswerSection extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (hasThinking) ...[
-          const SizedBox(height: AppTokens.space20),
+          const SizedBox(height: 20),
           const Divider(),
-          const SizedBox(height: AppTokens.space16),
+          const SizedBox(height: 16),
           const _SectionLabel(
             icon: Icons.psychology_alt_outlined,
             text: '推理过程',
           ),
-          const SizedBox(height: AppTokens.space10),
-          ThoughtBubble(content: thinking!),
+          const SizedBox(height: 10),
+          ThoughtBubble(content: thinking),
         ],
         if (hasAssistant || isStreaming) ...[
-          const SizedBox(height: AppTokens.space20),
+          const SizedBox(height: 20),
           const Divider(),
-          const SizedBox(height: AppTokens.space16),
+          const SizedBox(height: 16),
           const _SectionLabel(
             icon: Icons.smart_toy_outlined,
             text: '回答',
           ),
-          const SizedBox(height: AppTokens.space10),
+          const SizedBox(height: 10),
           if (hasAssistant)
             MessageBubble(
-              content: assistantContent!,
+              content: assistantContent,
               isUser: false,
               onCopy: () => onCopyText(assistantContent),
               onRetryReply: onRetryReply,
             )
           else
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(AppTokens.space16),
-              decoration: BoxDecoration(
-                color: AppTokens.surfaceSoft,
-                borderRadius: AppTokens.brLg,
-                border: Border.all(color: AppTokens.border),
-              ),
-              child: Row(
-                children: const [
-                  SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                  SizedBox(width: AppTokens.space12),
-                  Text(
-                    '正在生成回答...',
-                    style: TextStyle(
-                      color: AppTokens.textSecondary,
-                      fontSize: 14,
+            const Card(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
                     ),
-                  ),
-                ],
+                    SizedBox(width: 12),
+                    Text('正在生成回答...'),
+                  ],
+                ),
               ),
             ),
         ],
@@ -9242,43 +9914,14 @@ class _EditModeBanner extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-      padding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 10,
-      ),
-      decoration: BoxDecoration(
-        color: AppTokens.warningSoft,
-        borderRadius: AppTokens.brMd,
-        border: Border.all(
-          color: AppTokens.warning.withOpacity(0.18),
+    return MaterialBanner(
+      content: const Text('正在编辑重试，发送前不可切换页面，发送时将保留原附件'),
+      actions: [
+        TextButton(
+          onPressed: onCancel,
+          child: const Text('取消编辑'),
         ),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.edit_outlined,
-            size: 16,
-            color: AppTokens.warning,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              '正在编辑重试，发送前不可切换页面，发送时将保留原附件',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTokens.textPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
-          ),
-          TextButton(
-            onPressed: onCancel,
-            child: const Text('取消编辑'),
-          ),
-        ],
-      ),
+      ],
     );
   }
 }
@@ -9289,26 +9932,9 @@ class _RoundHeader extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppTokens.space12,
-            vertical: AppTokens.space6,
-          ),
-          decoration: BoxDecoration(
-            color: AppTokens.surfaceMuted,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: AppTokens.border),
-          ),
-          child: Text(
-            TimeFormatUtils.formatTimestamp(createdAt),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-        ),
-      ],
+    return Chip(
+      label: Text(TimeFormatUtils.formatTimestamp(createdAt)),
+      visualDensity: VisualDensity.compact,
     );
   }
 }
@@ -9323,63 +9949,13 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(
-          icon,
-          size: 17,
-          color: AppTokens.primary,
-        ),
-        const SizedBox(width: AppTokens.space6),
+        Icon(icon, size: 18),
+        const SizedBox(width: 6),
         Text(
           text,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: AppTokens.textPrimary,
-              ),
+          style: Theme.of(context).textTheme.titleSmall,
         ),
       ],
-    );
-  }
-}
-class _InlineErrorCard extends StatelessWidget {
-  final String message;
-  const _InlineErrorCard({
-    required this.message,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppTokens.space12),
-      decoration: BoxDecoration(
-        color: AppTokens.dangerSoft,
-        borderRadius: AppTokens.brMd,
-        border: Border.all(
-          color: AppTokens.danger.withOpacity(0.18),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Padding(
-            padding: EdgeInsets.only(top: 1),
-            child: Icon(
-              Icons.error_outline,
-              size: 16,
-              color: AppTokens.danger,
-            ),
-          ),
-          const SizedBox(width: AppTokens.space8),
-          Expanded(
-            child: Text(
-              message,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTokens.danger,
-                    height: 1.55,
-                  ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -9398,85 +9974,190 @@ class _PaginationBar extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
-    final progress =
-        totalPages == 0 ? 0.0 : (currentIndex + 1).clamp(0, totalPages) / totalPages;
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppTokens.surface,
-        border: Border(
-          bottom: BorderSide(color: AppTokens.border),
-        ),
-      ),
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-      child: Row(
-        children: [
-          _PagerButton(
-            icon: Icons.chevron_left_rounded,
-            onTap: onPrev,
-          ),
-          const SizedBox(width: AppTokens.space10),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  isEditMode
-                      ? '编辑中｜第 ${currentIndex + 1} 页 / 共 $totalPages 页'
-                      : '第 ${currentIndex + 1} 页 / 共 $totalPages 页',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppTokens.textPrimary,
-                      ),
-                ),
-                const SizedBox(height: AppTokens.space8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 6,
-                    backgroundColor: AppTokens.surfaceMuted,
-                    valueColor:
-                        const AlwaysStoppedAnimation(AppTokens.primary),
-                  ),
-                ),
-              ],
+    final progress = totalPages == 0
+        ? 0.0
+        : (currentIndex + 1).clamp(0, totalPages) / totalPages;
+    final textTheme = Theme.of(context).textTheme;
+    return Material(
+      elevation: 1,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        child: Row(
+          children: [
+            IconButton(
+              onPressed: onPrev,
+              icon: const Icon(Icons.chevron_left_rounded),
             ),
-          ),
-          const SizedBox(width: AppTokens.space10),
-          _PagerButton(
-            icon: Icons.chevron_right_rounded,
-            onTap: onNext,
-          ),
-        ],
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    isEditMode
+                        ? '编辑中｜第 ${currentIndex + 1} 页 / 共 $totalPages 页'
+                        : '第 ${currentIndex + 1} 页 / 共 $totalPages 页',
+                    style: textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 8),
+                  LinearProgressIndicator(value: progress),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            IconButton(
+              onPressed: onNext,
+              icon: const Icon(Icons.chevron_right_rounded),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
-class _PagerButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback? onTap;
-  const _PagerButton({
-    required this.icon,
-    required this.onTap,
+```
+
+## File: lib/presentation/widgets/message_bubble.dart
+```dart
+import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+class MessageBubble extends StatelessWidget {
+  final String content;
+  final bool isUser;
+  final VoidCallback? onCopy;
+  final VoidCallback? onRetryReply;
+  final VoidCallback? onEdit;
+  const MessageBubble({
+    super.key,
+    required this.content,
+    required this.isUser,
+    this.onCopy,
+    this.onRetryReply,
+    this.onEdit,
   });
   @override
   Widget build(BuildContext context) {
-    final enabled = onTap != null;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: AppTokens.brMd,
+    final colorScheme = Theme.of(context).colorScheme;
+    final bubbleColor =
+        isUser ? colorScheme.secondaryContainer : colorScheme.surfaceContainerHigh;
+    final textColor =
+        isUser ? colorScheme.onSecondaryContainer : colorScheme.onSurface;
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        width: 42,
-        height: 42,
-        decoration: BoxDecoration(
-          color: enabled ? AppTokens.surfaceSoft : AppTokens.surfaceMuted,
-          borderRadius: AppTokens.brMd,
-          border: Border.all(color: AppTokens.border),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.88,
         ),
-        child: Icon(
-          icon,
-          color: enabled ? AppTokens.textPrimary : AppTokens.textTertiary,
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
+          crossAxisAlignment:
+              isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            Card(
+              color: bubbleColor,
+              elevation: 0,
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                child: MarkdownBody(
+                  data: content,
+                  selectable: true,
+                  styleSheet: MarkdownStyleSheet(
+                    p: TextStyle(
+                      fontSize: 14,
+                      height: 1.7,
+                      color: textColor,
+                    ),
+                    h1: TextStyle(
+                      fontSize: 22,
+                      height: 1.35,
+                      fontWeight: FontWeight.w700,
+                      color: textColor,
+                    ),
+                    h2: TextStyle(
+                      fontSize: 18,
+                      height: 1.4,
+                      fontWeight: FontWeight.w700,
+                      color: textColor,
+                    ),
+                    h3: TextStyle(
+                      fontSize: 16,
+                      height: 1.45,
+                      fontWeight: FontWeight.w700,
+                      color: textColor,
+                    ),
+                    code: TextStyle(
+                      fontSize: 13,
+                      fontFamily: 'monospace',
+                      color: textColor,
+                    ),
+                    codeblockPadding: const EdgeInsets.all(12),
+                    codeblockDecoration: BoxDecoration(
+                      color: colorScheme.surface,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    blockSpacing: 10,
+                    listBullet: TextStyle(color: textColor),
+                    strong: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: textColor,
+                    ),
+                    em: TextStyle(
+                      fontStyle: FontStyle.italic,
+                      color: textColor,
+                    ),
+                    a: TextStyle(
+                      color: colorScheme.primary,
+                      decoration: TextDecoration.underline,
+                    ),
+                    blockquote: TextStyle(
+                      color: textColor.withValues(alpha: 0.85),
+                      height: 1.6,
+                    ),
+                    blockquoteDecoration: BoxDecoration(
+                      color: colorScheme.surface,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border(
+                        left: BorderSide(
+                          color: colorScheme.outline,
+                          width: 3,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (onCopy != null || onRetryReply != null || onEdit != null) ...[
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 4,
+                children: [
+                  if (onCopy != null)
+                    IconButton(
+                      tooltip: '复制',
+                      onPressed: onCopy,
+                      icon: const Icon(Icons.content_copy_outlined),
+                    ),
+                  if (onEdit != null)
+                    IconButton(
+                      tooltip: '编辑后发送',
+                      onPressed: onEdit,
+                      icon: const Icon(Icons.edit_outlined),
+                    ),
+                  if (onRetryReply != null)
+                    IconButton(
+                      tooltip: '重新生成',
+                      onPressed: onRetryReply,
+                      icon: const Icon(Icons.refresh_outlined),
+                    ),
+                ],
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -9492,11 +10173,8 @@ import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../core/models/session.dart';
 import '../../core/utils/time_format_utils.dart';
 import '../providers/global_streaming_provider.dart';
-import '../providers/session_card_provider.dart';
+import '../providers/home_session_list_provider.dart';
 import '../providers/session_list_notifier.dart';
-import '../themes/app_tokens.dart';
-import '../widgets/common/app_badge.dart';
-import '../widgets/common/app_card.dart';
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/input_bar.dart';
 import 'chat_page.dart';
@@ -9507,21 +10185,12 @@ class HomePage extends ConsumerWidget {
     BuildContext context,
     SessionListNotifier notifier,
     Session session,
-    WidgetRef ref,
   ) async {
     final controller = TextEditingController(text: session.title);
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: AppTokens.brLg,
-        ),
-        title: Text(
-          '重命名会话',
-          style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-        ),
+        title: const Text('重命名会话'),
         content: TextField(
           controller: controller,
           autofocus: true,
@@ -9544,125 +10213,94 @@ class HomePage extends ConsumerWidget {
     );
     if (result != null && result.isNotEmpty && result != session.title) {
       await notifier.updateSessionTitle('${session.id}.json', result);
-      ref.invalidate(sessionFileNamesProvider);
-      ref.invalidate(sessionCardProvider('${session.id}.json'));
     }
   }
   Future<void> _showDeleteConfirmDialog(
     BuildContext context,
     SessionListNotifier notifier,
     Session session,
-    WidgetRef ref,
   ) async {
+    final colorScheme = Theme.of(context).colorScheme;
     final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: AppTokens.brLg,
-        ),
-        title: Text(
-          '删除会话',
-          style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('删除会话'),
+            content: Text('确定要删除 “${session.title}” 吗？\n此操作无法撤销。'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('取消'),
               ),
-        ),
-        content: Text(
-          '确定要删除 “${session.title}” 吗？\n此操作无法撤销。',
-          style: Theme.of(ctx).textTheme.bodyMedium,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: colorScheme.error,
+                  foregroundColor: colorScheme.onError,
+                ),
+                child: const Text('删除'),
+              ),
+            ],
           ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppTokens.danger,
-            ),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
-    );
+        ) ??
+        false;
     if (confirmed == true) {
       await notifier.deleteSession('${session.id}.json');
-      ref.invalidate(sessionFileNamesProvider);
-      ref.invalidate(sessionCardProvider('${session.id}.json'));
     }
   }
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final sessionsAsync = ref.watch(homeSessionListProvider);
     final notifier = ref.read(sessionListProvider.notifier);
-    final fileNamesAsync = ref.watch(sessionFileNamesProvider);
     return AppPageScaffold(
       appBar: AppBar(
-        title: Text(
-          'AI Chat',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-        ),
+        title: const Text('AI Chat'),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: IconButton(
-              tooltip: '设置',
-              icon: const Icon(Icons.settings_outlined),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const SettingsPage(),
-                  ),
-                );
-              },
-            ),
+          IconButton(
+            tooltip: '设置',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const SettingsPage(),
+                ),
+              );
+            },
           ),
         ],
       ),
       body: Column(
         children: [
           Expanded(
-            child: fileNamesAsync.when(
+            child: sessionsAsync.when(
               loading: () => const Center(
                 child: CircularProgressIndicator(),
               ),
               error: (e, st) => _HomeErrorState(
                 message: '加载会话失败：$e',
                 onRetry: () async {
-                  ref.invalidate(sessionFileNamesProvider);
+                  await notifier.refresh();
                 },
               ),
-              data: (fileNames) {
-                if (fileNames.isEmpty) {
+              data: (items) {
+                if (items.isEmpty) {
                   return const _HomeEmptyState();
                 }
-                return RefreshIndicator(
-                  onRefresh: () async {
-                    ref.invalidate(sessionFileNamesProvider);
+                return ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                  itemCount: items.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    return _SessionCard(
+                      item: item,
+                      notifier: notifier,
+                      onRename: (session) =>
+                          _showRenameDialog(context, notifier, session),
+                      onDelete: (session) =>
+                          _showDeleteConfirmDialog(context, notifier, session),
+                    );
                   },
-                  child: ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                    children: [
-                      ...fileNames.map((fileName) {
-                        return Padding(
-                          padding:
-                              const EdgeInsets.only(bottom: AppTokens.space12),
-                          child: _SessionCard(
-                            fileName: fileName,
-                            notifier: notifier,
-                            onRename: (session) =>
-                                _showRenameDialog(context, notifier, session, ref),
-                            onDelete: (session) =>
-                                _showDeleteConfirmDialog(context, notifier, session, ref),
-                          ),
-                        );
-                      }),
-                      const SizedBox(height: 12),
-                    ],
-                  ),
                 );
               },
             ),
@@ -9671,10 +10309,8 @@ class HomePage extends ConsumerWidget {
             hintText: '发送消息',
             onSend: (content, attachments) async {
               final newFileName = await notifier.createSession('新对话');
-              ref.invalidate(sessionFileNamesProvider);
-              ref.invalidate(sessionCardProvider(newFileName));
               if (context.mounted) {
-                Navigator.push(
+                await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => ChatPage(
@@ -9684,6 +10320,9 @@ class HomePage extends ConsumerWidget {
                     ),
                   ),
                 );
+                if (context.mounted) {
+                  await notifier.refresh();
+                }
               }
             },
           ),
@@ -9697,42 +10336,27 @@ class _HomeEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: AppCard(
+      child: Card(
+        child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: AppTokens.primarySoft,
-                  borderRadius: BorderRadius.circular(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 360),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Icon(Icons.auto_awesome_outlined, size: 40),
+                SizedBox(height: 16),
+                Text(
+                  '开始你的第一段对话',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
                 ),
-                child: const Icon(
-                  Icons.auto_awesome_outlined,
-                  size: 32,
-                  color: AppTokens.primary,
+                SizedBox(height: 8),
+                Text(
+                  '在下方输入问题，系统会自动创建一个新会话。\n你也可以附加图片或文件开始交流。',
+                  textAlign: TextAlign.center,
                 ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                '开始你的第一段对话',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                '在下方输入问题，系统会自动创建一个新会话。\n你也可以附加图片或文件开始交流。',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppTokens.textSecondary,
-                    ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -9748,312 +10372,232 @@ class _HomeErrorState extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: AppCard(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.error_outline,
-                size: 40,
-                color: AppTokens.danger,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '出现了一点问题',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh),
-                label: const Text('重试'),
-              ),
-            ],
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 360),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 40,
+                  color: colorScheme.error,
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  '出现了一点问题',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('重试'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 }
-class _SessionCard extends ConsumerWidget {
-  final String fileName;
+class _SessionCard extends ConsumerStatefulWidget {
+  final HomeSessionItem item;
   final SessionListNotifier notifier;
   final Future<void> Function(Session session) onRename;
   final Future<void> Function(Session session) onDelete;
   const _SessionCard({
-    required this.fileName,
+    required this.item,
     required this.notifier,
     required this.onRename,
     required this.onDelete,
   });
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final sessionAsync = ref.watch(sessionCardProvider(fileName));
-    final streamingSessions = ref.watch(globalStreamingSessionsProvider);
-    final isStreaming = streamingSessions.contains(fileName);
-    return sessionAsync.when(
-      loading: () => AppCard(
-        padding: const EdgeInsets.all(16),
-        boxShadow: AppTokens.shadowSm,
-        child: const SizedBox(
-          height: 88,
-          child: Center(
-            child: CircularProgressIndicator(),
-          ),
-        ),
-      ),
-      error: (e, st) => AppCard(
-        padding: const EdgeInsets.all(16),
-        boxShadow: AppTokens.shadowSm,
-        child: Text(
-          '会话读取失败：$e',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppTokens.danger,
-              ),
-        ),
-      ),
-      data: (session) {
-        final roundCount = session.rounds.length;
-        final updatedAt = TimeFormatUtils.formatTimestamp(session.updatedAt);
-        final preview = _buildLatestPreview(session);
-        return Slidable(
-          key: ValueKey(fileName),
-          endActionPane: ActionPane(
-            motion: const DrawerMotion(),
-            extentRatio: 0.34,
-            children: [
-              CustomSlidableAction(
-                onPressed: (_) => onRename(session),
-                backgroundColor: AppTokens.info,
-                borderRadius: AppTokens.brLg,
-                child: const Icon(
-                  Icons.edit_outlined,
-                  color: Colors.white,
-                ),
-              ),
-              CustomSlidableAction(
-                onPressed: (_) => onDelete(session),
-                backgroundColor: AppTokens.danger,
-                borderRadius: AppTokens.brLg,
-                child: const Icon(
-                  Icons.delete_outline,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ChatPage(
-                      fileName: fileName,
-                    ),
-                  ),
-                );
-              },
-              borderRadius: AppTokens.brLg,
-              child: AppCard(
-                padding: const EdgeInsets.all(16),
-                boxShadow: AppTokens.shadowSm,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 46,
-                      height: 46,
-                      decoration: BoxDecoration(
-                        color: AppTokens.surfaceSoft,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppTokens.border),
-                      ),
-                      child: const Icon(
-                        Icons.forum_outlined,
-                        color: AppTokens.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(width: AppTokens.space12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  session.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleMedium
-                                      ?.copyWith(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                ),
-                              ),
-                              if (isStreaming) ...[
-                                const SizedBox(width: 8),
-                                AppBadge.info(
-                                  '生成中',
-                                  icon: Icons.bolt_outlined,
-                                ),
-                              ],
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _PreviewLine(
-                                label: 'YOU',
-                                text: preview.userPreview,
-                                color: AppTokens.info,
-                              ),
-                              const SizedBox(height: 4),
-                              _PreviewLine(
-                                label: 'AI',
-                                text: preview.aiPreview,
-                                color: AppTokens.success,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              AppBadge.info(
-                                '$roundCount 轮',
-                                icon: Icons.chat_bubble_outline,
-                              ),
-                              AppBadge.primary(
-                                updatedAt,
-                                icon: Icons.schedule_outlined,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: AppTokens.space8),
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: AppTokens.surfaceSoft,
-                        borderRadius: AppTokens.brMd,
-                        border: Border.all(color: AppTokens.border),
-                      ),
-                      child: const Icon(
-                        Icons.chevron_right_rounded,
-                        color: AppTokens.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+  ConsumerState<_SessionCard> createState() => _SessionCardState();
+}
+class _SessionCardState extends ConsumerState<_SessionCard> {
+  bool _requested = false;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _ensurePreviewLoaded();
+  }
+  @override
+  void didUpdateWidget(covariant _SessionCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.item.previewRoundId != widget.item.previewRoundId ||
+        oldWidget.item.session.id != widget.item.session.id) {
+      _requested = false;
+      _ensurePreviewLoaded();
+    }
+  }
+  void _ensurePreviewLoaded() {
+    final previewRoundId = widget.item.previewRoundId;
+    if (_requested || previewRoundId == null) return;
+    _requested = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final fileName = '${widget.item.session.id}.json';
+      final previewRound = widget.item.session.rounds.firstWhere(
+        (r) => r.id == previewRoundId,
+        orElse: () => widget.item.session.rounds.last,
+      );
+      ref
+          .read(globalStreamCacheProvider.notifier)
+          .ensureRoundLoaded(fileName, previewRound);
+    });
+  }
+  Widget _buildMetaChip(String label, {IconData? icon}) {
+    return Chip(
+      avatar: icon == null ? null : Icon(icon, size: 16),
+      label: Text(label),
+      visualDensity: VisualDensity.compact,
+    );
+  }
+  @override
+  Widget build(BuildContext context) {
+    final session = widget.item.session;
+    final fileName = '${session.id}.json';
+    final updatedAt = TimeFormatUtils.formatTimestamp(widget.item.updatedAt);
+    final previewRoundId = widget.item.previewRoundId;
+    final stream = previewRoundId == null
+        ? null
+        : ref.watch(
+            roundStreamProvider((fileName: fileName, roundId: previewRoundId)),
+          );
+    final aiPreview = stream == null
+        ? '加载中...'
+        : stream.content.trim().isEmpty
+            ? (stream.isStreaming ? '正在生成...' : '（等待回复）')
+            : stream.content;
+    final isStreaming = stream?.isStreaming == true;
+    return Slidable(
+      key: ValueKey(fileName),
+      endActionPane: ActionPane(
+        motion: const DrawerMotion(),
+        extentRatio: 0.34,
+        children: [
+          CustomSlidableAction(
+            onPressed: (_) => widget.onRename(session),
+            backgroundColor: Theme.of(context).colorScheme.secondary,
+            child: const Icon(
+              Icons.edit_outlined,
+              color: Colors.white,
             ),
           ),
-        );
-      },
+          CustomSlidableAction(
+            onPressed: (_) => widget.onDelete(session),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            child: Icon(
+              Icons.delete_outline,
+              color: Theme.of(context).colorScheme.onError,
+            ),
+          ),
+        ],
+      ),
+      child: Card(
+        child: ListTile(
+          onTap: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ChatPage(fileName: fileName),
+              ),
+            );
+            if (context.mounted) {
+              await widget.notifier.refresh();
+            }
+          },
+          leading: const Icon(Icons.forum_outlined),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  session.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (isStreaming) ...[
+                const SizedBox(width: 8),
+                _buildMetaChip('生成中', icon: Icons.bolt_outlined),
+              ],
+              if (widget.item.hasUnseen) ...[
+                const SizedBox(width: 8),
+                _buildMetaChip('未查看', icon: Icons.mark_chat_unread_outlined),
+              ],
+            ],
+          ),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _PreviewLine(label: 'YOU', text: widget.item.userPreview),
+                const SizedBox(height: 4),
+                _PreviewLine(label: 'AI', text: aiPreview),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _buildMetaChip(
+                      '${widget.item.roundCount} 轮',
+                      icon: Icons.chat_bubble_outline,
+                    ),
+                    _buildMetaChip(updatedAt, icon: Icons.schedule_outlined),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          trailing: const Icon(Icons.chevron_right_rounded),
+        ),
+      ),
     );
   }
-  _SessionPreview _buildLatestPreview(Session session) {
-    if (session.rounds.isEmpty) {
-      return const _SessionPreview(
-        userPreview: '点击开始新的对话',
-        aiPreview: '等待助手回复',
-      );
-    }
-    final latest = session.rounds.last;
-    final user = latest.userContent.trim().isEmpty
-        ? '（空输入）'
-        : latest.userContent.trim();
-    final ai = (latest.assistantContent ?? '').trim().isEmpty
-        ? '（等待回复）'
-        : latest.assistantContent!.trim();
-    return _SessionPreview(
-      userPreview: user,
-      aiPreview: ai,
-    );
-  }
-}
-class _SessionPreview {
-  final String userPreview;
-  final String aiPreview;
-  const _SessionPreview({
-    required this.userPreview,
-    required this.aiPreview,
-  });
 }
 class _PreviewLine extends StatelessWidget {
   final String label;
   final String text;
-  final Color color;
   const _PreviewLine({
     required this.label,
     required this.text,
-    required this.color,
   });
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           '$label  ',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: color,
-              ),
+          style: textTheme.bodySmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
         ),
         Expanded(
           child: Text(
             text,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontSize: 13,
-                  color: AppTokens.textSecondary,
-                  height: 1.4,
-                ),
+            style: textTheme.bodySmall,
           ),
         ),
       ],
     );
   }
 }
-```
-
-## File: lib/presentation/providers/attachment_bytes_provider.dart
-```dart
-import 'dart:typed_data';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../di/providers.dart';
-final attachmentBytesProvider =
-    FutureProvider.autoDispose.family<Uint8List, String>(
-  (ref, relativePath) async {
-    final repository = ref.read(conversationRepositoryProvider);
-    return repository.getAttachment(relativePath);
-  },
-);
 ```
 
 ## File: lib/presentation/providers/chat_notifier.dart
@@ -10076,34 +10620,56 @@ import '../../domain/states/chat_state.dart';
 import '../models/pending_attachment.dart';
 import 'global_streaming_provider.dart';
 import 'session_card_provider.dart';
+import 'session_list_notifier.dart';
 class ChatNotifier extends StateNotifier<ChatState> {
   final Ref ref;
   final String fileName;
+  final Set<String> _stoppingRoundIds = <String>{};
   ChatNotifier(this.ref, this.fileName) : super(ChatState.initial());
+  GlobalStreamCacheNotifier get _streamCache =>
+      ref.read(globalStreamCacheProvider.notifier);
+  StreamStatus? _getRoundStream(String roundId) {
+    final globalMap = ref.read(globalStreamCacheProvider);
+    return globalMap[fileName]?[roundId];
+  }
+  Future<void> ensureRoundLoaded(String roundId) async {
+    final session = state.session;
+    if (session == null) return;
+    final round = session.rounds.firstWhereOrNull((r) => r.id == roundId);
+    if (round == null) return;
+    _streamCache.ensureRoundLoaded(fileName, round);
+  }
+  Future<void> ensureRoundsLoaded(List<String> roundIds) async {
+    final session = state.session;
+    if (session == null || roundIds.isEmpty) return;
+    final ids = roundIds.toSet();
+    final rounds = session.rounds.where((r) => ids.contains(r.id)).toList();
+    _streamCache.ensureRoundsLoaded(fileName, rounds);
+  }
   Future<void> loadSession() async {
     state = state.copyWithLoading(true);
     try {
       final repository = ref.read(conversationRepositoryProvider);
-      final session = await repository.getSession(fileName);
+      var session = await repository.getSession(fileName);
+      if (session.hasUnseenUpdate) {
+        final cleared = session.copyWith(hasUnseenUpdate: false);
+        await repository.saveSession(fileName, cleared);
+        session = cleared;
+        await ref.read(sessionListProvider.notifier).refresh();
+      }
       final viewState = ChatViewStateBuilder.buildInitial(session);
       state = state.copyWithSession(session).copyWith(
             currentRoundId: viewState.currentRoundId,
             pageList: viewState.pageList,
             error: null,
           );
+      if (viewState.currentRoundId != null) {
+        await ensureRoundLoaded(viewState.currentRoundId!);
+      }
+      ref.invalidate(sessionCardProvider(fileName));
     } catch (e) {
       state = state.copyWithError(e.toString());
     }
-  }
-  void _markSessionStreaming(bool streaming) {
-    final notifier = ref.read(globalStreamingSessionsProvider.notifier);
-    final current = <String>{...notifier.state};
-    if (streaming) {
-      current.add(fileName);
-    } else {
-      current.remove(fileName);
-    }
-    notifier.state = current;
   }
   ModelInfo? _findSelectedModelInfo(AppConfig config) {
     final selectedId = config.selectedModel;
@@ -10125,6 +10691,33 @@ class ChatNotifier extends StateNotifier<ChatState> {
     if (hasImage && selectedModel.supportsVision != true) {
       throw Exception('当前模型未声明支持图片输入');
     }
+  }
+  Future<void> markRoundSeen(String roundId) async {
+    final session = state.session;
+    if (session == null) return;
+    final target = session.rounds.firstWhereOrNull((r) => r.id == roundId);
+    if (target == null || !target.hasUnseenUpdate) return;
+    final updatedRound = target.copyWith(hasUnseenUpdate: false);
+    final updatedSession = session.copyWith(
+      rounds: session.rounds.map((r) {
+        if (r.id == roundId) return updatedRound;
+        return r;
+      }).toList(),
+      hasUnseenUpdate:
+          session.rounds.any((r) => r.id != roundId && r.hasUnseenUpdate),
+    );
+    final repository = ref.read(conversationRepositoryProvider);
+    await repository.saveSession(fileName, updatedSession);
+    final updatedPageList = _replaceRoundInPageList(
+      state.pageList,
+      updatedRound,
+    );
+    state = state.copyWith(
+      session: updatedSession,
+      pageList: updatedPageList,
+    );
+    ref.invalidate(sessionCardProvider(fileName));
+    await ref.read(sessionListProvider.notifier).refresh();
   }
   Future<void> sendMessage(
     String content, {
@@ -10265,15 +10858,34 @@ class ChatNotifier extends StateNotifier<ChatState> {
     await repository.appendRound(fileName, round);
     final updatedSession = await repository.getSession(fileName);
     final viewState = ChatViewStateBuilder.buildForRound(updatedSession, round.id);
-    final newActiveStreams = Map<String, StreamStatus>.from(state.activeStreams);
-    newActiveStreams[round.id] = const StreamStatus();
-    _markSessionStreaming(true);
     state = state.copyWithSession(updatedSession).copyWith(
           currentRoundId: viewState.currentRoundId,
           pageList: viewState.pageList,
-          activeStreams: newActiveStreams,
           error: null,
         );
+    _streamCache.setRoundStream(
+      fileName,
+      round.id,
+      const StreamStatus(
+        content: '',
+        reasoning: '',
+        isStreaming: true,
+      ),
+    );
+    ref.invalidate(sessionCardProvider(fileName));
+    await ref.read(sessionListProvider.notifier).refresh();
+  }
+  String _appendStoppedSuffix(String content) {
+    final trimmed = content.trim();
+    if (trimmed.isEmpty) return '[已停止]';
+    return '$trimmed\n\n[已停止]';
+  }
+  String _appendErrorSuffix(String content, String? message) {
+    final trimmed = content.trim();
+    final cleanMessage = (message ?? '').trim();
+    final errorText = cleanMessage.isEmpty ? '[错误]' : '[错误]\n$cleanMessage';
+    if (trimmed.isEmpty) return errorText;
+    return '$trimmed\n\n$errorText';
   }
   Future<void> _handleStreamTask(
     ChatRound round,
@@ -10282,6 +10894,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
   ) async {
     final apiService = ref.read(apiServiceProvider);
     final accumulator = ChatStreamAccumulator();
+    var hasError = false;
+    String? errorMessage;
+    var wasStopped = false;
     try {
       final stream = apiService.chatStream(
         taskId: round.id,
@@ -10295,65 +10910,115 @@ class ChatNotifier extends StateNotifier<ChatState> {
       );
       await for (final chunk in stream) {
         if (chunk.error != null) {
-          _markSessionStreaming(false);
-          ref.invalidate(sessionCardProvider(fileName));
-          state = state.copyWithStreaming(round.id, error: chunk.error);
-          return;
+          hasError = true;
+          errorMessage = chunk.error;
+          break;
         }
         if (!chunk.isDone) {
           accumulator.add(chunk);
-          state = state.copyWithStreaming(
+          _streamCache.updateRoundStream(
+            fileName,
             round.id,
             content: accumulator.content,
             reasoning: accumulator.reasoning,
-            isDone: false,
+            isStreaming: true,
           );
-        } else {
-          break;
+          continue;
         }
+        if (_stoppingRoundIds.contains(round.id)) {
+          wasStopped = true;
+        }
+        break;
       }
-      final updatedRound = ChatRoundFactory.completeRound(
-        round: round,
-        content: accumulator.content,
-        reasoning: accumulator.reasoning,
-      );
-      final repository = ref.read(conversationRepositoryProvider);
-      await repository.updateRound(fileName, round.id, updatedRound);
-      final finalSession = await repository.getSession(fileName);
-      final finalPageList = _replaceRoundInCurrentPages(updatedRound);
-      _markSessionStreaming(false);
-      ref.invalidate(sessionCardProvider(fileName));
-      state = state.copyWithStreaming(round.id, isDone: true).copyWith(
-            session: finalSession,
-            pageList: finalPageList,
-            error: null,
-          );
     } catch (e) {
-      _markSessionStreaming(false);
-      ref.invalidate(sessionCardProvider(fileName));
-      state = state.copyWithStreaming(round.id, error: e.toString());
+      if (_stoppingRoundIds.contains(round.id)) {
+        wasStopped = true;
+      } else {
+        hasError = true;
+        errorMessage = e.toString();
+      }
+    } finally {
+      var finalContent = accumulator.content;
+      final finalReasoning = accumulator.reasoning;
+      if (hasError) {
+        finalContent = _appendErrorSuffix(finalContent, errorMessage);
+      } else if (wasStopped) {
+        finalContent = _appendStoppedSuffix(finalContent);
+      }
+      _streamCache.updateRoundStream(
+        fileName,
+        round.id,
+        content: finalContent,
+        reasoning: finalReasoning,
+        isStreaming: true,
+      );
+      await _finalizeRoundPersistence(round.id);
+      _stoppingRoundIds.remove(round.id);
     }
+  }
+  Future<void> _finalizeRoundPersistence(String roundId) async {
+    final repository = ref.read(conversationRepositoryProvider);
+    final session = state.session;
+    if (session == null) return;
+    final stream = _getRoundStream(roundId);
+    if (stream == null) return;
+    final updatedRounds = session.rounds.map((round) {
+      if (round.id != roundId) return round;
+      return round.copyWith(
+        assistantContent: stream.content.trim().isEmpty ? null : stream.content,
+        assistantThinking:
+            stream.reasoning.trim().isEmpty ? null : stream.reasoning,
+        isIncomplete: false,
+        hasUnseenUpdate: true,
+      );
+    }).toList();
+    final updatedRound = updatedRounds.firstWhere((r) => r.id == roundId);
+    final updatedSession = session.copyWith(
+      rounds: updatedRounds,
+      hasUnseenUpdate: true,
+      updatedAt: DateTime.now().millisecondsSinceEpoch,
+    );
+    await repository.saveSession(fileName, updatedSession);
+    state = state.copyWith(
+      session: updatedSession,
+      pageList: _replaceRoundInCurrentPages(updatedRound),
+      error: null,
+    );
+    _streamCache.updateRoundStream(
+      fileName,
+      roundId,
+      isStreaming: false,
+    );
+    ref.invalidate(sessionCardProvider(fileName));
+    await ref.read(sessionListProvider.notifier).refresh();
   }
   ChatPageList? _replaceRoundInCurrentPages(ChatRound updatedRound) {
     final currentPageList = state.pageList;
     if (currentPageList == null) return null;
-    final updatedPages = currentPageList.pages.map((page) {
+    return _replaceRoundInPageList(currentPageList, updatedRound);
+  }
+  ChatPageList? _replaceRoundInPageList(
+    ChatPageList? pageList,
+    ChatRound updatedRound,
+  ) {
+    if (pageList == null) return null;
+    final updatedPages = pageList.pages.map((page) {
       if (page.round.id == updatedRound.id) {
         return page.copyWith(round: updatedRound);
       }
       return page;
     }).toList();
-    return currentPageList.copyWith(pages: updatedPages);
+    return pageList.copyWith(pages: updatedPages);
   }
   void stopGeneration() {
     if (state.pageList == null || state.pageList!.pages.isEmpty) return;
     final viewingRound =
         state.pageList!.pages[state.pageList!.currentPageIndex].round;
-    if (!state.activeStreams.containsKey(viewingRound.id)) return;
+    final stream = _getRoundStream(viewingRound.id);
+    if (stream?.isStreaming != true) return;
+    _stoppingRoundIds.add(viewingRound.id);
     final apiService = ref.read(apiServiceProvider);
     apiService.cancelRequest(viewingRound.id);
-    _markSessionStreaming(false);
-    ref.invalidate(sessionCardProvider(fileName));
   }
   Future<void> switchBranch(String targetRoundId) async {
     if (state.session == null) return;
@@ -10363,6 +11028,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     state = state.copyWithCurrentRoundId(newRoundId).copyWith(
           pageList: viewState.pageList,
         );
+    await ensureRoundLoaded(newRoundId);
   }
   void changePage(int pageIndex) {
     if (state.pageList == null) return;
@@ -10373,6 +11039,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     state = state.copyWithCurrentRoundId(newRoundId).copyWith(
           pageList: state.pageList!.copyWith(currentPageIndex: pageIndex),
         );
+    ensureRoundLoaded(newRoundId);
   }
 }
 final chatProvider =
@@ -10383,731 +11050,42 @@ final chatProvider =
 );
 ```
 
-## File: lib/presentation/providers/input_draft_provider.dart
-```dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/pending_attachment.dart';
-final globalInputDraftProvider = StateProvider<String>((ref) => '');
-final globalAttachmentDraftProvider =
-    StateProvider<List<PendingAttachment>>((ref) => []);
-final globalEditSourceRoundIdProvider =
-    StateProvider<String?>((ref) => null);
-```
-
-## File: lib/presentation/widgets/attachment_list.dart
-```dart
-import 'dart:convert';
-import 'dart:io';
-import 'dart:typed_data';
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
-import '../../core/models/attachment.dart';
-import '../pages/text_attachment_viewer_page.dart';
-import '../providers/attachment_bytes_provider.dart';
-import '../themes/app_tokens.dart';
-class AttachmentList extends ConsumerWidget {
-  final List<Attachment> attachments;
-  final bool rightAligned;
-  const AttachmentList({
-    super.key,
-    required this.attachments,
-    this.rightAligned = true,
-  });
-  bool _isTextAttachment(Attachment attachment) {
-    final lowerName = attachment.name.toLowerCase();
-    final mime = (attachment.mimeType ?? '').toLowerCase();
-    return mime.startsWith('text/') ||
-        mime == 'application/json' ||
-        lowerName.endsWith('.md') ||
-        lowerName.endsWith('.txt') ||
-        lowerName.endsWith('.json') ||
-        lowerName.endsWith('.dart') ||
-        lowerName.endsWith('.yaml') ||
-        lowerName.endsWith('.yml') ||
-        lowerName.endsWith('.log') ||
-        lowerName.endsWith('.csv');
-  }
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (attachments.isEmpty) return const SizedBox.shrink();
-    return Align(
-      alignment: rightAligned ? Alignment.centerRight : Alignment.centerLeft,
-      child: Wrap(
-        alignment: rightAligned ? WrapAlignment.end : WrapAlignment.start,
-        spacing: AppTokens.space8,
-        runSpacing: AppTokens.space8,
-        children: attachments.map((attachment) {
-          if (attachment.isImage) {
-            return _ImageAttachmentThumb(attachment: attachment);
-          }
-          return _FileAttachmentChip(
-            attachment: attachment,
-            isText: _isTextAttachment(attachment),
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
-class _AttachmentActionHelper {
-  static Future<void> shareAttachmentFromBytes(
-    BuildContext context,
-    Attachment attachment,
-    Uint8List bytes,
-  ) async {
-    try {
-      final tempDir = await getTemporaryDirectory();
-      final file = File('${tempDir.path}/${attachment.name}');
-      await file.writeAsBytes(bytes, flush: true);
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        text: attachment.name,
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('共享文件失败：$e')),
-      );
-    }
-  }
-  static Future<void> previewImage(
-    BuildContext context,
-    Uint8List bytes,
-  ) async {
-    await showDialog(
-      context: context,
-      builder: (ctx) {
-        return Dialog(
-          insetPadding: const EdgeInsets.all(16),
-          backgroundColor: Colors.black,
-          child: Stack(
-            children: [
-              InteractiveViewer(
-                minScale: 0.5,
-                maxScale: 4,
-                child: Center(
-                  child: Image.memory(
-                    bytes,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: IconButton(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  icon: const Icon(
-                    Icons.close,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-  static Future<void> openTextViewer(
-    BuildContext context,
-    String title,
-    Uint8List bytes,
-  ) async {
-    final text = utf8.decode(bytes, allowMalformed: true);
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => TextAttachmentViewerPage(
-          title: title,
-          content: text,
-        ),
-      ),
-    );
-  }
-}
-class _ImageAttachmentThumb extends ConsumerWidget {
-  final Attachment attachment;
-  const _ImageAttachmentThumb({
-    required this.attachment,
-  });
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final bytesAsync = ref.watch(
-      attachmentBytesProvider(attachment.relativePath),
-    );
-    return bytesAsync.when(
-      loading: () => Container(
-        width: 108,
-        height: 108,
-        decoration: BoxDecoration(
-          color: AppTokens.surfaceSoft,
-          borderRadius: AppTokens.brMd,
-          border: Border.all(color: AppTokens.border),
-        ),
-        child: const Center(
-          child: SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
-      ),
-      error: (e, st) => Container(
-        width: 108,
-        height: 108,
-        decoration: BoxDecoration(
-          color: AppTokens.surfaceSoft,
-          borderRadius: AppTokens.brMd,
-          border: Border.all(color: AppTokens.border),
-        ),
-        child: const Center(
-          child: Icon(
-            Icons.broken_image_outlined,
-            color: AppTokens.textTertiary,
-          ),
-        ),
-      ),
-      data: (bytes) {
-        return Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => _AttachmentActionHelper.previewImage(context, bytes),
-            onLongPress: () => _AttachmentActionHelper.shareAttachmentFromBytes(
-              context,
-              attachment,
-              bytes,
-            ),
-            borderRadius: AppTokens.brMd,
-            child: Container(
-              width: 108,
-              height: 108,
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                borderRadius: AppTokens.brMd,
-                border: Border.all(color: AppTokens.border),
-                boxShadow: AppTokens.shadowSm,
-              ),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.memory(
-                    bytes,
-                    fit: BoxFit.cover,
-                    gaplessPlayback: true,
-                  ),
-                  Positioned(
-                    right: 6,
-                    bottom: 6,
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.45),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: const Icon(
-                        Icons.open_in_full_outlined,
-                        size: 14,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-class _FileAttachmentChip extends ConsumerWidget {
-  final Attachment attachment;
-  final bool isText;
-  const _FileAttachmentChip({
-    required this.attachment,
-    required this.isText,
-  });
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final bytesAsync = ref.watch(
-      attachmentBytesProvider(attachment.relativePath),
-    );
-    final leadingIcon =
-        isText ? Icons.description_outlined : Icons.attach_file_outlined;
-    final trailingIcon =
-        isText ? Icons.open_in_new_outlined : Icons.more_horiz;
-    return bytesAsync.when(
-      loading: () => Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppTokens.space10,
-          vertical: AppTokens.space8,
-        ),
-        decoration: BoxDecoration(
-          color: AppTokens.surfaceSoft,
-          borderRadius: AppTokens.brMd,
-          border: Border.all(color: AppTokens.border),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: AppTokens.surface,
-                borderRadius: AppTokens.brSm,
-                border: Border.all(color: AppTokens.border),
-              ),
-              child: Icon(
-                leadingIcon,
-                size: 16,
-                color: AppTokens.textSecondary,
-              ),
-            ),
-            const SizedBox(width: AppTokens.space8),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 180),
-              child: Text(
-                attachment.name,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontSize: 13,
-                      color: AppTokens.textPrimary,
-                      fontWeight: FontWeight.w500,
-                    ),
-              ),
-            ),
-            const SizedBox(width: AppTokens.space8),
-            const SizedBox(
-              width: 14,
-              height: 14,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          ],
-        ),
-      ),
-      error: (e, st) => Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onLongPress: null,
-          borderRadius: AppTokens.brMd,
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppTokens.space10,
-              vertical: AppTokens.space8,
-            ),
-            decoration: BoxDecoration(
-              color: AppTokens.surfaceSoft,
-              borderRadius: AppTokens.brMd,
-              border: Border.all(color: AppTokens.border),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: AppTokens.surface,
-                    borderRadius: AppTokens.brSm,
-                    border: Border.all(color: AppTokens.border),
-                  ),
-                  child: const Icon(
-                    Icons.error_outline,
-                    size: 16,
-                    color: AppTokens.danger,
-                  ),
-                ),
-                const SizedBox(width: AppTokens.space8),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 180),
-                  child: Text(
-                    attachment.name,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontSize: 13,
-                          color: AppTokens.textPrimary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-      data: (bytes) {
-        return Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () async {
-              if (isText) {
-                await _AttachmentActionHelper.openTextViewer(
-                  context,
-                  attachment.name,
-                  bytes,
-                );
-                return;
-              }
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('该文件暂不支持直接预览，请长按进行分享'),
-                ),
-              );
-            },
-            onLongPress: () => _AttachmentActionHelper.shareAttachmentFromBytes(
-              context,
-              attachment,
-              bytes,
-            ),
-            borderRadius: AppTokens.brMd,
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppTokens.space10,
-                vertical: AppTokens.space8,
-              ),
-              decoration: BoxDecoration(
-                color: AppTokens.surfaceSoft,
-                borderRadius: AppTokens.brMd,
-                border: Border.all(color: AppTokens.border),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: AppTokens.surface,
-                      borderRadius: AppTokens.brSm,
-                      border: Border.all(color: AppTokens.border),
-                    ),
-                    child: Icon(
-                      leadingIcon,
-                      size: 16,
-                      color: AppTokens.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(width: AppTokens.space8),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 180),
-                    child: Text(
-                      attachment.name,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            fontSize: 13,
-                            color: AppTokens.textPrimary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                    ),
-                  ),
-                  const SizedBox(width: AppTokens.space6),
-                  Icon(
-                    trailingIcon,
-                    size: 15,
-                    color: AppTokens.textTertiary,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-```
-
-## File: lib/presentation/widgets/common/app_page_scaffold.dart
-```dart
-import 'package:flutter/material.dart';
-import '../../themes/app_tokens.dart';
-class AppPageScaffold extends StatelessWidget {
-  final PreferredSizeWidget? appBar;
-  final Widget body;
-  final Widget? bottomNavigationBar;
-  final Color? backgroundColor;
-  final bool useSafeArea;
-  const AppPageScaffold({
-    super.key,
-    this.appBar,
-    required this.body,
-    this.bottomNavigationBar,
-    this.backgroundColor,
-    this.useSafeArea = true,
-  });
-  @override
-  Widget build(BuildContext context) {
-    final content = useSafeArea ? SafeArea(child: body) : body;
-    return Scaffold(
-      backgroundColor: backgroundColor ?? AppTokens.bg,
-      appBar: appBar,
-      bottomNavigationBar: bottomNavigationBar,
-      body: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-        child: content,
-      ),
-    );
-  }
-}
-```
-
-## File: lib/presentation/widgets/message_bubble.dart
-```dart
-import 'package:flutter/material.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
-import '../themes/app_tokens.dart';
-class MessageBubble extends StatelessWidget {
-  final String content;
-  final bool isUser;
-  final VoidCallback? onCopy;
-  final VoidCallback? onRetryReply;
-  final VoidCallback? onEdit;
-  const MessageBubble({
-    super.key,
-    required this.content,
-    required this.isUser,
-    this.onCopy,
-    this.onRetryReply,
-    this.onEdit,
-  });
-  @override
-  Widget build(BuildContext context) {
-    final bubbleColor = isUser ? AppTokens.userBubble : AppTokens.aiBubble;
-    final borderColor = isUser ? Colors.transparent : AppTokens.border;
-    final textColor =
-        isUser ? AppTokens.textOnPrimary : AppTokens.textPrimary;
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.88,
-        ),
-        margin: const EdgeInsets.symmetric(vertical: AppTokens.space4),
-        child: Column(
-          crossAxisAlignment:
-              isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppTokens.space14,
-                vertical: AppTokens.space12,
-              ),
-              decoration: BoxDecoration(
-                color: bubbleColor,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(AppTokens.radiusLg),
-                  topRight: const Radius.circular(AppTokens.radiusLg),
-                  bottomLeft: Radius.circular(
-                    isUser ? AppTokens.radiusLg : AppTokens.radiusSm,
-                  ),
-                  bottomRight: Radius.circular(
-                    isUser ? AppTokens.radiusSm : AppTokens.radiusLg,
-                  ),
-                ),
-                border: Border.all(color: borderColor),
-                boxShadow: isUser ? [] : AppTokens.shadowSm,
-              ),
-              child: MarkdownBody(
-                data: content,
-                selectable: true,
-                styleSheet: MarkdownStyleSheet(
-                  p: TextStyle(
-                    fontSize: 14,
-                    height: 1.7,
-                    color: textColor,
-                  ),
-                  h1: TextStyle(
-                    fontSize: 22,
-                    height: 1.35,
-                    fontWeight: FontWeight.w700,
-                    color: textColor,
-                  ),
-                  h2: TextStyle(
-                    fontSize: 18,
-                    height: 1.4,
-                    fontWeight: FontWeight.w700,
-                    color: textColor,
-                  ),
-                  h3: TextStyle(
-                    fontSize: 16,
-                    height: 1.45,
-                    fontWeight: FontWeight.w700,
-                    color: textColor,
-                  ),
-                  code: TextStyle(
-                    fontSize: 13,
-                    fontFamily: 'monospace',
-                    color: textColor,
-                    backgroundColor: isUser
-                        ? Colors.white.withOpacity(0.10)
-                        : AppTokens.surfaceMuted,
-                  ),
-                  codeblockPadding: const EdgeInsets.all(12),
-                  codeblockDecoration: BoxDecoration(
-                    color: isUser
-                        ? Colors.white.withOpacity(0.08)
-                        : AppTokens.surfaceSoft,
-                    borderRadius: AppTokens.brSm,
-                    border: Border.all(
-                      color: isUser
-                          ? Colors.white.withOpacity(0.08)
-                          : AppTokens.border,
-                    ),
-                  ),
-                  blockSpacing: 10,
-                  listBullet: TextStyle(color: textColor),
-                  strong: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: textColor,
-                  ),
-                  em: TextStyle(
-                    fontStyle: FontStyle.italic,
-                    color: textColor,
-                  ),
-                  a: TextStyle(
-                    color: isUser ? Colors.white : AppTokens.primary,
-                    decoration: TextDecoration.underline,
-                  ),
-                  blockquote: TextStyle(
-                    color: isUser
-                        ? Colors.white.withOpacity(0.85)
-                        : AppTokens.textSecondary,
-                    height: 1.6,
-                  ),
-                  blockquoteDecoration: BoxDecoration(
-                    color: isUser
-                        ? Colors.white.withOpacity(0.06)
-                        : AppTokens.surfaceMuted,
-                    borderRadius: AppTokens.brSm,
-                    border: Border(
-                      left: BorderSide(
-                        color: isUser
-                            ? Colors.white.withOpacity(0.20)
-                            : AppTokens.borderStrong,
-                        width: 3,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            if (onCopy != null || onRetryReply != null || onEdit != null) ...[
-              const SizedBox(height: AppTokens.space6),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (onCopy != null)
-                    _ActionIconButton(
-                      icon: Icons.content_copy_outlined,
-                      tooltip: '复制',
-                      onTap: onCopy!,
-                    ),
-                  if (onEdit != null) ...[
-                    const SizedBox(width: AppTokens.space4),
-                    _ActionIconButton(
-                      icon: Icons.edit_outlined,
-                      tooltip: '编辑后发送',
-                      onTap: onEdit!,
-                    ),
-                  ],
-                  if (onRetryReply != null) ...[
-                    const SizedBox(width: AppTokens.space4),
-                    _ActionIconButton(
-                      icon: Icons.refresh_outlined,
-                      tooltip: '重新生成',
-                      onTap: onRetryReply!,
-                    ),
-                  ],
-                ],
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-class _ActionIconButton extends StatelessWidget {
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-  const _ActionIconButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: AppTokens.brSm,
-          child: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppTokens.surface,
-              borderRadius: AppTokens.brSm,
-              border: Border.all(color: AppTokens.border),
-            ),
-            child: Icon(
-              icon,
-              size: 16,
-              color: AppTokens.textSecondary,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-```
-
 ## File: lib/presentation/pages/branch_tree_page.dart
 ```dart
-import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:graphview/GraphView.dart';
 import '../../core/models/chat_round.dart';
-import '../../core/models/session.dart';
 import '../../core/utils/time_format_utils.dart';
 import '../../di/providers.dart';
 import '../../domain/models/tree_node.dart';
 import '../../domain/services/tree_builder.dart';
 import '../providers/chat_notifier.dart';
-import '../providers/global_streaming_provider.dart';
-import '../themes/app_tokens.dart';
-import '../widgets/common/app_badge.dart';
 import '../widgets/common/app_page_scaffold.dart';
+import '../widgets/common/app_toast.dart';
 class BranchTreePage extends ConsumerStatefulWidget {
-  final Session session;
   final String fileName;
+  final String? initialFocusRoundId;
   const BranchTreePage({
     super.key,
-    required this.session,
     required this.fileName,
+    this.initialFocusRoundId,
   });
   @override
   ConsumerState<BranchTreePage> createState() => _BranchTreePageState();
 }
 class _BranchTreePageState extends ConsumerState<BranchTreePage> {
+  final GlobalKey _viewerKey = GlobalKey();
   final TransformationController _transformationController =
       TransformationController();
-  Graph _graph = Graph()..isTree = true;
   final BuchheimWalkerConfiguration _builder =
       BuchheimWalkerConfiguration();
-  final Map<String, Node> _nodeMap = {};
-  final Map<Node, TreeNode> _graphNodeToTreeNodeMap = {};
   List<TreeNode> _roots = [];
-  String _lastRootsSignature = '';
+  String _lastSignature = '';
+  GlobalKey? _targetNodeKey;
+  bool _hasFocused = false;
+  int _focusRetryCount = 0;
   @override
   void initState() {
     super.initState();
@@ -11116,53 +11094,142 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
       ..levelSeparation = 78
       ..subtreeSeparation = 50
       ..orientation = BuchheimWalkerConfiguration.ORIENTATION_TOP_BOTTOM;
-    _reloadTree(widget.session.rounds);
+    if (widget.initialFocusRoundId != null) {
+      _targetNodeKey = GlobalKey();
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await ref.read(chatProvider(widget.fileName).notifier).loadSession();
+    });
   }
   @override
   void dispose() {
     _transformationController.dispose();
     super.dispose();
   }
-  void _reloadTree(List<ChatRound> rounds) {
+  void _resetViewport() {
+    _transformationController.value = Matrix4.identity();
+    _hasFocused = false;
+    _focusRetryCount = 0;
+    _scheduleFocusToTarget();
+  }
+  bool _treeContainsNodeId(List<TreeNode> roots, String nodeId) {
+    return _findTreeNodeById(roots, nodeId) != null;
+  }
+  void _reloadTree(
+    List<ChatRound> rounds, {
+    bool resetViewport = false,
+  }) {
     final roots = rounds.isEmpty ? <TreeNode>[] : TreeBuilder.buildTree(rounds);
-    final signature = _buildRootsSignature(roots);
+    final signature = _buildSignature(roots);
+    if (!resetViewport && signature == _lastSignature) {
+      return;
+    }
+    if (resetViewport) {
+      _transformationController.value = Matrix4.identity();
+      _hasFocused = false;
+      _focusRetryCount = 0;
+      if (widget.initialFocusRoundId != null &&
+          _treeContainsNodeId(roots, widget.initialFocusRoundId!)) {
+        _targetNodeKey = GlobalKey();
+      } else {
+        _targetNodeKey = null;
+        _hasFocused = true;
+      }
+    }
     setState(() {
       _roots = roots;
-      _lastRootsSignature = signature;
-      _rebuildGraph(_roots);
+      _lastSignature = signature;
+    });
+    _scheduleFocusToTarget();
+  }
+  void _scheduleFocusToTarget() {
+    if (_hasFocused ||
+        widget.initialFocusRoundId == null ||
+        _targetNodeKey == null) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _focusOnTargetNode();
     });
   }
-  String _buildRootsSignature(List<TreeNode> roots) {
+  void _focusOnTargetNode() {
+    if (_hasFocused) return;
+    if (_targetNodeKey == null) return;
+    final targetContext = _targetNodeKey!.currentContext;
+    final viewerContext = _viewerKey.currentContext;
+    if (targetContext == null || viewerContext == null) {
+      _retryFocus();
+      return;
+    }
+    final targetBox = targetContext.findRenderObject() as RenderBox?;
+    final viewerBox = viewerContext.findRenderObject() as RenderBox?;
+    if (targetBox == null || viewerBox == null) {
+      _retryFocus();
+      return;
+    }
+    if (!targetBox.hasSize || !viewerBox.hasSize) {
+      _retryFocus();
+      return;
+    }
+    final targetTopLeft = targetBox.localToGlobal(
+      Offset.zero,
+      ancestor: viewerBox,
+    );
+    final targetSize = targetBox.size;
+    final viewerSize = viewerBox.size;
+    final targetCenter = Offset(
+      targetTopLeft.dx + targetSize.width / 2,
+      targetTopLeft.dy + targetSize.height / 2,
+    );
+    final viewerCenter = Offset(
+      viewerSize.width / 2,
+      viewerSize.height / 2,
+    );
+    final dx = viewerCenter.dx - targetCenter.dx;
+    final dy = viewerCenter.dy - targetCenter.dy;
+    _transformationController.value = Matrix4.identity()
+      ..translate(dx, dy)
+      ..scale(1.0);
+    _hasFocused = true;
+  }
+  void _retryFocus() {
+    if (_hasFocused) return;
+    if (_focusRetryCount >= 8) return;
+    _focusRetryCount++;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _focusOnTargetNode();
+    });
+  }
+  String _buildSignature(List<TreeNode> roots) {
     dynamic toJsonNode(TreeNode node) {
       return {
         'id': node.id,
+        'parentId': node.parentId,
+        'assistantContent': node.round.assistantContent,
+        'assistantThinking': node.round.assistantThinking,
+        'isIncomplete': node.round.isIncomplete,
+        'hasUnseenUpdate': node.round.hasUnseenUpdate,
         'children': node.children.map(toJsonNode).toList(),
       };
     }
-    return jsonEncode(roots.map(toJsonNode).toList());
+    return roots.map((e) => toJsonNode(e).toString()).join('|');
   }
-  void _rebuildGraph(List<TreeNode> roots) {
-    _graph = Graph()..isTree = true;
-    _nodeMap.clear();
-    _graphNodeToTreeNodeMap.clear();
-    for (final root in roots) {
-      _addTreeToGraph(root, null);
+  String _buildNodeSignature(TreeNode node) {
+    dynamic toJsonNode(TreeNode n) {
+      return {
+        'id': n.id,
+        'parentId': n.parentId,
+        'assistantContent': n.round.assistantContent,
+        'assistantThinking': n.round.assistantThinking,
+        'isIncomplete': n.round.isIncomplete,
+        'hasUnseenUpdate': n.round.hasUnseenUpdate,
+        'children': n.children.map(toJsonNode).toList(),
+      };
     }
-  }
-  void _addTreeToGraph(TreeNode treeNode, TreeNode? parent) {
-    final currentNode = Node.Id(treeNode.id);
-    _nodeMap[treeNode.id] = currentNode;
-    _graphNodeToTreeNodeMap[currentNode] = treeNode;
-    _graph.addNode(currentNode);
-    if (parent != null) {
-      final parentNode = _nodeMap[parent.id];
-      if (parentNode != null) {
-        _graph.addEdge(parentNode, currentNode);
-      }
-    }
-    for (final child in treeNode.children) {
-      _addTreeToGraph(child, treeNode);
-    }
+    return toJsonNode(node).toString();
   }
   Set<String> _collectSubtreeIds(TreeNode node) {
     final ids = <String>{node.id};
@@ -11189,7 +11256,10 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   Future<void> _deleteNode(String nodeId) async {
     final repository = ref.read(conversationRepositoryProvider);
     final chatState = ref.read(chatProvider(widget.fileName));
-    final session = chatState.session ?? widget.session;
+    final session = chatState.session;
+    if (session == null) {
+      throw Exception('会话未加载');
+    }
     final roots = session.rounds.isEmpty
         ? <TreeNode>[]
         : TreeBuilder.buildTree(session.rounds);
@@ -11210,33 +11280,81 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
       session,
       updatedSession,
     );
-    _reloadTree(updatedRounds);
+    if (widget.initialFocusRoundId != null &&
+        idsToDelete.contains(widget.initialFocusRoundId)) {
+      _targetNodeKey = null;
+      _hasFocused = true;
+    }
     await ref.read(chatProvider(widget.fileName).notifier).loadSession();
+  }
+  Future<bool> _confirmDelete(TreeNode node) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('删除节点'),
+            content: const Text('确定删除这一轮及其后续全部分支吗？'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('删除'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
   }
   @override
   Widget build(BuildContext context) {
+    final chatState = ref.watch(chatProvider(widget.fileName));
+    if (chatState.isLoading && chatState.session == null) {
+      return AppPageScaffold(
+        appBar: AppBar(
+          title: const Text('分支树'),
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+    if (chatState.session == null) {
+      return AppPageScaffold(
+        appBar: AppBar(
+          title: const Text('分支树'),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(chatState.error ?? '会话不存在'),
+          ),
+        ),
+      );
+    }
+    final session = chatState.session!;
+    final latestRoots = session.rounds.isEmpty
+        ? <TreeNode>[]
+        : TreeBuilder.buildTree(session.rounds);
+    final latestSignature = _buildSignature(latestRoots);
+    if (latestSignature != _lastSignature) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (widget.initialFocusRoundId != null &&
+            !_treeContainsNodeId(latestRoots, widget.initialFocusRoundId!)) {
+          _targetNodeKey = null;
+          _hasFocused = true;
+        }
+        _reloadTree(session.rounds);
+      });
+    }
     final chatNotifier = ref.read(chatProvider(widget.fileName).notifier);
-    final streamingSessions = ref.watch(globalStreamingSessionsProvider);
-    final isStreaming = streamingSessions.contains(widget.fileName);
     return AppPageScaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                widget.session.title,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-            ),
-            if (isStreaming)
-              AppBadge.info(
-                '生成中',
-                icon: Icons.bolt_outlined,
-              ),
-          ],
+        title: Text(
+          session.title,
+          overflow: TextOverflow.ellipsis,
         ),
       ),
       body: _roots.isEmpty
@@ -11254,71 +11372,51 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
                     current.scale(0.9);
                     _transformationController.value = current;
                   },
-                  onReset: () {
-                    _transformationController.value = Matrix4.identity();
-                  },
+                  onReset: _resetViewport,
                 ),
                 Expanded(
                   child: InteractiveViewer(
+                    key: _viewerKey,
                     constrained: false,
                     boundaryMargin: const EdgeInsets.all(double.infinity),
                     minScale: 0.1,
                     maxScale: 3.0,
                     transformationController: _transformationController,
-                    child: Container(
-                      padding: const EdgeInsets.all(32),
-                      color: AppTokens.bg,
-                      child: GraphView(
-                        key: ValueKey(_lastRootsSignature),
-                        graph: _graph,
-                        animated: false,
-                        algorithm: BuchheimWalkerAlgorithm(
-                          _builder,
-                          TreeEdgeRenderer(_builder),
-                        ),
-                        paint: Paint()
-                          ..color = const Color(0xFFD8DEE8)
-                          ..strokeWidth = 1.6
-                          ..style = PaintingStyle.stroke,
-                        builder: (Node node) {
-                          final treeNode = _graphNodeToTreeNodeMap[node];
-                          if (treeNode == null) {
-                            return const SizedBox.shrink();
-                          }
-                          return _GraphNodeCard(
-                            key: ValueKey(treeNode.id),
-                            treeNode: treeNode,
-                            onSwitch: () async {
-                              await chatNotifier.switchBranch(treeNode.id);
-                              if (context.mounted) {
-                                Navigator.of(context).pop();
-                              }
-                            },
-                            onDelete: () async {
-                              final confirmed =
-                                  await _showDeleteDialog(context, treeNode);
-                              if (!confirmed) return;
-                              try {
-                                await _deleteNode(treeNode.id);
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Wrap(
+                        spacing: 40,
+                        runSpacing: 40,
+                        crossAxisAlignment: WrapCrossAlignment.start,
+                        children: [
+                          for (final root in _roots)
+                            _RootTreeGroup(
+                              key: ValueKey(
+                                'root-tree-${root.id}-${_buildNodeSignature(root)}',
+                              ),
+                              root: root,
+                              graphSignature: _buildNodeSignature(root),
+                              builderConfig: _builder,
+                              targetNodeId: widget.initialFocusRoundId,
+                              targetNodeKey: _targetNodeKey,
+                              onSwitch: (treeNode) async {
+                                await chatNotifier.switchBranch(treeNode.id);
                                 if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('节点及其后续分支已删除'),
-                                    ),
-                                  );
+                                  Navigator.of(context).pop();
                                 }
-                              } catch (e) {
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('删除失败：$e'),
-                                    ),
-                                  );
+                              },
+                              onDelete: (treeNode) async {
+                                final confirmed =
+                                    await _confirmDelete(treeNode);
+                                if (!confirmed) return;
+                                try {
+                                  await _deleteNode(treeNode.id);
+                                } catch (e) {
+                                  await AppToast.show('删除失败：$e');
                                 }
-                              }
-                            },
-                          );
-                        },
+                              },
+                            ),
+                        ],
                       ),
                     ),
                   ),
@@ -11329,89 +11427,98 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   }
   Widget _buildEmptyState(BuildContext context) {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Container(
+      child: Card(
+        child: Padding(
           padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: AppTokens.surface,
-            borderRadius: AppTokens.brLg,
-            border: Border.all(color: AppTokens.border),
-            boxShadow: AppTokens.shadowMd,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 68,
-                height: 68,
-                decoration: BoxDecoration(
-                  color: AppTokens.primarySoft,
-                  borderRadius: BorderRadius.circular(22),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 360),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Icon(Icons.account_tree_outlined, size: 40),
+                SizedBox(height: 16),
+                Text(
+                  '暂无分支结构',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
                 ),
-                child: const Icon(
-                  Icons.account_tree_outlined,
-                  size: 30,
-                  color: AppTokens.primary,
+                SizedBox(height: 8),
+                Text(
+                  '当你对历史轮次重新生成回复时，这里会显示完整的分支关系。',
+                  textAlign: TextAlign.center,
                 ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                '暂无分支结构',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '当你对历史轮次重新生成回复时，这里会显示完整的分支关系。',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppTokens.textSecondary,
-                    ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
-  Future<bool> _showDeleteDialog(
-    BuildContext context,
-    TreeNode node,
-  ) async {
-    return await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: AppTokens.brLg,
-            ),
-            title: Text(
-              '删除节点',
-              style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-            content: Text(
-              '确定删除这一轮及其后续全部分支吗？\n\n${node.round.userContent}',
-              style: Theme.of(ctx).textTheme.bodyMedium,
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppTokens.danger,
-                ),
-                child: const Text('删除'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
+}
+class _RootTreeGroup extends StatelessWidget {
+  final TreeNode root;
+  final String graphSignature;
+  final BuchheimWalkerConfiguration builderConfig;
+  final Future<void> Function(TreeNode treeNode) onSwitch;
+  final Future<void> Function(TreeNode treeNode) onDelete;
+  final String? targetNodeId;
+  final GlobalKey? targetNodeKey;
+  const _RootTreeGroup({
+    super.key,
+    required this.root,
+    required this.graphSignature,
+    required this.builderConfig,
+    required this.onSwitch,
+    required this.onDelete,
+    this.targetNodeId,
+    this.targetNodeKey,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final graph = Graph()..isTree = true;
+    final nodeMap = <String, Node>{};
+    final graphNodeToTreeNodeMap = <Node, TreeNode>{};
+    void addTree(TreeNode treeNode, TreeNode? parent) {
+      final currentNode = Node.Id('${root.id}-${treeNode.id}-$graphSignature');
+      nodeMap[treeNode.id] = currentNode;
+      graphNodeToTreeNodeMap[currentNode] = treeNode;
+      graph.addNode(currentNode);
+      if (parent != null) {
+        final parentNode = nodeMap[parent.id];
+        if (parentNode != null) {
+          graph.addEdge(parentNode, currentNode);
+        }
+      }
+      for (final child in treeNode.children) {
+        addTree(child, treeNode);
+      }
+    }
+    addTree(root, null);
+    return GraphView(
+      key: ValueKey('graph-${root.id}-$graphSignature'),
+      graph: graph,
+      animated: false,
+      algorithm: BuchheimWalkerAlgorithm(
+        builderConfig,
+        TreeEdgeRenderer(builderConfig),
+      ),
+      paint: Paint()
+        ..color = Theme.of(context).dividerColor
+        ..strokeWidth = 1.6
+        ..style = PaintingStyle.stroke,
+      builder: (Node node) {
+        final treeNode = graphNodeToTreeNodeMap[node];
+        if (treeNode == null) return const SizedBox.shrink();
+        final isTarget = targetNodeId != null && treeNode.id == targetNodeId;
+        return _GraphNodeCard(
+          key: isTarget
+              ? targetNodeKey
+              : ValueKey('${treeNode.id}-$graphSignature'),
+          treeNode: treeNode,
+          onSwitch: () => onSwitch(treeNode),
+          onDelete: () => onDelete(treeNode),
+        );
+      },
+    );
   }
 }
 class _GraphToolbar extends StatelessWidget {
@@ -11425,130 +11532,31 @@ class _GraphToolbar extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 10,
-        ),
-        decoration: BoxDecoration(
-          color: AppTokens.surface,
-          borderRadius: AppTokens.brLg,
-          border: Border.all(color: AppTokens.border),
-          boxShadow: AppTokens.shadowSm,
-        ),
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
           children: [
-            const Icon(
-              Icons.tune_outlined,
-              size: 18,
-              color: AppTokens.textSecondary,
-            ),
+            const Icon(Icons.tune_outlined, size: 18),
             const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                '缩放、拖拽查看对话分支结构',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTokens.textSecondary,
-                    ),
-              ),
+            const Expanded(
+              child: Text('缩放、拖拽查看对话分支结构'),
             ),
-            _ToolbarIconButton(
-              icon: Icons.remove_rounded,
+            IconButton(
               tooltip: '缩小',
-              onTap: onZoomOut,
+              onPressed: onZoomOut,
+              icon: const Icon(Icons.remove_rounded),
             ),
-            const SizedBox(width: 6),
-            _ToolbarIconButton(
-              icon: Icons.add_rounded,
+            IconButton(
               tooltip: '放大',
-              onTap: onZoomIn,
+              onPressed: onZoomIn,
+              icon: const Icon(Icons.add_rounded),
             ),
-            const SizedBox(width: 6),
-            _ToolbarTextButton(
-              icon: Icons.center_focus_strong_outlined,
-              label: '重置',
-              onTap: onReset,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-class _ToolbarIconButton extends StatelessWidget {
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-  const _ToolbarIconButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: AppTokens.brMd,
-        child: Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: AppTokens.surfaceSoft,
-            borderRadius: AppTokens.brMd,
-            border: Border.all(color: AppTokens.border),
-          ),
-          child: Icon(
-            icon,
-            size: 18,
-            color: AppTokens.textPrimary,
-          ),
-        ),
-      ),
-    );
-  }
-}
-class _ToolbarTextButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  const _ToolbarTextButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: AppTokens.brMd,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 10,
-        ),
-        decoration: BoxDecoration(
-          color: AppTokens.surfaceSoft,
-          borderRadius: AppTokens.brMd,
-          border: Border.all(color: AppTokens.border),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: AppTokens.textSecondary,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: AppTokens.textPrimary,
-                  ),
+            TextButton.icon(
+              onPressed: onReset,
+              icon: const Icon(Icons.center_focus_strong_outlined, size: 18),
+              label: const Text('重置'),
             ),
           ],
         ),
@@ -11566,114 +11574,83 @@ class _GraphNodeCard extends StatelessWidget {
     required this.onSwitch,
     required this.onDelete,
   });
+  Widget _buildChip(String label, {IconData? icon}) {
+    return Chip(
+      avatar: icon == null ? null : Icon(icon, size: 16),
+      label: Text(label),
+      visualDensity: VisualDensity.compact,
+    );
+  }
   @override
   Widget build(BuildContext context) {
-    final isRoot = treeNode.parentId == null;
     final isIncomplete = treeNode.round.isIncomplete;
-    return Material(
-      color: Colors.transparent,
-      child: Container(
+    final hasUnseenUpdate = treeNode.round.hasUnseenUpdate;
+    final aiContent = (treeNode.round.assistantContent ?? '').trim().isEmpty
+        ? '（等待回复）'
+        : treeNode.round.assistantContent!;
+    return Card(
+      child: SizedBox(
         width: 290,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppTokens.surface,
-          borderRadius: AppTokens.brLg,
-          border: Border.all(
-            color: isIncomplete
-                ? AppTokens.warning.withOpacity(0.25)
-                : AppTokens.border,
-          ),
-          boxShadow: AppTokens.shadowMd,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                AppBadge.primary(
-                  '深度 ${treeNode.depth + 1}',
-                  icon: Icons.layers_outlined,
-                ),
-                const SizedBox(width: 8),
-                if (isRoot)
-                  AppBadge.info(
-                    '根节点',
-                    icon: Icons.flag_outlined,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _buildChip(
+                    '深度 ${treeNode.depth + 1}',
+                    icon: Icons.layers_outlined,
                   ),
-                if (isIncomplete) ...[
-                  const SizedBox(width: 8),
-                  AppBadge.warning(
-                    '未完成',
-                    icon: Icons.hourglass_empty_outlined,
+                  if (isIncomplete)
+                    _buildChip(
+                      '未完成',
+                      icon: Icons.hourglass_empty_outlined,
+                    ),
+                  if (hasUnseenUpdate)
+                    _buildChip(
+                      '未查看',
+                      icon: Icons.mark_chat_unread_outlined,
+                    ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                TimeFormatUtils.formatTimestamp(treeNode.round.createdAt),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 12),
+              _PreviewBlock(
+                label: 'YOU',
+                content: treeNode.round.userContent.trim().isEmpty
+                    ? '（空输入）'
+                    : treeNode.round.userContent,
+              ),
+              const SizedBox(height: 8),
+              _PreviewBlock(
+                label: 'AI',
+                content: aiContent,
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.tonal(
+                      onPressed: onSwitch,
+                      child: const Text('切换到此分支'),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: '删除',
+                    onPressed: onDelete,
+                    icon: const Icon(Icons.delete_outline),
                   ),
                 ],
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              TimeFormatUtils.formatTimestamp(treeNode.round.createdAt),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontSize: 11,
-                    color: AppTokens.textSecondary,
-                  ),
-            ),
-            const SizedBox(height: 12),
-            _PreviewBlock(
-              label: 'YOU',
-              content: treeNode.round.userContent.trim().isEmpty
-                  ? '（空输入）'
-                  : treeNode.round.userContent,
-              labelColor: AppTokens.info,
-            ),
-            const SizedBox(height: 8),
-            _PreviewBlock(
-              label: 'AI',
-              content: (treeNode.round.assistantContent ?? '').trim().isEmpty
-                  ? '（等待回复）'
-                  : treeNode.round.assistantContent!,
-              labelColor: AppTokens.success,
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.tonal(
-                    onPressed: onSwitch,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppTokens.primarySoft,
-                      foregroundColor: AppTokens.primary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: AppTokens.brMd,
-                      ),
-                    ),
-                    child: const Text('切换到此分支'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                if (treeNode.parentId != null)
-                  InkWell(
-                    onTap: onDelete,
-                    borderRadius: AppTokens.brMd,
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: AppTokens.dangerSoft,
-                        borderRadius: AppTokens.brMd,
-                        border: Border.all(
-                          color: AppTokens.danger.withOpacity(0.15),
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.delete_outline,
-                        size: 20,
-                        color: AppTokens.danger,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -11682,45 +11659,35 @@ class _GraphNodeCard extends StatelessWidget {
 class _PreviewBlock extends StatelessWidget {
   final String label;
   final String content;
-  final Color labelColor;
   const _PreviewBlock({
     required this.label,
     required this.content,
-    required this.labelColor,
   });
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: AppTokens.surfaceSoft,
-        borderRadius: AppTokens.brMd,
-        border: Border.all(color: AppTokens.border),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$label  ',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: labelColor,
-                ),
-          ),
-          Expanded(
-            child: Text(
-              content,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '$label  ',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontSize: 12,
-                    height: 1.5,
-                    color: AppTokens.textPrimary,
+                    fontWeight: FontWeight.w700,
                   ),
             ),
-          ),
-        ],
+            Expanded(
+              child: Text(
+                content,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

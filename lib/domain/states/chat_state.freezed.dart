@@ -19,8 +19,7 @@ final _privateConstructorUsedError = UnsupportedError(
 mixin _$StreamStatus {
   String get content => throw _privateConstructorUsedError;
   String get reasoning => throw _privateConstructorUsedError;
-  bool get isDone => throw _privateConstructorUsedError;
-  String? get error => throw _privateConstructorUsedError;
+  bool get isStreaming => throw _privateConstructorUsedError;
 
   /// Create a copy of StreamStatus
   /// with the given fields replaced by the non-null parameter values.
@@ -36,7 +35,7 @@ abstract class $StreamStatusCopyWith<$Res> {
     $Res Function(StreamStatus) then,
   ) = _$StreamStatusCopyWithImpl<$Res, StreamStatus>;
   @useResult
-  $Res call({String content, String reasoning, bool isDone, String? error});
+  $Res call({String content, String reasoning, bool isStreaming});
 }
 
 /// @nodoc
@@ -56,8 +55,7 @@ class _$StreamStatusCopyWithImpl<$Res, $Val extends StreamStatus>
   $Res call({
     Object? content = null,
     Object? reasoning = null,
-    Object? isDone = null,
-    Object? error = freezed,
+    Object? isStreaming = null,
   }) {
     return _then(
       _value.copyWith(
@@ -69,14 +67,10 @@ class _$StreamStatusCopyWithImpl<$Res, $Val extends StreamStatus>
                 ? _value.reasoning
                 : reasoning // ignore: cast_nullable_to_non_nullable
                       as String,
-            isDone: null == isDone
-                ? _value.isDone
-                : isDone // ignore: cast_nullable_to_non_nullable
+            isStreaming: null == isStreaming
+                ? _value.isStreaming
+                : isStreaming // ignore: cast_nullable_to_non_nullable
                       as bool,
-            error: freezed == error
-                ? _value.error
-                : error // ignore: cast_nullable_to_non_nullable
-                      as String?,
           )
           as $Val,
     );
@@ -92,7 +86,7 @@ abstract class _$$StreamStatusImplCopyWith<$Res>
   ) = __$$StreamStatusImplCopyWithImpl<$Res>;
   @override
   @useResult
-  $Res call({String content, String reasoning, bool isDone, String? error});
+  $Res call({String content, String reasoning, bool isStreaming});
 }
 
 /// @nodoc
@@ -111,8 +105,7 @@ class __$$StreamStatusImplCopyWithImpl<$Res>
   $Res call({
     Object? content = null,
     Object? reasoning = null,
-    Object? isDone = null,
-    Object? error = freezed,
+    Object? isStreaming = null,
   }) {
     return _then(
       _$StreamStatusImpl(
@@ -124,14 +117,10 @@ class __$$StreamStatusImplCopyWithImpl<$Res>
             ? _value.reasoning
             : reasoning // ignore: cast_nullable_to_non_nullable
                   as String,
-        isDone: null == isDone
-            ? _value.isDone
-            : isDone // ignore: cast_nullable_to_non_nullable
+        isStreaming: null == isStreaming
+            ? _value.isStreaming
+            : isStreaming // ignore: cast_nullable_to_non_nullable
                   as bool,
-        error: freezed == error
-            ? _value.error
-            : error // ignore: cast_nullable_to_non_nullable
-                  as String?,
       ),
     );
   }
@@ -143,8 +132,7 @@ class _$StreamStatusImpl implements _StreamStatus {
   const _$StreamStatusImpl({
     this.content = '',
     this.reasoning = '',
-    this.isDone = false,
-    this.error,
+    this.isStreaming = false,
   });
 
   @override
@@ -155,13 +143,11 @@ class _$StreamStatusImpl implements _StreamStatus {
   final String reasoning;
   @override
   @JsonKey()
-  final bool isDone;
-  @override
-  final String? error;
+  final bool isStreaming;
 
   @override
   String toString() {
-    return 'StreamStatus(content: $content, reasoning: $reasoning, isDone: $isDone, error: $error)';
+    return 'StreamStatus(content: $content, reasoning: $reasoning, isStreaming: $isStreaming)';
   }
 
   @override
@@ -172,13 +158,12 @@ class _$StreamStatusImpl implements _StreamStatus {
             (identical(other.content, content) || other.content == content) &&
             (identical(other.reasoning, reasoning) ||
                 other.reasoning == reasoning) &&
-            (identical(other.isDone, isDone) || other.isDone == isDone) &&
-            (identical(other.error, error) || other.error == error));
+            (identical(other.isStreaming, isStreaming) ||
+                other.isStreaming == isStreaming));
   }
 
   @override
-  int get hashCode =>
-      Object.hash(runtimeType, content, reasoning, isDone, error);
+  int get hashCode => Object.hash(runtimeType, content, reasoning, isStreaming);
 
   /// Create a copy of StreamStatus
   /// with the given fields replaced by the non-null parameter values.
@@ -193,8 +178,7 @@ abstract class _StreamStatus implements StreamStatus {
   const factory _StreamStatus({
     final String content,
     final String reasoning,
-    final bool isDone,
-    final String? error,
+    final bool isStreaming,
   }) = _$StreamStatusImpl;
 
   @override
@@ -202,9 +186,7 @@ abstract class _StreamStatus implements StreamStatus {
   @override
   String get reasoning;
   @override
-  bool get isDone;
-  @override
-  String? get error;
+  bool get isStreaming;
 
   /// Create a copy of StreamStatus
   /// with the given fields replaced by the non-null parameter values.
@@ -219,8 +201,6 @@ mixin _$ChatState {
   Session? get session => throw _privateConstructorUsedError;
   String? get currentRoundId => throw _privateConstructorUsedError;
   ChatPageList? get pageList => throw _privateConstructorUsedError;
-  Map<String, StreamStatus> get activeStreams =>
-      throw _privateConstructorUsedError;
   String? get error => throw _privateConstructorUsedError;
   bool get isLoading => throw _privateConstructorUsedError;
 
@@ -240,7 +220,6 @@ abstract class $ChatStateCopyWith<$Res> {
     Session? session,
     String? currentRoundId,
     ChatPageList? pageList,
-    Map<String, StreamStatus> activeStreams,
     String? error,
     bool isLoading,
   });
@@ -267,7 +246,6 @@ class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
     Object? session = freezed,
     Object? currentRoundId = freezed,
     Object? pageList = freezed,
-    Object? activeStreams = null,
     Object? error = freezed,
     Object? isLoading = null,
   }) {
@@ -285,10 +263,6 @@ class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
                 ? _value.pageList
                 : pageList // ignore: cast_nullable_to_non_nullable
                       as ChatPageList?,
-            activeStreams: null == activeStreams
-                ? _value.activeStreams
-                : activeStreams // ignore: cast_nullable_to_non_nullable
-                      as Map<String, StreamStatus>,
             error: freezed == error
                 ? _value.error
                 : error // ignore: cast_nullable_to_non_nullable
@@ -344,7 +318,6 @@ abstract class _$$ChatStateImplCopyWith<$Res>
     Session? session,
     String? currentRoundId,
     ChatPageList? pageList,
-    Map<String, StreamStatus> activeStreams,
     String? error,
     bool isLoading,
   });
@@ -372,7 +345,6 @@ class __$$ChatStateImplCopyWithImpl<$Res>
     Object? session = freezed,
     Object? currentRoundId = freezed,
     Object? pageList = freezed,
-    Object? activeStreams = null,
     Object? error = freezed,
     Object? isLoading = null,
   }) {
@@ -390,10 +362,6 @@ class __$$ChatStateImplCopyWithImpl<$Res>
             ? _value.pageList
             : pageList // ignore: cast_nullable_to_non_nullable
                   as ChatPageList?,
-        activeStreams: null == activeStreams
-            ? _value._activeStreams
-            : activeStreams // ignore: cast_nullable_to_non_nullable
-                  as Map<String, StreamStatus>,
         error: freezed == error
             ? _value.error
             : error // ignore: cast_nullable_to_non_nullable
@@ -414,10 +382,9 @@ class _$ChatStateImpl implements _ChatState {
     this.session,
     this.currentRoundId,
     this.pageList,
-    final Map<String, StreamStatus> activeStreams = const {},
     this.error,
     this.isLoading = false,
-  }) : _activeStreams = activeStreams;
+  });
 
   @override
   final Session? session;
@@ -425,15 +392,6 @@ class _$ChatStateImpl implements _ChatState {
   final String? currentRoundId;
   @override
   final ChatPageList? pageList;
-  final Map<String, StreamStatus> _activeStreams;
-  @override
-  @JsonKey()
-  Map<String, StreamStatus> get activeStreams {
-    if (_activeStreams is EqualUnmodifiableMapView) return _activeStreams;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableMapView(_activeStreams);
-  }
-
   @override
   final String? error;
   @override
@@ -442,7 +400,7 @@ class _$ChatStateImpl implements _ChatState {
 
   @override
   String toString() {
-    return 'ChatState(session: $session, currentRoundId: $currentRoundId, pageList: $pageList, activeStreams: $activeStreams, error: $error, isLoading: $isLoading)';
+    return 'ChatState(session: $session, currentRoundId: $currentRoundId, pageList: $pageList, error: $error, isLoading: $isLoading)';
   }
 
   @override
@@ -455,10 +413,6 @@ class _$ChatStateImpl implements _ChatState {
                 other.currentRoundId == currentRoundId) &&
             (identical(other.pageList, pageList) ||
                 other.pageList == pageList) &&
-            const DeepCollectionEquality().equals(
-              other._activeStreams,
-              _activeStreams,
-            ) &&
             (identical(other.error, error) || other.error == error) &&
             (identical(other.isLoading, isLoading) ||
                 other.isLoading == isLoading));
@@ -470,7 +424,6 @@ class _$ChatStateImpl implements _ChatState {
     session,
     currentRoundId,
     pageList,
-    const DeepCollectionEquality().hash(_activeStreams),
     error,
     isLoading,
   );
@@ -489,7 +442,6 @@ abstract class _ChatState implements ChatState {
     final Session? session,
     final String? currentRoundId,
     final ChatPageList? pageList,
-    final Map<String, StreamStatus> activeStreams,
     final String? error,
     final bool isLoading,
   }) = _$ChatStateImpl;
@@ -500,8 +452,6 @@ abstract class _ChatState implements ChatState {
   String? get currentRoundId;
   @override
   ChatPageList? get pageList;
-  @override
-  Map<String, StreamStatus> get activeStreams;
   @override
   String? get error;
   @override

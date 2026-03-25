@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import '../themes/app_tokens.dart';
 
 class MessageBubble extends StatelessWidget {
   final String content;
@@ -20,11 +19,11 @@ class MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bubbleColor = isUser ? AppTokens.userBubble : AppTokens.aiBubble;
-    final borderColor =
-        isUser ? const Color(0xFFC9E0FF) : AppTokens.border;
+    final colorScheme = Theme.of(context).colorScheme;
+    final bubbleColor =
+        isUser ? colorScheme.secondaryContainer : colorScheme.surfaceContainerHigh;
     final textColor =
-        isUser ? AppTokens.userBubbleText : AppTokens.textPrimary;
+        isUser ? colorScheme.onSecondaryContainer : colorScheme.onSurface;
 
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -32,109 +31,83 @@ class MessageBubble extends StatelessWidget {
         constraints: BoxConstraints(
           maxWidth: MediaQuery.of(context).size.width * 0.88,
         ),
-        margin: const EdgeInsets.symmetric(vertical: AppTokens.space4),
+        margin: const EdgeInsets.symmetric(vertical: 4),
         child: Column(
           crossAxisAlignment:
               isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppTokens.space14,
-                vertical: AppTokens.space12,
-              ),
-              decoration: BoxDecoration(
-                color: bubbleColor,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(AppTokens.radiusLg),
-                  topRight: const Radius.circular(AppTokens.radiusLg),
-                  bottomLeft: Radius.circular(
-                    isUser ? AppTokens.radiusLg : AppTokens.radiusSm,
-                  ),
-                  bottomRight: Radius.circular(
-                    isUser ? AppTokens.radiusSm : AppTokens.radiusLg,
-                  ),
+            Card(
+              color: bubbleColor,
+              elevation: 0,
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
                 ),
-                border: Border.all(color: borderColor),
-                boxShadow: isUser ? [] : AppTokens.shadowSm,
-              ),
-              child: MarkdownBody(
-                data: content,
-                selectable: true,
-                styleSheet: MarkdownStyleSheet(
-                  p: TextStyle(
-                    fontSize: 14,
-                    height: 1.7,
-                    color: textColor,
-                  ),
-                  h1: TextStyle(
-                    fontSize: 22,
-                    height: 1.35,
-                    fontWeight: FontWeight.w700,
-                    color: textColor,
-                  ),
-                  h2: TextStyle(
-                    fontSize: 18,
-                    height: 1.4,
-                    fontWeight: FontWeight.w700,
-                    color: textColor,
-                  ),
-                  h3: TextStyle(
-                    fontSize: 16,
-                    height: 1.45,
-                    fontWeight: FontWeight.w700,
-                    color: textColor,
-                  ),
-                  code: TextStyle(
-                    fontSize: 13,
-                    fontFamily: 'monospace',
-                    color: textColor,
-                    backgroundColor: isUser
-                        ? const Color(0xFFDCEEFF)
-                        : AppTokens.surfaceMuted,
-                  ),
-                  codeblockPadding: const EdgeInsets.all(12),
-                  codeblockDecoration: BoxDecoration(
-                    color: isUser
-                        ? const Color(0xFFDCEEFF)
-                        : AppTokens.surfaceSoft,
-                    borderRadius: AppTokens.brSm,
-                    border: Border.all(
-                      color: isUser
-                          ? const Color(0xFFC9E0FF)
-                          : AppTokens.border,
+                child: MarkdownBody(
+                  data: content,
+                  selectable: true,
+                  styleSheet: MarkdownStyleSheet(
+                    p: TextStyle(
+                      fontSize: 14,
+                      height: 1.7,
+                      color: textColor,
                     ),
-                  ),
-                  blockSpacing: 10,
-                  listBullet: TextStyle(color: textColor),
-                  strong: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: textColor,
-                  ),
-                  em: TextStyle(
-                    fontStyle: FontStyle.italic,
-                    color: textColor,
-                  ),
-                  a: TextStyle(
-                    color: isUser ? AppTokens.info : AppTokens.primary,
-                    decoration: TextDecoration.underline,
-                  ),
-                  blockquote: TextStyle(
-                    color: isUser
-                        ? AppTokens.userBubbleText
-                        : AppTokens.textSecondary,
-                    height: 1.6,
-                  ),
-                  blockquoteDecoration: BoxDecoration(
-                    color: isUser
-                        ? const Color(0xFFDCEEFF)
-                        : AppTokens.surfaceMuted,
-                    borderRadius: AppTokens.brSm,
-                    border: Border(
-                      left: BorderSide(
-                        color: isUser
-                            ? const Color(0xFF9FCBFF)
-                            : AppTokens.borderStrong,
-                        width: 3,
+                    h1: TextStyle(
+                      fontSize: 22,
+                      height: 1.35,
+                      fontWeight: FontWeight.w700,
+                      color: textColor,
+                    ),
+                    h2: TextStyle(
+                      fontSize: 18,
+                      height: 1.4,
+                      fontWeight: FontWeight.w700,
+                      color: textColor,
+                    ),
+                    h3: TextStyle(
+                      fontSize: 16,
+                      height: 1.45,
+                      fontWeight: FontWeight.w700,
+                      color: textColor,
+                    ),
+                    code: TextStyle(
+                      fontSize: 13,
+                      fontFamily: 'monospace',
+                      color: textColor,
+                    ),
+                    codeblockPadding: const EdgeInsets.all(12),
+                    codeblockDecoration: BoxDecoration(
+                      color: colorScheme.surface,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    blockSpacing: 10,
+                    listBullet: TextStyle(color: textColor),
+                    strong: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: textColor,
+                    ),
+                    em: TextStyle(
+                      fontStyle: FontStyle.italic,
+                      color: textColor,
+                    ),
+                    a: TextStyle(
+                      color: colorScheme.primary,
+                      decoration: TextDecoration.underline,
+                    ),
+                    blockquote: TextStyle(
+                      color: textColor.withValues(alpha: 0.85),
+                      height: 1.6,
+                    ),
+                    blockquoteDecoration: BoxDecoration(
+                      color: colorScheme.surface,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border(
+                        left: BorderSide(
+                          color: colorScheme.outline,
+                          width: 3,
+                        ),
                       ),
                     ),
                   ),
@@ -142,75 +115,32 @@ class MessageBubble extends StatelessWidget {
               ),
             ),
             if (onCopy != null || onRetryReply != null || onEdit != null) ...[
-              const SizedBox(height: AppTokens.space6),
-              Row(
-                mainAxisSize: MainAxisSize.min,
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 4,
                 children: [
                   if (onCopy != null)
-                    _ActionIconButton(
-                      icon: Icons.content_copy_outlined,
+                    IconButton(
                       tooltip: '复制',
-                      onTap: onCopy!,
+                      onPressed: onCopy,
+                      icon: const Icon(Icons.content_copy_outlined),
                     ),
-                  if (onEdit != null) ...[
-                    const SizedBox(width: AppTokens.space4),
-                    _ActionIconButton(
-                      icon: Icons.edit_outlined,
+                  if (onEdit != null)
+                    IconButton(
                       tooltip: '编辑后发送',
-                      onTap: onEdit!,
+                      onPressed: onEdit,
+                      icon: const Icon(Icons.edit_outlined),
                     ),
-                  ],
-                  if (onRetryReply != null) ...[
-                    const SizedBox(width: AppTokens.space4),
-                    _ActionIconButton(
-                      icon: Icons.refresh_outlined,
+                  if (onRetryReply != null)
+                    IconButton(
                       tooltip: '重新生成',
-                      onTap: onRetryReply!,
+                      onPressed: onRetryReply,
+                      icon: const Icon(Icons.refresh_outlined),
                     ),
-                  ],
                 ],
               ),
             ],
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ActionIconButton extends StatelessWidget {
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-
-  const _ActionIconButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: AppTokens.brSm,
-          child: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppTokens.surface,
-              borderRadius: AppTokens.brSm,
-              border: Border.all(color: AppTokens.border),
-            ),
-            child: Icon(
-              icon,
-              size: 16,
-              color: AppTokens.textSecondary,
-            ),
-          ),
         ),
       ),
     );
