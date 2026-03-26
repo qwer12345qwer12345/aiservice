@@ -114,7 +114,6 @@ lib/presentation/providers/session_list_notifier.dart
 lib/presentation/themes/app_theme.dart
 lib/presentation/themes/app_tokens.dart
 lib/presentation/widgets/attachment_list.dart
-lib/presentation/widgets/common/app_badge.dart
 lib/presentation/widgets/common/app_card.dart
 lib/presentation/widgets/common/app_page_scaffold.dart
 lib/presentation/widgets/common/app_section.dart
@@ -126,32 +125,6 @@ lib/presentation/widgets/thought_bubble.dart
 ```
 
 # Files
-
-## File: lib/presentation/widgets/common/app_toast.dart
-```dart
-import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
-abstract class AppToast {
-  static Future<void> show(
-    String message, {
-    ToastGravity gravity = ToastGravity.CENTER,
-    Toast toastLength = Toast.LENGTH_SHORT,
-    Color backgroundColor = const Color(0xE6111827),
-    Color textColor = Colors.white,
-    double fontSize = 14,
-  }) async {
-    await Fluttertoast.cancel();
-    await Fluttertoast.showToast(
-      msg: message,
-      toastLength: toastLength,
-      gravity: gravity,
-      backgroundColor: backgroundColor,
-      textColor: textColor,
-      fontSize: fontSize,
-    );
-  }
-}
-```
 
 ## File: lib/core/constants/app_constants.dart
 ```dart
@@ -5120,478 +5093,6 @@ class TreeBuilder {
 }
 ```
 
-## File: lib/domain/states/chat_state.dart
-```dart
-import 'package:freezed_annotation/freezed_annotation.dart';
-import '../../core/models/session.dart';
-import '../models/chat_page.dart';
-part 'chat_state.freezed.dart';
-@freezed
-class StreamStatus with _$StreamStatus {
-  const factory StreamStatus({
-    @Default('') String content,
-    @Default('') String reasoning,
-    @Default(false) bool isStreaming,
-  }) = _StreamStatus;
-}
-@freezed
-class ChatState with _$ChatState {
-  const factory ChatState({
-    Session? session,
-    String? currentRoundId,
-    ChatPageList? pageList,
-    String? error,
-    @Default(false) bool isLoading,
-  }) = _ChatState;
-  factory ChatState.initial() => const ChatState(
-        error: null,
-        isLoading: false,
-      );
-}
-extension ChatStateX on ChatState {
-  ChatState copyWithSession(Session session) {
-    return copyWith(
-      session: session,
-      isLoading: false,
-    );
-  }
-  ChatState copyWithCurrentRoundId(String roundId) {
-    return copyWith(currentRoundId: roundId);
-  }
-  ChatState copyWithError(String error) {
-    return copyWith(
-      error: error,
-      isLoading: false,
-    );
-  }
-  ChatState copyWithLoading(bool loading) {
-    return copyWith(isLoading: loading);
-  }
-}
-```
-
-## File: lib/domain/states/chat_state.freezed.dart
-```dart
-// coverage:ignore-file
-// GENERATED CODE - DO NOT MODIFY BY HAND
-// ignore_for_file: type=lint
-// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
-part of 'chat_state.dart';
-// **************************************************************************
-// FreezedGenerator
-// **************************************************************************
-T _$identity<T>(T value) => value;
-final _privateConstructorUsedError = UnsupportedError(
-  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
-);
-/// @nodoc
-mixin _$StreamStatus {
-  String get content => throw _privateConstructorUsedError;
-  String get reasoning => throw _privateConstructorUsedError;
-  bool get isStreaming => throw _privateConstructorUsedError;
-  /// Create a copy of StreamStatus
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $StreamStatusCopyWith<StreamStatus> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-/// @nodoc
-abstract class $StreamStatusCopyWith<$Res> {
-  factory $StreamStatusCopyWith(
-    StreamStatus value,
-    $Res Function(StreamStatus) then,
-  ) = _$StreamStatusCopyWithImpl<$Res, StreamStatus>;
-  @useResult
-  $Res call({String content, String reasoning, bool isStreaming});
-}
-/// @nodoc
-class _$StreamStatusCopyWithImpl<$Res, $Val extends StreamStatus>
-    implements $StreamStatusCopyWith<$Res> {
-  _$StreamStatusCopyWithImpl(this._value, this._then);
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-  /// Create a copy of StreamStatus
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? content = null,
-    Object? reasoning = null,
-    Object? isStreaming = null,
-  }) {
-    return _then(
-      _value.copyWith(
-            content: null == content
-                ? _value.content
-                : content // ignore: cast_nullable_to_non_nullable
-                      as String,
-            reasoning: null == reasoning
-                ? _value.reasoning
-                : reasoning // ignore: cast_nullable_to_non_nullable
-                      as String,
-            isStreaming: null == isStreaming
-                ? _value.isStreaming
-                : isStreaming // ignore: cast_nullable_to_non_nullable
-                      as bool,
-          )
-          as $Val,
-    );
-  }
-}
-/// @nodoc
-abstract class _$$StreamStatusImplCopyWith<$Res>
-    implements $StreamStatusCopyWith<$Res> {
-  factory _$$StreamStatusImplCopyWith(
-    _$StreamStatusImpl value,
-    $Res Function(_$StreamStatusImpl) then,
-  ) = __$$StreamStatusImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({String content, String reasoning, bool isStreaming});
-}
-/// @nodoc
-class __$$StreamStatusImplCopyWithImpl<$Res>
-    extends _$StreamStatusCopyWithImpl<$Res, _$StreamStatusImpl>
-    implements _$$StreamStatusImplCopyWith<$Res> {
-  __$$StreamStatusImplCopyWithImpl(
-    _$StreamStatusImpl _value,
-    $Res Function(_$StreamStatusImpl) _then,
-  ) : super(_value, _then);
-  /// Create a copy of StreamStatus
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? content = null,
-    Object? reasoning = null,
-    Object? isStreaming = null,
-  }) {
-    return _then(
-      _$StreamStatusImpl(
-        content: null == content
-            ? _value.content
-            : content // ignore: cast_nullable_to_non_nullable
-                  as String,
-        reasoning: null == reasoning
-            ? _value.reasoning
-            : reasoning // ignore: cast_nullable_to_non_nullable
-                  as String,
-        isStreaming: null == isStreaming
-            ? _value.isStreaming
-            : isStreaming // ignore: cast_nullable_to_non_nullable
-                  as bool,
-      ),
-    );
-  }
-}
-/// @nodoc
-class _$StreamStatusImpl implements _StreamStatus {
-  const _$StreamStatusImpl({
-    this.content = '',
-    this.reasoning = '',
-    this.isStreaming = false,
-  });
-  @override
-  @JsonKey()
-  final String content;
-  @override
-  @JsonKey()
-  final String reasoning;
-  @override
-  @JsonKey()
-  final bool isStreaming;
-  @override
-  String toString() {
-    return 'StreamStatus(content: $content, reasoning: $reasoning, isStreaming: $isStreaming)';
-  }
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$StreamStatusImpl &&
-            (identical(other.content, content) || other.content == content) &&
-            (identical(other.reasoning, reasoning) ||
-                other.reasoning == reasoning) &&
-            (identical(other.isStreaming, isStreaming) ||
-                other.isStreaming == isStreaming));
-  }
-  @override
-  int get hashCode => Object.hash(runtimeType, content, reasoning, isStreaming);
-  /// Create a copy of StreamStatus
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$StreamStatusImplCopyWith<_$StreamStatusImpl> get copyWith =>
-      __$$StreamStatusImplCopyWithImpl<_$StreamStatusImpl>(this, _$identity);
-}
-abstract class _StreamStatus implements StreamStatus {
-  const factory _StreamStatus({
-    final String content,
-    final String reasoning,
-    final bool isStreaming,
-  }) = _$StreamStatusImpl;
-  @override
-  String get content;
-  @override
-  String get reasoning;
-  @override
-  bool get isStreaming;
-  /// Create a copy of StreamStatus
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$StreamStatusImplCopyWith<_$StreamStatusImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-/// @nodoc
-mixin _$ChatState {
-  Session? get session => throw _privateConstructorUsedError;
-  String? get currentRoundId => throw _privateConstructorUsedError;
-  ChatPageList? get pageList => throw _privateConstructorUsedError;
-  String? get error => throw _privateConstructorUsedError;
-  bool get isLoading => throw _privateConstructorUsedError;
-  /// Create a copy of ChatState
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $ChatStateCopyWith<ChatState> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-/// @nodoc
-abstract class $ChatStateCopyWith<$Res> {
-  factory $ChatStateCopyWith(ChatState value, $Res Function(ChatState) then) =
-      _$ChatStateCopyWithImpl<$Res, ChatState>;
-  @useResult
-  $Res call({
-    Session? session,
-    String? currentRoundId,
-    ChatPageList? pageList,
-    String? error,
-    bool isLoading,
-  });
-  $SessionCopyWith<$Res>? get session;
-  $ChatPageListCopyWith<$Res>? get pageList;
-}
-/// @nodoc
-class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
-    implements $ChatStateCopyWith<$Res> {
-  _$ChatStateCopyWithImpl(this._value, this._then);
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-  /// Create a copy of ChatState
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? session = freezed,
-    Object? currentRoundId = freezed,
-    Object? pageList = freezed,
-    Object? error = freezed,
-    Object? isLoading = null,
-  }) {
-    return _then(
-      _value.copyWith(
-            session: freezed == session
-                ? _value.session
-                : session // ignore: cast_nullable_to_non_nullable
-                      as Session?,
-            currentRoundId: freezed == currentRoundId
-                ? _value.currentRoundId
-                : currentRoundId // ignore: cast_nullable_to_non_nullable
-                      as String?,
-            pageList: freezed == pageList
-                ? _value.pageList
-                : pageList // ignore: cast_nullable_to_non_nullable
-                      as ChatPageList?,
-            error: freezed == error
-                ? _value.error
-                : error // ignore: cast_nullable_to_non_nullable
-                      as String?,
-            isLoading: null == isLoading
-                ? _value.isLoading
-                : isLoading // ignore: cast_nullable_to_non_nullable
-                      as bool,
-          )
-          as $Val,
-    );
-  }
-  /// Create a copy of ChatState
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @pragma('vm:prefer-inline')
-  $SessionCopyWith<$Res>? get session {
-    if (_value.session == null) {
-      return null;
-    }
-    return $SessionCopyWith<$Res>(_value.session!, (value) {
-      return _then(_value.copyWith(session: value) as $Val);
-    });
-  }
-  /// Create a copy of ChatState
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @pragma('vm:prefer-inline')
-  $ChatPageListCopyWith<$Res>? get pageList {
-    if (_value.pageList == null) {
-      return null;
-    }
-    return $ChatPageListCopyWith<$Res>(_value.pageList!, (value) {
-      return _then(_value.copyWith(pageList: value) as $Val);
-    });
-  }
-}
-/// @nodoc
-abstract class _$$ChatStateImplCopyWith<$Res>
-    implements $ChatStateCopyWith<$Res> {
-  factory _$$ChatStateImplCopyWith(
-    _$ChatStateImpl value,
-    $Res Function(_$ChatStateImpl) then,
-  ) = __$$ChatStateImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({
-    Session? session,
-    String? currentRoundId,
-    ChatPageList? pageList,
-    String? error,
-    bool isLoading,
-  });
-  @override
-  $SessionCopyWith<$Res>? get session;
-  @override
-  $ChatPageListCopyWith<$Res>? get pageList;
-}
-/// @nodoc
-class __$$ChatStateImplCopyWithImpl<$Res>
-    extends _$ChatStateCopyWithImpl<$Res, _$ChatStateImpl>
-    implements _$$ChatStateImplCopyWith<$Res> {
-  __$$ChatStateImplCopyWithImpl(
-    _$ChatStateImpl _value,
-    $Res Function(_$ChatStateImpl) _then,
-  ) : super(_value, _then);
-  /// Create a copy of ChatState
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? session = freezed,
-    Object? currentRoundId = freezed,
-    Object? pageList = freezed,
-    Object? error = freezed,
-    Object? isLoading = null,
-  }) {
-    return _then(
-      _$ChatStateImpl(
-        session: freezed == session
-            ? _value.session
-            : session // ignore: cast_nullable_to_non_nullable
-                  as Session?,
-        currentRoundId: freezed == currentRoundId
-            ? _value.currentRoundId
-            : currentRoundId // ignore: cast_nullable_to_non_nullable
-                  as String?,
-        pageList: freezed == pageList
-            ? _value.pageList
-            : pageList // ignore: cast_nullable_to_non_nullable
-                  as ChatPageList?,
-        error: freezed == error
-            ? _value.error
-            : error // ignore: cast_nullable_to_non_nullable
-                  as String?,
-        isLoading: null == isLoading
-            ? _value.isLoading
-            : isLoading // ignore: cast_nullable_to_non_nullable
-                  as bool,
-      ),
-    );
-  }
-}
-/// @nodoc
-class _$ChatStateImpl implements _ChatState {
-  const _$ChatStateImpl({
-    this.session,
-    this.currentRoundId,
-    this.pageList,
-    this.error,
-    this.isLoading = false,
-  });
-  @override
-  final Session? session;
-  @override
-  final String? currentRoundId;
-  @override
-  final ChatPageList? pageList;
-  @override
-  final String? error;
-  @override
-  @JsonKey()
-  final bool isLoading;
-  @override
-  String toString() {
-    return 'ChatState(session: $session, currentRoundId: $currentRoundId, pageList: $pageList, error: $error, isLoading: $isLoading)';
-  }
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$ChatStateImpl &&
-            (identical(other.session, session) || other.session == session) &&
-            (identical(other.currentRoundId, currentRoundId) ||
-                other.currentRoundId == currentRoundId) &&
-            (identical(other.pageList, pageList) ||
-                other.pageList == pageList) &&
-            (identical(other.error, error) || other.error == error) &&
-            (identical(other.isLoading, isLoading) ||
-                other.isLoading == isLoading));
-  }
-  @override
-  int get hashCode => Object.hash(
-    runtimeType,
-    session,
-    currentRoundId,
-    pageList,
-    error,
-    isLoading,
-  );
-  /// Create a copy of ChatState
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$ChatStateImplCopyWith<_$ChatStateImpl> get copyWith =>
-      __$$ChatStateImplCopyWithImpl<_$ChatStateImpl>(this, _$identity);
-}
-abstract class _ChatState implements ChatState {
-  const factory _ChatState({
-    final Session? session,
-    final String? currentRoundId,
-    final ChatPageList? pageList,
-    final String? error,
-    final bool isLoading,
-  }) = _$ChatStateImpl;
-  @override
-  Session? get session;
-  @override
-  String? get currentRoundId;
-  @override
-  ChatPageList? get pageList;
-  @override
-  String? get error;
-  @override
-  bool get isLoading;
-  /// Create a copy of ChatState
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$ChatStateImplCopyWith<_$ChatStateImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-```
-
 ## File: lib/presentation/models/pending_attachment.dart
 ```dart
 class PendingAttachment {
@@ -5608,122 +5109,6 @@ class PendingAttachment {
     this.mimeType,
   });
 }
-```
-
-## File: lib/presentation/pages/text_attachment_viewer_page.dart
-```dart
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import '../widgets/common/app_page_scaffold.dart';
-import '../widgets/common/app_toast.dart';
-class TextAttachmentViewerPage extends StatelessWidget {
-  final String title;
-  final String content;
-  const TextAttachmentViewerPage({
-    super.key,
-    required this.title,
-    required this.content,
-  });
-  Future<void> _copyAll() async {
-    await Clipboard.setData(ClipboardData(text: content));
-    await AppToast.show('全文已复制');
-  }
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return AppPageScaffold(
-      appBar: AppBar(
-        title: Text(
-          title,
-          overflow: TextOverflow.ellipsis,
-          style: textTheme.titleMedium,
-        ),
-        actions: [
-          IconButton(
-            tooltip: '复制全文',
-            onPressed: _copyAll,
-            icon: const Icon(Icons.content_copy_outlined),
-          ),
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Card(
-          margin: EdgeInsets.zero,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: SelectableText(
-              content,
-              style: textTheme.bodyMedium?.copyWith(
-                fontFamily: 'monospace',
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-```
-
-## File: lib/presentation/providers/home_session_list_provider.dart
-```dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/session.dart';
-import '../../domain/services/branch_navigator.dart';
-import 'session_list_notifier.dart';
-class HomeSessionItem {
-  final Session session;
-  final bool hasUnseen;
-  final String userPreview;
-  final int roundCount;
-  final int updatedAt;
-  final String? previewRoundId;
-  const HomeSessionItem({
-    required this.session,
-    required this.hasUnseen,
-    required this.userPreview,
-    required this.roundCount,
-    required this.updatedAt,
-    required this.previewRoundId,
-  });
-}
-final homeSessionListProvider =
-    Provider<AsyncValue<List<HomeSessionItem>>>((ref) {
-  final sessionsAsync = ref.watch(sessionListProvider);
-  return sessionsAsync.whenData((sessions) {
-    final items = sessions.map((session) {
-      final hasUnseen = session.rounds.any((r) => r.hasUnseenUpdate);
-      final roundCount = session.rounds.length;
-      final previewRoundId = session.rounds.isEmpty
-          ? null
-          : BranchNavigator.getAllBranchLeaves(session).isNotEmpty
-              ? BranchNavigator.getAllBranchLeaves(session).last.id
-              : session.rounds.last.id;
-      final previewRound = previewRoundId == null
-          ? null
-          : session.rounds.firstWhere(
-              (r) => r.id == previewRoundId,
-              orElse: () => session.rounds.last,
-            );
-      final userPreview = previewRound == null
-          ? '点击开始新的对话'
-          : previewRound.userContent.trim().isEmpty
-              ? '（空输入）'
-              : previewRound.userContent.trim();
-      return HomeSessionItem(
-        session: session,
-        hasUnseen: hasUnseen,
-        userPreview: userPreview,
-        roundCount: roundCount,
-        updatedAt: session.updatedAt,
-        previewRoundId: previewRoundId,
-      );
-    }).toList();
-    items.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-    return items;
-  });
-});
 ```
 
 ## File: lib/presentation/providers/session_card_provider.dart
@@ -5751,521 +5136,27 @@ final sessionCardProvider =
 });
 ```
 
-## File: lib/presentation/themes/app_theme.dart
+## File: lib/presentation/widgets/common/app_toast.dart
 ```dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-class AppTheme {
-  static const Color _seedColor = Colors.blueGrey;
-  static ThemeData get lightTheme {
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: _seedColor,
-      brightness: Brightness.light,
-    );
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: colorScheme,
-      appBarTheme: const AppBarTheme(
-        systemOverlayStyle: SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.dark,
-          statusBarBrightness: Brightness.light,
-          systemNavigationBarIconBrightness: Brightness.dark,
-        ),
-      ),
-      cardTheme: const CardThemeData(
-        elevation: 0,
-      ),
-      inputDecorationTheme: const InputDecorationTheme(
-        border: OutlineInputBorder(),
-      ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(),
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(),
-      ),
-      textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(),
-      ),
-      snackBarTheme: const SnackBarThemeData(
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-  static ThemeData get darkTheme {
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: _seedColor,
-      brightness: Brightness.dark,
-    );
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: colorScheme,
-      appBarTheme: const AppBarTheme(
-        systemOverlayStyle: SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.light,
-          statusBarBrightness: Brightness.dark,
-          systemNavigationBarIconBrightness: Brightness.light,
-        ),
-      ),
-      cardTheme: const CardThemeData(
-        elevation: 0,
-      ),
-      inputDecorationTheme: const InputDecorationTheme(
-        border: OutlineInputBorder(),
-      ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(),
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(),
-      ),
-      textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(),
-      ),
-      snackBarTheme: const SnackBarThemeData(
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-}
-```
-
-## File: lib/presentation/widgets/common/app_badge.dart
-```dart
-import 'package:flutter/material.dart';
-class AppBadge extends StatelessWidget {
-  final String text;
-  final Color color;
-  final IconData? icon;
-  const AppBadge({
-    super.key,
-    required this.text,
-    required this.color,
-    this.icon,
-  });
-  factory AppBadge.primary(BuildContext context, String text, {IconData? icon}) {
-    return AppBadge(
-      text: text,
-      color: Theme.of(context).colorScheme.primary,
-      icon: icon,
-    );
-  }
-  factory AppBadge.success(BuildContext context, String text, {IconData? icon}) {
-    return AppBadge(
-      text: text,
-      color: Colors.green,
-      icon: icon,
-    );
-  }
-  factory AppBadge.warning(BuildContext context, String text, {IconData? icon}) {
-    return AppBadge(
-      text: text,
-      color: Colors.orange,
-      icon: icon,
-    );
-  }
-  factory AppBadge.info(BuildContext context, String text, {IconData? icon}) {
-    return AppBadge(
-      text: text,
-      color: Theme.of(context).colorScheme.secondary,
-      icon: icon,
-    );
-  }
-  factory AppBadge.danger(BuildContext context, String text, {IconData? icon}) {
-    return AppBadge(
-      text: text,
-      color: Theme.of(context).colorScheme.error,
-      icon: icon,
-    );
-  }
-  @override
-  Widget build(BuildContext context) {
-    final backgroundColor = color.withValues(alpha: 0.12);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: ShapeDecoration(
-        color: backgroundColor,
-        shape: const StadiumBorder(),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 12, color: color),
-            const SizedBox(width: 4),
-          ],
-          Text(
-            text,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-```
-
-## File: lib/presentation/widgets/common/app_card.dart
-```dart
-import 'package:flutter/material.dart';
-class AppCard extends StatelessWidget {
-  final Widget child;
-  final EdgeInsetsGeometry padding;
-  final EdgeInsetsGeometry? margin;
-  final Color? color;
-  final ShapeBorder? shape;
-  final double? elevation;
-  const AppCard({
-    super.key,
-    required this.child,
-    this.padding = const EdgeInsets.all(16),
-    this.margin,
-    this.color,
-    this.shape,
-    this.elevation,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: margin,
-      color: color,
-      shape: shape,
-      elevation: elevation,
-      child: Padding(
-        padding: padding,
-        child: child,
-      ),
-    );
-  }
-}
-```
-
-## File: lib/presentation/widgets/common/app_section.dart
-```dart
-import 'package:flutter/material.dart';
-import 'app_card.dart';
-class AppSection extends StatelessWidget {
-  final String title;
-  final String? subtitle;
-  final List<Widget> children;
-  final EdgeInsetsGeometry? margin;
-  const AppSection({
-    super.key,
-    required this.title,
-    this.subtitle,
-    required this.children,
-    this.margin,
-  });
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return AppCard(
-      margin: margin ?? const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: textTheme.titleMedium),
-          if (subtitle != null) ...[
-            const SizedBox(height: 8),
-            Text(subtitle!, style: textTheme.bodySmall),
-          ],
-          const SizedBox(height: 16),
-          ...children,
-        ],
-      ),
-    );
-  }
-}
-```
-
-## File: lib/presentation/widgets/input_bar.dart
-```dart
-import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
-import '../../core/utils/id_generator.dart';
-import '../models/pending_attachment.dart';
-import '../providers/input_draft_provider.dart';
-class InputBar extends ConsumerStatefulWidget {
-  final void Function(String text, List<PendingAttachment> attachments) onSend;
-  final VoidCallback? onStop;
-  final bool isStreaming;
-  final bool enabled;
-  final String hintText;
-  const InputBar({
-    super.key,
-    required this.onSend,
-    this.onStop,
-    this.isStreaming = false,
-    this.enabled = true,
-    this.hintText = '输入消息...',
-  });
-  @override
-  ConsumerState<InputBar> createState() => _InputBarState();
-}
-class _InputBarState extends ConsumerState<InputBar> {
-  late final TextEditingController _controller;
-  late final ProviderSubscription<String> _draftSubscription;
-  final ImagePicker _imagePicker = ImagePicker();
-  bool _isSyncingText = false;
-  @override
-  void initState() {
-    super.initState();
-    final draft = ref.read(globalInputDraftProvider);
-    _controller = TextEditingController(text: draft);
-    _controller.addListener(_handleControllerChanged);
-    _draftSubscription = ref.listenManual<String>(
-      globalInputDraftProvider,
-      (previous, next) {
-        if (_controller.text == next) return;
-        _syncControllerText(next);
-      },
-    );
-  }
-  @override
-  void dispose() {
-    _draftSubscription.close();
-    _controller.removeListener(_handleControllerChanged);
-    _controller.dispose();
-    super.dispose();
-  }
-  void _handleControllerChanged() {
-    if (_isSyncingText) return;
-    final text = _controller.text;
-    final notifier = ref.read(globalInputDraftProvider.notifier);
-    if (notifier.state != text) {
-      notifier.state = text;
-    }
-    if (mounted) {
-      setState(() {});
-    }
-  }
-  void _syncControllerText(String text) {
-    _isSyncingText = true;
-    _controller.value = TextEditingValue(
-      text: text,
-      selection: TextSelection.collapsed(offset: text.length),
-      composing: TextRange.empty,
-    );
-    _isSyncingText = false;
-    if (mounted) {
-      setState(() {});
-    }
-  }
-  void _clearDraft() {
-    ref.read(globalInputDraftProvider.notifier).state = '';
-  }
-  void _clearAttachmentDraft() {
-    ref.read(globalAttachmentDraftProvider.notifier).state = [];
-  }
-  bool _isImageFile(String name) {
-    final lower = name.toLowerCase();
-    return lower.endsWith('.png') ||
-        lower.endsWith('.jpg') ||
-        lower.endsWith('.jpeg') ||
-        lower.endsWith('.gif') ||
-        lower.endsWith('.webp') ||
-        lower.endsWith('.bmp');
-  }
-  String? _guessMimeType(String name) {
-    final lower = name.toLowerCase();
-    if (lower.endsWith('.png')) return 'image/png';
-    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
-      return 'image/jpeg';
-    }
-    if (lower.endsWith('.gif')) return 'image/gif';
-    if (lower.endsWith('.webp')) return 'image/webp';
-    if (lower.endsWith('.bmp')) return 'image/bmp';
-    if (lower.endsWith('.txt')) return 'text/plain';
-    if (lower.endsWith('.md')) return 'text/markdown';
-    if (lower.endsWith('.json')) return 'application/json';
-    if (lower.endsWith('.pdf')) return 'application/pdf';
-    if (lower.endsWith('.dart')) return 'text/plain';
-    if (lower.endsWith('.yaml') || lower.endsWith('.yml')) {
-      return 'text/yaml';
-    }
-    return null;
-  }
-  Future<void> _pickFileAttachment() async {
-    if (!widget.enabled) return;
-    final result = await FilePicker.platform.pickFiles(
-      allowMultiple: false,
-      withData: false,
-      type: FileType.any,
-    );
-    if (result == null || result.files.isEmpty) return;
-    final file = result.files.single;
-    final filePath = file.path;
-    if (filePath == null || filePath.trim().isEmpty) return;
-    final mimeType = _guessMimeType(file.name);
-    final isImage = _isImageFile(file.name);
-    final attachment = PendingAttachment(
-      id: IdGenerator.generate(),
-      name: file.name,
-      path: filePath,
-      isImage: isImage,
-      mimeType: mimeType,
-    );
-    final notifier = ref.read(globalAttachmentDraftProvider.notifier);
-    notifier.state = [...notifier.state, attachment];
-  }
-  Future<void> _pickImageFromGallery() async {
-    if (!widget.enabled) return;
-    final file = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 100,
-    );
-    if (file == null) return;
-    final name = file.name;
-    final attachment = PendingAttachment(
-      id: IdGenerator.generate(),
-      name: name,
-      path: file.path,
-      isImage: true,
-      mimeType: _guessMimeType(name) ?? 'image/*',
-    );
-    final notifier = ref.read(globalAttachmentDraftProvider.notifier);
-    notifier.state = [...notifier.state, attachment];
-  }
-  void _removeAttachment(String id) {
-    final notifier = ref.read(globalAttachmentDraftProvider.notifier);
-    notifier.state = notifier.state.where((item) => item.id != id).toList();
-  }
-  Future<void> _showAddAttachmentSheet() async {
-    if (!widget.enabled) return;
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.attach_file_outlined),
-                title: const Text('文件'),
-                onTap: () async {
-                  Navigator.of(context).pop();
-                  await _pickFileAttachment();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library_outlined),
-                title: const Text('相册'),
-                onTap: () async {
-                  Navigator.of(context).pop();
-                  await _pickImageFromGallery();
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-  void _handleSend() {
-    if (!widget.enabled) return;
-    final content = _controller.text.trim();
-    final attachments = ref.read(globalAttachmentDraftProvider);
-    if (content.isEmpty && attachments.isEmpty) return;
-    widget.onSend(content, attachments);
-    _clearDraft();
-    _clearAttachmentDraft();
-  }
-  @override
-  Widget build(BuildContext context) {
-    final attachments = ref.watch(globalAttachmentDraftProvider);
-    final hasText = _controller.text.trim().isNotEmpty;
-    final hasAttachments = attachments.isNotEmpty;
-    final canSend = (hasText || hasAttachments) && widget.enabled;
-    final showStopButton = widget.isStreaming && widget.onStop != null;
-    return SafeArea(
-      top: false,
-      child: Material(
-        elevation: 1,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (attachments.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: attachments.map((attachment) {
-                        return InputChip(
-                          avatar: Icon(
-                            attachment.isImage
-                                ? Icons.image_outlined
-                                : Icons.attach_file_outlined,
-                            size: 18,
-                          ),
-                          label: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 180),
-                            child: Text(
-                              attachment.name,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          onDeleted: () => _removeAttachment(attachment.id),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                ),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  IconButton(
-                    tooltip: '添加附件',
-                    onPressed: widget.enabled ? _showAddAttachmentSheet : null,
-                    icon: const Icon(Icons.add),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      minLines: 1,
-                      maxLines: 6,
-                      enabled: widget.enabled,
-                      keyboardType: TextInputType.multiline,
-                      textInputAction: TextInputAction.newline,
-                      decoration: InputDecoration(
-                        hintText: widget.hintText,
-                        isDense: true,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  if (showStopButton)
-                    IconButton.filledTonal(
-                      tooltip: '停止生成',
-                      onPressed: widget.enabled ? widget.onStop : null,
-                      icon: const Icon(Icons.stop_rounded),
-                    )
-                  else
-                    IconButton.filled(
-                      tooltip: '发送',
-                      onPressed: canSend ? _handleSend : null,
-                      icon: const Icon(Icons.arrow_upward_rounded),
-                    ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
+import 'package:fluttertoast/fluttertoast.dart';
+abstract class AppToast {
+  static Future<void> show(
+    String message, {
+    ToastGravity gravity = ToastGravity.CENTER,
+    Toast toastLength = Toast.LENGTH_SHORT,
+    Color backgroundColor = const Color(0xE6111827),
+    Color textColor = Colors.white,
+    double fontSize = 14,
+  }) async {
+    await Fluttertoast.cancel();
+    await Fluttertoast.showToast(
+      msg: message,
+      toastLength: toastLength,
+      gravity: gravity,
+      backgroundColor: backgroundColor,
+      textColor: textColor,
+      fontSize: fontSize,
     );
   }
 }
@@ -6294,63 +5185,6 @@ class PageIndicator extends StatelessWidget {
             style: const TextStyle(fontSize: 14, color: Colors.grey),
           ),
         ],
-      ),
-    );
-  }
-}
-```
-
-## File: lib/presentation/widgets/thought_bubble.dart
-```dart
-import 'package:flutter/material.dart';
-class ThoughtBubble extends StatelessWidget {
-  final String content;
-  const ThoughtBubble({
-    super.key,
-    required this.content,
-  });
-  @override
-  Widget build(BuildContext context) {
-    final text = content.trim();
-    if (text.isEmpty) return const SizedBox.shrink();
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return Card(
-      color: colorScheme.surfaceContainerHigh,
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.psychology_alt_outlined,
-                  size: 16,
-                  color: colorScheme.primary,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  '推理过程',
-                  style: textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: colorScheme.primary,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              text,
-              style: textTheme.bodySmall?.copyWith(
-                fontSize: 13,
-                height: 1.65,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -7985,6 +6819,1308 @@ class FileService implements IFileService {
 }
 ```
 
+## File: lib/domain/states/chat_state.dart
+```dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+import '../../core/models/session.dart';
+import '../models/chat_page.dart';
+part 'chat_state.freezed.dart';
+@freezed
+class StreamStatus with _$StreamStatus {
+  const factory StreamStatus({
+    @Default('') String content,
+    @Default('') String reasoning,
+    @Default(false) bool isStreaming,
+  }) = _StreamStatus;
+}
+@freezed
+class ChatState with _$ChatState {
+  const factory ChatState({
+    Session? session,
+    String? currentRoundId,
+    ChatPageList? pageList,
+    String? error,
+    @Default(false) bool isLoading,
+  }) = _ChatState;
+  factory ChatState.initial() => const ChatState(
+        error: null,
+        isLoading: false,
+      );
+}
+extension ChatStateX on ChatState {
+  ChatState copyWithSession(Session session) {
+    return copyWith(
+      session: session,
+      isLoading: false,
+    );
+  }
+  ChatState copyWithCurrentRoundId(String roundId) {
+    return copyWith(currentRoundId: roundId);
+  }
+  ChatState copyWithError(String error) {
+    return copyWith(
+      error: error,
+      isLoading: false,
+    );
+  }
+  ChatState copyWithLoading(bool loading) {
+    return copyWith(isLoading: loading);
+  }
+}
+```
+
+## File: lib/domain/states/chat_state.freezed.dart
+```dart
+// coverage:ignore-file
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint
+// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
+part of 'chat_state.dart';
+// **************************************************************************
+// FreezedGenerator
+// **************************************************************************
+T _$identity<T>(T value) => value;
+final _privateConstructorUsedError = UnsupportedError(
+  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
+);
+/// @nodoc
+mixin _$StreamStatus {
+  String get content => throw _privateConstructorUsedError;
+  String get reasoning => throw _privateConstructorUsedError;
+  bool get isStreaming => throw _privateConstructorUsedError;
+  /// Create a copy of StreamStatus
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $StreamStatusCopyWith<StreamStatus> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+/// @nodoc
+abstract class $StreamStatusCopyWith<$Res> {
+  factory $StreamStatusCopyWith(
+    StreamStatus value,
+    $Res Function(StreamStatus) then,
+  ) = _$StreamStatusCopyWithImpl<$Res, StreamStatus>;
+  @useResult
+  $Res call({String content, String reasoning, bool isStreaming});
+}
+/// @nodoc
+class _$StreamStatusCopyWithImpl<$Res, $Val extends StreamStatus>
+    implements $StreamStatusCopyWith<$Res> {
+  _$StreamStatusCopyWithImpl(this._value, this._then);
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+  /// Create a copy of StreamStatus
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? content = null,
+    Object? reasoning = null,
+    Object? isStreaming = null,
+  }) {
+    return _then(
+      _value.copyWith(
+            content: null == content
+                ? _value.content
+                : content // ignore: cast_nullable_to_non_nullable
+                      as String,
+            reasoning: null == reasoning
+                ? _value.reasoning
+                : reasoning // ignore: cast_nullable_to_non_nullable
+                      as String,
+            isStreaming: null == isStreaming
+                ? _value.isStreaming
+                : isStreaming // ignore: cast_nullable_to_non_nullable
+                      as bool,
+          )
+          as $Val,
+    );
+  }
+}
+/// @nodoc
+abstract class _$$StreamStatusImplCopyWith<$Res>
+    implements $StreamStatusCopyWith<$Res> {
+  factory _$$StreamStatusImplCopyWith(
+    _$StreamStatusImpl value,
+    $Res Function(_$StreamStatusImpl) then,
+  ) = __$$StreamStatusImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({String content, String reasoning, bool isStreaming});
+}
+/// @nodoc
+class __$$StreamStatusImplCopyWithImpl<$Res>
+    extends _$StreamStatusCopyWithImpl<$Res, _$StreamStatusImpl>
+    implements _$$StreamStatusImplCopyWith<$Res> {
+  __$$StreamStatusImplCopyWithImpl(
+    _$StreamStatusImpl _value,
+    $Res Function(_$StreamStatusImpl) _then,
+  ) : super(_value, _then);
+  /// Create a copy of StreamStatus
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? content = null,
+    Object? reasoning = null,
+    Object? isStreaming = null,
+  }) {
+    return _then(
+      _$StreamStatusImpl(
+        content: null == content
+            ? _value.content
+            : content // ignore: cast_nullable_to_non_nullable
+                  as String,
+        reasoning: null == reasoning
+            ? _value.reasoning
+            : reasoning // ignore: cast_nullable_to_non_nullable
+                  as String,
+        isStreaming: null == isStreaming
+            ? _value.isStreaming
+            : isStreaming // ignore: cast_nullable_to_non_nullable
+                  as bool,
+      ),
+    );
+  }
+}
+/// @nodoc
+class _$StreamStatusImpl implements _StreamStatus {
+  const _$StreamStatusImpl({
+    this.content = '',
+    this.reasoning = '',
+    this.isStreaming = false,
+  });
+  @override
+  @JsonKey()
+  final String content;
+  @override
+  @JsonKey()
+  final String reasoning;
+  @override
+  @JsonKey()
+  final bool isStreaming;
+  @override
+  String toString() {
+    return 'StreamStatus(content: $content, reasoning: $reasoning, isStreaming: $isStreaming)';
+  }
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$StreamStatusImpl &&
+            (identical(other.content, content) || other.content == content) &&
+            (identical(other.reasoning, reasoning) ||
+                other.reasoning == reasoning) &&
+            (identical(other.isStreaming, isStreaming) ||
+                other.isStreaming == isStreaming));
+  }
+  @override
+  int get hashCode => Object.hash(runtimeType, content, reasoning, isStreaming);
+  /// Create a copy of StreamStatus
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$StreamStatusImplCopyWith<_$StreamStatusImpl> get copyWith =>
+      __$$StreamStatusImplCopyWithImpl<_$StreamStatusImpl>(this, _$identity);
+}
+abstract class _StreamStatus implements StreamStatus {
+  const factory _StreamStatus({
+    final String content,
+    final String reasoning,
+    final bool isStreaming,
+  }) = _$StreamStatusImpl;
+  @override
+  String get content;
+  @override
+  String get reasoning;
+  @override
+  bool get isStreaming;
+  /// Create a copy of StreamStatus
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$StreamStatusImplCopyWith<_$StreamStatusImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+/// @nodoc
+mixin _$ChatState {
+  Session? get session => throw _privateConstructorUsedError;
+  String? get currentRoundId => throw _privateConstructorUsedError;
+  ChatPageList? get pageList => throw _privateConstructorUsedError;
+  String? get error => throw _privateConstructorUsedError;
+  bool get isLoading => throw _privateConstructorUsedError;
+  /// Create a copy of ChatState
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $ChatStateCopyWith<ChatState> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+/// @nodoc
+abstract class $ChatStateCopyWith<$Res> {
+  factory $ChatStateCopyWith(ChatState value, $Res Function(ChatState) then) =
+      _$ChatStateCopyWithImpl<$Res, ChatState>;
+  @useResult
+  $Res call({
+    Session? session,
+    String? currentRoundId,
+    ChatPageList? pageList,
+    String? error,
+    bool isLoading,
+  });
+  $SessionCopyWith<$Res>? get session;
+  $ChatPageListCopyWith<$Res>? get pageList;
+}
+/// @nodoc
+class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
+    implements $ChatStateCopyWith<$Res> {
+  _$ChatStateCopyWithImpl(this._value, this._then);
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+  /// Create a copy of ChatState
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? session = freezed,
+    Object? currentRoundId = freezed,
+    Object? pageList = freezed,
+    Object? error = freezed,
+    Object? isLoading = null,
+  }) {
+    return _then(
+      _value.copyWith(
+            session: freezed == session
+                ? _value.session
+                : session // ignore: cast_nullable_to_non_nullable
+                      as Session?,
+            currentRoundId: freezed == currentRoundId
+                ? _value.currentRoundId
+                : currentRoundId // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            pageList: freezed == pageList
+                ? _value.pageList
+                : pageList // ignore: cast_nullable_to_non_nullable
+                      as ChatPageList?,
+            error: freezed == error
+                ? _value.error
+                : error // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            isLoading: null == isLoading
+                ? _value.isLoading
+                : isLoading // ignore: cast_nullable_to_non_nullable
+                      as bool,
+          )
+          as $Val,
+    );
+  }
+  /// Create a copy of ChatState
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $SessionCopyWith<$Res>? get session {
+    if (_value.session == null) {
+      return null;
+    }
+    return $SessionCopyWith<$Res>(_value.session!, (value) {
+      return _then(_value.copyWith(session: value) as $Val);
+    });
+  }
+  /// Create a copy of ChatState
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $ChatPageListCopyWith<$Res>? get pageList {
+    if (_value.pageList == null) {
+      return null;
+    }
+    return $ChatPageListCopyWith<$Res>(_value.pageList!, (value) {
+      return _then(_value.copyWith(pageList: value) as $Val);
+    });
+  }
+}
+/// @nodoc
+abstract class _$$ChatStateImplCopyWith<$Res>
+    implements $ChatStateCopyWith<$Res> {
+  factory _$$ChatStateImplCopyWith(
+    _$ChatStateImpl value,
+    $Res Function(_$ChatStateImpl) then,
+  ) = __$$ChatStateImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({
+    Session? session,
+    String? currentRoundId,
+    ChatPageList? pageList,
+    String? error,
+    bool isLoading,
+  });
+  @override
+  $SessionCopyWith<$Res>? get session;
+  @override
+  $ChatPageListCopyWith<$Res>? get pageList;
+}
+/// @nodoc
+class __$$ChatStateImplCopyWithImpl<$Res>
+    extends _$ChatStateCopyWithImpl<$Res, _$ChatStateImpl>
+    implements _$$ChatStateImplCopyWith<$Res> {
+  __$$ChatStateImplCopyWithImpl(
+    _$ChatStateImpl _value,
+    $Res Function(_$ChatStateImpl) _then,
+  ) : super(_value, _then);
+  /// Create a copy of ChatState
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? session = freezed,
+    Object? currentRoundId = freezed,
+    Object? pageList = freezed,
+    Object? error = freezed,
+    Object? isLoading = null,
+  }) {
+    return _then(
+      _$ChatStateImpl(
+        session: freezed == session
+            ? _value.session
+            : session // ignore: cast_nullable_to_non_nullable
+                  as Session?,
+        currentRoundId: freezed == currentRoundId
+            ? _value.currentRoundId
+            : currentRoundId // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        pageList: freezed == pageList
+            ? _value.pageList
+            : pageList // ignore: cast_nullable_to_non_nullable
+                  as ChatPageList?,
+        error: freezed == error
+            ? _value.error
+            : error // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        isLoading: null == isLoading
+            ? _value.isLoading
+            : isLoading // ignore: cast_nullable_to_non_nullable
+                  as bool,
+      ),
+    );
+  }
+}
+/// @nodoc
+class _$ChatStateImpl implements _ChatState {
+  const _$ChatStateImpl({
+    this.session,
+    this.currentRoundId,
+    this.pageList,
+    this.error,
+    this.isLoading = false,
+  });
+  @override
+  final Session? session;
+  @override
+  final String? currentRoundId;
+  @override
+  final ChatPageList? pageList;
+  @override
+  final String? error;
+  @override
+  @JsonKey()
+  final bool isLoading;
+  @override
+  String toString() {
+    return 'ChatState(session: $session, currentRoundId: $currentRoundId, pageList: $pageList, error: $error, isLoading: $isLoading)';
+  }
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$ChatStateImpl &&
+            (identical(other.session, session) || other.session == session) &&
+            (identical(other.currentRoundId, currentRoundId) ||
+                other.currentRoundId == currentRoundId) &&
+            (identical(other.pageList, pageList) ||
+                other.pageList == pageList) &&
+            (identical(other.error, error) || other.error == error) &&
+            (identical(other.isLoading, isLoading) ||
+                other.isLoading == isLoading));
+  }
+  @override
+  int get hashCode => Object.hash(
+    runtimeType,
+    session,
+    currentRoundId,
+    pageList,
+    error,
+    isLoading,
+  );
+  /// Create a copy of ChatState
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$ChatStateImplCopyWith<_$ChatStateImpl> get copyWith =>
+      __$$ChatStateImplCopyWithImpl<_$ChatStateImpl>(this, _$identity);
+}
+abstract class _ChatState implements ChatState {
+  const factory _ChatState({
+    final Session? session,
+    final String? currentRoundId,
+    final ChatPageList? pageList,
+    final String? error,
+    final bool isLoading,
+  }) = _$ChatStateImpl;
+  @override
+  Session? get session;
+  @override
+  String? get currentRoundId;
+  @override
+  ChatPageList? get pageList;
+  @override
+  String? get error;
+  @override
+  bool get isLoading;
+  /// Create a copy of ChatState
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$ChatStateImplCopyWith<_$ChatStateImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+```
+
+## File: lib/presentation/pages/text_attachment_viewer_page.dart
+```dart
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../widgets/common/app_page_scaffold.dart';
+import '../widgets/common/app_toast.dart';
+class TextAttachmentViewerPage extends StatelessWidget {
+  final String title;
+  final String content;
+  const TextAttachmentViewerPage({
+    super.key,
+    required this.title,
+    required this.content,
+  });
+  Future<void> _copyAll() async {
+    await Clipboard.setData(ClipboardData(text: content));
+    await AppToast.show('全文已复制');
+  }
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return AppPageScaffold(
+      appBar: AppBar(
+        title: Text(
+          title,
+          overflow: TextOverflow.ellipsis,
+          style: textTheme.titleMedium,
+        ),
+        actions: [
+          IconButton(
+            tooltip: '复制全文',
+            onPressed: _copyAll,
+            icon: const Icon(Icons.content_copy_outlined),
+          ),
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: SelectableText(
+              content,
+              style: textTheme.bodyMedium?.copyWith(
+                fontFamily: 'monospace',
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+```
+
+## File: lib/presentation/providers/attachment_bytes_provider.dart
+```dart
+import 'dart:typed_data';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../di/providers.dart';
+final attachmentBytesProvider =
+    FutureProvider.autoDispose.family<Uint8List, String>(
+  (ref, relativePath) async {
+    final repository = ref.read(conversationRepositoryProvider);
+    return repository.getAttachment(relativePath);
+  },
+);
+```
+
+## File: lib/presentation/providers/config_notifier.dart
+```dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/app_config.dart';
+import '../../core/models/app_config_store.dart';
+import '../../di/providers.dart';
+class ConfigNotifier extends StateNotifier<AsyncValue<AppConfig>> {
+  final Ref ref;
+  ConfigNotifier(this.ref) : super(const AsyncValue.loading()) {
+    _loadInitialConfig();
+  }
+  Future<void> _loadInitialConfig() async {
+    try {
+      final repository = ref.read(configRepositoryProvider);
+      final config = await repository.getConfig();
+      state = AsyncValue.data(config);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+  Future<AppConfig> _fetchLatestConfig() async {
+    final repository = ref.read(configRepositoryProvider);
+    return await repository.getConfig();
+  }
+  Future<void> _reloadConfigWithoutLoading() async {
+    final config = await _fetchLatestConfig();
+    state = AsyncValue.data(config);
+  }
+  Future<void> updateApiKey(String apiKey) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.updateApiKey(apiKey);
+    await _reloadConfigWithoutLoading();
+  }
+  Future<void> updateBaseUrl(String baseUrl) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.updateBaseUrl(baseUrl);
+    await _reloadConfigWithoutLoading();
+  }
+  Future<void> updateModelsPath(String modelsPath) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.updateModelsPath(modelsPath);
+    await _reloadConfigWithoutLoading();
+  }
+  Future<void> updateChatPath(String chatPath) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.updateChatPath(chatPath);
+    await _reloadConfigWithoutLoading();
+  }
+  Future<void> updateApiMode(String apiMode) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.updateApiMode(apiMode);
+    await _reloadConfigWithoutLoading();
+  }
+  Future<void> updateSelectedModel(String? model) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.updateSelectedModel(model);
+    await _reloadConfigWithoutLoading();
+  }
+  Future<void> saveFullConfig(AppConfig config) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.saveFullConfig(config);
+    state = AsyncValue.data(config);
+  }
+  Future<void> saveAndRefreshModels(AppConfig config) async {
+    final repository = ref.read(configRepositoryProvider);
+    state = AsyncValue.data(
+      config.copyWith(
+        availableModels: [],
+      ),
+    );
+    await repository.saveAndRefreshModels(config);
+    await _reloadConfigWithoutLoading();
+  }
+  Future<void> refreshModels() async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.refreshModels();
+    await _reloadConfigWithoutLoading();
+  }
+}
+final configProvider =
+    StateNotifierProvider<ConfigNotifier, AsyncValue<AppConfig>>((ref) {
+  return ConfigNotifier(ref);
+});
+class ConfigProfilesNotifier
+    extends StateNotifier<AsyncValue<AppConfigStore>> {
+  final Ref ref;
+  ConfigProfilesNotifier(this.ref) : super(const AsyncValue.loading()) {
+    load();
+  }
+  Future<void> load() async {
+    try {
+      final repository = ref.read(configRepositoryProvider);
+      final store = await repository.getConfigStore();
+      state = AsyncValue.data(store);
+      final config = await repository.getConfig();
+      ref.read(configProvider.notifier).state = AsyncValue.data(config);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+  Future<void> switchProfile(String profileId) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.switchProfile(profileId);
+    await load();
+  }
+  Future<void> createProfile(String name) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.createProfile(name);
+    await load();
+  }
+  Future<void> renameProfile(String profileId, String name) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.renameProfile(profileId, name);
+    await load();
+  }
+  Future<void> deleteProfile(String profileId) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.deleteProfile(profileId);
+    await load();
+  }
+}
+final configProfilesProvider =
+    StateNotifierProvider<ConfigProfilesNotifier, AsyncValue<AppConfigStore>>(
+        (ref) {
+  return ConfigProfilesNotifier(ref);
+});
+```
+
+## File: lib/presentation/providers/home_session_list_provider.dart
+```dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/session.dart';
+import '../../domain/services/branch_navigator.dart';
+import 'session_list_notifier.dart';
+class HomeSessionItem {
+  final Session session;
+  final bool hasUnseen;
+  final String userPreview;
+  final int roundCount;
+  final int updatedAt;
+  final String? previewRoundId;
+  const HomeSessionItem({
+    required this.session,
+    required this.hasUnseen,
+    required this.userPreview,
+    required this.roundCount,
+    required this.updatedAt,
+    required this.previewRoundId,
+  });
+}
+final homeSessionListProvider =
+    Provider<AsyncValue<List<HomeSessionItem>>>((ref) {
+  final sessionsAsync = ref.watch(sessionListProvider);
+  return sessionsAsync.whenData((sessions) {
+    final items = sessions.map((session) {
+      final hasUnseen = session.rounds.any((r) => r.hasUnseenUpdate);
+      final roundCount = session.rounds.length;
+      final leaves = session.rounds.isEmpty
+          ? const []
+          : BranchNavigator.getAllBranchLeaves(session);
+      final previewRoundId =
+          session.rounds.isEmpty ? null : leaves.isNotEmpty ? leaves.last.id : session.rounds.last.id;
+      final previewRound =
+          previewRoundId == null ? null : session.rounds.firstWhere((r) => r.id == previewRoundId);
+      final userPreview = previewRound == null
+          ? '点击开始新的对话'
+          : previewRound.userContent.trim().isEmpty
+              ? '（空输入）'
+              : previewRound.userContent.trim();
+      return HomeSessionItem(
+        session: session,
+        hasUnseen: hasUnseen,
+        userPreview: userPreview,
+        roundCount: roundCount,
+        updatedAt: session.updatedAt,
+        previewRoundId: previewRoundId,
+      );
+    }).toList();
+    items.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return items;
+  });
+});
+```
+
+## File: lib/presentation/providers/input_draft_provider.dart
+```dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/pending_attachment.dart';
+final globalInputDraftProvider = StateProvider<String>((ref) => '');
+final globalAttachmentDraftProvider =
+    StateProvider<List<PendingAttachment>>((ref) => []);
+final globalEditSourceRoundIdProvider =
+    StateProvider<String?>((ref) => null);
+```
+
+## File: lib/presentation/providers/session_list_notifier.dart
+```dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/session.dart';
+import '../../di/providers.dart';
+class SessionListNotifier extends StateNotifier<AsyncValue<List<Session>>> {
+  final Ref ref;
+  SessionListNotifier(this.ref) : super(const AsyncValue.loading()) {
+    _loadSessions(initial: true);
+  }
+  Future<void> _loadSessions({bool initial = false}) async {
+    if (initial || !state.hasValue) {
+      state = const AsyncValue.loading();
+    }
+    try {
+      final repository = ref.read(conversationRepositoryProvider);
+      final sessions = await repository.getAllSessions();
+      state = AsyncValue.data(sessions);
+    } catch (e, st) {
+      if (initial || !state.hasValue) {
+        state = AsyncValue.error(e, st);
+      }
+    }
+  }
+  Future<void> refresh() async {
+    await _loadSessions(initial: false);
+  }
+  Future<void> deleteSession(String fileName) async {
+    try {
+      final repository = ref.read(conversationRepositoryProvider);
+      await repository.deleteSession(fileName);
+      await _loadSessions(initial: false);
+    } catch (e, st) {
+      if (!state.hasValue) {
+        state = AsyncValue.error(e, st);
+      }
+    }
+  }
+  Future<void> updateSessionTitle(String fileName, String newTitle) async {
+    try {
+      final repository = ref.read(conversationRepositoryProvider);
+      final cleanTitle = newTitle.trim();
+      if (cleanTitle.isEmpty) return;
+      await repository.updateSessionTitle(fileName, cleanTitle);
+      await _loadSessions(initial: false);
+    } catch (e, st) {
+      if (!state.hasValue) {
+        state = AsyncValue.error(e, st);
+      }
+    }
+  }
+  Future<String> createSession(String title) async {
+    final repository = ref.read(conversationRepositoryProvider);
+    final cleanTitle = title.trim().isEmpty ? '新对话' : title.trim();
+    final session = await repository.createSessionWithGeneratedId(
+      title: cleanTitle,
+    );
+    await _loadSessions(initial: false);
+    return '${session.id}.json';
+  }
+}
+final sessionListProvider =
+    StateNotifierProvider<SessionListNotifier, AsyncValue<List<Session>>>((ref) {
+  return SessionListNotifier(ref);
+});
+```
+
+## File: lib/presentation/themes/app_theme.dart
+```dart
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+class AppTheme {
+  static const Color _seedColor = Colors.blueGrey;
+  static ThemeData get lightTheme {
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: _seedColor,
+      brightness: Brightness.light,
+    );
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: colorScheme,
+      appBarTheme: const AppBarTheme(
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.dark,
+          statusBarBrightness: Brightness.light,
+          systemNavigationBarIconBrightness: Brightness.dark,
+        ),
+      ),
+      cardTheme: const CardThemeData(
+        elevation: 0,
+      ),
+      inputDecorationTheme: const InputDecorationTheme(
+        border: OutlineInputBorder(),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(),
+      ),
+      snackBarTheme: const SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+  static ThemeData get darkTheme {
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: _seedColor,
+      brightness: Brightness.dark,
+    );
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: colorScheme,
+      appBarTheme: const AppBarTheme(
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+          statusBarBrightness: Brightness.dark,
+          systemNavigationBarIconBrightness: Brightness.light,
+        ),
+      ),
+      cardTheme: const CardThemeData(
+        elevation: 0,
+      ),
+      inputDecorationTheme: const InputDecorationTheme(
+        border: OutlineInputBorder(),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(),
+      ),
+      snackBarTheme: const SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+}
+```
+
+## File: lib/presentation/widgets/common/app_card.dart
+```dart
+import 'package:flutter/material.dart';
+class AppCard extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final EdgeInsetsGeometry? margin;
+  final Color? color;
+  final ShapeBorder? shape;
+  final double? elevation;
+  const AppCard({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.all(16),
+    this.margin,
+    this.color,
+    this.shape,
+    this.elevation,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: margin,
+      color: color,
+      shape: shape,
+      elevation: elevation,
+      child: Padding(
+        padding: padding,
+        child: child,
+      ),
+    );
+  }
+}
+```
+
+## File: lib/presentation/widgets/common/app_section.dart
+```dart
+import 'package:flutter/material.dart';
+import 'app_card.dart';
+class AppSection extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final List<Widget> children;
+  final EdgeInsetsGeometry? margin;
+  const AppSection({
+    super.key,
+    required this.title,
+    this.subtitle,
+    required this.children,
+    this.margin,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return AppCard(
+      margin: margin ?? const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: textTheme.titleMedium),
+          if (subtitle != null) ...[
+            const SizedBox(height: 8),
+            Text(subtitle!, style: textTheme.bodySmall),
+          ],
+          const SizedBox(height: 16),
+          ...children,
+        ],
+      ),
+    );
+  }
+}
+```
+
+## File: lib/presentation/widgets/input_bar.dart
+```dart
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import '../../core/utils/id_generator.dart';
+import '../models/pending_attachment.dart';
+import '../providers/input_draft_provider.dart';
+class InputBar extends ConsumerStatefulWidget {
+  final void Function(String text, List<PendingAttachment> attachments) onSend;
+  final VoidCallback? onStop;
+  final bool isStreaming;
+  final bool enabled;
+  final String hintText;
+  const InputBar({
+    super.key,
+    required this.onSend,
+    this.onStop,
+    this.isStreaming = false,
+    this.enabled = true,
+    this.hintText = '输入消息...',
+  });
+  @override
+  ConsumerState<InputBar> createState() => _InputBarState();
+}
+class _InputBarState extends ConsumerState<InputBar> {
+  late final TextEditingController _controller;
+  late final ProviderSubscription<String> _draftSubscription;
+  final ImagePicker _imagePicker = ImagePicker();
+  bool _isSyncingText = false;
+  @override
+  void initState() {
+    super.initState();
+    final draft = ref.read(globalInputDraftProvider);
+    _controller = TextEditingController(text: draft);
+    _controller.addListener(_handleControllerChanged);
+    _draftSubscription = ref.listenManual<String>(
+      globalInputDraftProvider,
+      (previous, next) {
+        if (_controller.text == next) return;
+        _syncControllerText(next);
+      },
+    );
+  }
+  @override
+  void dispose() {
+    _draftSubscription.close();
+    _controller.removeListener(_handleControllerChanged);
+    _controller.dispose();
+    super.dispose();
+  }
+  void _handleControllerChanged() {
+    if (_isSyncingText) return;
+    final text = _controller.text;
+    final notifier = ref.read(globalInputDraftProvider.notifier);
+    if (notifier.state != text) {
+      notifier.state = text;
+    }
+    if (mounted) {
+      setState(() {});
+    }
+  }
+  void _syncControllerText(String text) {
+    _isSyncingText = true;
+    _controller.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+      composing: TextRange.empty,
+    );
+    _isSyncingText = false;
+    if (mounted) {
+      setState(() {});
+    }
+  }
+  void _clearDraft() {
+    ref.read(globalInputDraftProvider.notifier).state = '';
+  }
+  void _clearAttachmentDraft() {
+    ref.read(globalAttachmentDraftProvider.notifier).state = [];
+  }
+  bool _isImageFile(String name) {
+    final lower = name.toLowerCase();
+    return lower.endsWith('.png') ||
+        lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.gif') ||
+        lower.endsWith('.webp') ||
+        lower.endsWith('.bmp');
+  }
+  String? _guessMimeType(String name) {
+    final lower = name.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
+      return 'image/jpeg';
+    }
+    if (lower.endsWith('.gif')) return 'image/gif';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    if (lower.endsWith('.bmp')) return 'image/bmp';
+    if (lower.endsWith('.txt')) return 'text/plain';
+    if (lower.endsWith('.md')) return 'text/markdown';
+    if (lower.endsWith('.json')) return 'application/json';
+    if (lower.endsWith('.pdf')) return 'application/pdf';
+    if (lower.endsWith('.dart')) return 'text/plain';
+    if (lower.endsWith('.yaml') || lower.endsWith('.yml')) {
+      return 'text/yaml';
+    }
+    return null;
+  }
+  Future<void> _pickFileAttachment() async {
+    if (!widget.enabled) return;
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: false,
+      withData: false,
+      type: FileType.any,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.single;
+    final filePath = file.path;
+    if (filePath == null || filePath.trim().isEmpty) return;
+    final mimeType = _guessMimeType(file.name);
+    final isImage = _isImageFile(file.name);
+    final attachment = PendingAttachment(
+      id: IdGenerator.generate(),
+      name: file.name,
+      path: filePath,
+      isImage: isImage,
+      mimeType: mimeType,
+    );
+    final notifier = ref.read(globalAttachmentDraftProvider.notifier);
+    notifier.state = [...notifier.state, attachment];
+  }
+  Future<void> _pickImageFromGallery() async {
+    if (!widget.enabled) return;
+    final file = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 100,
+    );
+    if (file == null) return;
+    final name = file.name;
+    final attachment = PendingAttachment(
+      id: IdGenerator.generate(),
+      name: name,
+      path: file.path,
+      isImage: true,
+      mimeType: _guessMimeType(name) ?? 'image/*',
+    );
+    final notifier = ref.read(globalAttachmentDraftProvider.notifier);
+    notifier.state = [...notifier.state, attachment];
+  }
+  void _removeAttachment(String id) {
+    final notifier = ref.read(globalAttachmentDraftProvider.notifier);
+    notifier.state = notifier.state.where((item) => item.id != id).toList();
+  }
+  Future<void> _showAddAttachmentSheet() async {
+    if (!widget.enabled) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.attach_file_outlined),
+                title: const Text('文件'),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  await _pickFileAttachment();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: const Text('相册'),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  await _pickImageFromGallery();
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+  void _handleSend() {
+    if (!widget.enabled) return;
+    final content = _controller.text.trim();
+    final attachments = ref.read(globalAttachmentDraftProvider);
+    if (content.isEmpty && attachments.isEmpty) return;
+    widget.onSend(content, attachments);
+    _clearDraft();
+    _clearAttachmentDraft();
+  }
+  @override
+  Widget build(BuildContext context) {
+    final attachments = ref.watch(globalAttachmentDraftProvider);
+    final hasText = _controller.text.trim().isNotEmpty;
+    final hasAttachments = attachments.isNotEmpty;
+    final canSend = (hasText || hasAttachments) && widget.enabled;
+    final showStopButton = widget.isStreaming && widget.onStop != null;
+    return SafeArea(
+      top: false,
+      child: Material(
+        elevation: 1,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (attachments.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: attachments.map((attachment) {
+                        return InputChip(
+                          avatar: Icon(
+                            attachment.isImage
+                                ? Icons.image_outlined
+                                : Icons.attach_file_outlined,
+                            size: 18,
+                          ),
+                          label: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 180),
+                            child: Text(
+                              attachment.name,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          onDeleted: () => _removeAttachment(attachment.id),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  IconButton(
+                    tooltip: '添加附件',
+                    onPressed: widget.enabled ? _showAddAttachmentSheet : null,
+                    icon: const Icon(Icons.add),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      minLines: 1,
+                      maxLines: 6,
+                      enabled: widget.enabled,
+                      keyboardType: TextInputType.multiline,
+                      textInputAction: TextInputAction.newline,
+                      decoration: InputDecoration(
+                        hintText: widget.hintText,
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (showStopButton)
+                    IconButton.filledTonal(
+                      tooltip: '停止生成',
+                      onPressed: widget.enabled ? widget.onStop : null,
+                      icon: const Icon(Icons.stop_rounded),
+                    )
+                  else
+                    IconButton.filled(
+                      tooltip: '发送',
+                      onPressed: canSend ? _handleSend : null,
+                      icon: const Icon(Icons.arrow_upward_rounded),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+```
+
+## File: lib/presentation/widgets/thought_bubble.dart
+```dart
+import 'package:flutter/material.dart';
+class ThoughtBubble extends StatelessWidget {
+  final String content;
+  const ThoughtBubble({
+    super.key,
+    required this.content,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final text = content.trim();
+    if (text.isEmpty) return const SizedBox.shrink();
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Card(
+      color: colorScheme.surfaceContainerHigh,
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.psychology_alt_outlined,
+                  size: 16,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '推理过程',
+                  style: textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.primary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              text,
+              style: textTheme.bodySmall?.copyWith(
+                fontSize: 13,
+                height: 1.65,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+
 ## File: lib/domain/services/chat_round_factory.dart
 ```dart
 import '../../core/models/attachment.dart';
@@ -8727,148 +8863,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 }
 ```
 
-## File: lib/presentation/providers/attachment_bytes_provider.dart
-```dart
-import 'dart:typed_data';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../di/providers.dart';
-final attachmentBytesProvider =
-    FutureProvider.autoDispose.family<Uint8List, String>(
-  (ref, relativePath) async {
-    final repository = ref.read(conversationRepositoryProvider);
-    return repository.getAttachment(relativePath);
-  },
-);
-```
-
-## File: lib/presentation/providers/config_notifier.dart
-```dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/app_config.dart';
-import '../../core/models/app_config_store.dart';
-import '../../di/providers.dart';
-class ConfigNotifier extends StateNotifier<AsyncValue<AppConfig>> {
-  final Ref ref;
-  ConfigNotifier(this.ref) : super(const AsyncValue.loading()) {
-    _loadInitialConfig();
-  }
-  Future<void> _loadInitialConfig() async {
-    try {
-      final repository = ref.read(configRepositoryProvider);
-      final config = await repository.getConfig();
-      state = AsyncValue.data(config);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
-  }
-  Future<AppConfig> _fetchLatestConfig() async {
-    final repository = ref.read(configRepositoryProvider);
-    return await repository.getConfig();
-  }
-  Future<void> _reloadConfigWithoutLoading() async {
-    final config = await _fetchLatestConfig();
-    state = AsyncValue.data(config);
-  }
-  Future<void> updateApiKey(String apiKey) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.updateApiKey(apiKey);
-    await _reloadConfigWithoutLoading();
-  }
-  Future<void> updateBaseUrl(String baseUrl) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.updateBaseUrl(baseUrl);
-    await _reloadConfigWithoutLoading();
-  }
-  Future<void> updateModelsPath(String modelsPath) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.updateModelsPath(modelsPath);
-    await _reloadConfigWithoutLoading();
-  }
-  Future<void> updateChatPath(String chatPath) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.updateChatPath(chatPath);
-    await _reloadConfigWithoutLoading();
-  }
-  Future<void> updateApiMode(String apiMode) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.updateApiMode(apiMode);
-    await _reloadConfigWithoutLoading();
-  }
-  Future<void> updateSelectedModel(String? model) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.updateSelectedModel(model);
-    await _reloadConfigWithoutLoading();
-  }
-  Future<void> saveFullConfig(AppConfig config) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.saveFullConfig(config);
-    state = AsyncValue.data(config);
-  }
-  Future<void> saveAndRefreshModels(AppConfig config) async {
-    final repository = ref.read(configRepositoryProvider);
-    state = AsyncValue.data(
-      config.copyWith(
-        availableModels: [],
-      ),
-    );
-    await repository.saveAndRefreshModels(config);
-    await _reloadConfigWithoutLoading();
-  }
-  Future<void> refreshModels() async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.refreshModels();
-    await _reloadConfigWithoutLoading();
-  }
-}
-final configProvider =
-    StateNotifierProvider<ConfigNotifier, AsyncValue<AppConfig>>((ref) {
-  return ConfigNotifier(ref);
-});
-class ConfigProfilesNotifier
-    extends StateNotifier<AsyncValue<AppConfigStore>> {
-  final Ref ref;
-  ConfigProfilesNotifier(this.ref) : super(const AsyncValue.loading()) {
-    load();
-  }
-  Future<void> load() async {
-    try {
-      final repository = ref.read(configRepositoryProvider);
-      final store = await repository.getConfigStore();
-      state = AsyncValue.data(store);
-      final config = await repository.getConfig();
-      ref.read(configProvider.notifier).state = AsyncValue.data(config);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
-  }
-  Future<void> switchProfile(String profileId) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.switchProfile(profileId);
-    await load();
-  }
-  Future<void> createProfile(String name) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.createProfile(name);
-    await load();
-  }
-  Future<void> renameProfile(String profileId, String name) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.renameProfile(profileId, name);
-    await load();
-  }
-  Future<void> deleteProfile(String profileId) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.deleteProfile(profileId);
-    await load();
-  }
-}
-final configProfilesProvider =
-    StateNotifierProvider<ConfigProfilesNotifier, AsyncValue<AppConfigStore>>(
-        (ref) {
-  return ConfigProfilesNotifier(ref);
-});
-```
-
 ## File: lib/presentation/providers/global_streaming_provider.dart
 ```dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8983,84 +8977,6 @@ final roundStreamProvider =
     return sessionMap[args.roundId];
   },
 );
-```
-
-## File: lib/presentation/providers/input_draft_provider.dart
-```dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/pending_attachment.dart';
-final globalInputDraftProvider = StateProvider<String>((ref) => '');
-final globalAttachmentDraftProvider =
-    StateProvider<List<PendingAttachment>>((ref) => []);
-final globalEditSourceRoundIdProvider =
-    StateProvider<String?>((ref) => null);
-```
-
-## File: lib/presentation/providers/session_list_notifier.dart
-```dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/session.dart';
-import '../../di/providers.dart';
-class SessionListNotifier extends StateNotifier<AsyncValue<List<Session>>> {
-  final Ref ref;
-  SessionListNotifier(this.ref) : super(const AsyncValue.loading()) {
-    _loadSessions(initial: true);
-  }
-  Future<void> _loadSessions({bool initial = false}) async {
-    if (initial || !state.hasValue) {
-      state = const AsyncValue.loading();
-    }
-    try {
-      final repository = ref.read(conversationRepositoryProvider);
-      final sessions = await repository.getAllSessions();
-      state = AsyncValue.data(sessions);
-    } catch (e, st) {
-      if (initial || !state.hasValue) {
-        state = AsyncValue.error(e, st);
-      }
-    }
-  }
-  Future<void> refresh() async {
-    await _loadSessions(initial: false);
-  }
-  Future<void> deleteSession(String fileName) async {
-    try {
-      final repository = ref.read(conversationRepositoryProvider);
-      await repository.deleteSession(fileName);
-      await _loadSessions(initial: false);
-    } catch (e, st) {
-      if (!state.hasValue) {
-        state = AsyncValue.error(e, st);
-      }
-    }
-  }
-  Future<void> updateSessionTitle(String fileName, String newTitle) async {
-    try {
-      final repository = ref.read(conversationRepositoryProvider);
-      final cleanTitle = newTitle.trim();
-      if (cleanTitle.isEmpty) return;
-      await repository.updateSessionTitle(fileName, cleanTitle);
-      await _loadSessions(initial: false);
-    } catch (e, st) {
-      if (!state.hasValue) {
-        state = AsyncValue.error(e, st);
-      }
-    }
-  }
-  Future<String> createSession(String title) async {
-    final repository = ref.read(conversationRepositoryProvider);
-    final cleanTitle = title.trim().isEmpty ? '新对话' : title.trim();
-    final session = await repository.createSessionWithGeneratedId(
-      title: cleanTitle,
-    );
-    await _loadSessions(initial: false);
-    return '${session.id}.json';
-  }
-}
-final sessionListProvider =
-    StateNotifierProvider<SessionListNotifier, AsyncValue<List<Session>>>((ref) {
-  return SessionListNotifier(ref);
-});
 ```
 
 ## File: lib/presentation/themes/app_tokens.dart
@@ -9410,11 +9326,13 @@ import '../widgets/common/app_toast.dart';
 import 'branch_tree_page.dart';
 class ChatPage extends ConsumerStatefulWidget {
   final String fileName;
+  final String? initialRoundId;
   final String? initialMessage;
   final List<PendingAttachment>? initialAttachments;
   const ChatPage({
     super.key,
     required this.fileName,
+    this.initialRoundId,
     this.initialMessage,
     this.initialAttachments,
   });
@@ -9422,7 +9340,7 @@ class ChatPage extends ConsumerStatefulWidget {
   ConsumerState<ChatPage> createState() => _ChatPageState();
 }
 class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
-  late final PageController _pageController;
+  PageController? _pageController;
   late final ProviderSubscription<ChatState> _chatSubscription;
   bool _initialMessageHandled = false;
   bool _isMarkingSeen = false;
@@ -9431,36 +9349,40 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
   @override
   void initState() {
     super.initState();
-    _pageController = PageController();
     _chatSubscription = ref.listenManual<ChatState>(
       chatProvider(widget.fileName),
       (previous, next) {
+        final nextPageList = next.pageList;
+        if (nextPageList == null || nextPageList.pages.isEmpty) return;
+        if (_pageController == null) {
+          final initialIndex = nextPageList.currentPageIndex;
+          _pageController = PageController(initialPage: initialIndex);
+          if (mounted) {
+            setState(() {});
+          }
+          return;
+        }
+        final controller = _pageController;
+        if (controller == null || !controller.hasClients) return;
         final prevIndex = previous?.pageList?.currentPageIndex;
-        final nextIndex = next.pageList?.currentPageIndex;
-        if (next.pageList == null || next.pageList!.pages.isEmpty) return;
-        if (!_pageController.hasClients) return;
-        if (nextIndex == null) return;
+        final nextIndex = nextPageList.currentPageIndex;
         if (prevIndex == nextIndex) return;
-        final currentPage =
-            _pageController.page?.round() ?? _pageController.initialPage;
+        final currentPage = controller.page?.round() ?? controller.initialPage;
         if (currentPage == nextIndex) return;
-        _pageController.jumpToPage(nextIndex);
+        controller.jumpToPage(nextIndex);
       },
     );
     Future.microtask(() async {
       final notifier = ref.read(chatProvider(widget.fileName).notifier);
-      await notifier.loadSession();
+      await notifier.loadSession(initialRoundId: widget.initialRoundId);
       final state = ref.read(chatProvider(widget.fileName));
-      final initialIndex = state.pageList?.currentPageIndex;
-      if (initialIndex != null && _pageController.hasClients) {
-        _pageController.jumpToPage(initialIndex);
-      }
       final currentRoundId = state.currentRoundId;
       if (currentRoundId != null) {
         await notifier.ensureRoundLoaded(currentRoundId);
       }
       final message = widget.initialMessage?.trim() ?? '';
-      final attachments = widget.initialAttachments ?? const <PendingAttachment>[];
+      final attachments =
+          widget.initialAttachments ?? const <PendingAttachment>[];
       final hasMessage = message.isNotEmpty;
       final hasAttachments = attachments.isNotEmpty;
       if (!_initialMessageHandled && (hasMessage || hasAttachments) && mounted) {
@@ -9491,7 +9413,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     }
     _chatSubscription.close();
     appRouteObserver.unsubscribe(this);
-    _pageController.dispose();
+    _pageController?.dispose();
     super.dispose();
   }
   @override
@@ -9538,13 +9460,14 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
   Future<void> _syncSeenWithVisiblePage() async {
     if (!_isRouteVisible) return;
     if (_isMarkingSeen) return;
-    if (!_pageController.hasClients) return;
+    final controller = _pageController;
+    if (controller == null || !controller.hasClients) return;
     final state = ref.read(chatProvider(widget.fileName));
     final pageList = state.pageList;
     if (pageList == null || pageList.pages.isEmpty) return;
-    final page = _pageController.page;
-    final index = (page?.round() ?? pageList.currentPageIndex)
-        .clamp(0, pageList.pages.length - 1);
+    final page = controller.page;
+    final index =
+        (page?.round() ?? pageList.currentPageIndex).clamp(0, pageList.pages.length - 1);
     final round = pageList.pages[index].round;
     if (!round.hasUnseenUpdate) return;
     _isMarkingSeen = true;
@@ -9608,7 +9531,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
               onPrev: isEditMode
                   ? null
                   : state.pageList!.currentPageIndex > 0
-                      ? () => _pageController.previousPage(
+                      ? () => _pageController?.previousPage(
                             duration: const Duration(milliseconds: 260),
                             curve: Curves.easeOutCubic,
                           )
@@ -9617,7 +9540,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
                   ? null
                   : state.pageList!.currentPageIndex <
                           state.pageList!.totalPages - 1
-                      ? () => _pageController.nextPage(
+                      ? () => _pageController?.nextPage(
                             duration: const Duration(milliseconds: 260),
                             curve: Curves.easeOutCubic,
                           )
@@ -9635,47 +9558,49 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
                     ? _buildErrorState(state.error ?? '会话不存在')
                     : !hasPages
                         ? _buildWelcomeEmpty(context)
-                        : PageView.builder(
-                            controller: _pageController,
-                            physics: isEditMode
-                                ? const NeverScrollableScrollPhysics()
-                                : const PageScrollPhysics(),
-                            itemCount: state.pageList?.pages.length ?? 0,
-                            onPageChanged: (index) async {
-                              if (state.pageList == null) return;
-                              if (index != state.pageList!.currentPageIndex) {
-                                notifier.changePage(index);
-                              }
-                              final round =
-                                  state.pageList!.pages[index].round;
-                              await notifier.ensureRoundLoaded(round.id);
-                              await _syncSeenWithVisiblePage();
-                            },
-                            itemBuilder: (context, index) {
-                              final round = state.pageList!.pages[index].round;
-                              final stream = ref.watch(
-                                roundStreamProvider(
-                                  (fileName: widget.fileName, roundId: round.id),
-                                ),
-                              );
-                              final canEdit = stream?.isStreaming != true;
-                              return _ChatRoundPage(
-                                key: ValueKey(round.id),
-                                fileName: widget.fileName,
-                                round: round,
-                                canEdit: canEdit,
-                                onRetryReply: () =>
-                                    notifier.retryFromRound(round.id),
-                                onEdit: canEdit
-                                    ? () => _enterEditMode(
-                                          round.id,
-                                          round.userContent,
-                                        )
-                                    : null,
-                                onCopyText: _copyText,
-                              );
-                            },
-                          ),
+                        : _pageController == null
+                            ? const Center(child: CircularProgressIndicator())
+                            : PageView.builder(
+                                controller: _pageController,
+                                physics: isEditMode
+                                    ? const NeverScrollableScrollPhysics()
+                                    : const PageScrollPhysics(),
+                                itemCount: state.pageList?.pages.length ?? 0,
+                                onPageChanged: (index) async {
+                                  if (state.pageList == null) return;
+                                  if (index != state.pageList!.currentPageIndex) {
+                                    notifier.changePage(index);
+                                  }
+                                  final round =
+                                      state.pageList!.pages[index].round;
+                                  await notifier.ensureRoundLoaded(round.id);
+                                  await _syncSeenWithVisiblePage();
+                                },
+                                itemBuilder: (context, index) {
+                                  final round = state.pageList!.pages[index].round;
+                                  final stream = ref.watch(
+                                    roundStreamProvider(
+                                      (fileName: widget.fileName, roundId: round.id),
+                                    ),
+                                  );
+                                  final canEdit = stream?.isStreaming != true;
+                                  return _ChatRoundPage(
+                                    key: ValueKey(round.id),
+                                    fileName: widget.fileName,
+                                    round: round,
+                                    canEdit: canEdit,
+                                    onRetryReply: () =>
+                                        notifier.retryFromRound(round.id),
+                                    onEdit: canEdit
+                                        ? () => _enterEditMode(
+                                              round.id,
+                                              round.userContent,
+                                            )
+                                        : null,
+                                    onCopyText: _copyText,
+                                  );
+                                },
+                              ),
           ),
           InputBar(
             hintText: isEditMode ? '修改文本后发送（保留原附件）' : '发送消息',
@@ -10448,13 +10373,12 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final fileName = '${widget.item.session.id}.json';
-      final previewRound = widget.item.session.rounds.firstWhere(
-        (r) => r.id == previewRoundId,
-        orElse: () => widget.item.session.rounds.last,
-      );
-      ref
-          .read(globalStreamCacheProvider.notifier)
-          .ensureRoundLoaded(fileName, previewRound);
+      final previewRound =
+          widget.item.session.rounds.firstWhere((r) => r.id == previewRoundId);
+      ref.read(globalStreamCacheProvider.notifier).ensureRoundLoaded(
+            fileName,
+            previewRound,
+          );
     });
   }
   Widget _buildMetaChip(String label, {IconData? icon}) {
@@ -10511,7 +10435,10 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
             await Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => ChatPage(fileName: fileName),
+                builder: (_) => ChatPage(
+                  fileName: fileName,
+                  initialRoundId: widget.item.previewRoundId,
+                ),
               ),
             );
             if (context.mounted) {
@@ -10646,7 +10573,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     final rounds = session.rounds.where((r) => ids.contains(r.id)).toList();
     _streamCache.ensureRoundsLoaded(fileName, rounds);
   }
-  Future<void> loadSession() async {
+  Future<void> loadSession({String? initialRoundId}) async {
     state = state.copyWithLoading(true);
     try {
       final repository = ref.read(conversationRepositoryProvider);
@@ -10657,7 +10584,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
         session = cleared;
         await ref.read(sessionListProvider.notifier).refresh();
       }
-      final viewState = ChatViewStateBuilder.buildInitial(session);
+      final viewState = initialRoundId != null
+          ? ChatViewStateBuilder.buildForRound(session, initialRoundId)
+          : ChatViewStateBuilder.buildInitial(session);
       state = state.copyWithSession(session).copyWith(
             currentRoundId: viewState.currentRoundId,
             pageList: viewState.pageList,
@@ -11012,8 +10941,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
   }
   void stopGeneration() {
     if (state.pageList == null || state.pageList!.pages.isEmpty) return;
-    final viewingRound =
-        state.pageList!.pages[state.pageList!.currentPageIndex].round;
+    final viewingRound = state.pageList!.pages[state.pageList!.currentPageIndex].round;
     final stream = _getRoundStream(viewingRound.id);
     if (stream?.isStreaming != true) return;
     _stoppingRoundIds.add(viewingRound.id);

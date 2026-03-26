@@ -86,7 +86,6 @@ class HomePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final sessionsAsync = ref.watch(homeSessionListProvider);
     final notifier = ref.read(sessionListProvider.notifier);
-
     return AppPageScaffold(
       appBar: AppBar(
         title: const Text('AI Chat'),
@@ -293,19 +292,15 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
     final previewRoundId = widget.item.previewRoundId;
     if (_requested || previewRoundId == null) return;
     _requested = true;
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-
       final fileName = '${widget.item.session.id}.json';
-      final previewRound = widget.item.session.rounds.firstWhere(
-        (r) => r.id == previewRoundId,
-        orElse: () => widget.item.session.rounds.last,
-      );
-
-      ref
-          .read(globalStreamCacheProvider.notifier)
-          .ensureRoundLoaded(fileName, previewRound);
+      final previewRound =
+          widget.item.session.rounds.firstWhere((r) => r.id == previewRoundId);
+      ref.read(globalStreamCacheProvider.notifier).ensureRoundLoaded(
+            fileName,
+            previewRound,
+          );
     });
   }
 
@@ -328,15 +323,12 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
         : ref.watch(
             roundStreamProvider((fileName: fileName, roundId: previewRoundId)),
           );
-
     final aiPreview = stream == null
         ? '加载中...'
         : stream.content.trim().isEmpty
             ? (stream.isStreaming ? '正在生成...' : '（等待回复）')
             : stream.content;
-
     final isStreaming = stream?.isStreaming == true;
-
     return Slidable(
       key: ValueKey(fileName),
       endActionPane: ActionPane(
@@ -367,7 +359,10 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
             await Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => ChatPage(fileName: fileName),
+                builder: (_) => ChatPage(
+                  fileName: fileName,
+                  initialRoundId: widget.item.previewRoundId,
+                ),
               ),
             );
             if (context.mounted) {

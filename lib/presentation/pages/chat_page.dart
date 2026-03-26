@@ -20,12 +20,14 @@ import 'branch_tree_page.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   final String fileName;
+  final String? initialRoundId;
   final String? initialMessage;
   final List<PendingAttachment>? initialAttachments;
 
   const ChatPage({
     super.key,
     required this.fileName,
+    this.initialRoundId,
     this.initialMessage,
     this.initialAttachments,
   });
@@ -35,7 +37,7 @@ class ChatPage extends ConsumerStatefulWidget {
 }
 
 class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
-  late final PageController _pageController;
+  PageController? _pageController;
   late final ProviderSubscription<ChatState> _chatSubscription;
   bool _initialMessageHandled = false;
   bool _isMarkingSeen = false;
@@ -45,42 +47,49 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
   @override
   void initState() {
     super.initState();
-    _pageController = PageController();
 
     _chatSubscription = ref.listenManual<ChatState>(
       chatProvider(widget.fileName),
       (previous, next) {
+        final nextPageList = next.pageList;
+        if (nextPageList == null || nextPageList.pages.isEmpty) return;
+
+        if (_pageController == null) {
+          final initialIndex = nextPageList.currentPageIndex;
+          _pageController = PageController(initialPage: initialIndex);
+          if (mounted) {
+            setState(() {});
+          }
+          return;
+        }
+
+        final controller = _pageController;
+        if (controller == null || !controller.hasClients) return;
+
         final prevIndex = previous?.pageList?.currentPageIndex;
-        final nextIndex = next.pageList?.currentPageIndex;
-        if (next.pageList == null || next.pageList!.pages.isEmpty) return;
-        if (!_pageController.hasClients) return;
-        if (nextIndex == null) return;
+        final nextIndex = nextPageList.currentPageIndex;
         if (prevIndex == nextIndex) return;
 
-        final currentPage =
-            _pageController.page?.round() ?? _pageController.initialPage;
+        final currentPage = controller.page?.round() ?? controller.initialPage;
         if (currentPage == nextIndex) return;
-        _pageController.jumpToPage(nextIndex);
+
+        controller.jumpToPage(nextIndex);
       },
     );
 
     Future.microtask(() async {
       final notifier = ref.read(chatProvider(widget.fileName).notifier);
-      await notifier.loadSession();
+      await notifier.loadSession(initialRoundId: widget.initialRoundId);
 
       final state = ref.read(chatProvider(widget.fileName));
-      final initialIndex = state.pageList?.currentPageIndex;
-      if (initialIndex != null && _pageController.hasClients) {
-        _pageController.jumpToPage(initialIndex);
-      }
-
       final currentRoundId = state.currentRoundId;
       if (currentRoundId != null) {
         await notifier.ensureRoundLoaded(currentRoundId);
       }
 
       final message = widget.initialMessage?.trim() ?? '';
-      final attachments = widget.initialAttachments ?? const <PendingAttachment>[];
+      final attachments =
+          widget.initialAttachments ?? const <PendingAttachment>[];
       final hasMessage = message.isNotEmpty;
       final hasAttachments = attachments.isNotEmpty;
 
@@ -114,7 +123,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     }
     _chatSubscription.close();
     appRouteObserver.unsubscribe(this);
-    _pageController.dispose();
+    _pageController?.dispose();
     super.dispose();
   }
 
@@ -170,16 +179,16 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
   Future<void> _syncSeenWithVisiblePage() async {
     if (!_isRouteVisible) return;
     if (_isMarkingSeen) return;
-    if (!_pageController.hasClients) return;
+    final controller = _pageController;
+    if (controller == null || !controller.hasClients) return;
 
     final state = ref.read(chatProvider(widget.fileName));
     final pageList = state.pageList;
     if (pageList == null || pageList.pages.isEmpty) return;
 
-    final page = _pageController.page;
-    final index = (page?.round() ?? pageList.currentPageIndex)
-        .clamp(0, pageList.pages.length - 1);
-
+    final page = controller.page;
+    final index =
+        (page?.round() ?? pageList.currentPageIndex).clamp(0, pageList.pages.length - 1);
     final round = pageList.pages[index].round;
     if (!round.hasUnseenUpdate) return;
 
@@ -201,7 +210,6 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     final isEditMode = editSourceRoundId != null;
     final hasPages = state.pageList != null && state.pageList!.pages.isNotEmpty;
     final textTheme = Theme.of(context).textTheme;
-
     final currentRoundId = state.currentRoundId;
     final currentStream = currentRoundId == null
         ? null
@@ -210,7 +218,6 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
               (fileName: widget.fileName, roundId: currentRoundId),
             ),
           );
-
     final currentIsStreaming = currentStream?.isStreaming == true;
 
     return AppPageScaffold(
@@ -248,7 +255,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
               onPrev: isEditMode
                   ? null
                   : state.pageList!.currentPageIndex > 0
-                      ? () => _pageController.previousPage(
+                      ? () => _pageController?.previousPage(
                             duration: const Duration(milliseconds: 260),
                             curve: Curves.easeOutCubic,
                           )
@@ -257,7 +264,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
                   ? null
                   : state.pageList!.currentPageIndex <
                           state.pageList!.totalPages - 1
-                      ? () => _pageController.nextPage(
+                      ? () => _pageController?.nextPage(
                             duration: const Duration(milliseconds: 260),
                             curve: Curves.easeOutCubic,
                           )
@@ -275,48 +282,49 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
                     ? _buildErrorState(state.error ?? '会话不存在')
                     : !hasPages
                         ? _buildWelcomeEmpty(context)
-                        : PageView.builder(
-                            controller: _pageController,
-                            physics: isEditMode
-                                ? const NeverScrollableScrollPhysics()
-                                : const PageScrollPhysics(),
-                            itemCount: state.pageList?.pages.length ?? 0,
-                            onPageChanged: (index) async {
-                              if (state.pageList == null) return;
-                              if (index != state.pageList!.currentPageIndex) {
-                                notifier.changePage(index);
-                              }
-                              final round =
-                                  state.pageList!.pages[index].round;
-                              await notifier.ensureRoundLoaded(round.id);
-                              await _syncSeenWithVisiblePage();
-                            },
-                            itemBuilder: (context, index) {
-                              final round = state.pageList!.pages[index].round;
-                              final stream = ref.watch(
-                                roundStreamProvider(
-                                  (fileName: widget.fileName, roundId: round.id),
-                                ),
-                              );
-                              final canEdit = stream?.isStreaming != true;
-
-                              return _ChatRoundPage(
-                                key: ValueKey(round.id),
-                                fileName: widget.fileName,
-                                round: round,
-                                canEdit: canEdit,
-                                onRetryReply: () =>
-                                    notifier.retryFromRound(round.id),
-                                onEdit: canEdit
-                                    ? () => _enterEditMode(
-                                          round.id,
-                                          round.userContent,
-                                        )
-                                    : null,
-                                onCopyText: _copyText,
-                              );
-                            },
-                          ),
+                        : _pageController == null
+                            ? const Center(child: CircularProgressIndicator())
+                            : PageView.builder(
+                                controller: _pageController,
+                                physics: isEditMode
+                                    ? const NeverScrollableScrollPhysics()
+                                    : const PageScrollPhysics(),
+                                itemCount: state.pageList?.pages.length ?? 0,
+                                onPageChanged: (index) async {
+                                  if (state.pageList == null) return;
+                                  if (index != state.pageList!.currentPageIndex) {
+                                    notifier.changePage(index);
+                                  }
+                                  final round =
+                                      state.pageList!.pages[index].round;
+                                  await notifier.ensureRoundLoaded(round.id);
+                                  await _syncSeenWithVisiblePage();
+                                },
+                                itemBuilder: (context, index) {
+                                  final round = state.pageList!.pages[index].round;
+                                  final stream = ref.watch(
+                                    roundStreamProvider(
+                                      (fileName: widget.fileName, roundId: round.id),
+                                    ),
+                                  );
+                                  final canEdit = stream?.isStreaming != true;
+                                  return _ChatRoundPage(
+                                    key: ValueKey(round.id),
+                                    fileName: widget.fileName,
+                                    round: round,
+                                    canEdit: canEdit,
+                                    onRetryReply: () =>
+                                        notifier.retryFromRound(round.id),
+                                    onEdit: canEdit
+                                        ? () => _enterEditMode(
+                                              round.id,
+                                              round.userContent,
+                                            )
+                                        : null,
+                                    onCopyText: _copyText,
+                                  );
+                                },
+                              ),
           ),
           InputBar(
             hintText: isEditMode ? '修改文本后发送（保留原附件）' : '发送消息',
@@ -430,7 +438,6 @@ class _ChatRoundPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasUser = round.userContent.trim().isNotEmpty;
     final hasAttachments = round.userAttachments.isNotEmpty;
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       children: [
@@ -493,21 +500,17 @@ class _RoundAnswerSection extends ConsumerWidget {
     final stream = ref.watch(
       roundStreamProvider((fileName: fileName, roundId: roundId)),
     );
-
     if (stream == null) {
       return const SizedBox.shrink();
     }
-
     final thinking = stream.reasoning;
     final assistantContent = stream.content;
     final hasThinking = thinking.trim().isNotEmpty;
     final hasAssistant = assistantContent.trim().isNotEmpty;
     final isStreaming = stream.isStreaming;
-
     if (!hasThinking && !hasAssistant && !isStreaming) {
       return const SizedBox.shrink();
     }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -644,7 +647,6 @@ class _PaginationBar extends StatelessWidget {
         ? 0.0
         : (currentIndex + 1).clamp(0, totalPages) / totalPages;
     final textTheme = Theme.of(context).textTheme;
-
     return Material(
       elevation: 1,
       child: Padding(

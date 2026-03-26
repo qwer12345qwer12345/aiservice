@@ -24,25 +24,17 @@ class HomeSessionItem {
 final homeSessionListProvider =
     Provider<AsyncValue<List<HomeSessionItem>>>((ref) {
   final sessionsAsync = ref.watch(sessionListProvider);
-
   return sessionsAsync.whenData((sessions) {
     final items = sessions.map((session) {
       final hasUnseen = session.rounds.any((r) => r.hasUnseenUpdate);
       final roundCount = session.rounds.length;
-
-      final previewRoundId = session.rounds.isEmpty
-          ? null
-          : BranchNavigator.getAllBranchLeaves(session).isNotEmpty
-              ? BranchNavigator.getAllBranchLeaves(session).last.id
-              : session.rounds.last.id;
-
-      final previewRound = previewRoundId == null
-          ? null
-          : session.rounds.firstWhere(
-              (r) => r.id == previewRoundId,
-              orElse: () => session.rounds.last,
-            );
-
+      final leaves = session.rounds.isEmpty
+          ? const []
+          : BranchNavigator.getAllBranchLeaves(session);
+      final previewRoundId =
+          session.rounds.isEmpty ? null : leaves.isNotEmpty ? leaves.last.id : session.rounds.last.id;
+      final previewRound =
+          previewRoundId == null ? null : session.rounds.firstWhere((r) => r.id == previewRoundId);
       final userPreview = previewRound == null
           ? '点击开始新的对话'
           : previewRound.userContent.trim().isEmpty
