@@ -18,7 +18,4 @@ abstract class AppConstants {
 
   // 文件扩展名
   static const String extJson = '.json';
-
-  // 分页
-  static const int pageSizeMessages = 1; // 每页显示的消息对数 (逻辑上)
 }

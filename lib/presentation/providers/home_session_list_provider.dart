@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/session.dart';
-import '../../domain/services/branch_navigator.dart';
 import 'session_list_notifier.dart';
 
 class HomeSessionItem {
@@ -28,19 +27,20 @@ final homeSessionListProvider =
     final items = sessions.map((session) {
       final hasUnseen = session.rounds.any((r) => r.hasUnseenUpdate);
       final roundCount = session.rounds.length;
-      final leaves = session.rounds.isEmpty
-          ? const []
-          : BranchNavigator.getAllBranchLeaves(session);
-      final previewRoundId =
-          session.rounds.isEmpty ? null : leaves.isNotEmpty ? leaves.last.id : session.rounds.last.id;
-      final previewRound =
-          previewRoundId == null ? null : session.rounds.firstWhere((r) => r.id == previewRoundId);
+      
+      // ✅ 简化：直接获取最后一个 round 作为预览
+      final previewRound = session.rounds.isEmpty 
+          ? null 
+          : session.rounds.last;
+      
+      final previewRoundId = previewRound?.id;
+      
       final userPreview = previewRound == null
           ? '点击开始新的对话'
           : previewRound.userContent.trim().isEmpty
               ? '（空输入）'
               : previewRound.userContent.trim();
-
+      
       return HomeSessionItem(
         session: session,
         hasUnseen: hasUnseen,
@@ -50,7 +50,7 @@ final homeSessionListProvider =
         previewRoundId: previewRoundId,
       );
     }).toList();
-
+    
     items.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     return items;
   });

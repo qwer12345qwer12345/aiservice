@@ -14,6 +14,7 @@ import '../../domain/services/chat_stream_accumulator.dart';
 import '../../domain/services/chat_view_state_builder.dart';
 import '../../domain/states/chat_state.dart';
 import '../models/pending_attachment.dart';
+import '../utils/page_utils.dart';
 import 'global_streaming_provider.dart';
 import 'session_card_provider.dart';
 import 'session_list_notifier.dart';
@@ -50,7 +51,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
   }
 
   Future<void> loadSession({String? initialRoundId}) async {
-    state = state.copyWithLoading(true);
+    state = ChatState.initial().copyWithLoading(true);
     try {
       final repository = ref.read(conversationRepositoryProvider);
       var session = await repository.getSession(fileName);
@@ -421,6 +422,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     ChatRound updatedRound,
   ) {
     if (pageList == null) return null;
+    // ✅ 简化逻辑，无需处理 pageIndex
     final updatedPages = pageList.pages.map((page) {
       if (page.round.id == updatedRound.id) {
         return page.copyWith(round: updatedRound);
@@ -432,6 +434,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
   void stopGeneration() {
     if (state.pageList == null || state.pageList!.pages.isEmpty) return;
+    // ✅ 直接使用 currentPageIndex 获取当前页
     final viewingRound = state.pageList!.pages[state.pageList!.currentPageIndex].round;
     final stream = _getRoundStream(viewingRound.id);
     if (stream?.isStreaming != true) return;
@@ -453,13 +456,19 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
   void changePage(int pageIndex) {
     if (state.pageList == null) return;
+    
     final pages = state.pageList!.pages;
-    if (pageIndex < 0 || pageIndex >= pages.length) return;
+    
+    // ✅ 使用工具类验证索引
+    if (!PageUtils.isValidIndex(pageIndex, pages.length)) return;
+    
     final targetPage = pages[pageIndex];
     final newRoundId = targetPage.round.id;
+    
     state = state.copyWithCurrentRoundId(newRoundId).copyWith(
           pageList: state.pageList!.copyWith(currentPageIndex: pageIndex),
         );
+    
     ensureRoundLoaded(newRoundId);
   }
 }

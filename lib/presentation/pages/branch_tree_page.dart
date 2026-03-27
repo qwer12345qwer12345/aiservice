@@ -13,12 +13,12 @@ import '../widgets/common/app_toast.dart';
 
 class BranchTreePage extends ConsumerStatefulWidget {
   final String fileName;
-  final String? initialFocusRoundId;
+  final String initialFocusRoundId;
 
   const BranchTreePage({
     super.key,
     required this.fileName,
-    this.initialFocusRoundId,
+    required this.initialFocusRoundId,
   });
 
   @override
@@ -41,21 +41,12 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   @override
   void initState() {
     super.initState();
-
     _builder
       ..siblingSeparation = 40
       ..levelSeparation = 78
       ..subtreeSeparation = 50
       ..orientation = BuchheimWalkerConfiguration.ORIENTATION_TOP_BOTTOM;
-
-    if (widget.initialFocusRoundId != null) {
-      _targetNodeKey = GlobalKey();
-    }
-
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
-      await ref.read(chatProvider(widget.fileName).notifier).loadSession();
-    });
+    _targetNodeKey = GlobalKey();
   }
 
   @override
@@ -91,8 +82,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
       _hasFocused = false;
       _focusRetryCount = 0;
 
-      if (widget.initialFocusRoundId != null &&
-          _treeContainsNodeId(roots, widget.initialFocusRoundId!)) {
+      if (_treeContainsNodeId(roots, widget.initialFocusRoundId)) {
         _targetNodeKey = GlobalKey();
       } else {
         _targetNodeKey = null;
@@ -109,9 +99,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   }
 
   void _scheduleFocusToTarget() {
-    if (_hasFocused ||
-        widget.initialFocusRoundId == null ||
-        _targetNodeKey == null) {
+    if (_hasFocused || _targetNodeKey == null) {
       return;
     }
 
@@ -270,13 +258,27 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
       updatedSession,
     );
 
-    if (widget.initialFocusRoundId != null &&
-        idsToDelete.contains(widget.initialFocusRoundId)) {
+    // ✅ 判断是否删除了当前焦点节点
+    final deletedCurrentFocus = idsToDelete.contains(widget.initialFocusRoundId);
+
+    // ✅ 关键修改：不要 invalidate，直接更新 chatNotifier 的 state
+    final chatNotifier = ref.read(chatProvider(widget.fileName).notifier);
+    chatNotifier.state = chatNotifier.state.copyWith(
+      session: updatedSession,
+      pageList: deletedCurrentFocus ? null : chatNotifier.state.pageList,
+    );
+
+    // ✅ 如果删除了当前焦点节点，需要重新加载会话（让聊天页返回时定位到有效页）
+    if (deletedCurrentFocus) {
+      await chatNotifier.loadSession();
+    }
+
+    // ✅ 更新本地树状态
+    if (deletedCurrentFocus) {
       _targetNodeKey = null;
       _hasFocused = true;
     }
-
-    await ref.read(chatProvider(widget.fileName).notifier).loadSession();
+    _reloadTree(updatedRounds);
   }
 
   Future<bool> _confirmDelete(TreeNode node) async {
@@ -339,8 +341,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
 
-        if (widget.initialFocusRoundId != null &&
-            !_treeContainsNodeId(latestRoots, widget.initialFocusRoundId!)) {
+        if (!_treeContainsNodeId(latestRoots, widget.initialFocusRoundId)) {
           _targetNodeKey = null;
           _hasFocused = true;
         }

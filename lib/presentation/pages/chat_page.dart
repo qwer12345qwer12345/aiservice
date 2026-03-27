@@ -17,6 +17,7 @@ import '../widgets/common/app_card.dart';
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_toast.dart';
 import 'branch_tree_page.dart';
+import '../utils/page_utils.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   final String fileName;
@@ -179,6 +180,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
   Future<void> _syncSeenWithVisiblePage() async {
     if (!_isRouteVisible) return;
     if (_isMarkingSeen) return;
+    
     final controller = _pageController;
     if (controller == null || !controller.hasClients) return;
 
@@ -186,9 +188,11 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     final pageList = state.pageList;
     if (pageList == null || pageList.pages.isEmpty) return;
 
-    final page = controller.page;
-    final index =
-        (page?.round() ?? pageList.currentPageIndex).clamp(0, pageList.pages.length - 1);
+    final currentPage = controller.page;
+    final index = currentPage != null 
+        ? currentPage.round().clamp(0, pageList.pages.length - 1)
+        : pageList.currentPageIndex;
+        
     final round = pageList.pages[index].round;
     if (!round.hasUnseenUpdate) return;
 
@@ -238,7 +242,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
                         MaterialPageRoute(
                           builder: (_) => BranchTreePage(
                             fileName: widget.fileName,
-                            initialFocusRoundId: state.currentRoundId,
+                            initialFocusRoundId: state.currentRoundId!,
                           ),
                         ),
                       );
@@ -250,7 +254,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
         children: [
           if (state.pageList != null && state.pageList!.totalPages > 0)
             _PaginationBar(
-              currentIndex: state.pageList!.currentPageIndex,
+              currentIndex: state.pageList!.currentPageIndex,  // ✅ 直接传递 0-based
               totalPages: state.pageList!.totalPages,
               onPrev: isEditMode
                   ? null
@@ -262,8 +266,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
                       : null,
               onNext: isEditMode
                   ? null
-                  : state.pageList!.currentPageIndex <
-                          state.pageList!.totalPages - 1
+                  : state.pageList!.currentPageIndex < state.pageList!.totalPages - 1
                       ? () => _pageController?.nextPage(
                             duration: const Duration(milliseconds: 260),
                             curve: Curves.easeOutCubic,
@@ -291,12 +294,12 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
                                     : const PageScrollPhysics(),
                                 itemCount: state.pageList?.pages.length ?? 0,
                                 onPageChanged: (index) async {
+                                  // ✅ index 已经是 0-based，无需转换
                                   if (state.pageList == null) return;
                                   if (index != state.pageList!.currentPageIndex) {
-                                    notifier.changePage(index);
+                                    notifier.changePage(index);  // ✅ 直接传递 0-based
                                   }
-                                  final round =
-                                      state.pageList!.pages[index].round;
+                                  final round = state.pageList!.pages[index].round;
                                   await notifier.ensureRoundLoaded(round.id);
                                   await _syncSeenWithVisiblePage();
                                 },
@@ -307,19 +310,15 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
                                       (fileName: widget.fileName, roundId: round.id),
                                     ),
                                   );
-                                  final canEdit = stream?.isStreaming != true;
+                                  final canEdit = stream?.isStreaming != true;                              
                                   return _ChatRoundPage(
                                     key: ValueKey(round.id),
                                     fileName: widget.fileName,
                                     round: round,
                                     canEdit: canEdit,
-                                    onRetryReply: () =>
-                                        notifier.retryFromRound(round.id),
-                                    onEdit: canEdit
-                                        ? () => _enterEditMode(
-                                              round.id,
-                                              round.userContent,
-                                            )
+                                    onRetryReply: () => notifier.retryFromRound(round.id),
+                                    onEdit: canEdit 
+                                        ? () => _enterEditMode(round.id, round.userContent) 
                                         : null,
                                     onCopyText: _copyText,
                                   );
@@ -627,7 +626,7 @@ class _SectionLabel extends StatelessWidget {
 }
 
 class _PaginationBar extends StatelessWidget {
-  final int currentIndex;
+  final int currentIndex;    // ✅ 0-based 索引
   final int totalPages;
   final VoidCallback? onPrev;
   final VoidCallback? onNext;
@@ -643,10 +642,10 @@ class _PaginationBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final progress = totalPages == 0
-        ? 0.0
-        : (currentIndex + 1).clamp(0, totalPages) / totalPages;
+    // ✅ 使用统一工具类计算进度
+    final progress = PageUtils.calculateProgress(currentIndex, totalPages);
     final textTheme = Theme.of(context).textTheme;
+
     return Material(
       elevation: 1,
       child: Padding(
@@ -663,9 +662,10 @@ class _PaginationBar extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
+                    // ✅ 使用统一工具类格式化
                     isEditMode
-                        ? '编辑中｜第 ${currentIndex + 1} 页 / 共 $totalPages 页'
-                        : '第 ${currentIndex + 1} 页 / 共 $totalPages 页',
+                        ? '编辑中｜${PageUtils.format(currentIndex, totalPages)}'
+                        : PageUtils.format(currentIndex, totalPages),
                     style: textTheme.bodySmall,
                   ),
                   const SizedBox(height: 8),

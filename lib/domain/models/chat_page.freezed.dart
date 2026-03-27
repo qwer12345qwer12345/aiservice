@@ -17,7 +17,7 @@ final _privateConstructorUsedError = UnsupportedError(
 
 /// @nodoc
 mixin _$ChatPage {
-  int get pageIndex => throw _privateConstructorUsedError;
+  // ✅ 移除 pageIndex - 索引由列表位置决定
   ChatRound get round => throw _privateConstructorUsedError;
 
   /// Create a copy of ChatPage
@@ -32,7 +32,7 @@ abstract class $ChatPageCopyWith<$Res> {
   factory $ChatPageCopyWith(ChatPage value, $Res Function(ChatPage) then) =
       _$ChatPageCopyWithImpl<$Res, ChatPage>;
   @useResult
-  $Res call({int pageIndex, ChatRound round});
+  $Res call({ChatRound round});
 
   $ChatRoundCopyWith<$Res> get round;
 }
@@ -51,13 +51,9 @@ class _$ChatPageCopyWithImpl<$Res, $Val extends ChatPage>
   /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
-  $Res call({Object? pageIndex = null, Object? round = null}) {
+  $Res call({Object? round = null}) {
     return _then(
       _value.copyWith(
-            pageIndex: null == pageIndex
-                ? _value.pageIndex
-                : pageIndex // ignore: cast_nullable_to_non_nullable
-                      as int,
             round: null == round
                 ? _value.round
                 : round // ignore: cast_nullable_to_non_nullable
@@ -87,7 +83,7 @@ abstract class _$$ChatPageImplCopyWith<$Res>
   ) = __$$ChatPageImplCopyWithImpl<$Res>;
   @override
   @useResult
-  $Res call({int pageIndex, ChatRound round});
+  $Res call({ChatRound round});
 
   @override
   $ChatRoundCopyWith<$Res> get round;
@@ -106,13 +102,9 @@ class __$$ChatPageImplCopyWithImpl<$Res>
   /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
-  $Res call({Object? pageIndex = null, Object? round = null}) {
+  $Res call({Object? round = null}) {
     return _then(
       _$ChatPageImpl(
-        pageIndex: null == pageIndex
-            ? _value.pageIndex
-            : pageIndex // ignore: cast_nullable_to_non_nullable
-                  as int,
         round: null == round
             ? _value.round
             : round // ignore: cast_nullable_to_non_nullable
@@ -125,16 +117,15 @@ class __$$ChatPageImplCopyWithImpl<$Res>
 /// @nodoc
 
 class _$ChatPageImpl implements _ChatPage {
-  const _$ChatPageImpl({required this.pageIndex, required this.round});
+  const _$ChatPageImpl({required this.round});
 
-  @override
-  final int pageIndex;
+  // ✅ 移除 pageIndex - 索引由列表位置决定
   @override
   final ChatRound round;
 
   @override
   String toString() {
-    return 'ChatPage(pageIndex: $pageIndex, round: $round)';
+    return 'ChatPage(round: $round)';
   }
 
   @override
@@ -142,13 +133,11 @@ class _$ChatPageImpl implements _ChatPage {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
             other is _$ChatPageImpl &&
-            (identical(other.pageIndex, pageIndex) ||
-                other.pageIndex == pageIndex) &&
             (identical(other.round, round) || other.round == round));
   }
 
   @override
-  int get hashCode => Object.hash(runtimeType, pageIndex, round);
+  int get hashCode => Object.hash(runtimeType, round);
 
   /// Create a copy of ChatPage
   /// with the given fields replaced by the non-null parameter values.
@@ -160,13 +149,9 @@ class _$ChatPageImpl implements _ChatPage {
 }
 
 abstract class _ChatPage implements ChatPage {
-  const factory _ChatPage({
-    required final int pageIndex,
-    required final ChatRound round,
-  }) = _$ChatPageImpl;
+  const factory _ChatPage({required final ChatRound round}) = _$ChatPageImpl;
 
-  @override
-  int get pageIndex;
+  // ✅ 移除 pageIndex - 索引由列表位置决定
   @override
   ChatRound get round;
 
@@ -181,7 +166,8 @@ abstract class _ChatPage implements ChatPage {
 /// @nodoc
 mixin _$ChatPageList {
   List<ChatPage> get pages => throw _privateConstructorUsedError;
-  int get currentPageIndex => throw _privateConstructorUsedError;
+  int get currentPageIndex =>
+      throw _privateConstructorUsedError; // ✅ UI 状态的单一事实来源 (0-based)
   int get totalPages => throw _privateConstructorUsedError;
 
   /// Create a copy of ChatPageList
@@ -308,6 +294,7 @@ class _$ChatPageListImpl implements _ChatPageList {
 
   @override
   final int currentPageIndex;
+  // ✅ UI 状态的单一事实来源 (0-based)
   @override
   final int totalPages;
 
@@ -355,7 +342,7 @@ abstract class _ChatPageList implements ChatPageList {
   @override
   List<ChatPage> get pages;
   @override
-  int get currentPageIndex;
+  int get currentPageIndex; // ✅ UI 状态的单一事实来源 (0-based)
   @override
   int get totalPages;
 

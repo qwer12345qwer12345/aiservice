@@ -7,27 +7,19 @@ class MessagePaginator {
       return ChatPageList.fromPages([], 0);
     }
 
-    final pages = <ChatPage>[
-      for (int i = 0; i < rounds.length; i++)
-        ChatPage(
-          pageIndex: i,
-          round: rounds[i],
-        ),
-    ];
-
+    // ✅ 移除 pageIndex 设置，索引由列表位置决定
+    final pages = rounds.map((round) => ChatPage(round: round)).toList();
+    
     final validIndex = currentPageIndex.clamp(0, pages.length - 1);
-
     return ChatPageList.fromPages(pages, validIndex);
   }
 
   static ChatPage? getPage(List<ChatRound> rounds, int pageIndex) {
-    if (rounds.isEmpty) return null;
-    if (pageIndex < 0 || pageIndex >= rounds.length) return null;
-
-    return ChatPage(
-      pageIndex: pageIndex,
-      round: rounds[pageIndex],
-    );
+    if (rounds.isEmpty || pageIndex < 0 || pageIndex >= rounds.length) {
+      return null;
+    }
+    // ✅ 直接通过索引获取
+    return ChatPage(round: rounds[pageIndex]);
   }
 
   static int getTotalPages(List<ChatRound> rounds) {
