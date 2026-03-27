@@ -127,66 +127,6 @@ lib/presentation/widgets/thought_bubble.dart
 
 # Files
 
-## File: lib/presentation/utils/page_utils.dart
-```dart
-/// 页码工具类 - 统一处理索引转换逻辑
-/// 
-/// 遵循 Flutter 规范：
-/// - 内部逻辑使用 0-based 索引
-/// - UI 展示使用 1-based 页码
-abstract class PageUtils {
-  /// 将 0-based 索引转换为 UI 展示的 1-based 页码
-  static int toDisplayPage(int zeroBasedIndex) => zeroBasedIndex + 1;
-  /// 将 UI 页码转换为 0-based 索引
-  static int toInternalIndex(int displayPage) => displayPage - 1;
-  /// 格式化页码显示："X / Y"
-  static String formatSimple(int currentPageIndex, int totalPages) {
-    if (totalPages == 0) return '0 / 0';
-    return '${toDisplayPage(currentPageIndex)} / $totalPages';
-  }
-  /// 格式化页码显示："第 X 页 / 共 Y 页"
-  static String format(int currentPageIndex, int totalPages) {
-    if (totalPages == 0) return '第 0 页 / 共 0 页';
-    return '第 ${toDisplayPage(currentPageIndex)} 页 / 共 $totalPages 页';
-  }
-  /// 计算进度条进度 (0.0 - 1.0)
-  static double calculateProgress(int currentPageIndex, int totalPages) {
-    if (totalPages == 0) return 0.0;
-    return toDisplayPage(currentPageIndex).clamp(1, totalPages) / totalPages;
-  }
-  /// 验证页索引是否有效
-  static bool isValidIndex(int index, int totalPages) {
-    return index >= 0 && index < totalPages;
-  }
-  /// 安全获取页索引（越界时返回边界值）
-  static int clampIndex(int index, int totalPages) {
-    if (totalPages == 0) return 0;
-    return index.clamp(0, totalPages - 1);
-  }
-}
-```
-
-## File: lib/core/constants/app_constants.dart
-```dart
-abstract class AppConstants {
-  // 文件夹名称
-  static const String dirConversations = 'conversations';
-  static const String dirAttachments = 'attachments';
-  // 文件名
-  static const String fileConfig = 'config.json';
-  // 配置键
-  static const String keyBaseUrl = 'baseUrl';
-  static const String keyApiKey = 'apiKey';
-  static const String keyTheme = 'theme';
-  static const String keyModel = 'selectedModel';
-  // 默认值
-  static const String defaultBaseUrl = 'https://api.openai.com/v1';
-  static const String defaultTheme = 'system';
-  // 文件扩展名
-  static const String extJson = '.json';
-}
-```
-
 ## File: lib/core/errors/exceptions.dart
 ```dart
 /// 基础应用异常
@@ -3675,372 +3615,6 @@ final configRepositoryProvider = Provider<ConfigRepository>((ref) {
 });
 ```
 
-## File: lib/domain/models/chat_page.dart
-```dart
-import 'package:freezed_annotation/freezed_annotation.dart';
-import '../../core/models/chat_round.dart';
-part 'chat_page.freezed.dart';
-@freezed
-class ChatPage with _$ChatPage {
-  const factory ChatPage({
-    // ✅ 移除 pageIndex - 索引由列表位置决定
-    required ChatRound round,
-  }) = _ChatPage;
-}
-@freezed
-class ChatPageList with _$ChatPageList {
-  const factory ChatPageList({
-    required List<ChatPage> pages,
-    required int currentPageIndex,  // ✅ UI 状态的单一事实来源 (0-based)
-    required int totalPages,
-  }) = _ChatPageList;
-  factory ChatPageList.fromPages(List<ChatPage> pages, int currentIndex) {
-    return ChatPageList(
-      pages: pages,
-      currentPageIndex: pages.isEmpty ? 0 : currentIndex.clamp(0, pages.length - 1),
-      totalPages: pages.length,
-    );
-  }
-}
-// ✅ 将 getter 移到 extension 中（Freezed 要求）
-extension ChatPageListX on ChatPageList {
-  /// 通过 roundId 查找页索引
-  int? findPageIndexByRoundId(String roundId) {
-    return pages.indexWhere((page) => page.round.id == roundId);
-  }
-  /// 获取当前页
-  ChatPage? get currentPage {
-    if (pages.isEmpty || currentPageIndex < 0 || currentPageIndex >= pages.length) {
-      return null;
-    }
-    return pages[currentPageIndex];
-  }
-  /// 获取上一页索引
-  int? get prevPageIndex {
-    if (currentPageIndex <= 0) return null;
-    return currentPageIndex - 1;
-  }
-  /// 获取下一页索引
-  int? get nextPageIndex {
-    if (currentPageIndex >= pages.length - 1) return null;
-    return currentPageIndex + 1;
-  }
-}
-```
-
-## File: lib/domain/models/chat_page.freezed.dart
-```dart
-// coverage:ignore-file
-// GENERATED CODE - DO NOT MODIFY BY HAND
-// ignore_for_file: type=lint
-// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
-part of 'chat_page.dart';
-// **************************************************************************
-// FreezedGenerator
-// **************************************************************************
-T _$identity<T>(T value) => value;
-final _privateConstructorUsedError = UnsupportedError(
-  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
-);
-/// @nodoc
-mixin _$ChatPage {
-  // ✅ 移除 pageIndex - 索引由列表位置决定
-  ChatRound get round => throw _privateConstructorUsedError;
-  /// Create a copy of ChatPage
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $ChatPageCopyWith<ChatPage> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-/// @nodoc
-abstract class $ChatPageCopyWith<$Res> {
-  factory $ChatPageCopyWith(ChatPage value, $Res Function(ChatPage) then) =
-      _$ChatPageCopyWithImpl<$Res, ChatPage>;
-  @useResult
-  $Res call({ChatRound round});
-  $ChatRoundCopyWith<$Res> get round;
-}
-/// @nodoc
-class _$ChatPageCopyWithImpl<$Res, $Val extends ChatPage>
-    implements $ChatPageCopyWith<$Res> {
-  _$ChatPageCopyWithImpl(this._value, this._then);
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-  /// Create a copy of ChatPage
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({Object? round = null}) {
-    return _then(
-      _value.copyWith(
-            round: null == round
-                ? _value.round
-                : round // ignore: cast_nullable_to_non_nullable
-                      as ChatRound,
-          )
-          as $Val,
-    );
-  }
-  /// Create a copy of ChatPage
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @pragma('vm:prefer-inline')
-  $ChatRoundCopyWith<$Res> get round {
-    return $ChatRoundCopyWith<$Res>(_value.round, (value) {
-      return _then(_value.copyWith(round: value) as $Val);
-    });
-  }
-}
-/// @nodoc
-abstract class _$$ChatPageImplCopyWith<$Res>
-    implements $ChatPageCopyWith<$Res> {
-  factory _$$ChatPageImplCopyWith(
-    _$ChatPageImpl value,
-    $Res Function(_$ChatPageImpl) then,
-  ) = __$$ChatPageImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({ChatRound round});
-  @override
-  $ChatRoundCopyWith<$Res> get round;
-}
-/// @nodoc
-class __$$ChatPageImplCopyWithImpl<$Res>
-    extends _$ChatPageCopyWithImpl<$Res, _$ChatPageImpl>
-    implements _$$ChatPageImplCopyWith<$Res> {
-  __$$ChatPageImplCopyWithImpl(
-    _$ChatPageImpl _value,
-    $Res Function(_$ChatPageImpl) _then,
-  ) : super(_value, _then);
-  /// Create a copy of ChatPage
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({Object? round = null}) {
-    return _then(
-      _$ChatPageImpl(
-        round: null == round
-            ? _value.round
-            : round // ignore: cast_nullable_to_non_nullable
-                  as ChatRound,
-      ),
-    );
-  }
-}
-/// @nodoc
-class _$ChatPageImpl implements _ChatPage {
-  const _$ChatPageImpl({required this.round});
-  // ✅ 移除 pageIndex - 索引由列表位置决定
-  @override
-  final ChatRound round;
-  @override
-  String toString() {
-    return 'ChatPage(round: $round)';
-  }
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$ChatPageImpl &&
-            (identical(other.round, round) || other.round == round));
-  }
-  @override
-  int get hashCode => Object.hash(runtimeType, round);
-  /// Create a copy of ChatPage
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$ChatPageImplCopyWith<_$ChatPageImpl> get copyWith =>
-      __$$ChatPageImplCopyWithImpl<_$ChatPageImpl>(this, _$identity);
-}
-abstract class _ChatPage implements ChatPage {
-  const factory _ChatPage({required final ChatRound round}) = _$ChatPageImpl;
-  // ✅ 移除 pageIndex - 索引由列表位置决定
-  @override
-  ChatRound get round;
-  /// Create a copy of ChatPage
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$ChatPageImplCopyWith<_$ChatPageImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-/// @nodoc
-mixin _$ChatPageList {
-  List<ChatPage> get pages => throw _privateConstructorUsedError;
-  int get currentPageIndex =>
-      throw _privateConstructorUsedError; // ✅ UI 状态的单一事实来源 (0-based)
-  int get totalPages => throw _privateConstructorUsedError;
-  /// Create a copy of ChatPageList
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $ChatPageListCopyWith<ChatPageList> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-/// @nodoc
-abstract class $ChatPageListCopyWith<$Res> {
-  factory $ChatPageListCopyWith(
-    ChatPageList value,
-    $Res Function(ChatPageList) then,
-  ) = _$ChatPageListCopyWithImpl<$Res, ChatPageList>;
-  @useResult
-  $Res call({List<ChatPage> pages, int currentPageIndex, int totalPages});
-}
-/// @nodoc
-class _$ChatPageListCopyWithImpl<$Res, $Val extends ChatPageList>
-    implements $ChatPageListCopyWith<$Res> {
-  _$ChatPageListCopyWithImpl(this._value, this._then);
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-  /// Create a copy of ChatPageList
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? pages = null,
-    Object? currentPageIndex = null,
-    Object? totalPages = null,
-  }) {
-    return _then(
-      _value.copyWith(
-            pages: null == pages
-                ? _value.pages
-                : pages // ignore: cast_nullable_to_non_nullable
-                      as List<ChatPage>,
-            currentPageIndex: null == currentPageIndex
-                ? _value.currentPageIndex
-                : currentPageIndex // ignore: cast_nullable_to_non_nullable
-                      as int,
-            totalPages: null == totalPages
-                ? _value.totalPages
-                : totalPages // ignore: cast_nullable_to_non_nullable
-                      as int,
-          )
-          as $Val,
-    );
-  }
-}
-/// @nodoc
-abstract class _$$ChatPageListImplCopyWith<$Res>
-    implements $ChatPageListCopyWith<$Res> {
-  factory _$$ChatPageListImplCopyWith(
-    _$ChatPageListImpl value,
-    $Res Function(_$ChatPageListImpl) then,
-  ) = __$$ChatPageListImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({List<ChatPage> pages, int currentPageIndex, int totalPages});
-}
-/// @nodoc
-class __$$ChatPageListImplCopyWithImpl<$Res>
-    extends _$ChatPageListCopyWithImpl<$Res, _$ChatPageListImpl>
-    implements _$$ChatPageListImplCopyWith<$Res> {
-  __$$ChatPageListImplCopyWithImpl(
-    _$ChatPageListImpl _value,
-    $Res Function(_$ChatPageListImpl) _then,
-  ) : super(_value, _then);
-  /// Create a copy of ChatPageList
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? pages = null,
-    Object? currentPageIndex = null,
-    Object? totalPages = null,
-  }) {
-    return _then(
-      _$ChatPageListImpl(
-        pages: null == pages
-            ? _value._pages
-            : pages // ignore: cast_nullable_to_non_nullable
-                  as List<ChatPage>,
-        currentPageIndex: null == currentPageIndex
-            ? _value.currentPageIndex
-            : currentPageIndex // ignore: cast_nullable_to_non_nullable
-                  as int,
-        totalPages: null == totalPages
-            ? _value.totalPages
-            : totalPages // ignore: cast_nullable_to_non_nullable
-                  as int,
-      ),
-    );
-  }
-}
-/// @nodoc
-class _$ChatPageListImpl implements _ChatPageList {
-  const _$ChatPageListImpl({
-    required final List<ChatPage> pages,
-    required this.currentPageIndex,
-    required this.totalPages,
-  }) : _pages = pages;
-  final List<ChatPage> _pages;
-  @override
-  List<ChatPage> get pages {
-    if (_pages is EqualUnmodifiableListView) return _pages;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableListView(_pages);
-  }
-  @override
-  final int currentPageIndex;
-  // ✅ UI 状态的单一事实来源 (0-based)
-  @override
-  final int totalPages;
-  @override
-  String toString() {
-    return 'ChatPageList(pages: $pages, currentPageIndex: $currentPageIndex, totalPages: $totalPages)';
-  }
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$ChatPageListImpl &&
-            const DeepCollectionEquality().equals(other._pages, _pages) &&
-            (identical(other.currentPageIndex, currentPageIndex) ||
-                other.currentPageIndex == currentPageIndex) &&
-            (identical(other.totalPages, totalPages) ||
-                other.totalPages == totalPages));
-  }
-  @override
-  int get hashCode => Object.hash(
-    runtimeType,
-    const DeepCollectionEquality().hash(_pages),
-    currentPageIndex,
-    totalPages,
-  );
-  /// Create a copy of ChatPageList
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$ChatPageListImplCopyWith<_$ChatPageListImpl> get copyWith =>
-      __$$ChatPageListImplCopyWithImpl<_$ChatPageListImpl>(this, _$identity);
-}
-abstract class _ChatPageList implements ChatPageList {
-  const factory _ChatPageList({
-    required final List<ChatPage> pages,
-    required final int currentPageIndex,
-    required final int totalPages,
-  }) = _$ChatPageListImpl;
-  @override
-  List<ChatPage> get pages;
-  @override
-  int get currentPageIndex; // ✅ UI 状态的单一事实来源 (0-based)
-  @override
-  int get totalPages;
-  /// Create a copy of ChatPageList
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$ChatPageListImplCopyWith<_$ChatPageListImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-```
-
 ## File: lib/domain/models/tree_node.dart
 ```dart
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -4759,33 +4333,6 @@ class ChatViewStateBuilder {
 }
 ```
 
-## File: lib/domain/services/message_paginator.dart
-```dart
-import '../../core/models/chat_round.dart';
-import '../models/chat_page.dart';
-class MessagePaginator {
-  static ChatPageList paginate(List<ChatRound> rounds, int currentPageIndex) {
-    if (rounds.isEmpty) {
-      return ChatPageList.fromPages([], 0);
-    }
-    // ✅ 移除 pageIndex 设置，索引由列表位置决定
-    final pages = rounds.map((round) => ChatPage(round: round)).toList();
-    final validIndex = currentPageIndex.clamp(0, pages.length - 1);
-    return ChatPageList.fromPages(pages, validIndex);
-  }
-  static ChatPage? getPage(List<ChatRound> rounds, int pageIndex) {
-    if (rounds.isEmpty || pageIndex < 0 || pageIndex >= rounds.length) {
-      return null;
-    }
-    // ✅ 直接通过索引获取
-    return ChatPage(round: rounds[pageIndex]);
-  }
-  static int getTotalPages(List<ChatRound> rounds) {
-    return rounds.length;
-  }
-}
-```
-
 ## File: lib/domain/services/model_capability_registry.dart
 ```dart
 import '../../core/models/model_info.dart';
@@ -5179,6 +4726,45 @@ final sessionCardProvider =
 });
 ```
 
+## File: lib/presentation/utils/page_utils.dart
+```dart
+/// 页码工具类 - 统一处理索引转换逻辑
+/// 
+/// 遵循 Flutter 规范：
+/// - 内部逻辑使用 0-based 索引
+/// - UI 展示使用 1-based 页码
+abstract class PageUtils {
+  /// 将 0-based 索引转换为 UI 展示的 1-based 页码
+  static int toDisplayPage(int zeroBasedIndex) => zeroBasedIndex + 1;
+  /// 将 UI 页码转换为 0-based 索引
+  static int toInternalIndex(int displayPage) => displayPage - 1;
+  /// 格式化页码显示："X / Y"
+  static String formatSimple(int currentPageIndex, int totalPages) {
+    if (totalPages == 0) return '0 / 0';
+    return '${toDisplayPage(currentPageIndex)} / $totalPages';
+  }
+  /// 格式化页码显示："第 X 页 / 共 Y 页"
+  static String format(int currentPageIndex, int totalPages) {
+    if (totalPages == 0) return '第 0 页 / 共 0 页';
+    return '第 ${toDisplayPage(currentPageIndex)} 页 / 共 $totalPages 页';
+  }
+  /// 计算进度条进度 (0.0 - 1.0)
+  static double calculateProgress(int currentPageIndex, int totalPages) {
+    if (totalPages == 0) return 0.0;
+    return toDisplayPage(currentPageIndex).clamp(1, totalPages) / totalPages;
+  }
+  /// 验证页索引是否有效
+  static bool isValidIndex(int index, int totalPages) {
+    return index >= 0 && index < totalPages;
+  }
+  /// 安全获取页索引（越界时返回边界值）
+  static int clampIndex(int index, int totalPages) {
+    if (totalPages == 0) return 0;
+    return index.clamp(0, totalPages - 1);
+  }
+}
+```
+
 ## File: lib/presentation/widgets/common/app_toast.dart
 ```dart
 import 'package:flutter/material.dart';
@@ -5205,34 +4791,24 @@ abstract class AppToast {
 }
 ```
 
-## File: lib/presentation/widgets/page_indicator.dart
+## File: lib/core/constants/app_constants.dart
 ```dart
-import 'package:flutter/material.dart';
-import '../utils/page_utils.dart';
-class PageIndicator extends StatelessWidget {
-  final int currentPage;    // ✅ 0-based 索引
-  final int totalPages;
-  const PageIndicator({
-    super.key,
-    required this.currentPage,
-    required this.totalPages,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            // ✅ 使用统一工具类
-            PageUtils.formatSimple(currentPage, totalPages),
-            style: const TextStyle(fontSize: 14, color: Colors.grey),
-          ),
-        ],
-      ),
-    );
-  }
+abstract class AppConstants {
+  // 文件夹名称
+  static const String dirConversations = 'conversations';
+  static const String dirAttachments = 'attachments';
+  // 文件名
+  static const String fileConfig = 'config.json';
+  // 配置键
+  static const String keyBaseUrl = 'baseUrl';
+  static const String keyApiKey = 'apiKey';
+  static const String keyTheme = 'theme';
+  static const String keyModel = 'selectedModel';
+  // 默认值
+  static const String defaultBaseUrl = 'https://api.openai.com/v1';
+  static const String defaultTheme = 'system';
+  // 文件扩展名
+  static const String extJson = '.json';
 }
 ```
 
@@ -6864,6 +6440,399 @@ class FileService implements IFileService {
 }
 ```
 
+## File: lib/domain/models/chat_page.dart
+```dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+import '../../core/models/chat_round.dart';
+part 'chat_page.freezed.dart';
+@freezed
+class ChatPage with _$ChatPage {
+  const factory ChatPage({
+    // ✅ 移除 pageIndex - 索引由列表位置决定
+    required ChatRound round,
+  }) = _ChatPage;
+}
+@freezed
+class ChatPageList with _$ChatPageList {
+  const factory ChatPageList({
+    required List<ChatPage> pages,
+    required int currentPageIndex,  // ✅ UI 状态的单一事实来源 (0-based)
+    required int totalPages,
+  }) = _ChatPageList;
+  factory ChatPageList.fromPages(List<ChatPage> pages, int currentIndex) {
+    return ChatPageList(
+      pages: pages,
+      currentPageIndex: pages.isEmpty ? 0 : currentIndex.clamp(0, pages.length - 1),
+      totalPages: pages.length,
+    );
+  }
+}
+// ✅ 将 getter 移到 extension 中（Freezed 要求）
+extension ChatPageListX on ChatPageList {
+  /// 通过 roundId 查找页索引
+  int? findPageIndexByRoundId(String roundId) {
+    return pages.indexWhere((page) => page.round.id == roundId);
+  }
+  /// 获取当前页
+  ChatPage? get currentPage {
+    if (pages.isEmpty || currentPageIndex < 0 || currentPageIndex >= pages.length) {
+      return null;
+    }
+    return pages[currentPageIndex];
+  }
+  /// 获取上一页索引
+  int? get prevPageIndex {
+    if (currentPageIndex <= 0) return null;
+    return currentPageIndex - 1;
+  }
+  /// 获取下一页索引
+  int? get nextPageIndex {
+    if (currentPageIndex >= pages.length - 1) return null;
+    return currentPageIndex + 1;
+  }
+}
+```
+
+## File: lib/domain/models/chat_page.freezed.dart
+```dart
+// coverage:ignore-file
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint
+// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
+part of 'chat_page.dart';
+// **************************************************************************
+// FreezedGenerator
+// **************************************************************************
+T _$identity<T>(T value) => value;
+final _privateConstructorUsedError = UnsupportedError(
+  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
+);
+/// @nodoc
+mixin _$ChatPage {
+  // ✅ 移除 pageIndex - 索引由列表位置决定
+  ChatRound get round => throw _privateConstructorUsedError;
+  /// Create a copy of ChatPage
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $ChatPageCopyWith<ChatPage> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+/// @nodoc
+abstract class $ChatPageCopyWith<$Res> {
+  factory $ChatPageCopyWith(ChatPage value, $Res Function(ChatPage) then) =
+      _$ChatPageCopyWithImpl<$Res, ChatPage>;
+  @useResult
+  $Res call({ChatRound round});
+  $ChatRoundCopyWith<$Res> get round;
+}
+/// @nodoc
+class _$ChatPageCopyWithImpl<$Res, $Val extends ChatPage>
+    implements $ChatPageCopyWith<$Res> {
+  _$ChatPageCopyWithImpl(this._value, this._then);
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+  /// Create a copy of ChatPage
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? round = null}) {
+    return _then(
+      _value.copyWith(
+            round: null == round
+                ? _value.round
+                : round // ignore: cast_nullable_to_non_nullable
+                      as ChatRound,
+          )
+          as $Val,
+    );
+  }
+  /// Create a copy of ChatPage
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $ChatRoundCopyWith<$Res> get round {
+    return $ChatRoundCopyWith<$Res>(_value.round, (value) {
+      return _then(_value.copyWith(round: value) as $Val);
+    });
+  }
+}
+/// @nodoc
+abstract class _$$ChatPageImplCopyWith<$Res>
+    implements $ChatPageCopyWith<$Res> {
+  factory _$$ChatPageImplCopyWith(
+    _$ChatPageImpl value,
+    $Res Function(_$ChatPageImpl) then,
+  ) = __$$ChatPageImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({ChatRound round});
+  @override
+  $ChatRoundCopyWith<$Res> get round;
+}
+/// @nodoc
+class __$$ChatPageImplCopyWithImpl<$Res>
+    extends _$ChatPageCopyWithImpl<$Res, _$ChatPageImpl>
+    implements _$$ChatPageImplCopyWith<$Res> {
+  __$$ChatPageImplCopyWithImpl(
+    _$ChatPageImpl _value,
+    $Res Function(_$ChatPageImpl) _then,
+  ) : super(_value, _then);
+  /// Create a copy of ChatPage
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? round = null}) {
+    return _then(
+      _$ChatPageImpl(
+        round: null == round
+            ? _value.round
+            : round // ignore: cast_nullable_to_non_nullable
+                  as ChatRound,
+      ),
+    );
+  }
+}
+/// @nodoc
+class _$ChatPageImpl implements _ChatPage {
+  const _$ChatPageImpl({required this.round});
+  // ✅ 移除 pageIndex - 索引由列表位置决定
+  @override
+  final ChatRound round;
+  @override
+  String toString() {
+    return 'ChatPage(round: $round)';
+  }
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$ChatPageImpl &&
+            (identical(other.round, round) || other.round == round));
+  }
+  @override
+  int get hashCode => Object.hash(runtimeType, round);
+  /// Create a copy of ChatPage
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$ChatPageImplCopyWith<_$ChatPageImpl> get copyWith =>
+      __$$ChatPageImplCopyWithImpl<_$ChatPageImpl>(this, _$identity);
+}
+abstract class _ChatPage implements ChatPage {
+  const factory _ChatPage({required final ChatRound round}) = _$ChatPageImpl;
+  // ✅ 移除 pageIndex - 索引由列表位置决定
+  @override
+  ChatRound get round;
+  /// Create a copy of ChatPage
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$ChatPageImplCopyWith<_$ChatPageImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+/// @nodoc
+mixin _$ChatPageList {
+  List<ChatPage> get pages => throw _privateConstructorUsedError;
+  int get currentPageIndex =>
+      throw _privateConstructorUsedError; // ✅ UI 状态的单一事实来源 (0-based)
+  int get totalPages => throw _privateConstructorUsedError;
+  /// Create a copy of ChatPageList
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $ChatPageListCopyWith<ChatPageList> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+/// @nodoc
+abstract class $ChatPageListCopyWith<$Res> {
+  factory $ChatPageListCopyWith(
+    ChatPageList value,
+    $Res Function(ChatPageList) then,
+  ) = _$ChatPageListCopyWithImpl<$Res, ChatPageList>;
+  @useResult
+  $Res call({List<ChatPage> pages, int currentPageIndex, int totalPages});
+}
+/// @nodoc
+class _$ChatPageListCopyWithImpl<$Res, $Val extends ChatPageList>
+    implements $ChatPageListCopyWith<$Res> {
+  _$ChatPageListCopyWithImpl(this._value, this._then);
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+  /// Create a copy of ChatPageList
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? pages = null,
+    Object? currentPageIndex = null,
+    Object? totalPages = null,
+  }) {
+    return _then(
+      _value.copyWith(
+            pages: null == pages
+                ? _value.pages
+                : pages // ignore: cast_nullable_to_non_nullable
+                      as List<ChatPage>,
+            currentPageIndex: null == currentPageIndex
+                ? _value.currentPageIndex
+                : currentPageIndex // ignore: cast_nullable_to_non_nullable
+                      as int,
+            totalPages: null == totalPages
+                ? _value.totalPages
+                : totalPages // ignore: cast_nullable_to_non_nullable
+                      as int,
+          )
+          as $Val,
+    );
+  }
+}
+/// @nodoc
+abstract class _$$ChatPageListImplCopyWith<$Res>
+    implements $ChatPageListCopyWith<$Res> {
+  factory _$$ChatPageListImplCopyWith(
+    _$ChatPageListImpl value,
+    $Res Function(_$ChatPageListImpl) then,
+  ) = __$$ChatPageListImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({List<ChatPage> pages, int currentPageIndex, int totalPages});
+}
+/// @nodoc
+class __$$ChatPageListImplCopyWithImpl<$Res>
+    extends _$ChatPageListCopyWithImpl<$Res, _$ChatPageListImpl>
+    implements _$$ChatPageListImplCopyWith<$Res> {
+  __$$ChatPageListImplCopyWithImpl(
+    _$ChatPageListImpl _value,
+    $Res Function(_$ChatPageListImpl) _then,
+  ) : super(_value, _then);
+  /// Create a copy of ChatPageList
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? pages = null,
+    Object? currentPageIndex = null,
+    Object? totalPages = null,
+  }) {
+    return _then(
+      _$ChatPageListImpl(
+        pages: null == pages
+            ? _value._pages
+            : pages // ignore: cast_nullable_to_non_nullable
+                  as List<ChatPage>,
+        currentPageIndex: null == currentPageIndex
+            ? _value.currentPageIndex
+            : currentPageIndex // ignore: cast_nullable_to_non_nullable
+                  as int,
+        totalPages: null == totalPages
+            ? _value.totalPages
+            : totalPages // ignore: cast_nullable_to_non_nullable
+                  as int,
+      ),
+    );
+  }
+}
+/// @nodoc
+class _$ChatPageListImpl implements _ChatPageList {
+  const _$ChatPageListImpl({
+    required final List<ChatPage> pages,
+    required this.currentPageIndex,
+    required this.totalPages,
+  }) : _pages = pages;
+  final List<ChatPage> _pages;
+  @override
+  List<ChatPage> get pages {
+    if (_pages is EqualUnmodifiableListView) return _pages;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_pages);
+  }
+  @override
+  final int currentPageIndex;
+  // ✅ UI 状态的单一事实来源 (0-based)
+  @override
+  final int totalPages;
+  @override
+  String toString() {
+    return 'ChatPageList(pages: $pages, currentPageIndex: $currentPageIndex, totalPages: $totalPages)';
+  }
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$ChatPageListImpl &&
+            const DeepCollectionEquality().equals(other._pages, _pages) &&
+            (identical(other.currentPageIndex, currentPageIndex) ||
+                other.currentPageIndex == currentPageIndex) &&
+            (identical(other.totalPages, totalPages) ||
+                other.totalPages == totalPages));
+  }
+  @override
+  int get hashCode => Object.hash(
+    runtimeType,
+    const DeepCollectionEquality().hash(_pages),
+    currentPageIndex,
+    totalPages,
+  );
+  /// Create a copy of ChatPageList
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$ChatPageListImplCopyWith<_$ChatPageListImpl> get copyWith =>
+      __$$ChatPageListImplCopyWithImpl<_$ChatPageListImpl>(this, _$identity);
+}
+abstract class _ChatPageList implements ChatPageList {
+  const factory _ChatPageList({
+    required final List<ChatPage> pages,
+    required final int currentPageIndex,
+    required final int totalPages,
+  }) = _$ChatPageListImpl;
+  @override
+  List<ChatPage> get pages;
+  @override
+  int get currentPageIndex; // ✅ UI 状态的单一事实来源 (0-based)
+  @override
+  int get totalPages;
+  /// Create a copy of ChatPageList
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$ChatPageListImplCopyWith<_$ChatPageListImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+```
+
+## File: lib/domain/services/message_paginator.dart
+```dart
+import '../../core/models/chat_round.dart';
+import '../models/chat_page.dart';
+class MessagePaginator {
+  static ChatPageList paginate(List<ChatRound> rounds, int currentPageIndex) {
+    if (rounds.isEmpty) {
+      return ChatPageList.fromPages([], 0);
+    }
+    // ✅ 移除 pageIndex 设置，索引由列表位置决定
+    final pages = rounds.map((round) => ChatPage(round: round)).toList();
+    final validIndex = currentPageIndex.clamp(0, pages.length - 1);
+    return ChatPageList.fromPages(pages, validIndex);
+  }
+  static ChatPage? getPage(List<ChatRound> rounds, int pageIndex) {
+    if (rounds.isEmpty || pageIndex < 0 || pageIndex >= rounds.length) {
+      return null;
+    }
+    // ✅ 直接通过索引获取
+    return ChatPage(round: rounds[pageIndex]);
+  }
+  static int getTotalPages(List<ChatRound> rounds) {
+    return rounds.length;
+  }
+}
+```
+
 ## File: lib/domain/states/chat_state.dart
 ```dart
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -8053,6 +8022,37 @@ class _InputBarState extends ConsumerState<InputBar> {
 }
 ```
 
+## File: lib/presentation/widgets/page_indicator.dart
+```dart
+import 'package:flutter/material.dart';
+import '../utils/page_utils.dart';
+class PageIndicator extends StatelessWidget {
+  final int currentPage;    // ✅ 0-based 索引
+  final int totalPages;
+  const PageIndicator({
+    super.key,
+    required this.currentPage,
+    required this.totalPages,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            // ✅ 使用统一工具类
+            PageUtils.formatSimple(currentPage, totalPages),
+            style: const TextStyle(fontSize: 14, color: Colors.grey),
+          ),
+        ],
+      ),
+    );
+  }
+}
+```
+
 ## File: lib/presentation/widgets/thought_bubble.dart
 ```dart
 import 'package:flutter/material.dart';
@@ -8157,696 +8157,6 @@ class ChatRoundFactory {
       userContent: newContent,
       userAttachments: attachments,
       isIncomplete: true,
-    );
-  }
-}
-```
-
-## File: lib/presentation/pages/settings_page.dart
-```dart
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/app_config.dart';
-import '../../core/models/app_config_store.dart';
-import '../../core/models/model_info.dart';
-import '../providers/config_notifier.dart';
-import '../widgets/common/app_page_scaffold.dart';
-import '../widgets/common/app_section.dart';
-import '../widgets/common/app_toast.dart';
-class SettingsPage extends ConsumerStatefulWidget {
-  const SettingsPage({super.key});
-  @override
-  ConsumerState<SettingsPage> createState() => _SettingsPageState();
-}
-class _SettingsPageState extends ConsumerState<SettingsPage> {
-  static const String _defaultModelsPath = 'v1/models';
-  final _baseUrlController = TextEditingController();
-  final _apiKeyController = TextEditingController();
-  final _modelsPathController = TextEditingController();
-  final _chatPathController = TextEditingController();
-  bool _initialized = false;
-  bool _isRefreshingModels = false;
-  String? _selectedModel;
-  String _apiMode = 'chat_completions';
-  List<ModelInfo> _models = const [];
-  @override
-  void dispose() {
-    _baseUrlController.dispose();
-    _apiKeyController.dispose();
-    _modelsPathController.dispose();
-    _chatPathController.dispose();
-    super.dispose();
-  }
-  String _defaultChatPathForApiMode(String apiMode) {
-    switch (apiMode) {
-      case 'responses':
-        return 'v1/responses';
-      case 'chat_completions':
-      default:
-        return 'v1/chat/completions';
-    }
-  }
-  void _applyConfig(AppConfig config) {
-    _baseUrlController.text = config.baseUrl;
-    _apiKeyController.text = config.apiKey;
-    _modelsPathController.text = config.modelsPath;
-    _chatPathController.text = config.chatPath;
-    _selectedModel = config.selectedModel;
-    _apiMode = config.apiMode;
-    _models = config.availableModels ?? const [];
-    _initialized = true;
-  }
-  ModelInfo? _selectedModelInfo() {
-    final selectedId = _selectedModel;
-    if (selectedId == null || selectedId.trim().isEmpty) return null;
-    for (final model in _models) {
-      if (model.id == selectedId) return model;
-    }
-    return null;
-  }
-  String _getSelectedModelDisplayText(List<ModelInfo> models) {
-    if (_selectedModel == null || _selectedModel!.trim().isEmpty) {
-      return '请选择模型';
-    }
-    for (final model in models) {
-      if (model.id == _selectedModel) {
-        final name = (model.name ?? '').trim();
-        return name.isNotEmpty ? name : model.id;
-      }
-    }
-    return _selectedModel!;
-  }
-  List<Widget> _buildModelChips(ModelInfo model) {
-    final widgets = <Widget>[];
-    if (model.supportsVision == true) {
-      widgets.add(
-        const Chip(
-          avatar: Icon(Icons.image_outlined, size: 16),
-          label: Text('Vision'),
-          visualDensity: VisualDensity.compact,
-        ),
-      );
-    }
-    if (model.supportsReasoning == true) {
-      widgets.add(
-        const Chip(
-          avatar: Icon(Icons.psychology_alt_outlined, size: 16),
-          label: Text('Reasoning'),
-          visualDensity: VisualDensity.compact,
-        ),
-      );
-    }
-    return widgets;
-  }
-  Widget _buildSelectedModelSupportsCard() {
-    final model = _selectedModelInfo();
-    if (model == null) return const SizedBox.shrink();
-    final chips = _buildModelChips(model);
-    if (chips.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: chips,
-        ),
-      ),
-    );
-  }
-  void _updateSelectedModelOverride({
-    bool? overrideVision,
-    bool? overrideReasoning,
-  }) {
-    final selected = _selectedModelInfo();
-    if (selected == null) return;
-    final updated = selected.copyWith(
-      overrideSupportsVision:
-          overrideVision ?? selected.overrideSupportsVision,
-      overrideSupportsReasoning:
-          overrideReasoning ?? selected.overrideSupportsReasoning,
-      supportsVision: overrideVision ?? selected.supportsVision,
-      supportsReasoning: overrideReasoning ?? selected.supportsReasoning,
-    );
-    setState(() {
-      _models = _models.map((m) {
-        if (m.id == selected.id) return updated;
-        return m;
-      }).toList();
-    });
-  }
-  Future<void> _saveSettings() async {
-    final current = ref.read(configProvider).value;
-    if (current == null) return;
-    final updated = current.copyWith(
-      baseUrl: _baseUrlController.text.trim(),
-      apiKey: _apiKeyController.text.trim(),
-      modelsPath: _modelsPathController.text.trim().isEmpty
-          ? _defaultModelsPath
-          : _modelsPathController.text.trim(),
-      chatPath: _chatPathController.text.trim().isEmpty
-          ? _defaultChatPathForApiMode(_apiMode)
-          : _chatPathController.text.trim(),
-      selectedModel: (_selectedModel?.trim().isEmpty ?? true)
-          ? null
-          : _selectedModel!.trim(),
-      apiMode: _apiMode,
-      availableModels: _models,
-    );
-    try {
-      await ref.read(configProvider.notifier).saveFullConfig(updated);
-      await ref.read(configProfilesProvider.notifier).load();
-      await AppToast.show('设置已保存');
-    } catch (e) {
-      await AppToast.show('保存失败：$e');
-    }
-  }
-  Future<void> _refreshModels() async {
-    final current = ref.read(configProvider).value;
-    if (current == null) return;
-    final previousOverrides = {
-      for (final model in _models) model.id: model,
-    };
-    final draft = current.copyWith(
-      baseUrl: _baseUrlController.text.trim(),
-      apiKey: _apiKeyController.text.trim(),
-      modelsPath: _modelsPathController.text.trim().isEmpty
-          ? _defaultModelsPath
-          : _modelsPathController.text.trim(),
-      chatPath: _chatPathController.text.trim().isEmpty
-          ? _defaultChatPathForApiMode(_apiMode)
-          : _chatPathController.text.trim(),
-      selectedModel: (_selectedModel?.trim().isEmpty ?? true)
-          ? null
-          : _selectedModel!.trim(),
-      apiMode: _apiMode,
-      availableModels: _models,
-    );
-    setState(() {
-      _isRefreshingModels = true;
-    });
-    try {
-      await ref.read(configProvider.notifier).saveAndRefreshModels(draft);
-      final refreshed = ref.read(configProvider).value;
-      if (refreshed != null) {
-        final mergedModels = (refreshed.availableModels ?? const []).map((model) {
-          final old = previousOverrides[model.id];
-          if (old == null) return model;
-          return model.copyWith(
-            overrideSupportsVision: old.overrideSupportsVision,
-            overrideSupportsReasoning: old.overrideSupportsReasoning,
-            supportsVision: old.overrideSupportsVision ?? model.supportsVision,
-            supportsReasoning:
-                old.overrideSupportsReasoning ?? model.supportsReasoning,
-          );
-        }).toList();
-        setState(() {
-          _models = mergedModels;
-          final exists = _models.any((m) => m.id == _selectedModel);
-          if (!exists) {
-            _selectedModel = _models.isNotEmpty ? _models.first.id : null;
-          }
-        });
-      }
-      await ref.read(configProfilesProvider.notifier).load();
-      await AppToast.show('模型列表已同步');
-    } catch (e) {
-      await AppToast.show('同步模型失败：$e');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isRefreshingModels = false;
-        });
-      }
-    }
-  }
-  Widget _buildManualCapabilityEditor() {
-    final model = _selectedModelInfo();
-    if (model == null) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 12),
-        const Text(
-          '手动覆盖模型能力',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('支持 Vision'),
-          subtitle: const Text('用于图片输入能力声明'),
-          value: model.supportsVision == true,
-          onChanged: (value) {
-            _updateSelectedModelOverride(overrideVision: value);
-          },
-        ),
-        const Divider(),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('支持 Reasoning'),
-          subtitle: const Text('用于推理过程能力声明'),
-          value: model.supportsReasoning == true,
-          onChanged: (value) {
-            _updateSelectedModelOverride(overrideReasoning: value);
-          },
-        ),
-      ],
-    );
-  }
-  Future<void> _showCreateProfileDialog() async {
-    final controller = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('新建配置存档'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: '输入配置名称',
-          ),
-          onSubmitted: (value) => Navigator.of(ctx).pop(value.trim()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-            child: const Text('创建'),
-          ),
-        ],
-      ),
-    );
-    if (result == null) return;
-    await ref.read(configProfilesProvider.notifier).createProfile(result);
-    _initialized = false;
-  }
-  Future<void> _showRenameProfileDialog(ConfigProfile profile) async {
-    final controller = TextEditingController(text: profile.name);
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('重命名配置存档'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: '输入配置名称',
-          ),
-          onSubmitted: (value) => Navigator.of(ctx).pop(value.trim()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-            child: const Text('保存'),
-          ),
-        ],
-      ),
-    );
-    if (result == null || result.isEmpty) return;
-    await ref
-        .read(configProfilesProvider.notifier)
-        .renameProfile(profile.id, result);
-  }
-  Future<void> _deleteProfile(ConfigProfile profile, int profileCount) async {
-    if (profileCount <= 1) {
-      await AppToast.show('至少保留一个配置存档');
-      return;
-    }
-    final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('删除配置存档'),
-            content: Text('确定删除“${profile.name}”吗？'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                child: const Text('删除'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-    if (!confirmed) return;
-    await ref.read(configProfilesProvider.notifier).deleteProfile(profile.id);
-    _initialized = false;
-  }
-  Future<void> _confirmRestoreDefaults() async {
-    final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('恢复默认设置'),
-            content: const Text(
-              '确定要将当前配置存档恢复为默认设置吗？\n\n仅会影响当前选中的配置存档，不会影响其他配置存档。',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                child: const Text('恢复默认'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-    if (!confirmed) return;
-    await _restoreCurrentProfileDefaults();
-  }
-  Future<void> _restoreCurrentProfileDefaults() async {
-    try {
-      final defaultConfig = AppConfig.defaultConfig();
-      await ref.read(configProvider.notifier).saveFullConfig(defaultConfig);
-      await ref.read(configProfilesProvider.notifier).load();
-      setState(() {
-        _applyConfig(defaultConfig);
-      });
-    } catch (e) {
-      await AppToast.show('恢复默认失败：$e');
-    }
-  }
-  @override
-  Widget build(BuildContext context) {
-    final configState = ref.watch(configProvider);
-    final profilesState = ref.watch(configProfilesProvider);
-    ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
-      next.whenData((config) {
-        if (!_initialized) {
-          setState(() {
-            _applyConfig(config);
-          });
-        }
-      });
-    });
-    final isBusy = configState.isLoading || _isRefreshingModels;
-    return AppPageScaffold(
-      appBar: AppBar(
-        title: const Text('设置'),
-      ),
-      body: profilesState.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text('加载配置存档失败：$e'),
-          ),
-        ),
-        data: (store) {
-          final activeProfile = store.profiles.firstWhere(
-            (p) => p.id == store.activeProfileId,
-          );
-          return configState.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text('加载配置失败：$e'),
-              ),
-            ),
-            data: (config) {
-              if (!_initialized) {
-                _applyConfig(config);
-              }
-              final models = _models;
-              return ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  AppSection(
-                    title: '配置存档',
-                    subtitle: '可保存多套 API 与模型配置，并快速切换。',
-                    children: [
-                      DropdownButtonFormField<String>(
-                        value: store.activeProfileId,
-                        decoration: const InputDecoration(
-                          labelText: '当前配置存档',
-                        ),
-                        items: store.profiles.map((profile) {
-                          return DropdownMenuItem(
-                            value: profile.id,
-                            child: Text(profile.name),
-                          );
-                        }).toList(),
-                        onChanged: isBusy
-                            ? null
-                            : (value) async {
-                                if (value == null) return;
-                                await ref
-                                    .read(configProfilesProvider.notifier)
-                                    .switchProfile(value);
-                                _initialized = false;
-                              },
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: [
-                          OutlinedButton(
-                            onPressed: isBusy ? null : _showCreateProfileDialog,
-                            child: const Text('新建'),
-                          ),
-                          OutlinedButton(
-                            onPressed: isBusy
-                                ? null
-                                : () => _showRenameProfileDialog(activeProfile),
-                            child: const Text('重命名'),
-                          ),
-                          OutlinedButton(
-                            onPressed: isBusy
-                                ? null
-                                : () => _deleteProfile(
-                                      activeProfile,
-                                      store.profiles.length,
-                                    ),
-                            child: const Text('删除'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  AppSection(
-                    title: '连接配置',
-                    subtitle: '用于配置 API 服务地址与接口路径。',
-                    children: [
-                      TextField(
-                        controller: _baseUrlController,
-                        enabled: !isBusy,
-                        decoration: const InputDecoration(
-                          labelText: 'Base URL',
-                          hintText: 'https://api.openai.com',
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _apiKeyController,
-                        enabled: !isBusy,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'API Key',
-                          hintText: '输入 API Key',
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _modelsPathController,
-                        enabled: !isBusy,
-                        decoration: const InputDecoration(
-                          labelText: 'Models Path',
-                          hintText: _defaultModelsPath,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _chatPathController,
-                        enabled: !isBusy,
-                        decoration: InputDecoration(
-                          labelText: 'Chat Path',
-                          hintText: _defaultChatPathForApiMode(_apiMode),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        value: _apiMode,
-                        decoration: const InputDecoration(
-                          labelText: 'API Mode',
-                        ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'chat_completions',
-                            child: Text('chat_completions'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'responses',
-                            child: Text('responses'),
-                          ),
-                        ],
-                        onChanged: isBusy
-                            ? null
-                            : (value) {
-                                if (value == null) return;
-                                setState(() {
-                                  _apiMode = value;
-                                  if (_chatPathController.text.trim().isEmpty ||
-                                      _chatPathController.text ==
-                                          _defaultChatPathForApiMode(
-                                              'chat_completions') ||
-                                      _chatPathController.text ==
-                                          _defaultChatPathForApiMode(
-                                              'responses')) {
-                                    _chatPathController.text =
-                                        _defaultChatPathForApiMode(value);
-                                  }
-                                });
-                              },
-                      ),
-                    ],
-                  ),
-                  AppSection(
-                    title: '模型配置',
-                    subtitle: '选择当前模型，并同步远端模型列表。',
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: SearchAnchor(
-                              builder: (context, controller) {
-                                return GestureDetector(
-                                  onTap: isBusy
-                                      ? null
-                                      : () {
-                                          controller.openView();
-                                        },
-                                  child: InputDecorator(
-                                    decoration: const InputDecoration(
-                                      labelText: '当前模型',
-                                      suffixIcon: Icon(Icons.arrow_drop_down),
-                                    ),
-                                    child: Text(
-                                      _getSelectedModelDisplayText(models),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                );
-                              },
-                              suggestionsBuilder: (context, controller) {
-                                final query =
-                                    controller.text.trim().toLowerCase();
-                                final filteredModels = models.where((model) {
-                                  final id = model.id.toLowerCase();
-                                  final name =
-                                      (model.name ?? '').toLowerCase();
-                                  return query.isEmpty ||
-                                      id.contains(query) ||
-                                      name.contains(query);
-                                }).toList();
-                                if (filteredModels.isEmpty) {
-                                  return const [
-                                    ListTile(title: Text('没有匹配的模型')),
-                                  ];
-                                }
-                                return filteredModels.map((model) {
-                                  final isSelected = model.id == _selectedModel;
-                                  final title =
-                                      (model.name ?? '').trim().isNotEmpty
-                                          ? model.name!
-                                          : model.id;
-                                  final showSubtitle =
-                                      (model.name ?? '').trim().isNotEmpty &&
-                                          model.name != model.id;
-                                  final chips = _buildModelChips(model);
-                                  return ListTile(
-                                    title: Text(
-                                      title,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    subtitle: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        if (showSubtitle) Text(model.id),
-                                        if (chips.isNotEmpty) ...[
-                                          const SizedBox(height: 6),
-                                          Wrap(
-                                            spacing: 6,
-                                            runSpacing: 6,
-                                            children: chips,
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                    trailing: isSelected
-                                        ? const Icon(Icons.check)
-                                        : null,
-                                    onTap: () {
-                                      setState(() {
-                                        _selectedModel = model.id;
-                                      });
-                                      controller.closeView(model.id);
-                                    },
-                                  );
-                                }).toList();
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          FilledButton(
-                            onPressed: isBusy ? null : _refreshModels,
-                            child: _isRefreshingModels
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Text('同步模型'),
-                          ),
-                        ],
-                      ),
-                      _buildSelectedModelSupportsCard(),
-                      _buildManualCapabilityEditor(),
-                    ],
-                  ),
-                  AppSection(
-                    title: '操作',
-                    subtitle: '保存或重置当前配置存档。',
-                    children: [
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: [
-                          OutlinedButton(
-                            onPressed: isBusy ? null : _confirmRestoreDefaults,
-                            child: const Text('恢复默认'),
-                          ),
-                          FilledButton(
-                            onPressed: isBusy ? null : _saveSettings,
-                            child: const Text('保存设置'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
-              );
-            },
-          );
-        },
-      ),
     );
   }
 }
@@ -8966,59 +8276,6 @@ final roundStreamProvider =
     return sessionMap[args.roundId];
   },
 );
-```
-
-## File: lib/presentation/providers/home_session_list_provider.dart
-```dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/session.dart';
-import 'session_list_notifier.dart';
-class HomeSessionItem {
-  final Session session;
-  final bool hasUnseen;
-  final String userPreview;
-  final int roundCount;
-  final int updatedAt;
-  final String? previewRoundId;
-  const HomeSessionItem({
-    required this.session,
-    required this.hasUnseen,
-    required this.userPreview,
-    required this.roundCount,
-    required this.updatedAt,
-    required this.previewRoundId,
-  });
-}
-final homeSessionListProvider =
-    Provider<AsyncValue<List<HomeSessionItem>>>((ref) {
-  final sessionsAsync = ref.watch(sessionListProvider);
-  return sessionsAsync.whenData((sessions) {
-    final items = sessions.map((session) {
-      final hasUnseen = session.rounds.any((r) => r.hasUnseenUpdate);
-      final roundCount = session.rounds.length;
-      // ✅ 简化：直接获取最后一个 round 作为预览
-      final previewRound = session.rounds.isEmpty 
-          ? null 
-          : session.rounds.last;
-      final previewRoundId = previewRound?.id;
-      final userPreview = previewRound == null
-          ? '点击开始新的对话'
-          : previewRound.userContent.trim().isEmpty
-              ? '（空输入）'
-              : previewRound.userContent.trim();
-      return HomeSessionItem(
-        session: session,
-        hasUnseen: hasUnseen,
-        userPreview: userPreview,
-        roundCount: roundCount,
-        updatedAt: session.updatedAt,
-        previewRoundId: previewRoundId,
-      );
-    }).toList();
-    items.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-    return items;
-  });
-});
 ```
 
 ## File: lib/presentation/themes/app_tokens.dart
@@ -9343,6 +8600,790 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+```
+
+## File: lib/presentation/pages/settings_page.dart
+```dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/app_config.dart';
+import '../../core/models/app_config_store.dart';
+import '../../core/models/model_info.dart';
+import '../providers/config_notifier.dart';
+import '../widgets/common/app_page_scaffold.dart';
+import '../widgets/common/app_section.dart';
+import '../widgets/common/app_toast.dart';
+class SettingsPage extends ConsumerStatefulWidget {
+  const SettingsPage({super.key});
+  @override
+  ConsumerState<SettingsPage> createState() => _SettingsPageState();
+}
+class _SettingsPageState extends ConsumerState<SettingsPage> {
+  static const String _defaultModelsPath = 'v1/models';
+  final _baseUrlController = TextEditingController();
+  final _apiKeyController = TextEditingController();
+  final _modelsPathController = TextEditingController();
+  final _chatPathController = TextEditingController();
+  bool _initialized = false;
+  bool _isRefreshingModels = false;
+  String? _selectedModel;
+  String _apiMode = 'chat_completions';
+  List<ModelInfo> _models = const [];
+  @override
+  void dispose() {
+    _baseUrlController.dispose();
+    _apiKeyController.dispose();
+    _modelsPathController.dispose();
+    _chatPathController.dispose();
+    super.dispose();
+  }
+  String _defaultChatPathForApiMode(String apiMode) {
+    switch (apiMode) {
+      case 'responses':
+        return 'v1/responses';
+      case 'chat_completions':
+      default:
+        return 'v1/chat/completions';
+    }
+  }
+  void _applyConfig(AppConfig config) {
+    _baseUrlController.text = config.baseUrl;
+    _apiKeyController.text = config.apiKey;
+    _modelsPathController.text = config.modelsPath;
+    _chatPathController.text = config.chatPath;
+    _selectedModel = config.selectedModel;
+    _apiMode = config.apiMode;
+    _models = config.availableModels ?? const [];
+    _initialized = true;
+  }
+  ModelInfo? _selectedModelInfo() {
+    final selectedId = _selectedModel;
+    if (selectedId == null || selectedId.trim().isEmpty) return null;
+    for (final model in _models) {
+      if (model.id == selectedId) return model;
+    }
+    return null;
+  }
+  String _getSelectedModelDisplayText(List<ModelInfo> models) {
+    if (_selectedModel == null || _selectedModel!.trim().isEmpty) {
+      return '请选择模型';
+    }
+    for (final model in models) {
+      if (model.id == _selectedModel) {
+        final name = (model.name ?? '').trim();
+        return name.isNotEmpty ? name : model.id;
+      }
+    }
+    return _selectedModel!;
+  }
+  List<Widget> _buildModelChips(ModelInfo model) {
+    final widgets = <Widget>[];
+    if (model.supportsVision == true) {
+      widgets.add(
+        const Chip(
+          avatar: Icon(Icons.image_outlined, size: 16),
+          label: Text('Vision'),
+          visualDensity: VisualDensity.compact,
+        ),
+      );
+    }
+    if (model.supportsReasoning == true) {
+      widgets.add(
+        const Chip(
+          avatar: Icon(Icons.psychology_alt_outlined, size: 16),
+          label: Text('Reasoning'),
+          visualDensity: VisualDensity.compact,
+        ),
+      );
+    }
+    return widgets;
+  }
+  Widget _buildSelectedModelSupportsCard() {
+    final model = _selectedModelInfo();
+    if (model == null) return const SizedBox.shrink();
+    final chips = _buildModelChips(model);
+    if (chips.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: chips,
+        ),
+      ),
+    );
+  }
+  void _updateSelectedModelOverride({
+    bool? overrideVision,
+    bool? overrideReasoning,
+  }) {
+    final selected = _selectedModelInfo();
+    if (selected == null) return;
+    final updated = selected.copyWith(
+      overrideSupportsVision:
+          overrideVision ?? selected.overrideSupportsVision,
+      overrideSupportsReasoning:
+          overrideReasoning ?? selected.overrideSupportsReasoning,
+      supportsVision: overrideVision ?? selected.supportsVision,
+      supportsReasoning: overrideReasoning ?? selected.supportsReasoning,
+    );
+    setState(() {
+      _models = _models.map((m) {
+        if (m.id == selected.id) return updated;
+        return m;
+      }).toList();
+    });
+  }
+  Future<void> _showCustomModelDialog() async {
+    final controller = TextEditingController(text: _selectedModel ?? '');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('自定义模型'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: '模型 ID',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+    if (result != null && result.isNotEmpty) {
+      setState(() {
+        _selectedModel = result;
+      });
+    }
+  }
+  Future<void> _saveSettings() async {
+    final current = ref.read(configProvider).value;
+    if (current == null) return;
+    final updated = current.copyWith(
+      baseUrl: _baseUrlController.text.trim(),
+      apiKey: _apiKeyController.text.trim(),
+      modelsPath: _modelsPathController.text.trim().isEmpty
+          ? _defaultModelsPath
+          : _modelsPathController.text.trim(),
+      chatPath: _chatPathController.text.trim().isEmpty
+          ? _defaultChatPathForApiMode(_apiMode)
+          : _chatPathController.text.trim(),
+      selectedModel: (_selectedModel?.trim().isEmpty ?? true)
+          ? null
+          : _selectedModel!.trim(),
+      apiMode: _apiMode,
+      availableModels: _models,
+    );
+    try {
+      await ref.read(configProvider.notifier).saveFullConfig(updated);
+      await ref.read(configProfilesProvider.notifier).load();
+      await AppToast.show('设置已保存');
+    } catch (e) {
+      await AppToast.show('保存失败：$e');
+    }
+  }
+  Future<void> _refreshModels() async {
+    final current = ref.read(configProvider).value;
+    if (current == null) return;
+    final previousOverrides = {
+      for (final model in _models) model.id: model,
+    };
+    final draft = current.copyWith(
+      baseUrl: _baseUrlController.text.trim(),
+      apiKey: _apiKeyController.text.trim(),
+      modelsPath: _modelsPathController.text.trim().isEmpty
+          ? _defaultModelsPath
+          : _modelsPathController.text.trim(),
+      chatPath: _chatPathController.text.trim().isEmpty
+          ? _defaultChatPathForApiMode(_apiMode)
+          : _chatPathController.text.trim(),
+      selectedModel: (_selectedModel?.trim().isEmpty ?? true)
+          ? null
+          : _selectedModel!.trim(),
+      apiMode: _apiMode,
+      availableModels: _models,
+    );
+    setState(() {
+      _isRefreshingModels = true;
+    });
+    try {
+      await ref.read(configProvider.notifier).saveAndRefreshModels(draft);
+      final refreshed = ref.read(configProvider).value;
+      if (refreshed != null) {
+        final mergedModels = (refreshed.availableModels ?? const []).map((model) {
+          final old = previousOverrides[model.id];
+          if (old == null) return model;
+          return model.copyWith(
+            overrideSupportsVision: old.overrideSupportsVision,
+            overrideSupportsReasoning: old.overrideSupportsReasoning,
+            supportsVision: old.overrideSupportsVision ?? model.supportsVision,
+            supportsReasoning:
+                old.overrideSupportsReasoning ?? model.supportsReasoning,
+          );
+        }).toList();
+        setState(() {
+          _models = mergedModels;
+          final exists = _models.any((m) => m.id == _selectedModel);
+          if (!exists) {
+            _selectedModel = _models.isNotEmpty ? _models.first.id : null;
+          }
+        });
+      }
+      await ref.read(configProfilesProvider.notifier).load();
+      await AppToast.show('模型列表已同步');
+    } catch (e) {
+      await AppToast.show('同步模型失败：$e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRefreshingModels = false;
+        });
+      }
+    }
+  }
+  Widget _buildManualCapabilityEditor() {
+    final model = _selectedModelInfo();
+    if (model == null) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 12),
+        const Text(
+          '手动覆盖模型能力',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('支持 Vision'),
+          subtitle: const Text('用于图片输入能力声明'),
+          value: model.supportsVision == true,
+          onChanged: (value) {
+            _updateSelectedModelOverride(overrideVision: value);
+          },
+        ),
+        const Divider(),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('支持 Reasoning'),
+          subtitle: const Text('用于推理过程能力声明'),
+          value: model.supportsReasoning == true,
+          onChanged: (value) {
+            _updateSelectedModelOverride(overrideReasoning: value);
+          },
+        ),
+      ],
+    );
+  }
+  Future<void> _showCreateProfileDialog() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('新建配置存档'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: '输入配置名称',
+          ),
+          onSubmitted: (value) => Navigator.of(ctx).pop(value.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            child: const Text('创建'),
+          ),
+        ],
+      ),
+    );
+    if (result == null) return;
+    await ref.read(configProfilesProvider.notifier).createProfile(result);
+    _initialized = false;
+  }
+  Future<void> _showRenameProfileDialog(ConfigProfile profile) async {
+    final controller = TextEditingController(text: profile.name);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('重命名配置存档'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: '输入配置名称',
+          ),
+          onSubmitted: (value) => Navigator.of(ctx).pop(value.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    if (result == null || result.isEmpty) return;
+    await ref
+        .read(configProfilesProvider.notifier)
+        .renameProfile(profile.id, result);
+  }
+  Future<void> _deleteProfile(ConfigProfile profile, int profileCount) async {
+    if (profileCount <= 1) {
+      await AppToast.show('至少保留一个配置存档');
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('删除配置存档'),
+            content: Text('确定删除"${profile.name}"吗？'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('删除'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed) return;
+    await ref.read(configProfilesProvider.notifier).deleteProfile(profile.id);
+    _initialized = false;
+  }
+  Future<void> _confirmRestoreDefaults() async {
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('恢复默认设置'),
+            content: const Text(
+              '确定要将当前配置存档恢复为默认设置吗？\n\n仅会影响当前选中的配置存档，不会影响其他配置存档。',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('恢复默认'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed) return;
+    await _restoreCurrentProfileDefaults();
+  }
+  Future<void> _restoreCurrentProfileDefaults() async {
+    try {
+      final defaultConfig = AppConfig.defaultConfig();
+      await ref.read(configProvider.notifier).saveFullConfig(defaultConfig);
+      await ref.read(configProfilesProvider.notifier).load();
+      setState(() {
+        _applyConfig(defaultConfig);
+      });
+    } catch (e) {
+      await AppToast.show('恢复默认失败：$e');
+    }
+  }
+  @override
+  Widget build(BuildContext context) {
+    final configState = ref.watch(configProvider);
+    final profilesState = ref.watch(configProfilesProvider);
+    ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
+      next.whenData((config) {
+        if (!_initialized) {
+          setState(() {
+            _applyConfig(config);
+          });
+        }
+      });
+    });
+    final isBusy = configState.isLoading || _isRefreshingModels;
+    return AppPageScaffold(
+      appBar: AppBar(
+        title: const Text('设置'),
+      ),
+      body: profilesState.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text('加载配置存档失败：$e'),
+          ),
+        ),
+        data: (store) {
+          final activeProfile = store.profiles.firstWhere(
+            (p) => p.id == store.activeProfileId,
+          );
+          return configState.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text('加载配置失败：$e'),
+              ),
+            ),
+            data: (config) {
+              if (!_initialized) {
+                _applyConfig(config);
+              }
+              final models = _models;
+              return ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  AppSection(
+                    title: '配置存档',
+                    subtitle: '可保存多套 API 与模型配置，并快速切换。',
+                    children: [
+                      DropdownButtonFormField<String>(
+                        value: store.activeProfileId,
+                        decoration: const InputDecoration(
+                          labelText: '当前配置存档',
+                        ),
+                        items: store.profiles.map((profile) {
+                          return DropdownMenuItem(
+                            value: profile.id,
+                            child: Text(profile.name),
+                          );
+                        }).toList(),
+                        onChanged: isBusy
+                            ? null
+                            : (value) async {
+                                if (value == null) return;
+                                await ref
+                                    .read(configProfilesProvider.notifier)
+                                    .switchProfile(value);
+                                _initialized = false;
+                              },
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          OutlinedButton(
+                            onPressed: isBusy ? null : _showCreateProfileDialog,
+                            child: const Text('新建'),
+                          ),
+                          OutlinedButton(
+                            onPressed: isBusy
+                                ? null
+                                : () => _showRenameProfileDialog(activeProfile),
+                            child: const Text('重命名'),
+                          ),
+                          OutlinedButton(
+                            onPressed: isBusy
+                                ? null
+                                : () => _deleteProfile(
+                                      activeProfile,
+                                      store.profiles.length,
+                                    ),
+                            child: const Text('删除'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  AppSection(
+                    title: '连接配置',
+                    subtitle: '用于配置 API 服务地址与接口路径。',
+                    children: [
+                      TextField(
+                        controller: _baseUrlController,
+                        enabled: !isBusy,
+                        decoration: const InputDecoration(
+                          labelText: 'Base URL',
+                          hintText: 'https://api.openai.com',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _apiKeyController,
+                        enabled: !isBusy,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'API Key',
+                          hintText: '输入 API Key',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _modelsPathController,
+                        enabled: !isBusy,
+                        decoration: const InputDecoration(
+                          labelText: 'Models Path',
+                          hintText: _defaultModelsPath,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _chatPathController,
+                        enabled: !isBusy,
+                        decoration: InputDecoration(
+                          labelText: 'Chat Path',
+                          hintText: _defaultChatPathForApiMode(_apiMode),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: _apiMode,
+                        decoration: const InputDecoration(
+                          labelText: 'API Mode',
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'chat_completions',
+                            child: Text('chat_completions'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'responses',
+                            child: Text('responses'),
+                          ),
+                        ],
+                        onChanged: isBusy
+                            ? null
+                            : (value) {
+                                if (value == null) return;
+                                setState(() {
+                                  _apiMode = value;
+                                  if (_chatPathController.text.trim().isEmpty ||
+                                      _chatPathController.text ==
+                                          _defaultChatPathForApiMode(
+                                              'chat_completions') ||
+                                      _chatPathController.text ==
+                                          _defaultChatPathForApiMode(
+                                              'responses')) {
+                                    _chatPathController.text =
+                                        _defaultChatPathForApiMode(value);
+                                  }
+                                });
+                              },
+                      ),
+                    ],
+                  ),
+                  AppSection(
+                    title: '模型配置',
+                    subtitle: '选择当前模型，并同步远端模型列表。',
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: SearchAnchor(
+                              builder: (context, controller) {
+                                return GestureDetector(
+                                  onTap: isBusy
+                                      ? null
+                                      : () {
+                                          controller.openView();
+                                        },
+                                  child: InputDecorator(
+                                    decoration: const InputDecoration(
+                                      labelText: '当前模型',
+                                      suffixIcon: Icon(Icons.arrow_drop_down),
+                                    ),
+                                    child: Text(
+                                      _getSelectedModelDisplayText(models),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                );
+                              },
+                              suggestionsBuilder: (context, controller) {
+                                final query =
+                                    controller.text.trim().toLowerCase();
+                                final filteredModels = models.where((model) {
+                                  final id = model.id.toLowerCase();
+                                  final name =
+                                      (model.name ?? '').toLowerCase();
+                                  return query.isEmpty ||
+                                      id.contains(query) ||
+                                      name.contains(query);
+                                }).toList();
+                                if (filteredModels.isEmpty) {
+                                  return const [
+                                    ListTile(title: Text('没有匹配的模型')),
+                                  ];
+                                }
+                                return [
+                                  ...filteredModels.map((model) {
+                                    final isSelected = model.id == _selectedModel;
+                                    final title =
+                                        (model.name ?? '').trim().isNotEmpty
+                                            ? model.name!
+                                            : model.id;
+                                    final showSubtitle =
+                                        (model.name ?? '').trim().isNotEmpty &&
+                                            model.name != model.id;
+                                    final chips = _buildModelChips(model);
+                                    return ListTile(
+                                      title: Text(
+                                        title,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      subtitle: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          if (showSubtitle) Text(model.id),
+                                          if (chips.isNotEmpty) ...[
+                                            const SizedBox(height: 6),
+                                            Wrap(
+                                              spacing: 6,
+                                              runSpacing: 6,
+                                              children: chips,
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                      trailing: isSelected
+                                          ? const Icon(Icons.check)
+                                          : null,
+                                      onTap: () {
+                                        setState(() {
+                                          _selectedModel = model.id;
+                                        });
+                                        controller.closeView(model.id);
+                                      },
+                                    );
+                                  }),
+                                  ListTile(
+                                    title: const Text('自定义模型 ID'),
+                                    onTap: () {
+                                      controller.closeView(null);
+                                      _showCustomModelDialog();
+                                    },
+                                  ),
+                                ];
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          FilledButton(
+                            onPressed: isBusy ? null : _refreshModels,
+                            child: _isRefreshingModels
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text('同步模型'),
+                          ),
+                        ],
+                      ),
+                      _buildSelectedModelSupportsCard(),
+                      _buildManualCapabilityEditor(),
+                    ],
+                  ),
+                  AppSection(
+                    title: '操作',
+                    subtitle: '保存或重置当前配置存档。',
+                    children: [
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          OutlinedButton(
+                            onPressed: isBusy ? null : _confirmRestoreDefaults,
+                            child: const Text('恢复默认'),
+                          ),
+                          FilledButton(
+                            onPressed: isBusy ? null : _saveSettings,
+                            child: const Text('保存设置'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+```
+
+## File: lib/presentation/providers/home_session_list_provider.dart
+```dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/session.dart';
+import 'session_list_notifier.dart';
+class HomeSessionItem {
+  final Session session;
+  final bool hasUnseen;
+  final String userPreview;
+  final int roundCount;
+  final int updatedAt;
+  final String? previewRoundId;
+  const HomeSessionItem({
+    required this.session,
+    required this.hasUnseen,
+    required this.userPreview,
+    required this.roundCount,
+    required this.updatedAt,
+    required this.previewRoundId,
+  });
+}
+final homeSessionListProvider =
+    Provider<AsyncValue<List<HomeSessionItem>>>((ref) {
+  final sessionsAsync = ref.watch(sessionListProvider);
+  return sessionsAsync.whenData((sessions) {
+    final items = sessions.map((session) {
+      final hasUnseen = session.rounds.any((r) => r.hasUnseenUpdate);
+      final roundCount = session.rounds.length;
+      // ✅ 简化：直接获取最后一个 round 作为预览
+      final previewRound = session.rounds.isEmpty 
+          ? null 
+          : session.rounds.last;
+      final previewRoundId = previewRound?.id;
+      final userPreview = previewRound == null
+          ? '点击开始新的对话'
+          : previewRound.userContent.trim().isEmpty
+              ? '（空输入）'
+              : previewRound.userContent.trim();
+      return HomeSessionItem(
+        session: session,
+        hasUnseen: hasUnseen,
+        userPreview: userPreview,
+        roundCount: roundCount,
+        updatedAt: session.updatedAt,
+        previewRoundId: previewRoundId,
+      );
+    }).toList();
+    items.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return items;
+  });
+});
 ```
 
 ## File: lib/presentation/widgets/message_bubble.dart
@@ -10129,6 +10170,443 @@ class _PaginationBar extends StatelessWidget {
 }
 ```
 
+## File: lib/presentation/pages/home_page.dart
+```dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
+import '../../core/models/session.dart';
+import '../../core/utils/time_format_utils.dart';
+import '../providers/global_streaming_provider.dart';
+import '../providers/home_session_list_provider.dart';
+import '../providers/session_list_notifier.dart';
+import '../widgets/common/app_page_scaffold.dart';
+import '../widgets/input_bar.dart';
+import 'chat_page.dart';
+import 'settings_page.dart';
+class HomePage extends ConsumerWidget {
+  const HomePage({super.key});
+  Future<void> _showRenameDialog(
+    BuildContext context,
+    SessionListNotifier notifier,
+    Session session,
+  ) async {
+    final controller = TextEditingController(text: session.title);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('重命名会话'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: '输入新的会话名称',
+          ),
+          onSubmitted: (value) => Navigator.of(ctx).pop(value.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    if (result != null && result.isNotEmpty && result != session.title) {
+      await notifier.updateSessionTitle('${session.id}.json', result);
+    }
+  }
+  Future<void> _showDeleteConfirmDialog(
+    BuildContext context,
+    SessionListNotifier notifier,
+    Session session,
+  ) async {
+    final colorScheme = Theme.of(context).colorScheme;
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('删除会话'),
+            content: Text('确定要删除 “${session.title}” 吗？\n此操作无法撤销。'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: colorScheme.error,
+                  foregroundColor: colorScheme.onError,
+                ),
+                child: const Text('删除'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (confirmed == true) {
+      await notifier.deleteSession('${session.id}.json');
+    }
+  }
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sessionsAsync = ref.watch(homeSessionListProvider);
+    final notifier = ref.read(sessionListProvider.notifier);
+    return AppPageScaffold(
+      appBar: AppBar(
+        title: const Text('AI Chat'),
+        actions: [
+          IconButton(
+            tooltip: '设置',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const SettingsPage(),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: sessionsAsync.when(
+              loading: () => const Center(
+                child: CircularProgressIndicator(),
+              ),
+              error: (e, st) => _HomeErrorState(
+                message: '加载会话失败：$e',
+                onRetry: () async {
+                  await notifier.refresh();
+                },
+              ),
+              data: (items) {
+                if (items.isEmpty) {
+                  return const _HomeEmptyState();
+                }
+                return ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                  itemCount: items.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    return _SessionCard(
+                      item: item,
+                      notifier: notifier,
+                      onRename: (session) =>
+                          _showRenameDialog(context, notifier, session),
+                      onDelete: (session) =>
+                          _showDeleteConfirmDialog(context, notifier, session),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+          InputBar(
+            hintText: '发送消息',
+            onSend: (content, attachments) async {
+              final newFileName = await notifier.createSession('新对话');
+              if (context.mounted) {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ChatPage(
+                      fileName: newFileName,
+                      initialMessage: content,
+                      initialAttachments: attachments,
+                    ),
+                  ),
+                );
+                if (context.mounted) {
+                  await notifier.refresh();
+                }
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+class _HomeEmptyState extends StatelessWidget {
+  const _HomeEmptyState();
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 360),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Icon(Icons.auto_awesome_outlined, size: 40),
+                SizedBox(height: 16),
+                Text(
+                  '开始你的第一段对话',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  '在下方输入问题，系统会自动创建一个新会话。\n你也可以附加图片或文件开始交流。',
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+class _HomeErrorState extends StatelessWidget {
+  final String message;
+  final Future<void> Function() onRetry;
+  const _HomeErrorState({
+    required this.message,
+    required this.onRetry,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Center(
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 360),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 40,
+                  color: colorScheme.error,
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  '出现了一点问题',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('重试'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+class _SessionCard extends ConsumerStatefulWidget {
+  final HomeSessionItem item;
+  final SessionListNotifier notifier;
+  final Future<void> Function(Session session) onRename;
+  final Future<void> Function(Session session) onDelete;
+  const _SessionCard({
+    required this.item,
+    required this.notifier,
+    required this.onRename,
+    required this.onDelete,
+  });
+  @override
+  ConsumerState<_SessionCard> createState() => _SessionCardState();
+}
+class _SessionCardState extends ConsumerState<_SessionCard> {
+  bool _requested = false;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _ensurePreviewLoaded();
+  }
+  @override
+  void didUpdateWidget(covariant _SessionCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.item.previewRoundId != widget.item.previewRoundId ||
+        oldWidget.item.session.id != widget.item.session.id) {
+      _requested = false;
+      _ensurePreviewLoaded();
+    }
+  }
+  void _ensurePreviewLoaded() {
+    final previewRoundId = widget.item.previewRoundId;
+    if (_requested || previewRoundId == null) return;
+    _requested = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final fileName = '${widget.item.session.id}.json';
+      final previewRound =
+          widget.item.session.rounds.firstWhere((r) => r.id == previewRoundId);
+      ref.read(globalStreamCacheProvider.notifier).ensureRoundLoaded(
+            fileName,
+            previewRound,
+          );
+    });
+  }
+  Widget _buildMetaChip(String label, {IconData? icon}) {
+    return Chip(
+      avatar: icon == null ? null : Icon(icon, size: 16),
+      label: Text(label),
+      visualDensity: VisualDensity.compact,
+    );
+  }
+  @override
+  Widget build(BuildContext context) {
+    final session = widget.item.session;
+    final fileName = '${session.id}.json';
+    final updatedAt = TimeFormatUtils.formatTimestamp(widget.item.updatedAt);
+    final previewRoundId = widget.item.previewRoundId;
+    final stream = previewRoundId == null
+        ? null
+        : ref.watch(
+            roundStreamProvider((fileName: fileName, roundId: previewRoundId)),
+          );
+    final aiPreview = stream == null
+        ? '加载中...'
+        : stream.content.trim().isEmpty
+            ? (stream.isStreaming ? '正在生成...' : '（等待回复）')
+            : stream.content;
+    final isStreaming = stream?.isStreaming == true;
+    return Slidable(
+      key: ValueKey(fileName),
+      endActionPane: ActionPane(
+        motion: const DrawerMotion(),
+        extentRatio: 0.34,
+        children: [
+          CustomSlidableAction(
+            onPressed: (_) => widget.onRename(session),
+            backgroundColor: Theme.of(context).colorScheme.secondary,
+            child: const Icon(
+              Icons.edit_outlined,
+              color: Colors.white,
+            ),
+          ),
+          CustomSlidableAction(
+            onPressed: (_) => widget.onDelete(session),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            child: Icon(
+              Icons.delete_outline,
+              color: Theme.of(context).colorScheme.onError,
+            ),
+          ),
+        ],
+      ),
+      child: Card(
+        child: ListTile(
+          onTap: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ChatPage(
+                  fileName: fileName,
+                  initialRoundId: widget.item.previewRoundId,
+                ),
+              ),
+            );
+            if (context.mounted) {
+              await widget.notifier.refresh();
+            }
+          },
+          leading: const Icon(Icons.forum_outlined),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  session.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (isStreaming) ...[
+                const SizedBox(width: 8),
+                _buildMetaChip('生成中', icon: Icons.bolt_outlined),
+              ],
+              if (widget.item.hasUnseen) ...[
+                const SizedBox(width: 8),
+                _buildMetaChip('未查看', icon: Icons.mark_chat_unread_outlined),
+              ],
+            ],
+          ),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _PreviewLine(label: 'YOU', text: widget.item.userPreview),
+                const SizedBox(height: 4),
+                _PreviewLine(label: 'AI', text: aiPreview),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _buildMetaChip(
+                      '${widget.item.roundCount} 轮',
+                      icon: Icons.chat_bubble_outline,
+                    ),
+                    _buildMetaChip(updatedAt, icon: Icons.schedule_outlined),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          trailing: const Icon(Icons.chevron_right_rounded),
+        ),
+      ),
+    );
+  }
+}
+class _PreviewLine extends StatelessWidget {
+  final String label;
+  final String text;
+  const _PreviewLine({
+    required this.label,
+    required this.text,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$label  ',
+          style: textTheme.bodySmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.bodySmall,
+          ),
+        ),
+      ],
+    );
+  }
+}
+```
+
 ## File: lib/presentation/pages/branch_tree_page.dart
 ```dart
 import 'package:flutter/material.dart';
@@ -10770,443 +11248,6 @@ class _PreviewBlock extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-```
-
-## File: lib/presentation/pages/home_page.dart
-```dart
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_slidable/flutter_slidable.dart';
-import '../../core/models/session.dart';
-import '../../core/utils/time_format_utils.dart';
-import '../providers/global_streaming_provider.dart';
-import '../providers/home_session_list_provider.dart';
-import '../providers/session_list_notifier.dart';
-import '../widgets/common/app_page_scaffold.dart';
-import '../widgets/input_bar.dart';
-import 'chat_page.dart';
-import 'settings_page.dart';
-class HomePage extends ConsumerWidget {
-  const HomePage({super.key});
-  Future<void> _showRenameDialog(
-    BuildContext context,
-    SessionListNotifier notifier,
-    Session session,
-  ) async {
-    final controller = TextEditingController(text: session.title);
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('重命名会话'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: '输入新的会话名称',
-          ),
-          onSubmitted: (value) => Navigator.of(ctx).pop(value.trim()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-            child: const Text('保存'),
-          ),
-        ],
-      ),
-    );
-    if (result != null && result.isNotEmpty && result != session.title) {
-      await notifier.updateSessionTitle('${session.id}.json', result);
-    }
-  }
-  Future<void> _showDeleteConfirmDialog(
-    BuildContext context,
-    SessionListNotifier notifier,
-    Session session,
-  ) async {
-    final colorScheme = Theme.of(context).colorScheme;
-    final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('删除会话'),
-            content: Text('确定要删除 “${session.title}” 吗？\n此操作无法撤销。'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                style: FilledButton.styleFrom(
-                  backgroundColor: colorScheme.error,
-                  foregroundColor: colorScheme.onError,
-                ),
-                child: const Text('删除'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-    if (confirmed == true) {
-      await notifier.deleteSession('${session.id}.json');
-    }
-  }
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final sessionsAsync = ref.watch(homeSessionListProvider);
-    final notifier = ref.read(sessionListProvider.notifier);
-    return AppPageScaffold(
-      appBar: AppBar(
-        title: const Text('AI Chat'),
-        actions: [
-          IconButton(
-            tooltip: '设置',
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const SettingsPage(),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: sessionsAsync.when(
-              loading: () => const Center(
-                child: CircularProgressIndicator(),
-              ),
-              error: (e, st) => _HomeErrorState(
-                message: '加载会话失败：$e',
-                onRetry: () async {
-                  await notifier.refresh();
-                },
-              ),
-              data: (items) {
-                if (items.isEmpty) {
-                  return const _HomeEmptyState();
-                }
-                return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                  itemCount: items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final item = items[index];
-                    return _SessionCard(
-                      item: item,
-                      notifier: notifier,
-                      onRename: (session) =>
-                          _showRenameDialog(context, notifier, session),
-                      onDelete: (session) =>
-                          _showDeleteConfirmDialog(context, notifier, session),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-          InputBar(
-            hintText: '发送消息',
-            onSend: (content, attachments) async {
-              final newFileName = await notifier.createSession('新对话');
-              if (context.mounted) {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ChatPage(
-                      fileName: newFileName,
-                      initialMessage: content,
-                      initialAttachments: attachments,
-                    ),
-                  ),
-                );
-                if (context.mounted) {
-                  await notifier.refresh();
-                }
-              }
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-class _HomeEmptyState extends StatelessWidget {
-  const _HomeEmptyState();
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 360),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: const [
-                Icon(Icons.auto_awesome_outlined, size: 40),
-                SizedBox(height: 16),
-                Text(
-                  '开始你的第一段对话',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  '在下方输入问题，系统会自动创建一个新会话。\n你也可以附加图片或文件开始交流。',
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-class _HomeErrorState extends StatelessWidget {
-  final String message;
-  final Future<void> Function() onRetry;
-  const _HomeErrorState({
-    required this.message,
-    required this.onRetry,
-  });
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Center(
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 360),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.error_outline,
-                  size: 40,
-                  color: colorScheme.error,
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  '出现了一点问题',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  message,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                FilledButton.icon(
-                  onPressed: onRetry,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('重试'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-class _SessionCard extends ConsumerStatefulWidget {
-  final HomeSessionItem item;
-  final SessionListNotifier notifier;
-  final Future<void> Function(Session session) onRename;
-  final Future<void> Function(Session session) onDelete;
-  const _SessionCard({
-    required this.item,
-    required this.notifier,
-    required this.onRename,
-    required this.onDelete,
-  });
-  @override
-  ConsumerState<_SessionCard> createState() => _SessionCardState();
-}
-class _SessionCardState extends ConsumerState<_SessionCard> {
-  bool _requested = false;
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _ensurePreviewLoaded();
-  }
-  @override
-  void didUpdateWidget(covariant _SessionCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.item.previewRoundId != widget.item.previewRoundId ||
-        oldWidget.item.session.id != widget.item.session.id) {
-      _requested = false;
-      _ensurePreviewLoaded();
-    }
-  }
-  void _ensurePreviewLoaded() {
-    final previewRoundId = widget.item.previewRoundId;
-    if (_requested || previewRoundId == null) return;
-    _requested = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final fileName = '${widget.item.session.id}.json';
-      final previewRound =
-          widget.item.session.rounds.firstWhere((r) => r.id == previewRoundId);
-      ref.read(globalStreamCacheProvider.notifier).ensureRoundLoaded(
-            fileName,
-            previewRound,
-          );
-    });
-  }
-  Widget _buildMetaChip(String label, {IconData? icon}) {
-    return Chip(
-      avatar: icon == null ? null : Icon(icon, size: 16),
-      label: Text(label),
-      visualDensity: VisualDensity.compact,
-    );
-  }
-  @override
-  Widget build(BuildContext context) {
-    final session = widget.item.session;
-    final fileName = '${session.id}.json';
-    final updatedAt = TimeFormatUtils.formatTimestamp(widget.item.updatedAt);
-    final previewRoundId = widget.item.previewRoundId;
-    final stream = previewRoundId == null
-        ? null
-        : ref.watch(
-            roundStreamProvider((fileName: fileName, roundId: previewRoundId)),
-          );
-    final aiPreview = stream == null
-        ? '加载中...'
-        : stream.content.trim().isEmpty
-            ? (stream.isStreaming ? '正在生成...' : '（等待回复）')
-            : stream.content;
-    final isStreaming = stream?.isStreaming == true;
-    return Slidable(
-      key: ValueKey(fileName),
-      endActionPane: ActionPane(
-        motion: const DrawerMotion(),
-        extentRatio: 0.34,
-        children: [
-          CustomSlidableAction(
-            onPressed: (_) => widget.onRename(session),
-            backgroundColor: Theme.of(context).colorScheme.secondary,
-            child: const Icon(
-              Icons.edit_outlined,
-              color: Colors.white,
-            ),
-          ),
-          CustomSlidableAction(
-            onPressed: (_) => widget.onDelete(session),
-            backgroundColor: Theme.of(context).colorScheme.error,
-            child: Icon(
-              Icons.delete_outline,
-              color: Theme.of(context).colorScheme.onError,
-            ),
-          ),
-        ],
-      ),
-      child: Card(
-        child: ListTile(
-          onTap: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ChatPage(
-                  fileName: fileName,
-                  initialRoundId: widget.item.previewRoundId,
-                ),
-              ),
-            );
-            if (context.mounted) {
-              await widget.notifier.refresh();
-            }
-          },
-          leading: const Icon(Icons.forum_outlined),
-          title: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  session.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              if (isStreaming) ...[
-                const SizedBox(width: 8),
-                _buildMetaChip('生成中', icon: Icons.bolt_outlined),
-              ],
-              if (widget.item.hasUnseen) ...[
-                const SizedBox(width: 8),
-                _buildMetaChip('未查看', icon: Icons.mark_chat_unread_outlined),
-              ],
-            ],
-          ),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _PreviewLine(label: 'YOU', text: widget.item.userPreview),
-                const SizedBox(height: 4),
-                _PreviewLine(label: 'AI', text: aiPreview),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _buildMetaChip(
-                      '${widget.item.roundCount} 轮',
-                      icon: Icons.chat_bubble_outline,
-                    ),
-                    _buildMetaChip(updatedAt, icon: Icons.schedule_outlined),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          trailing: const Icon(Icons.chevron_right_rounded),
-        ),
-      ),
-    );
-  }
-}
-class _PreviewLine extends StatelessWidget {
-  final String label;
-  final String text;
-  const _PreviewLine({
-    required this.label,
-    required this.text,
-  });
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '$label  ',
-          style: textTheme.bodySmall?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        Expanded(
-          child: Text(
-            text,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: textTheme.bodySmall,
-          ),
-        ),
-      ],
     );
   }
 }

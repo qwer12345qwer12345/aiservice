@@ -119,9 +119,6 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
 
   @override
   void dispose() {
-    if (_isInEditMode()) {
-      _cancelEditMode();
-    }
     _chatSubscription.close();
     appRouteObserver.unsubscribe(this);
     _pageController?.dispose();
@@ -154,6 +151,9 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
   @override
   void didPop() {
     _isRouteVisible = false;
+    if (_isInEditMode()) {
+      _cancelEditMode();
+    }
   }
 
   Future<void> _copyText(String text) async {
@@ -326,7 +326,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
                               ),
           ),
           InputBar(
-            hintText: isEditMode ? '修改文本后发送（保留原附件）' : '发送消息',
+            hintText: isEditMode ? '修改文本后发送' : '发送消息',
             isStreaming: currentIsStreaming,
             onStop: notifier.stopGeneration,
             onSend: (text, attachments) async {
