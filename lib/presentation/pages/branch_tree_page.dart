@@ -169,35 +169,11 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   }
 
   String _buildSignature(List<TreeNode> roots) {
-    dynamic toJsonNode(TreeNode node) {
-      return {
-        'id': node.id,
-        'parentId': node.parentId,
-        'assistantContent': node.round.assistantContent,
-        'assistantThinking': node.round.assistantThinking,
-        'isIncomplete': node.round.isIncomplete,
-        'hasUnseenUpdate': node.round.hasUnseenUpdate,
-        'children': node.children.map(toJsonNode).toList(),
-      };
-    }
-
-    return roots.map((e) => toJsonNode(e).toString()).join('|');
+    return roots.map((e) => e.toJson().toString()).join('|');
   }
 
   String _buildNodeSignature(TreeNode node) {
-    dynamic toJsonNode(TreeNode n) {
-      return {
-        'id': n.id,
-        'parentId': n.parentId,
-        'assistantContent': n.round.assistantContent,
-        'assistantThinking': n.round.assistantThinking,
-        'isIncomplete': n.round.isIncomplete,
-        'hasUnseenUpdate': n.round.hasUnseenUpdate,
-        'children': n.children.map(toJsonNode).toList(),
-      };
-    }
-
-    return toJsonNode(node).toString();
+    return node.toJson().toString();
   }
 
   Set<String> _collectSubtreeIds(TreeNode node) {

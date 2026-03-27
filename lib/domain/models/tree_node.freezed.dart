@@ -15,6 +15,10 @@ final _privateConstructorUsedError = UnsupportedError(
   'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
 );
 
+TreeNode _$TreeNodeFromJson(Map<String, dynamic> json) {
+  return _TreeNode.fromJson(json);
+}
+
 /// @nodoc
 mixin _$TreeNode {
   String get id => throw _privateConstructorUsedError;
@@ -23,6 +27,9 @@ mixin _$TreeNode {
   List<TreeNode> get children => throw _privateConstructorUsedError;
   int get depth => throw _privateConstructorUsedError;
   String? get preview => throw _privateConstructorUsedError;
+
+  /// Serializes this TreeNode to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
 
   /// Create a copy of TreeNode
   /// with the given fields replaced by the non-null parameter values.
@@ -187,7 +194,7 @@ class __$$TreeNodeImplCopyWithImpl<$Res>
 }
 
 /// @nodoc
-
+@JsonSerializable()
 class _$TreeNodeImpl implements _TreeNode {
   const _$TreeNodeImpl({
     required this.id,
@@ -197,6 +204,9 @@ class _$TreeNodeImpl implements _TreeNode {
     required this.depth,
     this.preview,
   }) : _children = children;
+
+  factory _$TreeNodeImpl.fromJson(Map<String, dynamic> json) =>
+      _$$TreeNodeImplFromJson(json);
 
   @override
   final String id;
@@ -236,6 +246,7 @@ class _$TreeNodeImpl implements _TreeNode {
             (identical(other.preview, preview) || other.preview == preview));
   }
 
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hash(
     runtimeType,
@@ -254,6 +265,11 @@ class _$TreeNodeImpl implements _TreeNode {
   @pragma('vm:prefer-inline')
   _$$TreeNodeImplCopyWith<_$TreeNodeImpl> get copyWith =>
       __$$TreeNodeImplCopyWithImpl<_$TreeNodeImpl>(this, _$identity);
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$TreeNodeImplToJson(this);
+  }
 }
 
 abstract class _TreeNode implements TreeNode {
@@ -265,6 +281,9 @@ abstract class _TreeNode implements TreeNode {
     required final int depth,
     final String? preview,
   }) = _$TreeNodeImpl;
+
+  factory _TreeNode.fromJson(Map<String, dynamic> json) =
+      _$TreeNodeImpl.fromJson;
 
   @override
   String get id;
@@ -287,10 +306,17 @@ abstract class _TreeNode implements TreeNode {
       throw _privateConstructorUsedError;
 }
 
+TreePath _$TreePathFromJson(Map<String, dynamic> json) {
+  return _TreePath.fromJson(json);
+}
+
 /// @nodoc
 mixin _$TreePath {
   List<TreeNode> get nodes => throw _privateConstructorUsedError;
   TreeNode get targetNode => throw _privateConstructorUsedError;
+
+  /// Serializes this TreePath to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
 
   /// Create a copy of TreePath
   /// with the given fields replaced by the non-null parameter values.
@@ -395,12 +421,15 @@ class __$$TreePathImplCopyWithImpl<$Res>
 }
 
 /// @nodoc
-
+@JsonSerializable()
 class _$TreePathImpl implements _TreePath {
   const _$TreePathImpl({
     required final List<TreeNode> nodes,
     required this.targetNode,
   }) : _nodes = nodes;
+
+  factory _$TreePathImpl.fromJson(Map<String, dynamic> json) =>
+      _$$TreePathImplFromJson(json);
 
   final List<TreeNode> _nodes;
   @override
@@ -428,6 +457,7 @@ class _$TreePathImpl implements _TreePath {
                 other.targetNode == targetNode));
   }
 
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hash(
     runtimeType,
@@ -442,6 +472,11 @@ class _$TreePathImpl implements _TreePath {
   @pragma('vm:prefer-inline')
   _$$TreePathImplCopyWith<_$TreePathImpl> get copyWith =>
       __$$TreePathImplCopyWithImpl<_$TreePathImpl>(this, _$identity);
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$TreePathImplToJson(this);
+  }
 }
 
 abstract class _TreePath implements TreePath {
@@ -449,6 +484,9 @@ abstract class _TreePath implements TreePath {
     required final List<TreeNode> nodes,
     required final TreeNode targetNode,
   }) = _$TreePathImpl;
+
+  factory _TreePath.fromJson(Map<String, dynamic> json) =
+      _$TreePathImpl.fromJson;
 
   @override
   List<TreeNode> get nodes;
