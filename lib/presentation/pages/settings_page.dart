@@ -17,12 +17,10 @@ class SettingsPage extends ConsumerStatefulWidget {
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   static const String _defaultModelsPath = 'v1/models';
-
   final _baseUrlController = TextEditingController();
   final _apiKeyController = TextEditingController();
   final _modelsPathController = TextEditingController();
   final _chatPathController = TextEditingController();
-
   bool _initialized = false;
   bool _isRefreshingModels = false;
   String? _selectedModel;
@@ -109,7 +107,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (model == null) return const SizedBox.shrink();
     final chips = _buildModelChips(model);
     if (chips.isEmpty) return const SizedBox.shrink();
-
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: Align(
@@ -143,6 +140,39 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         return m;
       }).toList();
     });
+  }
+
+  Future<void> _showCustomModelDialog() async {
+    final controller = TextEditingController(text: _selectedModel ?? '');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('自定义模型'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: '模型 ID',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+    if (result != null && result.isNotEmpty) {
+      setState(() {
+        _selectedModel = result;
+      });
+    }
   }
 
   Future<void> _saveSettings() async {
@@ -235,7 +265,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget _buildManualCapabilityEditor() {
     final model = _selectedModelInfo();
     if (model == null) return const SizedBox.shrink();
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -339,7 +368,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('删除配置存档'),
-            content: Text('确定删除“${profile.name}”吗？'),
+            content: Text('确定删除"${profile.name}"吗？'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(false),
@@ -400,7 +429,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget build(BuildContext context) {
     final configState = ref.watch(configProvider);
     final profilesState = ref.watch(configProfilesProvider);
-
     ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
       next.whenData((config) {
         if (!_initialized) {
@@ -410,9 +438,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         }
       });
     });
-
     final isBusy = configState.isLoading || _isRefreshingModels;
-
     return AppPageScaffold(
       appBar: AppBar(
         title: const Text('设置'),
@@ -442,7 +468,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 _applyConfig(config);
               }
               final models = _models;
-
               return ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
@@ -620,47 +645,56 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                                     ListTile(title: Text('没有匹配的模型')),
                                   ];
                                 }
-                                return filteredModels.map((model) {
-                                  final isSelected = model.id == _selectedModel;
-                                  final title =
-                                      (model.name ?? '').trim().isNotEmpty
-                                          ? model.name!
-                                          : model.id;
-                                  final showSubtitle =
-                                      (model.name ?? '').trim().isNotEmpty &&
-                                          model.name != model.id;
-                                  final chips = _buildModelChips(model);
-                                  return ListTile(
-                                    title: Text(
-                                      title,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    subtitle: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        if (showSubtitle) Text(model.id),
-                                        if (chips.isNotEmpty) ...[
-                                          const SizedBox(height: 6),
-                                          Wrap(
-                                            spacing: 6,
-                                            runSpacing: 6,
-                                            children: chips,
-                                          ),
+                                return [
+                                  ...filteredModels.map((model) {
+                                    final isSelected = model.id == _selectedModel;
+                                    final title =
+                                        (model.name ?? '').trim().isNotEmpty
+                                            ? model.name!
+                                            : model.id;
+                                    final showSubtitle =
+                                        (model.name ?? '').trim().isNotEmpty &&
+                                            model.name != model.id;
+                                    final chips = _buildModelChips(model);
+                                    return ListTile(
+                                      title: Text(
+                                        title,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      subtitle: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          if (showSubtitle) Text(model.id),
+                                          if (chips.isNotEmpty) ...[
+                                            const SizedBox(height: 6),
+                                            Wrap(
+                                              spacing: 6,
+                                              runSpacing: 6,
+                                              children: chips,
+                                            ),
+                                          ],
                                         ],
-                                      ],
-                                    ),
-                                    trailing: isSelected
-                                        ? const Icon(Icons.check)
-                                        : null,
+                                      ),
+                                      trailing: isSelected
+                                          ? const Icon(Icons.check)
+                                          : null,
+                                      onTap: () {
+                                        setState(() {
+                                          _selectedModel = model.id;
+                                        });
+                                        controller.closeView(model.id);
+                                      },
+                                    );
+                                  }),
+                                  ListTile(
+                                    title: const Text('自定义模型 ID'),
                                     onTap: () {
-                                      setState(() {
-                                        _selectedModel = model.id;
-                                      });
-                                      controller.closeView(model.id);
+                                      controller.closeView(null);
+                                      _showCustomModelDialog();
                                     },
-                                  );
-                                }).toList();
+                                  ),
+                                ];
                               },
                             ),
                           ),
