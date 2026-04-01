@@ -309,13 +309,13 @@ class ChatNotifier extends StateNotifier<ChatState> {
     List<ApiMessage> apiContext,
     AppConfig config,
   ) async {
-    final apiService = ref.read(apiServiceProvider);
+    final apiSource = ref.read(remoteApiSourceProvider);
     final accumulator = ChatStreamAccumulator();
     var hasError = false;
     String? errorMessage;
     var wasStopped = false;
     try {
-      final stream = apiService.chatStream(
+      final stream = apiSource.chatStream(
         taskId: round.id,
         baseUrl: config.baseUrl,
         apiKey: config.apiKey,
@@ -439,8 +439,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
     final stream = _getRoundStream(viewingRound.id);
     if (stream?.isStreaming != true) return;
     _stoppingRoundIds.add(viewingRound.id);
-    final apiService = ref.read(apiServiceProvider);
-    apiService.cancelRequest(viewingRound.id);
+    final apiSource = ref.read(remoteApiSourceProvider);
+    apiSource.cancelRequest(viewingRound.id);
   }
 
   Future<void> switchBranch(String targetRoundId) async {
