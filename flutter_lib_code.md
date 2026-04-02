@@ -59,6 +59,7 @@ core/utils/app_route_observer.dart
 core/utils/file_name_utils.dart
 core/utils/id_generator.dart
 core/utils/json_utils.dart
+core/utils/sse_parser.dart
 core/utils/time_format_utils.dart
 data/data_sources/local_file_source.dart
 data/data_sources/remote_api_source.dart
@@ -890,6 +891,116 @@ abstract class JsonUtils {
 }
 ```
 
+## File: core/utils/sse_parser.dart
+```dart
+import '../models/sse_event.dart';
+
+/// 标准 SSE 解析器
+///
+/// 负责：
+/// - 处理 HTTP 分块不等于 SSE 事件边界的问题
+/// - 支持 event/id/data/retry
+/// - 支持多行 data 拼接
+/// - 以空行作为一个 SSE event 的结束
+class SseParser {
+  String _buffer = '';
+
+  final List<String> _dataLines = [];
+  String? _event;
+  String? _id;
+
+  /// 输入任意一段文本，输出当前能够完整解析出的 SSE 事件列表
+  List<SseEvent> addChunk(String chunk) {
+    _buffer += chunk;
+    final events = <SseEvent>[];
+
+    while (true) {
+      final newlineIndex = _buffer.indexOf('\n');
+      if (newlineIndex == -1) break;
+
+      var line = _buffer.substring(0, newlineIndex);
+      _buffer = _buffer.substring(newlineIndex + 1);
+
+      if (line.endsWith('\r')) {
+        line = line.substring(0, line.length - 1);
+      }
+
+      // 空行 => 一个事件结束
+      if (line.isEmpty) {
+        final event = _flushEvent();
+        if (event != null) {
+          events.add(event);
+        }
+        continue;
+      }
+
+      // 注释行
+      if (line.startsWith(':')) {
+        continue;
+      }
+
+      final colonIndex = line.indexOf(':');
+      String field;
+      String value;
+
+      if (colonIndex == -1) {
+        field = line;
+        value = '';
+      } else {
+        field = line.substring(0, colonIndex);
+        value = line.substring(colonIndex + 1);
+        if (value.startsWith(' ')) {
+          value = value.substring(1);
+        }
+      }
+
+      switch (field) {
+        case 'event':
+          _event = value;
+          break;
+        case 'data':
+          _dataLines.add(value);
+          break;
+        case 'id':
+          _id = value;
+          break;
+        case 'retry':
+          // 目前不处理自动重试时间
+          break;
+        default:
+          // 未知字段忽略
+          break;
+      }
+    }
+
+    return events;
+  }
+
+  /// 在底层流结束时调用，尝试 flush 最后一个未结束事件
+  SseEvent? close() {
+    return _flushEvent();
+  }
+
+  SseEvent? _flushEvent() {
+    if (_dataLines.isEmpty && _event == null && _id == null) {
+      return null;
+    }
+
+    final event = SseEvent(
+      id: _id,
+      event: _event,
+      data: _dataLines.join('\n'),
+    );
+
+    _dataLines.clear();
+    _event = null;
+    _id = null;
+
+    return event;
+  }
+}
+```
+
 ## File: core/utils/time_format_utils.dart
 ```dart
 import 'package:intl/intl.dart';
@@ -1042,17 +1153,13 @@ class LocalFileSource implements ILocalFileSource {
 
 ## File: data/data_sources/remote_api_source.dart
 ```dart
-import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-// 导入库的核心类和请求类型枚举
-import 'package:flutter_client_sse/constants/sse_request_type_enum.dart';
-import 'package:flutter_client_sse/flutter_client_sse.dart';
-
 import '../../core/errors/exceptions.dart';
 import '../../core/models/model_info.dart';
 import '../../core/models/api_message.dart';
 import '../../core/models/chat_chunk.dart';
+import '../../core/utils/sse_parser.dart';
 import '../../domain/services/model_capability_registry.dart';
 import 'sse_event_decoder.dart';
 
@@ -1078,7 +1185,7 @@ abstract class IRemoteApiSource {
 }
 
 class RemoteApiSource implements IRemoteApiSource {
-  final Map<String, StreamSubscription<SSEModel>> _activeSubscriptions = {};
+  final Map<String, http.Client> _activeClients = {};
   final Set<String> _cancelledTasks = {};
 
   String _buildUrl(String baseUrl, String path) {
@@ -1346,109 +1453,119 @@ class RemoteApiSource implements IRemoteApiSource {
     bool enableReasoning = false,
   }) async* {
     _cancelledTasks.remove(taskId);
-    String currentUrl = _buildUrl(baseUrl, chatPath);
-
-    // 1. 创建中间Controller，用于中转处理后的ChatChunk
-    final controller = StreamController<ChatChunk>();
-    StreamSubscription<SSEModel>? sseSubscription;
+    final client = http.Client();
+    _activeClients[taskId] = client;
 
     try {
+      final url = Uri.parse(_buildUrl(baseUrl, chatPath));
       final requestBody = _buildRequestBody(
         apiMode: apiMode,
         model: model,
         context: context,
         enableReasoning: enableReasoning,
       );
+      final body = jsonEncode(requestBody);
 
-      final sseStream = SSEClient.subscribeToSSE(
-        method: SSERequestType.POST,
-        url: currentUrl,
-        header: {
+      // 调试用：必要时打开
+      // print('REQUEST URL => $url');
+      // print('REQUEST BODY => $body');
+
+      final request = http.Request('POST', url)
+        ..headers.addAll({
           'Authorization': 'Bearer $apiKey',
           'Content-Type': 'application/json',
           'Accept': 'text/event-stream',
           'Cache-Control': 'no-cache',
-        },
-        body: requestBody,
-      );
+        })
+        ..body = body;
 
-      // 2. 仅一次监听SSE流，拿到subscription用于取消（解决原始重复监听问题）
-      sseSubscription = sseStream.listen(
-        (sseModel) async {
-          // 如果任务已经被取消，直接结束流
+      final streamedResponse = await client.send(request);
+
+      if (streamedResponse.statusCode < 200 ||
+          streamedResponse.statusCode >= 300) {
+        final errorBody = await streamedResponse.stream.bytesToString();
+        throw ApiException(
+          '流式请求失败：${streamedResponse.statusCode} $errorBody',
+          code: 'CHAT_STREAM_ERROR',
+        );
+      }
+
+      final parser = SseParser();
+      final stream = streamedResponse.stream.transform(utf8.decoder);
+
+      await for (final rawChunk in stream) {
+        if (_cancelledTasks.contains(taskId)) {
+          yield const ChatChunk(isDone: true);
+          return;
+        }
+
+        final events = parser.addChunk(rawChunk);
+
+        for (final event in events) {
           if (_cancelledTasks.contains(taskId)) {
-            if (!controller.isClosed) {
-              controller.add(const ChatChunk(isDone: true));
-              await controller.close();
-            }
+            yield const ChatChunk(isDone: true);
             return;
           }
 
           try {
             final decoded = SseEventDecoder.decode(
               apiMode: apiMode,
-              event: sseModel,
+              event: event,
             );
-            if (decoded == null) return;
 
-            // 把解码后的事件加到中间Controller
-            if (!controller.isClosed) {
-              controller.add(decoded);
-            }
+            if (decoded == null) continue;
 
-            // 收到结束事件则关闭流
+            yield decoded;
+
             if (decoded.isDone) {
-              await controller.close();
+              return;
             }
           } catch (e) {
-            // 解码错误可忽略，不中断整体流
+            // 保持原逻辑风格：单条 SSE 事件解析失败不让整个流崩掉
+            // 如需调试，可打开下面这行：
+            // print('SSE decode error: $e, event=$event');
           }
-        },
-        onError: (e) async {
-          if (_cancelledTasks.contains(taskId)) {
-            if (!controller.isClosed) controller.add(const ChatChunk(isDone: true));
-          } else {
-            if (!controller.isClosed) controller.add(ChatChunk(isDone: true, error: '流式请求失败：$e'));
-          }
-          if (!controller.isClosed) await controller.close();
-        },
-        onDone: () async {
-          if (!controller.isClosed) {
-            controller.add(const ChatChunk(isDone: true));
-            await controller.close();
-          }
-        },
-        cancelOnError: true,
-      );
+        }
+      }
 
-      // 3. 把subscription存到Map里，用于后续按taskId取消
-      _activeSubscriptions[taskId] = sseSubscription;
+      // 流结束时 flush 一次，避免最后一个事件未被空行结尾
+      final lastEvent = parser.close();
+      if (lastEvent != null) {
+        try {
+          final decoded = SseEventDecoder.decode(
+            apiMode: apiMode,
+            event: lastEvent,
+          );
+          if (decoded != null) {
+            yield decoded;
+            if (decoded.isDone) return;
+          }
+        } catch (_) {
+          // 忽略最后一次 flush 解码错误
+        }
+      }
 
-      // 4. 转发中间Controller的流给调用方（yield*在async*顶层，语法合法）
-      yield* controller.stream;
+      yield const ChatChunk(isDone: true);
+    } on ApiException {
+      rethrow;
     } catch (e) {
-      // 外层异常兜底
       if (_cancelledTasks.contains(taskId)) {
         yield const ChatChunk(isDone: true);
       } else {
         yield ChatChunk(isDone: true, error: '流式请求失败：$e');
       }
     } finally {
-      // 5. 资源清理，避免内存泄漏
-      sseSubscription?.cancel();
-      _activeSubscriptions.remove(taskId);
+      _activeClients[taskId]?.close();
+      _activeClients.remove(taskId);
       _cancelledTasks.remove(taskId);
-      if (!controller.isClosed) await controller.close();
-      // ❌ 永远不要调用全局取消，会中断其他并行SSE请求
-      // SSEClient.unsubscribeFromSSE();
     }
   }
 
   @override
   void cancelRequest(String taskId) {
     _cancelledTasks.add(taskId);
-    _activeSubscriptions[taskId]?.cancel();
-    _activeSubscriptions.remove(taskId);
+    _activeClients[taskId]?.close();
+    _activeClients.remove(taskId);
   }
 }
 ```
@@ -1456,34 +1573,33 @@ class RemoteApiSource implements IRemoteApiSource {
 ## File: data/data_sources/sse_event_decoder.dart
 ```dart
 import 'dart:convert';
-import 'package:flutter_client_sse/flutter_client_sse.dart';
-
 import '../../core/models/chat_chunk.dart';
+import '../../core/models/sse_event.dart';
 
 /// 按不同 API 协议把 SSEEvent 解释成统一的 ChatChunk
 class SseEventDecoder {
   static ChatChunk? decode({
     required String apiMode,
-    required SSEModel event, // 直接用库的SSEModel
+    required SseEvent event,
   }) {
-    // 空安全处理，保证data非空
-    final data = event.data?.trim() ?? '';
+    final data = event.data.trim();
     if (data.isEmpty) return null;
-    // 其他原有逻辑完全不变
+
     if (data == '[DONE]') {
       return const ChatChunk(isDone: true);
     }
+
     switch (apiMode) {
       case 'responses':
-        return _decodeResponses(event, data);
+        return _decodeResponses(event);
       case 'chat_completions':
       default:
-        return _decodeChatCompletions(event, data);
+        return _decodeChatCompletions(event);
     }
   }
 
-  static ChatChunk? _decodeChatCompletions(SSEModel event, String data) {
-    final json = jsonDecode(data) as Map<String, dynamic>;
+  static ChatChunk? _decodeChatCompletions(SseEvent event) {
+    final json = jsonDecode(event.data) as Map<String, dynamic>;
 
     if (json['error'] != null) {
       return ChatChunk(
@@ -1524,8 +1640,8 @@ class SseEventDecoder {
     return null;
   }
 
-  static ChatChunk? _decodeResponses(SSEModel event, String data) {
-    final json = jsonDecode(data) as Map<String, dynamic>;
+  static ChatChunk? _decodeResponses(SseEvent event) {
+    final json = jsonDecode(event.data) as Map<String, dynamic>;
     final type = json['type'] as String?;
 
     switch (type) {
@@ -8183,12 +8299,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
                                 },
                                 itemBuilder: (context, index) {
                                   final round = state.pageList!.pages[index].round;
-                                  final stream = ref.watch(
-                                    roundStreamProvider(
-                                      (fileName: widget.fileName, roundId: round.id),
-                                    ),
-                                  );
-                                  final canEdit = stream?.isStreaming != true;                              
+                                  final canEdit = !round.isIncomplete;
                                   return _ChatRoundPage(
                                     key: ValueKey(round.id),
                                     fileName: widget.fileName,

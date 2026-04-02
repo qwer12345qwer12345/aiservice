@@ -2723,22 +2723,6 @@ Map<String, dynamic> _$$ModelInfoImplToJson(_$ModelInfoImpl instance) =>
     };
 ```
 
-## File: lib/core/models/sse_event.dart
-```dart
-class SseEvent {
-  final String? id;
-  final String? event;
-  final String data;
-  const SseEvent({
-    this.id,
-    this.event,
-    required this.data,
-  });
-  @override
-  String toString() => 'SseEvent(id: $id, event: $event, data: $data)';
-}
-```
-
 ## File: lib/core/utils/app_route_observer.dart
 ```dart
 import 'package:flutter/material.dart';
@@ -7522,52 +7506,6 @@ abstract class AppToast {
 }
 ```
 
-## File: lib/core/constants/app_constants.dart
-```dart
-abstract class AppConstants {
-  // 文件夹名称
-  static const String dirConversations = 'conversations';
-  static const String dirAttachments = 'attachments';
-  // 文件名
-  static const String fileConfig = 'config.json';
-  // 配置键
-  static const String keyBaseUrl = 'baseUrl';
-  static const String keyApiKey = 'apiKey';
-  static const String keyTheme = 'theme';
-  static const String keyModel = 'selectedModel';
-  // 默认值
-  static const String defaultBaseUrl = 'https://api.openai.com/v1';
-  static const String defaultTheme = 'system';
-  // 文件扩展名
-  static const String extJson = '.json';
-}
-```
-
-## File: lib/core/interfaces/config_service.dart
-```dart
-// core/interfaces/config_service.dart
-import '../models/app_config.dart';
-import '../models/app_config_store.dart';
-abstract class IConfigService {
-  // 现有的同步方法
-  Future<AppConfigStore> loadConfigStore();
-  Future<AppConfig> loadConfig();
-  Future<void> saveConfig(AppConfig config);
-  Future<void> refreshModels();
-  Future<List<ConfigProfile>> getProfiles();
-  Future<String> getActiveProfileId();
-  Future<void> switchProfile(String profileId);
-  Future<void> createProfile(String name);
-  Future<void> renameProfile(String profileId, String name);
-  Future<void> deleteProfile(String profileId);
-  // ========== 新增：watch 方法 ==========
-  /// 监听配置Store的变更
-  Stream<AppConfigStore> watchConfigStore();
-  /// 监听当前配置
-  Stream<AppConfig> watchConfig();
-}
-```
-
 ## File: lib/core/models/chat_round.dart
 ```dart
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -8527,6 +8465,34 @@ Map<String, dynamic> _$$SessionConfigImplToJson(_$SessionConfigImpl instance) =>
     };
 ```
 
+## File: lib/core/models/sse_event.dart
+```dart
+// 导入库的模型和枚举
+import 'package:flutter_client_sse/flutter_client_sse.dart';
+// 保持你原有SseEvent的非空约定，避免修改下游Decoder
+class SseEvent {
+  final String? id;
+  final String? event;
+  final String data; // 保持非空，和你原有逻辑一致
+  // 从库的SSEModel转换，自动处理空值
+  factory SseEvent.fromSSEModel(SSEModel model) {
+    return SseEvent(
+      id: model.id,
+      event: model.event,
+      // 空值处理：保证data永远非空，不会给下游Decoder传null
+      data: model.data?.trim() ?? '',
+    );
+  }
+  const SseEvent({
+    this.id,
+    this.event,
+    required this.data,
+  });
+  @override
+  String toString() => 'SseEvent(id: $id, event: $event, data: $data)';
+}
+```
+
 ## File: lib/data/data_sources/local_file_source.dart
 ```dart
 import 'dart:io';
@@ -8646,103 +8612,6 @@ class LocalFileSource implements ILocalFileSource {
         code: 'ATTACHMENT_READ_ERROR',
       );
     }
-  }
-}
-```
-
-## File: lib/data/repositories/config_repository.dart
-```dart
-// data/repositories/config_repository.dart
-import 'dart:async';
-import '../../core/models/app_config.dart';
-import '../../core/models/app_config_store.dart';
-import '../../core/interfaces/config_service.dart';
-class ConfigRepository {
-  final IConfigService _configService;
-  ConfigRepository(this._configService);
-  /// 监听配置Store的变更 - 使用真正的数据库流
-  Stream<AppConfigStore> watchConfigStore() {
-    return _configService.watchConfigStore();
-  }
-  /// 监听当前激活的配置
-  Stream<AppConfig> watchConfig() {
-    return _configService.watchConfig();
-  }
-  // ========== 以下保留原有的同步方法 ==========
-  Future<AppConfig> getConfig() async {
-    return await _configService.loadConfig();
-  }
-  Future<AppConfigStore> getConfigStore() async {
-    return await _configService.loadConfigStore();
-  }
-  Future<List<ConfigProfile>> getProfiles() async {
-    return await _configService.getProfiles();
-  }
-  Future<String> getActiveProfileId() async {
-    return await _configService.getActiveProfileId();
-  }
-  Future<void> switchProfile(String profileId) async {
-    await _configService.switchProfile(profileId);
-  }
-  Future<void> createProfile(String name) async {
-    await _configService.createProfile(name);
-  }
-  Future<void> renameProfile(String profileId, String name) async {
-    await _configService.renameProfile(profileId, name);
-  }
-  Future<void> deleteProfile(String profileId) async {
-    await _configService.deleteProfile(profileId);
-  }
-  Future<void> saveConfig(AppConfig config) async {
-    await _configService.saveConfig(config);
-  }
-  Future<void> saveFullConfig(AppConfig config) async {
-    await saveConfig(config);
-  }
-  Future<void> saveAndRefreshModels(AppConfig config) async {
-    final clearedConfig = config.copyWith(
-      availableModels: [],
-    );
-    await _configService.saveConfig(clearedConfig);
-    await _configService.refreshModels();
-  }
-  Future<void> updateApiKey(String apiKey) async {
-    final config = await getConfig();
-    final updated = config.copyWith(apiKey: apiKey);
-    await saveConfig(updated);
-  }
-  Future<void> updateBaseUrl(String baseUrl) async {
-    final config = await getConfig();
-    final updated = config.copyWith(baseUrl: baseUrl);
-    await saveConfig(updated);
-  }
-  Future<void> updateModelsPath(String modelsPath) async {
-    final config = await getConfig();
-    final updated = config.copyWith(modelsPath: modelsPath);
-    await saveConfig(updated);
-  }
-  Future<void> updateChatPath(String chatPath) async {
-    final config = await getConfig();
-    final updated = config.copyWith(chatPath: chatPath);
-    await saveConfig(updated);
-  }
-  Future<void> updateApiMode(String apiMode) async {
-    final config = await getConfig();
-    final updated = config.copyWith(apiMode: apiMode);
-    await saveConfig(updated);
-  }
-  Future<void> updateSelectedModel(String? model) async {
-    final config = await getConfig();
-    final updated = config.copyWith(selectedModel: model);
-    await saveConfig(updated);
-  }
-  Future<void> refreshModels() async {
-    await _configService.refreshModels();
-  }
-  Future<List<String>> getAvailableModelIds() async {
-    final config = await getConfig();
-    final models = config.availableModels ?? [];
-    return models.map((m) => m.id).toList();
   }
 }
 ```
@@ -10279,126 +10148,6 @@ class TextAttachmentViewerPage extends StatelessWidget {
 }
 ```
 
-## File: lib/presentation/providers/attachment_bytes_provider.dart
-```dart
-// presentation/providers/attachment_bytes_provider.dart
-import 'dart:typed_data';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../di/providers.dart';
-// 使用 autoDispose，组件销毁时自动释放内存
-final attachmentBytesProvider =
-    FutureProvider.autoDispose.family<Uint8List, String>(
-  (ref, relativePath) async {
-    final repository = ref.read(conversationRepositoryProvider);
-    return repository.getAttachment(relativePath);
-  },
-);
-```
-
-## File: lib/presentation/providers/config_notifier.dart
-```dart
-// presentation/providers/config_notifier.dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/app_config.dart';
-import '../../core/models/app_config_store.dart';
-import '../../di/providers.dart';
-// ✅ 使用纯声明式 StreamProvider - 无需手动管理生命周期
-final configProvider = StreamProvider<AppConfig>((ref) {
-  final repository = ref.watch(configRepositoryProvider);
-  return repository.watchConfig();
-});
-final configProfilesProvider = StreamProvider<AppConfigStore>((ref) {
-  final repository = ref.watch(configRepositoryProvider);
-  return repository.watchConfigStore();
-});
-// ✅ 保留旧的 StateNotifier 方式用于需要命令式调用的场景
-// 内部委托给上面的 StreamProvider
-class ConfigNotifier extends StateNotifier<AsyncValue<AppConfig>> {
-  final Ref ref;
-  ConfigNotifier(this.ref) : super(const AsyncValue.loading()) {
-    // 监听上面的 StreamProvider
-    ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
-      state = next;
-    });
-  }
-  Future<void> updateApiKey(String apiKey) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.updateApiKey(apiKey);
-  }
-  Future<void> updateBaseUrl(String baseUrl) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.updateBaseUrl(baseUrl);
-  }
-  Future<void> updateModelsPath(String modelsPath) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.updateModelsPath(modelsPath);
-  }
-  Future<void> updateChatPath(String chatPath) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.updateChatPath(chatPath);
-  }
-  Future<void> updateApiMode(String apiMode) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.updateApiMode(apiMode);
-  }
-  Future<void> updateSelectedModel(String? model) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.updateSelectedModel(model);
-  }
-  Future<void> saveFullConfig(AppConfig config) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.saveFullConfig(config);
-  }
-  Future<void> saveAndRefreshModels(AppConfig config) async {
-    // 先标记为加载中
-    state = const AsyncValue.loading();
-    final repository = ref.read(configRepositoryProvider);
-    // 先保存空模型列表
-    await repository.saveConfig(config.copyWith(availableModels: []));
-    await repository.refreshModels();
-    // Stream 会自动更新状态
-  }
-  Future<void> refreshModels() async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.refreshModels();
-  }
-}
-// ✅ 使用 Provider 而非 StateNotifierProvider，让生命周期完全自动化
-final configNotifierProvider = Provider<ConfigNotifier>((ref) {
-  return ConfigNotifier(ref);
-});
-class ConfigProfilesNotifier extends StateNotifier<AsyncValue<AppConfigStore>> {
-  final Ref ref;
-  ConfigProfilesNotifier(this.ref) : super(const AsyncValue.loading()) {
-    ref.listen<AsyncValue<AppConfigStore>>(configProfilesProvider, (previous, next) {
-      state = next;
-    });
-  }
-  Future<void> load() async {
-    // Stream 会自动同步，无需手动操作
-  }
-  Future<void> switchProfile(String profileId) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.switchProfile(profileId);
-  }
-  Future<void> createProfile(String name) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.createProfile(name);
-  }
-  Future<void> renameProfile(String profileId, String name) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.renameProfile(profileId, name);
-  }
-  Future<void> deleteProfile(String profileId) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.deleteProfile(profileId);
-  }
-}
-final configProfilesNotifierProvider = Provider<ConfigProfilesNotifier>((ref) {
-  return ConfigProfilesNotifier(ref);
-});
-```
-
 ## File: lib/presentation/providers/input_draft_provider.dart
 ```dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10408,66 +10157,6 @@ final globalAttachmentDraftProvider =
     StateProvider<List<PendingAttachment>>((ref) => []);
 final globalEditSourceRoundIdProvider =
     StateProvider<String?>((ref) => null);
-```
-
-## File: lib/presentation/providers/session_list_notifier.dart
-```dart
-// presentation/providers/session_list_notifier.dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/session.dart';
-import '../../di/providers.dart';
-// ✅ 使用纯声明式 StreamProvider
-final sessionListProvider = StreamProvider<List<Session>>((ref) {
-  final repository = ref.watch(conversationRepositoryProvider);
-  return repository.watchAllSessions();
-});
-// ✅ 保留命令式 notifier 用于需要直接调用方法的场景
-class SessionListNotifier extends StateNotifier<AsyncValue<List<Session>>> {
-  final Ref ref;
-  SessionListNotifier(this.ref) : super(const AsyncValue.loading()) {
-    // 监听上面的 StreamProvider
-    ref.listen<AsyncValue<List<Session>>>(sessionListProvider, (previous, next) {
-      state = next;
-    });
-  }
-  Future<void> refresh() async {
-    // Stream 会自动同步，保留此方法用于兼容性
-  }
-  Future<void> deleteSession(String fileName) async {
-    try {
-      final repository = ref.read(conversationRepositoryProvider);
-      await repository.deleteSession(fileName);
-      // Stream 会自动同步
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
-  }
-  Future<void> updateSessionTitle(String fileName, String newTitle) async {
-    try {
-      final repository = ref.read(conversationRepositoryProvider);
-      final cleanTitle = newTitle.trim();
-      if (cleanTitle.isEmpty) return;
-      await repository.updateSessionTitle(fileName, cleanTitle);
-      // Stream 会自动同步
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
-  }
-  Future<String> createSession(String title) async {
-    final repository = ref.read(conversationRepositoryProvider);
-    final cleanTitle = title.trim().isEmpty ? '新对话' : title.trim();
-    // 使用时间戳生成临时 ID
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final sessionId = now.toString();
-    final fileName = '$sessionId.json';
-    await repository.createSession(fileName: fileName, title: cleanTitle);
-    return fileName;
-  }
-}
-// ✅ 使用 Provider 而非 StateNotifierProvider
-final sessionListNotifierProvider = Provider<SessionListNotifier>((ref) {
-  return SessionListNotifier(ref);
-});
 ```
 
 ## File: lib/presentation/themes/app_theme.dart
@@ -10999,6 +10688,52 @@ class ThoughtBubble extends StatelessWidget {
 }
 ```
 
+## File: lib/core/constants/app_constants.dart
+```dart
+abstract class AppConstants {
+  // 文件夹名称
+  static const String dirConversations = 'conversations';
+  static const String dirAttachments = 'attachments';
+  // 文件名
+  static const String fileConfig = 'config.json';
+  // 配置键
+  static const String keyBaseUrl = 'baseUrl';
+  static const String keyApiKey = 'apiKey';
+  static const String keyTheme = 'theme';
+  static const String keyModel = 'selectedModel';
+  // 默认值
+  static const String defaultBaseUrl = 'https://api.openai.com';
+  static const String defaultTheme = 'system';
+  // 文件扩展名
+  static const String extJson = '.json';
+}
+```
+
+## File: lib/core/interfaces/config_service.dart
+```dart
+// core/interfaces/config_service.dart
+import '../models/app_config.dart';
+import '../models/app_config_store.dart';
+abstract class IConfigService {
+  // 现有的同步方法
+  Future<AppConfigStore> loadConfigStore();
+  Future<AppConfig> loadConfig();
+  Future<void> saveConfig(AppConfig config);
+  Future<void> refreshModels();
+  Future<List<ConfigProfile>> getProfiles();
+  Future<String> getActiveProfileId();
+  Future<void> switchProfile(String profileId);
+  Future<void> createProfile(String name);
+  Future<void> renameProfile(String profileId, String name);
+  Future<void> deleteProfile(String profileId);
+  // ========== 新增：watch 方法 ==========
+  /// 监听配置Store的变更
+  Stream<AppConfigStore> watchConfigStore();
+  /// 监听当前配置
+  Stream<AppConfig> watchConfig();
+}
+```
+
 ## File: lib/core/interfaces/file_service.dart
 ```dart
 import 'dart:typed_data';
@@ -11006,6 +10741,644 @@ abstract class IFileService {
   Future<String> saveAttachment(Uint8List data, String fileName);
   Future<Uint8List> readAttachment(String relativePath);
   Future<void> deleteAttachment(String relativePath);
+}
+```
+
+## File: lib/data/repositories/config_repository.dart
+```dart
+// data/repositories/config_repository.dart
+import 'dart:async';
+import '../../core/models/app_config.dart';
+import '../../core/models/app_config_store.dart';
+import '../../core/interfaces/config_service.dart';
+class ConfigRepository {
+  final IConfigService _configService;
+  ConfigRepository(this._configService);
+  /// 监听配置Store的变更 - 使用真正的数据库流
+  Stream<AppConfigStore> watchConfigStore() {
+    return _configService.watchConfigStore();
+  }
+  /// 监听当前激活的配置
+  Stream<AppConfig> watchConfig() {
+    return _configService.watchConfig();
+  }
+  /// 获取配置（仅用于兼容性，优先使用 watch 方法）
+  Future<AppConfig> getConfig() async {
+    return await _configService.loadConfig();
+  }
+  Future<AppConfigStore> getConfigStore() async {
+    return await _configService.loadConfigStore();
+  }
+  Future<List<ConfigProfile>> getProfiles() async {
+    return await _configService.getProfiles();
+  }
+  Future<String> getActiveProfileId() async {
+    return await _configService.getActiveProfileId();
+  }
+  Future<void> switchProfile(String profileId) async {
+    await _configService.switchProfile(profileId);
+  }
+  Future<void> createProfile(String name) async {
+    await _configService.createProfile(name);
+  }
+  Future<void> renameProfile(String profileId, String name) async {
+    await _configService.renameProfile(profileId, name);
+  }
+  Future<void> deleteProfile(String profileId) async {
+    await _configService.deleteProfile(profileId);
+  }
+  Future<void> saveConfig(AppConfig config) async {
+    await _configService.saveConfig(config);
+  }
+  Future<void> saveFullConfig(AppConfig config) async {
+    await saveConfig(config);
+  }
+  Future<void> saveAndRefreshModels(AppConfig config) async {
+    final clearedConfig = config.copyWith(availableModels: []);
+    await _configService.saveConfig(clearedConfig);
+    await _configService.refreshModels();
+  }
+  /// 修改当前激活配置的基础URL（自动获取当前激活的配置ID）
+  Future<void> updateBaseUrl(String baseUrl) async {
+    final config = await getConfig();
+    final updated = config.copyWith(baseUrl: baseUrl);
+    await saveConfig(updated);
+  }
+  /// 修改当前激活配置的API Key
+  Future<void> updateApiKey(String apiKey) async {
+    final config = await getConfig();
+    final updated = config.copyWith(apiKey: apiKey);
+    await saveConfig(updated);
+  }
+  /// 修改当前激活配置的模型路径
+  Future<void> updateModelsPath(String modelsPath) async {
+    final config = await getConfig();
+    final updated = config.copyWith(modelsPath: modelsPath);
+    await saveConfig(updated);
+  }
+  /// 修改当前激活配置的聊天路径
+  Future<void> updateChatPath(String chatPath) async {
+    final config = await getConfig();
+    final updated = config.copyWith(chatPath: chatPath);
+    await saveConfig(updated);
+  }
+  /// 修改当前激活配置的API模式
+  Future<void> updateApiMode(String apiMode) async {
+    final config = await getConfig();
+    final updated = config.copyWith(apiMode: apiMode);
+    await saveConfig(updated);
+  }
+  /// 修改当前激活配置的选中的模型
+  Future<void> updateSelectedModel(String? model) async {
+    final config = await getConfig();
+    final updated = config.copyWith(selectedModel: model);
+    await saveConfig(updated);
+  }
+  Future<void> refreshModels() async {
+    await _configService.refreshModels();
+  }
+  Future<List<String>> getAvailableModelIds() async {
+    final config = await getConfig();
+    final models = config.availableModels ?? [];
+    return models.map((m) => m.id).toList();
+  }
+}
+```
+
+## File: lib/data/services/file_service.dart
+```dart
+import 'dart:typed_data';
+import '../../core/interfaces/file_service.dart';
+import '../data_sources/local_file_source.dart';
+class FileService implements IFileService {
+  final ILocalFileSource _fileSource;
+  FileService(this._fileSource);
+  @override
+  Future<String> saveAttachment(Uint8List data, String fileName) async {
+    return await _fileSource.saveAttachment(data, fileName);
+  }
+  @override
+  Future<Uint8List> readAttachment(String relativePath) async {
+    return await _fileSource.readAttachment(relativePath);
+  }
+  @override
+  Future<void> deleteAttachment(String relativePath) async {
+    await _fileSource.deleteFile(relativePath);
+  }
+}
+```
+
+## File: lib/domain/services/chat_round_factory.dart
+```dart
+import '../../core/models/attachment.dart';
+import '../../core/models/chat_round.dart';
+import '../../core/utils/id_generator.dart';
+class ChatRoundFactory {
+  static ChatRound createUserRound({
+    required String content,
+    required String? parentId,
+    required List<Attachment> attachments,
+  }) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return ChatRound(
+      id: IdGenerator.generate(),
+      parentId: parentId,
+      createdAt: now,
+      userContent: content,
+      userAttachments: attachments,
+      isIncomplete: true,
+    );
+  }
+  static ChatRound createRetryRound({
+    required ChatRound sourceRound,
+  }) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return ChatRound(
+      id: IdGenerator.generate(),
+      parentId: sourceRound.parentId,
+      createdAt: now,
+      userContent: sourceRound.userContent,
+      userAttachments: sourceRound.userAttachments,
+      isIncomplete: true,
+    );
+  }
+  static ChatRound createEditedRetryRound({
+    required ChatRound sourceRound,
+    required String newContent,
+    required List<Attachment> attachments,
+  }) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return ChatRound(
+      id: IdGenerator.generate(),
+      parentId: sourceRound.parentId,
+      createdAt: now,
+      userContent: newContent,
+      userAttachments: attachments,
+      isIncomplete: true,
+    );
+  }
+}
+```
+
+## File: lib/presentation/providers/attachment_bytes_provider.dart
+```dart
+// presentation/providers/attachment_bytes_provider.dart
+import 'dart:typed_data';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../di/providers.dart';
+// 使用 autoDispose，组件销毁时自动释放内存
+final attachmentBytesProvider =
+    FutureProvider.autoDispose.family<Uint8List, String>(
+  (ref, relativePath) async {
+    final repository = ref.read(conversationRepositoryProvider);
+    return repository.getAttachment(relativePath);
+  },
+);
+```
+
+## File: lib/presentation/providers/config_notifier.dart
+```dart
+// presentation/providers/config_notifier.dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/app_config.dart';
+import '../../core/models/app_config_store.dart';
+import '../../di/providers.dart';
+/// 使用纯声明式 StreamProvider - 所有状态来自 Drift 数据库流
+final configProvider = StreamProvider<AppConfig>((ref) {
+  final repository = ref.watch(configRepositoryProvider);
+  return repository.watchConfig();
+});
+final configProfilesProvider = StreamProvider<AppConfigStore>((ref) {
+  final repository = ref.watch(configRepositoryProvider);
+  return repository.watchConfigStore();
+});
+/// 直接使用 StreamProvider，不额外维护本地状态
+/// 所有配置操作直接调用 Repository 方法，写入数据库后流自动更新
+class ConfigNotifier extends StateNotifier<AsyncValue<AppConfig>> {
+  final Ref ref;
+  ConfigNotifier(this.ref) : super(const AsyncValue.loading()) {
+    // 监听 StreamProvider，自动同步本地状态
+    ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
+      state = next;
+    });
+  }
+  Future<void> updateBaseUrl(String baseUrl) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.updateBaseUrl(baseUrl);
+    // 无需手动更新状态，流会自动推送
+  }
+  Future<void> updateApiKey(String apiKey) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.updateApiKey(apiKey);
+  }
+  Future<void> updateModelsPath(String modelsPath) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.updateModelsPath(modelsPath);
+  }
+  Future<void> updateChatPath(String chatPath) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.updateChatPath(chatPath);
+  }
+  Future<void> updateApiMode(String apiMode) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.updateApiMode(apiMode);
+  }
+  Future<void> updateSelectedModel(String? model) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.updateSelectedModel(model);
+  }
+  Future<void> saveFullConfig(AppConfig config) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.saveFullConfig(config);
+  }
+  Future<void> saveAndRefreshModels(AppConfig config) async {
+    state = const AsyncValue.loading();
+    final repository = ref.read(configRepositoryProvider);
+    await repository.saveConfig(config.copyWith(availableModels: []));
+    await repository.refreshModels();
+  }
+  Future<void> refreshModels() async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.refreshModels();
+  }
+}
+final configNotifierProvider = Provider<ConfigNotifier>((ref) {
+  return ConfigNotifier(ref);
+});
+class ConfigProfilesNotifier extends StateNotifier<AsyncValue<AppConfigStore>> {
+  final Ref ref;
+  ConfigProfilesNotifier(this.ref) : super(const AsyncValue.loading()) {
+    ref.listen<AsyncValue<AppConfigStore>>(configProfilesProvider, (previous, next) {
+      state = next;
+    });
+  }
+  Future<void> load() async {
+    // Stream 会自动同步，无需手动操作
+  }
+  Future<void> switchProfile(String profileId) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.switchProfile(profileId);
+  }
+  Future<void> createProfile(String name) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.createProfile(name);
+  }
+  Future<void> renameProfile(String profileId, String name) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.renameProfile(profileId, name);
+  }
+  Future<void> deleteProfile(String profileId) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.deleteProfile(profileId);
+  }
+}
+final configProfilesNotifierProvider = Provider<ConfigProfilesNotifier>((ref) {
+  return ConfigProfilesNotifier(ref);
+});
+```
+
+## File: lib/presentation/providers/session_list_notifier.dart
+```dart
+// presentation/providers/session_list_notifier.dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/session.dart';
+import '../../di/providers.dart';
+// ✅ 使用纯声明式 StreamProvider
+final sessionListProvider = StreamProvider<List<Session>>((ref) {
+  final repository = ref.watch(conversationRepositoryProvider);
+  return repository.watchAllSessions();
+});
+// ✅ 保留命令式 notifier 用于需要直接调用方法的场景
+class SessionListNotifier extends StateNotifier<AsyncValue<List<Session>>> {
+  final Ref ref;
+  SessionListNotifier(this.ref) : super(const AsyncValue.loading()) {
+    // 监听上面的 StreamProvider
+    ref.listen<AsyncValue<List<Session>>>(sessionListProvider, (previous, next) {
+      state = next;
+    });
+  }
+  Future<void> refresh() async {
+    // Stream 会自动同步，保留此方法用于兼容性
+  }
+  Future<void> deleteSession(String fileName) async {
+    try {
+      final repository = ref.read(conversationRepositoryProvider);
+      await repository.deleteSession(fileName);
+      // Stream 会自动同步
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+  Future<void> updateSessionTitle(String fileName, String newTitle) async {
+    try {
+      final repository = ref.read(conversationRepositoryProvider);
+      final cleanTitle = newTitle.trim();
+      if (cleanTitle.isEmpty) return;
+      await repository.updateSessionTitle(fileName, cleanTitle);
+      // Stream 会自动同步
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+  Future<String> createSession(String title) async {
+    final repository = ref.read(conversationRepositoryProvider);
+    final cleanTitle = title.trim().isEmpty ? '新对话' : title.trim();
+    // 使用时间戳生成临时 ID
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final sessionId = now.toString();
+    final fileName = '$sessionId.json';
+    await repository.createSession(fileName: fileName, title: cleanTitle);
+    return fileName;
+  }
+}
+// ✅ 使用 Provider 而非 StateNotifierProvider
+final sessionListNotifierProvider = Provider<SessionListNotifier>((ref) {
+  return SessionListNotifier(ref);
+});
+```
+
+## File: lib/presentation/themes/app_tokens.dart
+```dart
+abstract class AppTokens {
+  const AppTokens._();
+  static const double spaceXs = 4;
+  static const double spaceSm = 8;
+  static const double spaceMd = 12;
+  static const double spaceLg = 16;
+  static const double spaceXl = 24;
+}
+```
+
+## File: lib/presentation/widgets/attachment_list.dart
+```dart
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import '../../core/models/attachment.dart';
+import '../pages/text_attachment_viewer_page.dart';
+import '../providers/attachment_bytes_provider.dart';
+import 'common/app_toast.dart';
+class AttachmentList extends ConsumerWidget {
+  final List<Attachment> attachments;
+  final bool rightAligned;
+  const AttachmentList({
+    super.key,
+    required this.attachments,
+    this.rightAligned = true,
+  });
+  bool _isTextAttachment(Attachment attachment) {
+    final lowerName = attachment.name.toLowerCase();
+    final mime = (attachment.mimeType ?? '').toLowerCase();
+    return mime.startsWith('text/') ||
+        mime == 'application/json' ||
+        lowerName.endsWith('.md') ||
+        lowerName.endsWith('.txt') ||
+        lowerName.endsWith('.json') ||
+        lowerName.endsWith('.dart') ||
+        lowerName.endsWith('.yaml') ||
+        lowerName.endsWith('.yml') ||
+        lowerName.endsWith('.log') ||
+        lowerName.endsWith('.csv');
+  }
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (attachments.isEmpty) return const SizedBox.shrink();
+    return Align(
+      alignment: rightAligned ? Alignment.centerRight : Alignment.centerLeft,
+      child: Wrap(
+        alignment: rightAligned ? WrapAlignment.end : WrapAlignment.start,
+        spacing: 8,
+        runSpacing: 8,
+        children: attachments.map((attachment) {
+          if (attachment.isImage) {
+            return _ImageAttachmentThumb(attachment: attachment);
+          }
+          return _FileAttachmentChip(
+            attachment: attachment,
+            isText: _isTextAttachment(attachment),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+class _AttachmentActionHelper {
+  static Future<void> shareAttachmentFromBytes(
+    Attachment attachment,
+    Uint8List bytes,
+  ) async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/${attachment.name}');
+      await file.writeAsBytes(bytes, flush: true);
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: attachment.name,
+      );
+    } catch (e) {
+      await AppToast.show('共享文件失败：$e');
+    }
+  }
+  static Future<void> previewImage(
+    BuildContext context,
+    Uint8List bytes,
+  ) async {
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          child: Stack(
+            children: [
+              InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 4,
+                child: Center(
+                  child: Image.memory(
+                    bytes,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: IconButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  icon: const Icon(Icons.close),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+  static Future<void> openTextViewer(
+    BuildContext context,
+    String title,
+    Uint8List bytes,
+  ) async {
+    final text = utf8.decode(bytes, allowMalformed: true);
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TextAttachmentViewerPage(
+          title: title,
+          content: text,
+        ),
+      ),
+    );
+  }
+}
+class _ImageAttachmentThumb extends ConsumerWidget {
+  final Attachment attachment;
+  const _ImageAttachmentThumb({
+    required this.attachment,
+  });
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bytesAsync = ref.watch(
+      attachmentBytesProvider(attachment.relativePath),
+    );
+    return bytesAsync.when(
+      loading: () => const SizedBox(
+        width: 108,
+        height: 108,
+        child: Center(
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ),
+      error: (e, st) => const SizedBox(
+        width: 108,
+        height: 108,
+        child: Center(
+          child: Icon(Icons.broken_image_outlined),
+        ),
+      ),
+      data: (bytes) {
+        return InkWell(
+          onTap: () => _AttachmentActionHelper.previewImage(context, bytes),
+          onLongPress: () =>
+              _AttachmentActionHelper.shareAttachmentFromBytes(
+            attachment,
+            bytes,
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              width: 108,
+              height: 108,
+              child: Image.memory(
+                bytes,
+                fit: BoxFit.cover,
+                gaplessPlayback: true,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+class _FileAttachmentChip extends ConsumerWidget {
+  final Attachment attachment;
+  final bool isText;
+  const _FileAttachmentChip({
+    required this.attachment,
+    required this.isText,
+  });
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bytesAsync = ref.watch(
+      attachmentBytesProvider(attachment.relativePath),
+    );
+    final leadingIcon =
+        isText ? Icons.description_outlined : Icons.attach_file_outlined;
+    return bytesAsync.when(
+      loading: () => Chip(
+        avatar: Icon(leadingIcon, size: 18),
+        label: Text(
+          attachment.name,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+      error: (e, st) => Chip(
+        avatar: const Icon(Icons.error_outline, size: 18),
+        label: Text(
+          attachment.name,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+      data: (bytes) {
+        return InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () async {
+            if (isText) {
+              await _AttachmentActionHelper.openTextViewer(
+                context,
+                attachment.name,
+                bytes,
+              );
+              return;
+            }
+            await AppToast.show('该文件暂不支持直接预览，请长按进行分享');
+          },
+          onLongPress: () =>
+              _AttachmentActionHelper.shareAttachmentFromBytes(
+            attachment,
+            bytes,
+          ),
+          child: Chip(
+            avatar: Icon(leadingIcon, size: 18),
+            label: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 180),
+              child: Text(
+                attachment.name,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+```
+
+## File: lib/presentation/widgets/common/app_page_scaffold.dart
+```dart
+import 'package:flutter/material.dart';
+class AppPageScaffold extends StatelessWidget {
+  final PreferredSizeWidget? appBar;
+  final Widget body;
+  final Widget? bottomNavigationBar;
+  final Color? backgroundColor;
+  final bool useSafeArea;
+  const AppPageScaffold({
+    super.key,
+    this.appBar,
+    required this.body,
+    this.bottomNavigationBar,
+    this.backgroundColor,
+    this.useSafeArea = true,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final content = useSafeArea ? SafeArea(child: body) : body;
+    return Scaffold(
+      backgroundColor: backgroundColor,
+      appBar: appBar,
+      bottomNavigationBar: bottomNavigationBar,
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        child: content,
+      ),
+    );
+  }
 }
 ```
 
@@ -11396,12 +11769,11 @@ class ConfigService implements IConfigService {
   final AppDatabase _db;
   final IRemoteApiSource _apiSource;
   ConfigService(this._db, this._apiSource);
-  @override
-  Future<AppConfigStore> loadConfigStore() async {
+  /// 确保数据库有默认数据，返回合法的配置存储
+  Future<AppConfigStore> _ensureInitialized() async {
     final storeRow = await _db.select(_db.dbConfigStore).getSingleOrNull();
-    final activeId = storeRow?.activeProfileId ?? 'default';
+    var activeId = storeRow?.activeProfileId ?? 'default';
     final profileRows = await _db.select(_db.dbConfigProfiles).get();
-    // 初始化默认数据
     if (profileRows.isEmpty) {
       final defaultProfile = ConfigProfile(
         id: 'default',
@@ -11418,26 +11790,40 @@ class ConfigService implements IConfigService {
       await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
         const DbConfigStoreCompanion(id: Value(1), activeProfileId: Value('default')),
       );
-      return AppConfigStore(activeProfileId: 'default', profiles: [defaultProfile]);
+      activeId = 'default';
+      return AppConfigStore(activeProfileId: activeId, profiles: [defaultProfile]);
     }
-    final profiles = profileRows.map((p) => ConfigProfile(
-      id: p.id, 
-      name: p.name, 
-      config: p.config,
-    )).toList();
+    final profiles = profileRows
+        .map((p) => ConfigProfile(id: p.id, name: p.name, config: p.config))
+        .toList();
+    // 校验 activeId 有效性，不合法则切换到第一个
+    if (!profiles.any((p) => p.id == activeId)) {
+      activeId = profiles.first.id;
+      await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
+        DbConfigStoreCompanion(id: const Value(1), activeProfileId: Value(activeId)),
+      );
+    }
     return AppConfigStore(activeProfileId: activeId, profiles: profiles);
+  }
+  @override
+  Future<AppConfigStore> loadConfigStore() async {
+    return await _ensureInitialized();
   }
   @override
   Future<AppConfig> loadConfig() async {
     final store = await loadConfigStore();
-    return store.profiles.firstWhere((p) => p.id == store.activeProfileId).config;
+    // 使用 firstWhere 带 orElse，避免抛异常
+    return store.profiles.firstWhere(
+      (p) => p.id == store.activeProfileId,
+      orElse: () => store.profiles.first,
+    ).config;
   }
   @override
   Future<void> saveConfig(AppConfig config) async {
     final activeId = await getActiveProfileId();
-    await _db.update(_db.dbConfigProfiles)
-      ..where((t) => t.id.equals(activeId))
-      ..write(DbConfigProfilesCompanion(config: Value(config)));
+    await (_db.update(_db.dbConfigProfiles)
+          ..where((t) => t.id.equals(activeId)))
+        .write(DbConfigProfilesCompanion(config: Value(config)));
   }
   @override
   Future<void> refreshModels() async {
@@ -11458,10 +11844,20 @@ class ConfigService implements IConfigService {
   @override
   Future<String> getActiveProfileId() async {
     final storeRow = await _db.select(_db.dbConfigStore).getSingleOrNull();
-    return storeRow?.activeProfileId ?? 'default';
+    var activeId = storeRow?.activeProfileId ?? 'default';
+    // 校验有效性
+    final profiles = await _db.select(_db.dbConfigProfiles).get();
+    if (!profiles.any((p) => p.id == activeId) && profiles.isNotEmpty) {
+      activeId = profiles.first.id;
+      await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
+        DbConfigStoreCompanion(id: const Value(1), activeProfileId: Value(activeId)),
+      );
+    }
+    return activeId;
   }
   @override
   Future<void> switchProfile(String profileId) async {
+    // 直接写入数据库，依赖 Drift 触发流更新
     await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
       DbConfigStoreCompanion(id: const Value(1), activeProfileId: Value(profileId)),
     );
@@ -11473,8 +11869,8 @@ class ConfigService implements IConfigService {
     final cleanName = name.trim().isEmpty ? '新配置' : name.trim();
     await _db.into(_db.dbConfigProfiles).insert(
       DbConfigProfilesCompanion.insert(
-        id: newId, 
-        name: cleanName, 
+        id: newId,
+        name: cleanName,
         config: activeConfig,
       ),
     );
@@ -11488,123 +11884,131 @@ class ConfigService implements IConfigService {
   }
   @override
   Future<void> deleteProfile(String profileId) async {
-    // ✅ 原子操作：先获取当前状态
     final store = await loadConfigStore();
     // 只有一个配置文件时不允许删除
     if (store.profiles.length <= 1) return;
-    // ✅ 如果要删除的是当前激活的配置，先切换到其他配置
+    // 如果要删除的是当前激活的配置，先切换到其他配置
     if (store.activeProfileId == profileId) {
-      // 找到剩余配置中的第一个
       final remaining = store.profiles.where((p) => p.id != profileId).toList();
       if (remaining.isNotEmpty) {
         await switchProfile(remaining.first.id);
       }
     }
-    // 最后删除目标配置
     await (_db.delete(_db.dbConfigProfiles)..where((t) => t.id.equals(profileId))).go();
   }
+  /// 同时监听两个表的变更，用原生Dart的Stream实现组合
   @override
   Stream<AppConfigStore> watchConfigStore() {
-    // 监听 dbConfigStore 表
+    // 首次执行初始化
+    _ensureInitialized();
+    // 监听配置存储表（activeProfileId）
     final storeStream = _db.select(_db.dbConfigStore).watchSingleOrNull();
-    return storeStream.asyncExpand((storeRow) async* {
-      final activeId = storeRow?.activeProfileId ?? 'default';
-      // 监听 profiles 表变化
-      final profilesStream = _db.select(_db.dbConfigProfiles).watch();
-      await for (final profileRows in profilesStream) {
-        final profiles = profileRows.map((p) => ConfigProfile(
-          id: p.id,
-          name: p.name,
-          config: p.config,
-        )).toList();
-        yield AppConfigStore(
-          activeProfileId: activeId,
-          profiles: profiles,
+    // 监听配置存档列表
+    final profilesStream = _db.select(_db.dbConfigProfiles).watch();
+    // 用StreamController手动合并两个流
+    // 各自维护最新的值，任意一个流更新时用两个最新值计算结果
+    final outputController = StreamController<AppConfigStore>();
+    // 存储各自最新的值
+    DbConfigStoreData? latestStoreRow;
+    List<DbConfigProfile> latestProfileRows = [];
+    // 计算并输出最新的AppConfigStore
+    void computeAndOutput() {
+      final storeRow = latestStoreRow;
+      final profileRows = latestProfileRows;
+      // 如果两个值都还没有，不输出
+      if (storeRow == null && profileRows.isEmpty) return;
+      // 兜底：如果配置列表为空，重新初始化
+      if (profileRows.isEmpty) {
+        return;
+      }
+      var activeId = storeRow?.activeProfileId ?? 'default';
+      final profiles = profileRows
+          .map((p) => ConfigProfile(id: p.id, name: p.name, config: p.config))
+          .toList();
+      // 确保 activeId 合法
+      if (!profiles.any((p) => p.id == activeId)) {
+        activeId = profiles.first.id;
+        // 自动修正
+        _db.into(_db.dbConfigStore).insertOnConflictUpdate(
+          DbConfigStoreCompanion(id: const Value(1), activeProfileId: Value(activeId)),
         );
       }
-    });
+      outputController.add(AppConfigStore(activeProfileId: activeId, profiles: profiles));
+    }
+    // 订阅 storeStream
+    final storeSubscription = storeStream.listen(
+      (row) {
+        latestStoreRow = row;
+        computeAndOutput();
+      },
+      onError: (e) {
+        outputController.addError(e);
+      },
+    );
+    // 订阅 profilesStream
+    final profilesSubscription = profilesStream.listen(
+      (rows) {
+        latestProfileRows = rows;
+        computeAndOutput();
+      },
+      onError: (e) {
+        outputController.addError(e);
+      },
+    );
+    // 清理资源
+    outputController.onCancel = () {
+      storeSubscription.cancel();
+      profilesSubscription.cancel();
+    };
+    return outputController.stream;
   }
+  /// 监听当前激活的配置
   @override
   Stream<AppConfig> watchConfig() {
     return watchConfigStore().map((store) {
-      return store.profiles
-          .firstWhere((p) => p.id == store.activeProfileId)
-          .config;
+      return store.profiles.firstWhere(
+        (p) => p.id == store.activeProfileId,
+        orElse: () => store.profiles.first,
+      ).config;
     });
   }
 }
 ```
 
-## File: lib/data/services/file_service.dart
+## File: lib/main.dart
 ```dart
-import 'dart:typed_data';
-import '../../core/interfaces/file_service.dart';
-import '../data_sources/local_file_source.dart';
-class FileService implements IFileService {
-  final ILocalFileSource _fileSource;
-  FileService(this._fileSource);
-  @override
-  Future<String> saveAttachment(Uint8List data, String fileName) async {
-    return await _fileSource.saveAttachment(data, fileName);
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'core/utils/app_route_observer.dart';
+import 'di/providers.dart';
+import 'presentation/pages/home_page.dart';
+import 'presentation/themes/app_theme.dart';
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final container = ProviderContainer();
+  await container.read(initProvider.notifier).initialize();
+  final initState = container.read(initProvider);
+  if (initState.status != InitStatus.success) {
+    throw Exception('应用初始化失败：${initState.errorMessage}');
   }
-  @override
-  Future<Uint8List> readAttachment(String relativePath) async {
-    return await _fileSource.readAttachment(relativePath);
-  }
-  @override
-  Future<void> deleteAttachment(String relativePath) async {
-    await _fileSource.deleteFile(relativePath);
-  }
+  runApp(
+    UncontrolledProviderScope(
+      container: container,
+      child: const MyApp(),
+    ),
+  );
 }
-```
-
-## File: lib/domain/services/chat_round_factory.dart
-```dart
-import '../../core/models/attachment.dart';
-import '../../core/models/chat_round.dart';
-import '../../core/utils/id_generator.dart';
-class ChatRoundFactory {
-  static ChatRound createUserRound({
-    required String content,
-    required String? parentId,
-    required List<Attachment> attachments,
-  }) {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    return ChatRound(
-      id: IdGenerator.generate(),
-      parentId: parentId,
-      createdAt: now,
-      userContent: content,
-      userAttachments: attachments,
-      isIncomplete: true,
-    );
-  }
-  static ChatRound createRetryRound({
-    required ChatRound sourceRound,
-  }) {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    return ChatRound(
-      id: IdGenerator.generate(),
-      parentId: sourceRound.parentId,
-      createdAt: now,
-      userContent: sourceRound.userContent,
-      userAttachments: sourceRound.userAttachments,
-      isIncomplete: true,
-    );
-  }
-  static ChatRound createEditedRetryRound({
-    required ChatRound sourceRound,
-    required String newContent,
-    required List<Attachment> attachments,
-  }) {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    return ChatRound(
-      id: IdGenerator.generate(),
-      parentId: sourceRound.parentId,
-      createdAt: now,
-      userContent: newContent,
-      userAttachments: attachments,
-      isIncomplete: true,
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'AI Chat',
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.system,
+      navigatorObservers: [appRouteObserver],
+      home: const HomePage(),
     );
   }
 }
@@ -11769,754 +12173,6 @@ final roundStreamProvider =
 );
 ```
 
-## File: lib/presentation/themes/app_tokens.dart
-```dart
-abstract class AppTokens {
-  const AppTokens._();
-  static const double spaceXs = 4;
-  static const double spaceSm = 8;
-  static const double spaceMd = 12;
-  static const double spaceLg = 16;
-  static const double spaceXl = 24;
-}
-```
-
-## File: lib/presentation/widgets/attachment_list.dart
-```dart
-import 'dart:convert';
-import 'dart:io';
-import 'dart:typed_data';
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
-import '../../core/models/attachment.dart';
-import '../pages/text_attachment_viewer_page.dart';
-import '../providers/attachment_bytes_provider.dart';
-import 'common/app_toast.dart';
-class AttachmentList extends ConsumerWidget {
-  final List<Attachment> attachments;
-  final bool rightAligned;
-  const AttachmentList({
-    super.key,
-    required this.attachments,
-    this.rightAligned = true,
-  });
-  bool _isTextAttachment(Attachment attachment) {
-    final lowerName = attachment.name.toLowerCase();
-    final mime = (attachment.mimeType ?? '').toLowerCase();
-    return mime.startsWith('text/') ||
-        mime == 'application/json' ||
-        lowerName.endsWith('.md') ||
-        lowerName.endsWith('.txt') ||
-        lowerName.endsWith('.json') ||
-        lowerName.endsWith('.dart') ||
-        lowerName.endsWith('.yaml') ||
-        lowerName.endsWith('.yml') ||
-        lowerName.endsWith('.log') ||
-        lowerName.endsWith('.csv');
-  }
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (attachments.isEmpty) return const SizedBox.shrink();
-    return Align(
-      alignment: rightAligned ? Alignment.centerRight : Alignment.centerLeft,
-      child: Wrap(
-        alignment: rightAligned ? WrapAlignment.end : WrapAlignment.start,
-        spacing: 8,
-        runSpacing: 8,
-        children: attachments.map((attachment) {
-          if (attachment.isImage) {
-            return _ImageAttachmentThumb(attachment: attachment);
-          }
-          return _FileAttachmentChip(
-            attachment: attachment,
-            isText: _isTextAttachment(attachment),
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
-class _AttachmentActionHelper {
-  static Future<void> shareAttachmentFromBytes(
-    Attachment attachment,
-    Uint8List bytes,
-  ) async {
-    try {
-      final tempDir = await getTemporaryDirectory();
-      final file = File('${tempDir.path}/${attachment.name}');
-      await file.writeAsBytes(bytes, flush: true);
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        text: attachment.name,
-      );
-    } catch (e) {
-      await AppToast.show('共享文件失败：$e');
-    }
-  }
-  static Future<void> previewImage(
-    BuildContext context,
-    Uint8List bytes,
-  ) async {
-    await showDialog(
-      context: context,
-      builder: (ctx) {
-        return Dialog(
-          child: Stack(
-            children: [
-              InteractiveViewer(
-                minScale: 0.5,
-                maxScale: 4,
-                child: Center(
-                  child: Image.memory(
-                    bytes,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: IconButton(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  icon: const Icon(Icons.close),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-  static Future<void> openTextViewer(
-    BuildContext context,
-    String title,
-    Uint8List bytes,
-  ) async {
-    final text = utf8.decode(bytes, allowMalformed: true);
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => TextAttachmentViewerPage(
-          title: title,
-          content: text,
-        ),
-      ),
-    );
-  }
-}
-class _ImageAttachmentThumb extends ConsumerWidget {
-  final Attachment attachment;
-  const _ImageAttachmentThumb({
-    required this.attachment,
-  });
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final bytesAsync = ref.watch(
-      attachmentBytesProvider(attachment.relativePath),
-    );
-    return bytesAsync.when(
-      loading: () => const SizedBox(
-        width: 108,
-        height: 108,
-        child: Center(
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
-      ),
-      error: (e, st) => const SizedBox(
-        width: 108,
-        height: 108,
-        child: Center(
-          child: Icon(Icons.broken_image_outlined),
-        ),
-      ),
-      data: (bytes) {
-        return InkWell(
-          onTap: () => _AttachmentActionHelper.previewImage(context, bytes),
-          onLongPress: () =>
-              _AttachmentActionHelper.shareAttachmentFromBytes(
-            attachment,
-            bytes,
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: SizedBox(
-              width: 108,
-              height: 108,
-              child: Image.memory(
-                bytes,
-                fit: BoxFit.cover,
-                gaplessPlayback: true,
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-class _FileAttachmentChip extends ConsumerWidget {
-  final Attachment attachment;
-  final bool isText;
-  const _FileAttachmentChip({
-    required this.attachment,
-    required this.isText,
-  });
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final bytesAsync = ref.watch(
-      attachmentBytesProvider(attachment.relativePath),
-    );
-    final leadingIcon =
-        isText ? Icons.description_outlined : Icons.attach_file_outlined;
-    return bytesAsync.when(
-      loading: () => Chip(
-        avatar: Icon(leadingIcon, size: 18),
-        label: Text(
-          attachment.name,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ),
-      error: (e, st) => Chip(
-        avatar: const Icon(Icons.error_outline, size: 18),
-        label: Text(
-          attachment.name,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ),
-      data: (bytes) {
-        return InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: () async {
-            if (isText) {
-              await _AttachmentActionHelper.openTextViewer(
-                context,
-                attachment.name,
-                bytes,
-              );
-              return;
-            }
-            await AppToast.show('该文件暂不支持直接预览，请长按进行分享');
-          },
-          onLongPress: () =>
-              _AttachmentActionHelper.shareAttachmentFromBytes(
-            attachment,
-            bytes,
-          ),
-          child: Chip(
-            avatar: Icon(leadingIcon, size: 18),
-            label: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 180),
-              child: Text(
-                attachment.name,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-```
-
-## File: lib/presentation/widgets/common/app_page_scaffold.dart
-```dart
-import 'package:flutter/material.dart';
-class AppPageScaffold extends StatelessWidget {
-  final PreferredSizeWidget? appBar;
-  final Widget body;
-  final Widget? bottomNavigationBar;
-  final Color? backgroundColor;
-  final bool useSafeArea;
-  const AppPageScaffold({
-    super.key,
-    this.appBar,
-    required this.body,
-    this.bottomNavigationBar,
-    this.backgroundColor,
-    this.useSafeArea = true,
-  });
-  @override
-  Widget build(BuildContext context) {
-    final content = useSafeArea ? SafeArea(child: body) : body;
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      appBar: appBar,
-      bottomNavigationBar: bottomNavigationBar,
-      body: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-        child: content,
-      ),
-    );
-  }
-}
-```
-
-## File: lib/main.dart
-```dart
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'core/utils/app_route_observer.dart';
-import 'di/providers.dart';
-import 'presentation/pages/home_page.dart';
-import 'presentation/themes/app_theme.dart';
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  final container = ProviderContainer();
-  await container.read(initProvider.notifier).initialize();
-  final initState = container.read(initProvider);
-  if (initState.status != InitStatus.success) {
-    throw Exception('应用初始化失败：${initState.errorMessage}');
-  }
-  runApp(
-    UncontrolledProviderScope(
-      container: container,
-      child: const MyApp(),
-    ),
-  );
-}
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'AI Chat',
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
-      navigatorObservers: [appRouteObserver],
-      home: const HomePage(),
-    );
-  }
-}
-```
-
-## File: lib/presentation/pages/settings_page.dart
-```dart
-// presentation/pages/settings_page.dart
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/app_config.dart';
-import '../../core/models/app_config_store.dart';
-import '../../core/models/model_info.dart';
-import '../providers/config_notifier.dart';
-import '../widgets/common/app_page_scaffold.dart';
-import '../widgets/common/app_section.dart';
-import '../widgets/common/app_toast.dart';
-class SettingsPage extends ConsumerStatefulWidget {
-  const SettingsPage({super.key});
-  @override
-  ConsumerState<SettingsPage> createState() => _SettingsPageState();
-}
-class _SettingsPageState extends ConsumerState<SettingsPage> {
-  static const String _defaultModelsPath = 'v1/models';
-  final _baseUrlController = TextEditingController();
-  final _apiKeyController = TextEditingController();
-  final _modelsPathController = TextEditingController();
-  final _chatPathController = TextEditingController();
-  String? _selectedModel;
-  String _apiMode = 'chat_completions';
-  List<ModelInfo> _models = const [];
-  bool _isRefreshingModels = false;
-  @override
-  void dispose() {
-    _baseUrlController.dispose();
-    _apiKeyController.dispose();
-    _modelsPathController.dispose();
-    _chatPathController.dispose();
-    super.dispose();
-  }
-  void _syncControllersWithConfig(AppConfig config) {
-    setState(() {  // ✅ 加这个
-      _baseUrlController.text = config.baseUrl;
-      _apiKeyController.text = config.apiKey;
-      _modelsPathController.text = config.modelsPath;
-      _chatPathController.text = config.chatPath;
-      _selectedModel = config.selectedModel;
-      _apiMode = config.apiMode;
-      _models = config.availableModels ?? const [];
-    });
-  }
-  void _saveConfig(AppConfig config) {
-    // ✅ 自动保存
-    ref.read(configNotifierProvider).saveFullConfig(config);
-  }
-  @override
-  Widget build(BuildContext context) {
-    final configState = ref.watch(configProvider);
-    final profilesState = ref.watch(configProfilesProvider);
-    // ✅ 监听配置变化，同步 Controller（但不重建页面）
-    ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
-      next.whenData((config) {
-        _syncControllersWithConfig(config);
-      });
-    });
-    final isBusy = configState.isLoading || _isRefreshingModels;
-    return AppPageScaffold(
-      appBar: AppBar(
-        title: const Text('设置'),
-        actions: [
-          IconButton(
-            onPressed: isBusy ? null : _confirmRestoreDefaults,
-            icon: const Icon(Icons.restart_alt),
-            tooltip: '恢复默认',
-            style: IconButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
-            ),
-          ),
-        ],
-      ),
-      body: profilesState.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('加载配置存档失败：$e')),
-        data: (store) {
-          return configState.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('加载配置失败：$e')),
-            data: (config) {
-              // ✅ 首次加载或 Controller 为空时同步
-              if (_baseUrlController.text.isEmpty) {
-                _syncControllersWithConfig(config);
-              }
-              return _buildSettingsContent(context, store, config, isBusy);
-            },
-          );
-        },
-      ),
-    );
-  }
-  Widget _buildSettingsContent(BuildContext context, AppConfigStore store, AppConfig config, bool isBusy) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        // 配置存档
-        AppSection(
-          title: '配置存档',
-          subtitle: '切换后自动同步到表单',
-          children: [
-            DropdownButtonFormField<String>(
-              value: store.activeProfileId,
-              decoration: const InputDecoration(labelText: '当前配置存档'),
-              items: store.profiles.map((p) => DropdownMenuItem(value: p.id, child: Text(p.name))).toList(),
-              onChanged: isBusy ? null : (value) async {
-                if (value == null) return;
-                await ref.read(configProfilesNotifierProvider).switchProfile(value);
-                // ✅ 监听器会自动同步 Controller
-              },
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 12,
-              children: [
-                OutlinedButton(onPressed: isBusy ? null : _showCreateProfileDialog, child: const Text('新建')),
-                OutlinedButton(
-                  onPressed: isBusy ? null : () => _showRenameProfileDialog(store.profiles.firstWhere((p) => p.id == store.activeProfileId)),
-                  child: const Text('重命名'),
-                ),
-                OutlinedButton(
-                  onPressed: isBusy ? null : () => _deleteProfile(store.profiles.firstWhere((p) => p.id == store.activeProfileId), store.profiles.length),
-                  child: const Text('删除'),
-                ),
-              ],
-            ),
-          ],
-        ),
-        // 连接配置 - ✅ 使用 Controller，自动保存
-        AppSection(
-          title: '连接配置',
-          subtitle: '修改后自动保存',
-          children: [
-            TextField(
-              controller: _baseUrlController,
-              enabled: !isBusy,
-              decoration: const InputDecoration(labelText: 'Base URL', hintText: 'https://api.openai.com'),
-              // ✅ 自动保存
-              onChanged: (v) => _saveConfig(config.copyWith(baseUrl: v)),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _apiKeyController,
-              enabled: !isBusy,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'API Key'),
-              onChanged: (v) => _saveConfig(config.copyWith(apiKey: v)),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _modelsPathController,
-              enabled: !isBusy,
-              decoration: const InputDecoration(labelText: 'Models Path', hintText: _defaultModelsPath),
-              onChanged: (v) => _saveConfig(config.copyWith(modelsPath: v.isEmpty ? _defaultModelsPath : v)),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _chatPathController,
-              enabled: !isBusy,
-              decoration: InputDecoration(labelText: 'Chat Path', hintText: _defaultChatPathForApiMode(_apiMode)),
-              onChanged: (v) => _saveConfig(config.copyWith(chatPath: v.isEmpty ? _defaultChatPathForApiMode(_apiMode) : v)),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: _apiMode,
-              decoration: const InputDecoration(labelText: 'API Mode'),
-              items: const [
-                DropdownMenuItem(value: 'chat_completions', child: Text('chat_completions')),
-                DropdownMenuItem(value: 'responses', child: Text('responses')),
-              ],
-              onChanged: isBusy ? null : (value) {
-                if (value == null) return;
-                setState(() => _apiMode = value);
-                // 自动更新 chatPath
-                if (_chatPathController.text.isEmpty) {
-                  _chatPathController.text = _defaultChatPathForApiMode(value);
-                }
-                _saveConfig(config.copyWith(apiMode: value, chatPath: _chatPathController.text));
-              },
-            ),
-          ],
-        ),
-        // 模型配置
-        AppSection(
-          title: '模型配置',
-          subtitle: '选择后自动保存',
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: _buildModelSelector(context, isBusy)),
-                const SizedBox(width: 12),
-                FilledButton(
-                  onPressed: isBusy ? null : _refreshModels,
-                  child: _isRefreshingModels
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('同步模型'),
-                ),
-              ],
-            ),
-            _buildModelChips(),
-          ],
-        ),
-      ],
-    );
-  }
-  Widget _buildModelSelector(BuildContext context, bool isBusy) {
-    return SearchAnchor(
-      builder: (context, controller) {
-        return GestureDetector(
-          onTap: isBusy ? null : () => controller.openView(),
-          child: InputDecorator(
-            decoration: const InputDecoration(labelText: '当前模型', suffixIcon: Icon(Icons.arrow_drop_down)),
-            child: Text(_getSelectedModelDisplayText(), overflow: TextOverflow.ellipsis),
-          ),
-        );
-      },
-      suggestionsBuilder: (context, controller) {
-        final query = controller.text.trim().toLowerCase();
-        final filtered = _models.where((m) {
-          final id = m.id.toLowerCase();
-          final name = (m.name ?? '').toLowerCase();
-          return query.isEmpty || id.contains(query) || name.contains(query);
-        }).toList();
-        if (filtered.isEmpty) return const [ListTile(title: Text('没有匹配的模型'))];
-        return [
-          ...filtered.map((model) => ListTile(
-            title: Text((model.name ?? '').trim().isNotEmpty ? model.name! : model.id),
-            trailing: model.id == _selectedModel ? const Icon(Icons.check) : null,
-            onTap: () {
-              setState(() => _selectedModel = model.id);
-              _saveConfig(ref.read(configProvider).valueOrNull!.copyWith(selectedModel: model.id));
-              controller.closeView(model.id);
-            },
-          )),
-          ListTile(
-            title: const Text('自定义模型 ID'),
-            onTap: () {
-              final text = controller.text;
-              controller.closeView(null);
-              if (text.isNotEmpty) {
-                setState(() => _selectedModel = text);
-                _saveConfig(ref.read(configProvider).valueOrNull!.copyWith(selectedModel: text));
-              }
-            },
-          ),
-        ];
-      },
-    );
-  }
-  Widget _buildModelChips() {
-    if (_selectedModel == null) return const SizedBox.shrink();
-    final model = _models.where((m) => m.id == _selectedModel).firstOrNull;
-    if (model == null) return const SizedBox.shrink();
-    final chips = <Widget>[];
-    if (model.supportsVision == true) {
-      chips.add(const Chip(avatar: Icon(Icons.image_outlined, size: 16), label: Text('Vision'), visualDensity: VisualDensity.compact));
-    }
-    if (model.supportsReasoning == true) {
-      chips.add(const Chip(avatar: Icon(Icons.psychology_alt_outlined, size: 16), label: Text('Reasoning'), visualDensity: VisualDensity.compact));
-    }
-    if (chips.isEmpty) return const SizedBox.shrink();
-    return Padding(padding: const EdgeInsets.only(top: 12), child: Wrap(spacing: 8, runSpacing: 8, children: chips));
-  }
-  String _getSelectedModelDisplayText() {
-    if (_selectedModel == null || _selectedModel!.trim().isEmpty) return '请选择模型';
-    for (final m in _models) {
-      if (m.id == _selectedModel) return (m.name ?? '').trim().isNotEmpty ? m.name! : m.id;
-    }
-    return _selectedModel!;
-  }
-  String _defaultChatPathForApiMode(String apiMode) {
-    return apiMode == 'responses' ? 'v1/responses' : 'v1/chat/completions';
-  }
-  Future<void> _refreshModels() async {
-    final current = ref.read(configProvider).valueOrNull;
-    if (current == null) return;
-    setState(() => _isRefreshingModels = true);
-    try {
-      await ref.read(configNotifierProvider).saveAndRefreshModels(current);
-      await ref.read(configProfilesNotifierProvider).load();
-      await AppToast.show('模型列表已同步');
-    } catch (e) {
-      await AppToast.show('同步模型失败：$e');
-    } finally {
-      if (mounted) setState(() => _isRefreshingModels = false);
-    }
-  }
-  Future<void> _confirmRestoreDefaults() async {
-    final colorScheme = Theme.of(context).colorScheme;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('恢复默认设置'),
-        content: const Text('确定要将当前配置存档恢复为默认设置吗？'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: colorScheme.error, foregroundColor: colorScheme.onError),
-            child: const Text('恢复默认'),
-          ),
-        ],
-      ),
-    ) ?? false;
-    if (!confirmed) return;
-    try {
-      await ref.read(configNotifierProvider).saveFullConfig(AppConfig.defaultConfig());
-      await ref.read(configProfilesNotifierProvider).load();
-    } catch (e) {
-      await AppToast.show('恢复默认失败：$e');
-    }
-  }
-  Future<void> _showCreateProfileDialog() async {
-    final controller = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('新建配置存档'),
-        content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(hintText: '输入配置名称')),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(controller.text.trim()), child: const Text('创建')),
-        ],
-      ),
-    );
-    if (result == null) return;
-    await ref.read(configProfilesNotifierProvider).createProfile(result);
-  }
-  Future<void> _showRenameProfileDialog(ConfigProfile profile) async {
-    final controller = TextEditingController(text: profile.name);
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('重命名配置存档'),
-        content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(hintText: '输入配置名称')),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(controller.text.trim()), child: const Text('保存')),
-        ],
-      ),
-    );
-    if (result == null || result.isEmpty) return;
-    await ref.read(configProfilesNotifierProvider).renameProfile(profile.id, result);
-  }
-  Future<void> _deleteProfile(ConfigProfile profile, int profileCount) async {
-    if (profileCount <= 1) {
-      await AppToast.show('至少保留一个配置存档');
-      return;
-    }
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('删除配置存档'),
-        content: Text('确定删除"${profile.name}"吗？'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('删除')),
-        ],
-      ),
-    ) ?? false;
-    if (!confirmed) return;
-    await ref.read(configProfilesNotifierProvider).deleteProfile(profile.id);
-  }
-}
-```
-
-## File: lib/presentation/providers/home_session_list_provider.dart
-```dart
-// presentation/providers/home_session_list_provider.dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/session.dart';
-import 'session_list_notifier.dart';
-class HomeSessionItem {
-  final Session session;
-  final bool hasUnseen;
-  final String userPreview;
-  final int roundCount;
-  final int updatedAt;
-  final String? previewRoundId;
-  const HomeSessionItem({
-    required this.session,
-    required this.hasUnseen,
-    required this.userPreview,
-    required this.roundCount,
-    required this.updatedAt,
-    required this.previewRoundId,
-  });
-}
-// 简化：直接监听 sessionListProvider，无需额外处理
-final homeSessionListProvider = Provider<AsyncValue<List<HomeSessionItem>>>((ref) {
-  final sessionsAsync = ref.watch(sessionListProvider);
-  return sessionsAsync.whenData((sessions) {
-    final items = sessions.map((session) {
-      final hasUnseen = session.rounds.any((r) => r.hasUnseenUpdate);
-      final roundCount = session.rounds.length;
-      // 直接获取最后一个 round 作为预览
-      final previewRound = session.rounds.isEmpty 
-          ? null 
-          : session.rounds.last;
-      final previewRoundId = previewRound?.id;
-      final userPreview = previewRound == null
-          ? '点击开始新的对话'
-          : previewRound.userContent.trim().isEmpty
-              ? '（空输入）'
-              : previewRound.userContent.trim();
-      return HomeSessionItem(
-        session: session,
-        hasUnseen: hasUnseen,
-        userPreview: userPreview,
-        roundCount: roundCount,
-        updatedAt: session.updatedAt,
-        previewRoundId: previewRoundId,
-      );
-    }).toList();
-    items.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-    return items;
-  });
-});
-```
-
 ## File: lib/presentation/widgets/message_bubble.dart
 ```dart
 import 'package:flutter/material.dart';
@@ -12663,6 +12319,453 @@ class MessageBubble extends StatelessWidget {
     );
   }
 }
+```
+
+## File: lib/presentation/pages/settings_page.dart
+```dart
+// presentation/pages/settings_page.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/app_config.dart';
+import '../../core/models/app_config_store.dart';
+import '../../core/models/model_info.dart';
+import '../providers/config_notifier.dart';
+import '../widgets/common/app_page_scaffold.dart';
+import '../widgets/common/app_section.dart';
+import '../widgets/common/app_toast.dart';
+class SettingsPage extends ConsumerStatefulWidget {
+  const SettingsPage({super.key});
+  @override
+  ConsumerState<SettingsPage> createState() => _SettingsPageState();
+}
+class _SettingsPageState extends ConsumerState<SettingsPage> {
+  static const String _defaultModelsPath = 'v1/models';
+  final _baseUrlController = TextEditingController();
+  final _apiKeyController = TextEditingController();
+  final _modelsPathController = TextEditingController();
+  final _chatPathController = TextEditingController();
+  bool _isSyncing = false;
+  @override
+  void dispose() {
+    _baseUrlController.dispose();
+    _apiKeyController.dispose();
+    _modelsPathController.dispose();
+    _chatPathController.dispose();
+    super.dispose();
+  }
+  /// 同步表单值到配置流，自动触发，无需手动保存
+  void _syncControllersWithConfig(AppConfig config) {
+    _isSyncing = true;
+    setState(() {
+      _baseUrlController.text = config.baseUrl;
+      _apiKeyController.text = config.apiKey;
+      _modelsPathController.text = config.modelsPath;
+      _chatPathController.text = config.chatPath;
+    });
+    _isSyncing = false;
+  }
+  String _defaultChatPathForApiMode(String apiMode) {
+    return apiMode == 'responses' ? 'v1/responses' : 'v1/chat/completions';
+  }
+  @override
+  Widget build(BuildContext context) {
+    final configAsync = ref.watch(configProvider);
+    final profilesAsync = ref.watch(configProfilesProvider);
+    // 监听配置变化，自动同步到表单
+    ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
+      next.whenData((config) {
+        _syncControllersWithConfig(config);
+      });
+    });
+    final isBusy = configAsync.isLoading || profilesAsync.isLoading;
+    return AppPageScaffold(
+      appBar: AppBar(
+        title: const Text('设置'),
+        actions: [
+          IconButton(
+            onPressed: isBusy ? null : _confirmRestoreDefaults,
+            icon: const Icon(Icons.restart_alt),
+            tooltip: '恢复默认',
+            style: IconButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+          ),
+        ],
+      ),
+      body: profilesAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('加载配置存档失败：$e')),
+        data: (store) {
+          return configAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('加载配置失败：$e')),
+            data: (config) {
+              // 首次加载时同步 Controller
+              if (_baseUrlController.text.isEmpty) {
+                _syncControllersWithConfig(config);
+              }
+              return _buildSettingsContent(context, store, config, isBusy);
+            },
+          );
+        },
+      ),
+    );
+  }
+  Widget _buildSettingsContent(
+    BuildContext context,
+    AppConfigStore store,
+    AppConfig config,
+    bool isBusy,
+  ) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // 配置存档
+        AppSection(
+          title: '配置存档',
+          subtitle: '切换后自动同步到表单',
+          children: [
+            DropdownButtonFormField<String>(
+              value: store.activeProfileId,
+              decoration: const InputDecoration(labelText: '当前配置存档'),
+              items: store.profiles
+                  .map((p) => DropdownMenuItem(value: p.id, child: Text(p.name)))
+                  .toList(),
+              onChanged: isBusy
+                  ? null
+                  : (value) async {
+                      if (value == null) return;
+                      await ref.read(configProfilesNotifierProvider).switchProfile(value);
+                    },
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              children: [
+                OutlinedButton(
+                  onPressed: isBusy ? null : _showCreateProfileDialog,
+                  child: const Text('新建'),
+                ),
+                OutlinedButton(
+                  onPressed: isBusy
+                      ? null
+                      : () => _showRenameProfileDialog(
+                          store.profiles.firstWhere((p) => p.id == store.activeProfileId)),
+                  child: const Text('重命名'),
+                ),
+                OutlinedButton(
+                  onPressed: isBusy
+                      ? null
+                      : () => _deleteProfile(
+                          store.profiles.firstWhere((p) => p.id == store.activeProfileId),
+                          store.profiles.length),
+                  child: const Text('删除'),
+                ),
+              ],
+            ),
+          ],
+        ),
+        // 连接配置
+        AppSection(
+          title: '连接配置',
+          subtitle: '修改后自动保存到当前配置',
+          children: [
+            TextField(
+              controller: _baseUrlController,
+              enabled: !isBusy,
+              decoration: const InputDecoration(labelText: 'Base URL', hintText: 'https://api.openai.com'),
+              onChanged: (v) {
+                if (_isSyncing) return;
+                ref.read(configNotifierProvider).updateBaseUrl(v);
+              },
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _apiKeyController,
+              enabled: !isBusy,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'API Key'),
+              onChanged: (v) {
+                if (_isSyncing) return;
+                ref.read(configNotifierProvider).updateApiKey(v);
+              },
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _modelsPathController,
+              enabled: !isBusy,
+              decoration: const InputDecoration(labelText: 'Models Path', hintText: _defaultModelsPath),
+              onChanged: (v) {
+                if (_isSyncing) return;
+                ref.read(configNotifierProvider).updateModelsPath(v.isEmpty ? _defaultModelsPath : v);
+              },
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _chatPathController,
+              enabled: !isBusy,
+              decoration: InputDecoration(labelText: 'Chat Path', hintText: _defaultChatPathForApiMode(config.apiMode)),
+              onChanged: (v) {
+                if (_isSyncing) return;
+                ref.read(configNotifierProvider).updateChatPath(v.isEmpty ? _defaultChatPathForApiMode(config.apiMode) : v);
+              },
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: config.apiMode,
+              decoration: const InputDecoration(labelText: 'API Mode'),
+              items: const [
+                DropdownMenuItem(value: 'chat_completions', child: Text('chat_completions')),
+                DropdownMenuItem(value: 'responses', child: Text('responses')),
+              ],
+              onChanged: isBusy
+                  ? null
+                  : (value) {
+                      if (value == null || _isSyncing) return;
+                      ref.read(configNotifierProvider).updateApiMode(value);
+                      if (_chatPathController.text.isEmpty) {
+                        _chatPathController.text = _defaultChatPathForApiMode(value);
+                        ref.read(configNotifierProvider).updateChatPath(_chatPathController.text);
+                      }
+                    },
+            ),
+          ],
+        ),
+        // 模型配置
+        AppSection(
+          title: '模型配置',
+          subtitle: '选择后自动保存到当前配置',
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: _buildModelSelector(context, config, isBusy)),
+                const SizedBox(width: 12),
+                FilledButton(
+                  onPressed: isBusy ? null : _refreshModels,
+                  child: const Text('同步模型'),
+                ),
+              ],
+            ),
+            _buildModelChips(config),
+          ],
+        ),
+      ],
+    );
+  }
+  Widget _buildModelSelector(BuildContext context, AppConfig config, bool isBusy) {
+    final models = config.availableModels ?? const [];
+    final selectedId = config.selectedModel;
+    return SearchAnchor(
+      builder: (context, controller) {
+        return GestureDetector(
+          onTap: isBusy ? null : () => controller.openView(),
+          child: InputDecorator(
+            decoration: const InputDecoration(labelText: '当前模型', suffixIcon: Icon(Icons.arrow_drop_down)),
+            child: Text(_getSelectedModelDisplayText(models, selectedId), overflow: TextOverflow.ellipsis),
+          ),
+        );
+      },
+      suggestionsBuilder: (context, controller) {
+        final query = controller.text.trim().toLowerCase();
+        final filtered = models.where((m) {
+          final id = m.id.toLowerCase();
+          final name = (m.name ?? '').toLowerCase();
+          return query.isEmpty || id.contains(query) || name.contains(query);
+        }).toList();
+        if (filtered.isEmpty) return const [ListTile(title: Text('没有匹配的模型'))];
+        return [
+          ...filtered.map((model) => ListTile(
+                title: Text((model.name ?? '').trim().isNotEmpty ? model.name! : model.id),
+                trailing: model.id == selectedId ? const Icon(Icons.check) : null,
+                onTap: () {
+                  if (_isSyncing) return;
+                  ref.read(configNotifierProvider).updateSelectedModel(model.id);
+                  controller.closeView(model.id);
+                },
+              )),
+          ListTile(
+            title: const Text('自定义模型 ID'),
+            onTap: () {
+              final text = controller.text;
+              controller.closeView(null);
+              if (text.isNotEmpty && !_isSyncing) {
+                ref.read(configNotifierProvider).updateSelectedModel(text);
+              }
+            },
+          ),
+        ];
+      },
+    );
+  }
+  Widget _buildModelChips(AppConfig config) {
+    final selectedId = config.selectedModel;
+    if (selectedId == null || selectedId.trim().isEmpty) return const SizedBox.shrink();
+    final model = (config.availableModels ?? const []).where((m) => m.id == selectedId).firstOrNull;
+    if (model == null) return const SizedBox.shrink();
+    final chips = <Widget>[];
+    if (model.supportsVision == true) {
+      chips.add(const Chip(avatar: Icon(Icons.image_outlined, size: 16), label: Text('Vision'), visualDensity: VisualDensity.compact));
+    }
+    if (model.supportsReasoning == true) {
+      chips.add(const Chip(avatar: Icon(Icons.psychology_alt_outlined, size: 16), label: Text('Reasoning'), visualDensity: VisualDensity.compact));
+    }
+    if (chips.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Wrap(spacing: 8, runSpacing: 8, children: chips),
+    );
+  }
+  String _getSelectedModelDisplayText(List<ModelInfo> models, String? selectedId) {
+    if (selectedId == null || selectedId.trim().isEmpty) return '请选择模型';
+    for (final m in models) {
+      if (m.id == selectedId) return (m.name ?? '').trim().isNotEmpty ? m.name! : m.id;
+    }
+    return selectedId;
+  }
+  Future<void> _refreshModels() async {
+    final configAsync = ref.read(configProvider);
+    final config = configAsync.valueOrNull;
+    if (config == null) return;
+    try {
+      await ref.read(configNotifierProvider).saveAndRefreshModels(config);
+      await AppToast.show('模型列表已同步');
+    } catch (e) {
+      await AppToast.show('同步模型失败：$e');
+    }
+  }
+  Future<void> _confirmRestoreDefaults() async {
+    final colorScheme = Theme.of(context).colorScheme;
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('恢复默认设置'),
+            content: const Text('确定要将当前配置存档恢复为默认设置吗？'),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                style: FilledButton.styleFrom(backgroundColor: colorScheme.error, foregroundColor: colorScheme.onError),
+                child: const Text('恢复默认'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed) return;
+    try {
+      await ref.read(configNotifierProvider).saveFullConfig(AppConfig.defaultConfig());
+    } catch (e) {
+      await AppToast.show('恢复默认失败：$e');
+    }
+  }
+  Future<void> _showCreateProfileDialog() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('新建配置存档'),
+        content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(hintText: '输入配置名称')),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(controller.text.trim()), child: const Text('创建')),
+        ],
+      ),
+    );
+    if (result == null || result.isEmpty) return;
+    await ref.read(configProfilesNotifierProvider).createProfile(result);
+  }
+  Future<void> _showRenameProfileDialog(ConfigProfile profile) async {
+    final controller = TextEditingController(text: profile.name);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('重命名配置存档'),
+        content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(hintText: '输入配置名称')),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(controller.text.trim()), child: const Text('保存')),
+        ],
+      ),
+    );
+    if (result == null || result.isEmpty) return;
+    await ref.read(configProfilesNotifierProvider).renameProfile(profile.id, result);
+  }
+  Future<void> _deleteProfile(ConfigProfile profile, int profileCount) async {
+    if (profileCount <= 1) {
+      await AppToast.show('至少保留一个配置存档');
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('删除配置存档'),
+            content: Text('确定删除 "${profile.name}" 吗？'),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
+              FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('删除')),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed) return;
+    await ref.read(configProfilesNotifierProvider).deleteProfile(profile.id);
+  }
+}
+```
+
+## File: lib/presentation/providers/home_session_list_provider.dart
+```dart
+// presentation/providers/home_session_list_provider.dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/session.dart';
+import 'session_list_notifier.dart';
+class HomeSessionItem {
+  final Session session;
+  final bool hasUnseen;
+  final String userPreview;
+  final int roundCount;
+  final int updatedAt;
+  final String? previewRoundId;
+  const HomeSessionItem({
+    required this.session,
+    required this.hasUnseen,
+    required this.userPreview,
+    required this.roundCount,
+    required this.updatedAt,
+    required this.previewRoundId,
+  });
+}
+// 简化：直接监听 sessionListProvider，无需额外处理
+final homeSessionListProvider = Provider<AsyncValue<List<HomeSessionItem>>>((ref) {
+  final sessionsAsync = ref.watch(sessionListProvider);
+  return sessionsAsync.whenData((sessions) {
+    final items = sessions.map((session) {
+      final hasUnseen = session.rounds.any((r) => r.hasUnseenUpdate);
+      final roundCount = session.rounds.length;
+      // 直接获取最后一个 round 作为预览
+      final previewRound = session.rounds.isEmpty 
+          ? null 
+          : session.rounds.last;
+      final previewRoundId = previewRound?.id;
+      final userPreview = previewRound == null
+          ? '点击开始新的对话'
+          : previewRound.userContent.trim().isEmpty
+              ? '（空输入）'
+              : previewRound.userContent.trim();
+      return HomeSessionItem(
+        session: session,
+        hasUnseen: hasUnseen,
+        userPreview: userPreview,
+        roundCount: roundCount,
+        updatedAt: session.updatedAt,
+        previewRoundId: previewRoundId,
+      );
+    }).toList();
+    items.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return items;
+  });
+});
 ```
 
 ## File: lib/presentation/pages/home_page.dart
@@ -12949,7 +13052,7 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
     }
   }
   void _ensurePreviewLoaded() {
-    final previewRoundId = widget.item.previewRoundId as String?;
+    final previewRoundId = widget.item.previewRoundId;
     if (_requested || previewRoundId == null) return;
     _requested = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -12974,8 +13077,8 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
   Widget build(BuildContext context) {
     final session = widget.item.session;
     final fileName = '${session.id}.json';
-    final updatedAt = TimeFormatUtils.formatTimestamp(widget.item.updatedAt as int);
-    final previewRoundId = widget.item.previewRoundId as String?;
+    final updatedAt = TimeFormatUtils.formatTimestamp(widget.item.updatedAt);
+    final previewRoundId = widget.item.previewRoundId;
     final stream = previewRoundId == null
         ? null
         : ref.watch(
@@ -13168,26 +13271,47 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     _chatSubscription = ref.listenManual<ChatState>(
       chatProvider(widget.fileName),
       (previous, next) {
+        // 原有分页逻辑保持不变
         final nextPageList = next.pageList;
-        if (nextPageList == null || nextPageList.pages.isEmpty) return;
-        if (_pageController == null) {
-          final initialIndex = nextPageList.currentPageIndex;
-          _pageController = PageController(initialPage: initialIndex);
-          if (mounted) {
-            setState(() {});
+        if (nextPageList != null && nextPageList.pages.isNotEmpty) {
+          if (_pageController == null) {
+            final initialIndex = nextPageList.currentPageIndex;
+            _pageController = PageController(initialPage: initialIndex);
+            if (mounted) {
+              setState(() {});
+            }
+            return;
           }
-          return;
+          final controller = _pageController!;
+          if (controller.hasClients) {
+            final prevIndex = previous?.pageList?.currentPageIndex;
+            final nextIndex = nextPageList.currentPageIndex;
+            if (prevIndex != nextIndex) {
+              final currentPage = controller.page?.round() ?? controller.initialPage;
+              if (currentPage != nextIndex) {
+                controller.jumpToPage(nextIndex);
+              }
+            }
+          }
         }
-        final controller = _pageController;
-        if (controller == null || !controller.hasClients) return;
-        final prevIndex = previous?.pageList?.currentPageIndex;
-        final nextIndex = nextPageList.currentPageIndex;
-        if (prevIndex == nextIndex) return;
-        final currentPage = controller.page?.round() ?? controller.initialPage;
-        if (currentPage == nextIndex) return;
-        controller.jumpToPage(nextIndex);
+        // ========== 新增：会话加载完成后处理初始消息 ==========
+        if (next.session != null && !_initialMessageHandled && mounted) {
+          final message = widget.initialMessage?.trim() ?? '';
+          final attachments = widget.initialAttachments ?? const <PendingAttachment>[];
+          final hasContent = message.isNotEmpty || attachments.isNotEmpty;
+          if (hasContent) {
+            _initialMessageHandled = true;
+            // 异步发送不阻塞UI，添加错误捕获
+            ref.read(chatProvider(widget.fileName).notifier)
+                .sendMessage(message, attachments: attachments)
+                .catchError((e) {
+                  if (mounted) AppToast.show('发送失败：${e.toString()}');
+                });
+          }
+        }
       },
     );
+    // 原有微任务逻辑删除初始消息处理部分
     Future.microtask(() async {
       final notifier = ref.read(chatProvider(widget.fileName).notifier);
       await notifier.loadSession(initialRoundId: widget.initialRoundId);
@@ -13195,18 +13319,6 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
       final currentRoundId = state.currentRoundId;
       if (currentRoundId != null) {
         await notifier.ensureRoundLoaded(currentRoundId);
-      }
-      final message = widget.initialMessage?.trim() ?? '';
-      final attachments =
-          widget.initialAttachments ?? const <PendingAttachment>[];
-      final hasMessage = message.isNotEmpty;
-      final hasAttachments = attachments.isNotEmpty;
-      if (!_initialMessageHandled && (hasMessage || hasAttachments) && mounted) {
-        _initialMessageHandled = true;
-        await notifier.sendMessage(
-          message,
-          attachments: attachments,
-        );
       }
     });
   }
@@ -13752,477 +13864,6 @@ class _PaginationBar extends StatelessWidget {
     );
   }
 }
-```
-
-## File: lib/presentation/providers/chat_notifier.dart
-```dart
-// presentation/providers/chat_notifier.dart
-import 'dart:async';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/app_config.dart';
-import '../../core/models/chat_round.dart';
-import '../../core/models/model_info.dart';
-import '../../core/models/session.dart';
-import '../../core/models/attachment.dart';
-import '../../di/providers.dart';
-import '../../domain/models/chat_page.dart';
-import '../../domain/services/attachment_preparer.dart';
-import '../../domain/services/branch_navigator.dart';
-import '../../domain/services/chat_context_builder.dart';
-import '../../domain/services/chat_stream_accumulator.dart';
-import '../../domain/states/chat_state.dart';
-import '../models/pending_attachment.dart';
-import '../utils/page_utils.dart';
-import 'global_streaming_provider.dart';
-import '../../core/utils/id_generator.dart';
-import 'config_notifier.dart';  // ✅ 添加这一行
-// 辅助函数：找到第一个匹配的元素，否则返回null
-T? _firstWhereOrNull<T>(List<T> list, bool Function(T) test) {
-  for (final element in list) {
-    if (test(element)) return element;
-  }
-  return null;
-}
-class ChatNotifier extends StateNotifier<ChatState> {
-  final Ref ref;
-  final String fileName;
-  final Set<String> _stoppingRoundIds = {};
-  // Stream 订阅
-  StreamSubscription? _sessionSubscription;
-  // 纯 UI 状态
-  int _currentPageIndex = 0;
-  ChatNotifier(this.ref, this.fileName) : super(ChatState.initial()) {
-    _initWatch();
-  }
-  void _initWatch() {
-    final repository = ref.read(conversationRepositoryProvider);
-    // 监听会话变更
-    _sessionSubscription = repository.watchSession(fileName).listen((session) {
-      if (session == null) {
-        state = state.copyWith(
-          session: null,
-          error: '会话不存在',
-          isLoading: false,
-        );
-        return;
-      }
-      // ========== 修复：每次打开会话都定位到最新页 ==========
-      // 获取所有分支叶子节点（最新创建的轮次）
-      final leaves = BranchNavigator.getAllBranchLeaves(session);
-      // 确定当前应该显示的轮次ID
-      String? currentRoundId;
-      List<ChatRound> branchPath;
-      int targetPageIndex;
-      if (leaves.isNotEmpty) {
-        // 默认显示最新创建的轮次
-        currentRoundId = leaves.last.id;
-        branchPath = BranchNavigator.getCurrentBranchPath(session, currentRoundId);
-        targetPageIndex = branchPath.isNotEmpty ? branchPath.length - 1 : 0;
-      } else {
-        // 如果没有轮次，显示空页面
-        currentRoundId = null;
-        branchPath = [];
-        targetPageIndex = 0;
-      }
-      _currentPageIndex = targetPageIndex;
-      // 将 ChatRound 转换为 ChatPage
-      final chatPages = branchPath.map((round) => ChatPage(round: round)).toList();
-      state = state.copyWith(
-        session: session,
-        currentRoundId: currentRoundId,
-        pageList: ChatPageList.fromPages(chatPages, _currentPageIndex),
-        error: null,
-        isLoading: false,
-      );
-      // 确保当前轮次的数据已加载到流式缓存
-      if (currentRoundId != null && branchPath.isNotEmpty) {
-        final round = branchPath.last;
-        _streamCache.ensureRoundLoaded(fileName, round);
-      }
-    });
-  }
-  GlobalStreamCacheNotifier get _streamCache =>
-      ref.read(globalStreamCacheProvider.notifier);
-  StreamStatus? _getRoundStream(String roundId) {
-    final globalMap = ref.read(globalStreamCacheProvider);
-    return globalMap[fileName]?[roundId];
-  }
-  Future<void> ensureRoundLoaded(String roundId) async {
-    final session = state.session;
-    if (session == null) return;
-    final round = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
-    if (round == null) return;
-    _streamCache.ensureRoundLoaded(fileName, round);
-  }
-  Future<void> loadSession({String? initialRoundId}) async {
-    if (initialRoundId != null) {
-      state = state.copyWith(currentRoundId: initialRoundId);
-    }
-  }
-  ModelInfo? _findSelectedModelInfo(AppConfig config) {
-    final selectedId = config.selectedModel;
-    if (selectedId == null || selectedId.trim().isEmpty) return null;
-    final models = config.availableModels ?? const <ModelInfo>[];
-    return _firstWhereOrNull(models, (m) => m.id == selectedId);
-  }
-  bool _shouldEnableReasoning(AppConfig config) {
-    final selectedModel = _findSelectedModelInfo(config);
-    return selectedModel?.supportsReasoning == true;
-  }
-  void _validateRequestCapability({
-    required AppConfig config,
-    required List<PendingAttachment> attachments,
-  }) {
-    final selectedModel = _findSelectedModelInfo(config);
-    if (selectedModel == null) return;
-    final hasImage = attachments.any((a) => a.isImage);
-    if (hasImage && selectedModel.supportsVision != true) {
-      throw Exception('当前模型未声明支持图片输入');
-    }
-  }
-  Future<void> sendMessage(
-    String content, {
-    List<PendingAttachment>? attachments,
-  }) async {
-    final session = state.session;
-    if (session == null) {
-      state = state.copyWithError('会话未初始化');
-      return;
-    }
-    try {
-      final pendingAttachments = attachments ?? const <PendingAttachment>[];
-      final repository = ref.read(conversationRepositoryProvider);
-      final configAsync = ref.read(configProvider);
-      final config = await ref.read(configRepositoryProvider).getConfig();
-      _validateRequestCapability(
-        config: config,
-        attachments: pendingAttachments,
-      );
-      final savedAttachments = await AttachmentPreparer.savePendingAttachments(
-        repository,
-        pendingAttachments,
-      );
-      // 构建新轮次
-      final newRound = ChatRound(
-        id: IdGenerator.generate(),
-        parentId: state.currentRoundId,
-        createdAt: DateTime.now().millisecondsSinceEpoch,
-        userContent: content,
-        userAttachments: savedAttachments,
-        isIncomplete: true,
-        hasUnseenUpdate: false,
-      );
-      // 写入数据库（watch 会自动更新状态）
-      await repository.appendRound(fileName, newRound);
-      // 设置当前轮次ID，等待 watch 更新后同步
-      state = state.copyWith(currentRoundId: newRound.id);
-      // 进入流式生成状态
-      _streamCache.setRoundStream(
-        fileName,
-        newRound.id,
-        const StreamStatus(
-          content: '',
-          reasoning: '',
-          isStreaming: true,
-        ),
-      );
-      // 触发流式请求
-      _handleStreamTask(newRound, session, config);
-    } catch (e) {
-      state = state.copyWithError(e.toString());
-    }
-  }
-  Future<void> retryFromRound(String roundId) async {
-    final session = state.session;
-    if (session == null) {
-      state = state.copyWithError('会话未初始化');
-      return;
-    }
-    try {
-      final repository = ref.read(conversationRepositoryProvider);
-      final configAsync = ref.read(configProvider);
-      final config = await ref.read(configRepositoryProvider).getConfig();
-      final sourceRound = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
-      if (sourceRound == null) {
-        state = state.copyWithError('未找到要重新回复的对话');
-        return;
-      }
-      final selectedModel = _findSelectedModelInfo(config);
-      if (selectedModel != null) {
-        final hasImage = sourceRound.userAttachments.any((a) => a.isImage);
-        if (hasImage && selectedModel.supportsVision != true) {
-          state = state.copyWithError('当前模型未声明支持图片输入');
-          return;
-        }
-      }
-      final newRound = ChatRound(
-        id: IdGenerator.generate(),
-        parentId: sourceRound.parentId,
-        createdAt: DateTime.now().millisecondsSinceEpoch,
-        userContent: sourceRound.userContent,
-        userAttachments: sourceRound.userAttachments,
-        isIncomplete: true,
-        hasUnseenUpdate: false,
-      );
-      await repository.appendRound(fileName, newRound);
-      state = state.copyWith(currentRoundId: newRound.id);
-      _streamCache.setRoundStream(
-        fileName,
-        newRound.id,
-        const StreamStatus(
-          content: '',
-          reasoning: '',
-          isStreaming: true,
-        ),
-      );
-      _handleStreamTask(newRound, session, config);
-    } catch (e) {
-      state = state.copyWithError(e.toString());
-    }
-  }
-  Future<void> editAndResendFromRound(
-    String roundId,
-    String newContent, {
-    List<PendingAttachment>? attachments,
-  }) async {
-    final session = state.session;
-    if (session == null) {
-      state = state.copyWithError('会话未初始化');
-      return;
-    }
-    try {
-      final repository = ref.read(conversationRepositoryProvider);
-      final configAsync = ref.read(configProvider);
-      final config = await ref.read(configRepositoryProvider).getConfig();
-      final pendingAttachments = attachments ?? const <PendingAttachment>[];
-      _validateRequestCapability(
-        config: config,
-        attachments: pendingAttachments,
-      );
-      final sourceRound = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
-      if (sourceRound == null) {
-        state = state.copyWithError('未找到要编辑重试的对话');
-        return;
-      }
-      final selectedModel = _findSelectedModelInfo(config);
-      if (selectedModel != null) {
-        final hasImage = sourceRound.userAttachments.any((a) => a.isImage) ||
-            pendingAttachments.any((a) => a.isImage);
-        if (hasImage && selectedModel.supportsVision != true) {
-          state = state.copyWithError('当前模型未声明支持图片输入');
-          return;
-        }
-      }
-      final savedAttachments = await AttachmentPreparer.savePendingAttachments(
-        repository,
-        pendingAttachments,
-      );
-      final mergedAttachments = <Attachment>[
-        ...sourceRound.userAttachments,
-        ...savedAttachments,
-      ];
-      final newRound = ChatRound(
-        id: IdGenerator.generate(),
-        parentId: sourceRound.parentId,
-        createdAt: DateTime.now().millisecondsSinceEpoch,
-        userContent: newContent,
-        userAttachments: mergedAttachments,
-        isIncomplete: true,
-        hasUnseenUpdate: false,
-      );
-      await repository.appendRound(fileName, newRound);
-      state = state.copyWith(currentRoundId: newRound.id);
-      _streamCache.setRoundStream(
-        fileName,
-        newRound.id,
-        const StreamStatus(
-          content: '',
-          reasoning: '',
-          isStreaming: true,
-        ),
-      );
-      _handleStreamTask(newRound, session, config);
-    } catch (e) {
-      state = state.copyWithError(e.toString());
-    }
-  }
-  Future<void> _handleStreamTask(
-    ChatRound round,
-    Session session,
-    AppConfig config,
-  ) async {
-    final apiSource = ref.read(remoteApiSourceProvider);
-    final repository = ref.read(conversationRepositoryProvider);
-    final accumulator = ChatStreamAccumulator();
-    var hasError = false;
-    String? errorMessage;
-    var wasStopped = false;
-    try {
-      // 构建 API 上下文
-      final contextRounds = BranchNavigator.getCurrentBranchPath(session, round.id);
-      final apiContext = await ChatContextBuilder.buildFromRounds(
-        contextRounds,
-        repository,
-      );
-      final stream = apiSource.chatStream(
-        taskId: round.id,
-        baseUrl: config.baseUrl,
-        apiKey: config.apiKey,
-        chatPath: config.chatPath,
-        apiMode: config.apiMode,
-        model: config.selectedModel ?? 'unknown-model',
-        context: apiContext,
-        enableReasoning: _shouldEnableReasoning(config),
-      );
-      await for (final chunk in stream) {
-        if (chunk.error != null) {
-          hasError = true;
-          errorMessage = chunk.error;
-          break;
-        }
-        if (!chunk.isDone) {
-          accumulator.add(chunk);
-          _streamCache.updateRoundStream(
-            fileName,
-            round.id,
-            content: accumulator.content,
-            reasoning: accumulator.reasoning,
-            isStreaming: true,
-          );
-          // 增量写入数据库（实时保存思考过程）
-          if (accumulator.reasoning.isNotEmpty || accumulator.content.isNotEmpty) {
-            final updatedRound = round.copyWith(
-              assistantThinking: accumulator.reasoning,
-              assistantContent: accumulator.content,
-              isIncomplete: true,
-              hasUnseenUpdate: false,
-            );
-            await repository.updateRound(fileName, round.id, updatedRound);
-          }
-          continue;
-        }
-        if (_stoppingRoundIds.contains(round.id)) {
-          wasStopped = true;
-        }
-        break;
-      }
-    } catch (e) {
-      if (_stoppingRoundIds.contains(round.id)) {
-        wasStopped = true;
-      } else {
-        hasError = true;
-        errorMessage = e.toString();
-      }
-    } finally {
-      var finalContent = accumulator.content;
-      final finalReasoning = accumulator.reasoning;
-      if (hasError) {
-        finalContent = _appendErrorSuffix(finalContent, errorMessage);
-      } else if (wasStopped) {
-        finalContent = _appendStoppedSuffix(finalContent);
-      }
-      // 更新流式缓存
-      _streamCache.updateRoundStream(
-        fileName,
-        round.id,
-        content: finalContent,
-        reasoning: finalReasoning,
-        isStreaming: false,
-      );
-      // 持久化最终结果
-      await _finalizeRoundPersistence(round.id, finalContent, finalReasoning);
-      _stoppingRoundIds.remove(round.id);
-    }
-  }
-  String _appendStoppedSuffix(String content) {
-    final trimmed = content.trim();
-    if (trimmed.isEmpty) return '[已停止]';
-    return '$trimmed\n\n[已停止]';
-  }
-  String _appendErrorSuffix(String content, String? message) {
-    final trimmed = content.trim();
-    final cleanMessage = (message ?? '').trim();
-    final errorText = cleanMessage.isEmpty ? '[错误]' : '[错误]\n$cleanMessage';
-    if (trimmed.isEmpty) return errorText;
-    return '$trimmed\n\n$errorText';
-  }
-  Future<void> _finalizeRoundPersistence(
-    String roundId,
-    String content,
-    String reasoning,
-  ) async {
-    final repository = ref.read(conversationRepositoryProvider);
-    final session = state.session;
-    if (session == null) return;
-    // 从 session 中获取原始轮次数据
-    final originalRound = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
-    if (originalRound == null) return;
-    // 使用原始数据更新
-    final updatedRound = originalRound.copyWith(
-      assistantContent: content.trim().isEmpty ? null : content,
-      assistantThinking: reasoning.trim().isEmpty ? null : reasoning,
-      isIncomplete: false,
-      hasUnseenUpdate: true,
-    );
-    await repository.updateRound(fileName, roundId, updatedRound);
-    // 清理流式缓存
-    _streamCache.updateRoundStream(
-      fileName,
-      roundId,
-      isStreaming: false,
-    );
-  }
-  void stopGeneration() {
-    if (state.pageList == null || state.pageList!.pages.isEmpty) return;
-    final viewingRound = state.pageList!.pages[_currentPageIndex].round;
-    final stream = _getRoundStream(viewingRound.id);
-    if (stream?.isStreaming != true) return;
-    _stoppingRoundIds.add(viewingRound.id);
-    final apiSource = ref.read(remoteApiSourceProvider);
-    apiSource.cancelRequest(viewingRound.id);
-  }
-  Future<void> switchBranch(String targetRoundId) async {
-    final session = state.session;
-    if (session == null) return;
-    final newRoundId = BranchNavigator.switchBranch(session, targetRoundId);
-    state = state.copyWithCurrentRoundId(newRoundId);
-    await ensureRoundLoaded(newRoundId);
-  }
-  void changePage(int pageIndex) {
-    if (state.pageList == null) return;
-    final pages = state.pageList!.pages;
-    if (!PageUtils.isValidIndex(pageIndex, pages.length)) return;
-    final targetPage = pages[pageIndex];
-    final newRoundId = targetPage.round.id;
-    _currentPageIndex = pageIndex;
-    state = state.copyWith(
-      currentRoundId: newRoundId,
-      pageList: state.pageList!.copyWith(currentPageIndex: pageIndex),
-    );
-    ensureRoundLoaded(newRoundId);
-  }
-  Future<void> markRoundSeen(String roundId) async {
-    final session = state.session;
-    if (session == null) return;
-    final target = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
-    if (target == null || !target.hasUnseenUpdate) return;
-    // 更新数据库
-    final repository = ref.read(conversationRepositoryProvider);
-    final updatedRound = target.copyWith(hasUnseenUpdate: false);
-    await repository.updateRound(fileName, roundId, updatedRound);
-  }
-  @override
-  void dispose() {
-    _sessionSubscription?.cancel();
-    super.dispose();
-  }
-}
-final chatProvider =
-    StateNotifierProvider.family<ChatNotifier, ChatState, String>(
-  (ref, fileName) {
-    return ChatNotifier(ref, fileName);
-  },
-);
 ```
 
 ## File: lib/presentation/pages/branch_tree_page.dart
@@ -14864,4 +14505,442 @@ class _PreviewBlock extends StatelessWidget {
     );
   }
 }
+```
+
+## File: lib/presentation/providers/chat_notifier.dart
+```dart
+// presentation/providers/chat_notifier.dart
+import 'dart:async';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/app_config.dart';
+import '../../core/models/chat_round.dart';
+import '../../core/models/model_info.dart';
+import '../../core/models/session.dart';
+import '../../core/models/attachment.dart';
+import '../../di/providers.dart';
+import '../../domain/models/chat_page.dart';
+import '../../domain/services/attachment_preparer.dart';
+import '../../domain/services/branch_navigator.dart';
+import '../../domain/services/chat_context_builder.dart';
+import '../../domain/services/chat_stream_accumulator.dart';
+import '../../domain/states/chat_state.dart';
+import '../models/pending_attachment.dart';
+import '../utils/page_utils.dart';
+import 'global_streaming_provider.dart';
+import '../../core/utils/id_generator.dart';
+import 'config_notifier.dart';
+/// 辅助函数
+T? _firstWhereOrNull<T>(List<T> list, bool Function(T) test) {
+  for (final element in list) {
+    if (test(element)) return element;
+  }
+  return null;
+}
+class ChatNotifier extends StateNotifier<ChatState> {
+  final Ref ref;
+  final String fileName;
+  final Set<String> _stoppingRoundIds = {};
+  StreamSubscription? _sessionSubscription;
+  int _currentPageIndex = 0;
+  ChatNotifier(this.ref, this.fileName) : super(ChatState.initial()) {
+    _initWatch();
+  }
+  void _initWatch() {
+    final repository = ref.read(conversationRepositoryProvider);
+    _sessionSubscription = repository.watchSession(fileName).listen((session) {
+      if (session == null) {
+        state = state.copyWith(
+          session: null,
+          error: '会话不存在',
+          isLoading: false,
+        );
+        return;
+      }
+      final leaves = BranchNavigator.getAllBranchLeaves(session);
+      String? currentRoundId;
+      List<ChatRound> branchPath;
+      int targetPageIndex;
+      if (leaves.isNotEmpty) {
+        currentRoundId = leaves.last.id;
+        branchPath = BranchNavigator.getCurrentBranchPath(session, currentRoundId);
+        targetPageIndex = branchPath.isNotEmpty ? branchPath.length - 1 : 0;
+      } else {
+        currentRoundId = null;
+        branchPath = [];
+        targetPageIndex = 0;
+      }
+      _currentPageIndex = targetPageIndex;
+      final chatPages = branchPath.map((round) => ChatPage(round: round)).toList();
+      state = state.copyWith(
+        session: session,
+        currentRoundId: currentRoundId,
+        pageList: ChatPageList.fromPages(chatPages, _currentPageIndex),
+        error: null,
+        isLoading: false,
+      );
+      if (currentRoundId != null && branchPath.isNotEmpty) {
+        final round = branchPath.last;
+        _streamCache.ensureRoundLoaded(fileName, round);
+      }
+    });
+  }
+  GlobalStreamCacheNotifier get _streamCache =>
+      ref.read(globalStreamCacheProvider.notifier);
+  StreamStatus? _getRoundStream(String roundId) {
+    final globalMap = ref.read(globalStreamCacheProvider);
+    return globalMap[fileName]?[roundId];
+  }
+  Future<void> ensureRoundLoaded(String roundId) async {
+    final session = state.session;
+    if (session == null) return;
+    final round = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
+    if (round == null) return;
+    _streamCache.ensureRoundLoaded(fileName, round);
+  }
+  Future<void> loadSession({String? initialRoundId}) async {
+    if (initialRoundId != null) {
+      state = state.copyWith(currentRoundId: initialRoundId);
+    }
+  }
+  /// 从配置流获取最新的模型信息，避免缓存导致切换配置后用旧模型
+  ModelInfo? _findSelectedModelInfo() {
+    // 从 StreamProvider 获取最新配置
+    final configAsync = ref.read(configProvider);
+    final config = configAsync.valueOrNull;
+    if (config == null) return null;
+    final selectedId = config.selectedModel;
+    if (selectedId == null || selectedId.trim().isEmpty) return null;
+    final models = config.availableModels ?? const <ModelInfo>[];
+    return _firstWhereOrNull(models, (m) => m.id == selectedId);
+  }
+  /// 从配置流获取最新的配置，避免缓存导致切换配置后用旧配置请求
+  Future<AppConfig> _getCurrentConfig() async {
+    // 优先从 Stream 获取最新配置
+    final configAsync = ref.read(configProvider);
+    if (configAsync.hasValue) {
+      return configAsync.valueOrNull!;
+    }
+    // 如果 Stream 还没值，降级使用同步方法
+    return await ref.read(configRepositoryProvider).getConfig();
+  }
+  bool _shouldEnableReasoning(AppConfig config) {
+    final selectedModel = _findSelectedModelInfo();
+    return selectedModel?.supportsReasoning == true;
+  }
+  void _validateRequestCapability({
+    required AppConfig config,
+    required List<PendingAttachment> attachments,
+  }) {
+    final selectedModel = _findSelectedModelInfo();
+    if (selectedModel == null) return;
+    final hasImage = attachments.any((a) => a.isImage);
+    if (hasImage && selectedModel.supportsVision != true) {
+      throw Exception('当前模型未声明支持图片输入');
+    }
+  }
+  Future<void> sendMessage(
+    String content, {
+    List<PendingAttachment>? attachments,
+  }) async {
+    final session = state.session;
+    if (session == null) {
+      state = state.copyWithError('会话未初始化');
+      return;
+    }
+    try {
+      final pendingAttachments = attachments ?? const <PendingAttachment>[];
+      final repository = ref.read(conversationRepositoryProvider);
+      // 从流获取最新配置
+      final config = await _getCurrentConfig();
+      _validateRequestCapability(config: config, attachments: pendingAttachments);
+      final savedAttachments = await AttachmentPreparer.savePendingAttachments(
+        repository,
+        pendingAttachments,
+      );
+      final newRound = ChatRound(
+        id: IdGenerator.generate(),
+        parentId: state.currentRoundId,
+        createdAt: DateTime.now().millisecondsSinceEpoch,
+        userContent: content,
+        userAttachments: savedAttachments,
+        isIncomplete: true,
+        hasUnseenUpdate: false,
+      );
+      await repository.appendRound(fileName, newRound);
+      state = state.copyWith(currentRoundId: newRound.id);
+      _streamCache.setRoundStream(
+        fileName,
+        newRound.id,
+        const StreamStatus(content: '', reasoning: '', isStreaming: true),
+      );
+      _handleStreamTask(newRound, session, config);
+    } catch (e) {
+      state = state.copyWithError(e.toString());
+    }
+  }
+  Future<void> retryFromRound(String roundId) async {
+    final session = state.session;
+    if (session == null) {
+      state = state.copyWithError('会话未初始化');
+      return;
+    }
+    try {
+      final repository = ref.read(conversationRepositoryProvider);
+      final config = await _getCurrentConfig();
+      final sourceRound = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
+      if (sourceRound == null) {
+        state = state.copyWithError('未找到要重新回复的对话');
+        return;
+      }
+      final selectedModel = _findSelectedModelInfo();
+      if (selectedModel != null) {
+        final hasImage = sourceRound.userAttachments.any((a) => a.isImage);
+        if (hasImage && selectedModel.supportsVision != true) {
+          state = state.copyWithError('当前模型未声明支持图片输入');
+          return;
+        }
+      }
+      final newRound = ChatRound(
+        id: IdGenerator.generate(),
+        parentId: sourceRound.parentId,
+        createdAt: DateTime.now().millisecondsSinceEpoch,
+        userContent: sourceRound.userContent,
+        userAttachments: sourceRound.userAttachments,
+        isIncomplete: true,
+        hasUnseenUpdate: false,
+      );
+      await repository.appendRound(fileName, newRound);
+      state = state.copyWith(currentRoundId: newRound.id);
+      _streamCache.setRoundStream(
+        fileName,
+        newRound.id,
+        const StreamStatus(content: '', reasoning: '', isStreaming: true),
+      );
+      _handleStreamTask(newRound, session, config);
+    } catch (e) {
+      state = state.copyWithError(e.toString());
+    }
+  }
+  Future<void> editAndResendFromRound(
+    String roundId,
+    String newContent, {
+    List<PendingAttachment>? attachments,
+  }) async {
+    final session = state.session;
+    if (session == null) {
+      state = state.copyWithError('会话未初始化');
+      return;
+    }
+    try {
+      final repository = ref.read(conversationRepositoryProvider);
+      final config = await _getCurrentConfig();
+      final pendingAttachments = attachments ?? const <PendingAttachment>[];
+      _validateRequestCapability(config: config, attachments: pendingAttachments);
+      final sourceRound = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
+      if (sourceRound == null) {
+        state = state.copyWithError('未找到要编辑重试的对话');
+        return;
+      }
+      final selectedModel = _findSelectedModelInfo();
+      if (selectedModel != null) {
+        final hasImage = sourceRound.userAttachments.any((a) => a.isImage) ||
+            pendingAttachments.any((a) => a.isImage);
+        if (hasImage && selectedModel.supportsVision != true) {
+          state = state.copyWithError('当前模型未声明支持图片输入');
+          return;
+        }
+      }
+      final savedAttachments = await AttachmentPreparer.savePendingAttachments(
+        repository,
+        pendingAttachments,
+      );
+      final mergedAttachments = <Attachment>[
+        ...sourceRound.userAttachments,
+        ...savedAttachments,
+      ];
+      final newRound = ChatRound(
+        id: IdGenerator.generate(),
+        parentId: sourceRound.parentId,
+        createdAt: DateTime.now().millisecondsSinceEpoch,
+        userContent: newContent,
+        userAttachments: mergedAttachments,
+        isIncomplete: true,
+        hasUnseenUpdate: false,
+      );
+      await repository.appendRound(fileName, newRound);
+      state = state.copyWith(currentRoundId: newRound.id);
+      _streamCache.setRoundStream(
+        fileName,
+        newRound.id,
+        const StreamStatus(content: '', reasoning: '', isStreaming: true),
+      );
+      _handleStreamTask(newRound, session, config);
+    } catch (e) {
+      state = state.copyWithError(e.toString());
+    }
+  }
+  Future<void> _handleStreamTask(
+    ChatRound round,
+    Session session,
+    AppConfig config,
+  ) async {
+    final apiSource = ref.read(remoteApiSourceProvider);
+    final repository = ref.read(conversationRepositoryProvider);
+    final accumulator = ChatStreamAccumulator();
+    var hasError = false;
+    String? errorMessage;
+    var wasStopped = false;
+    try {
+      final contextRounds = BranchNavigator.getCurrentBranchPath(session, round.id);
+      final apiContext = await ChatContextBuilder.buildFromRounds(
+        contextRounds,
+        repository,
+      );
+      final stream = apiSource.chatStream(
+        taskId: round.id,
+        baseUrl: config.baseUrl,
+        apiKey: config.apiKey,
+        chatPath: config.chatPath,
+        apiMode: config.apiMode,
+        model: config.selectedModel ?? 'unknown-model',
+        context: apiContext,
+        enableReasoning: _shouldEnableReasoning(config),
+      );
+      await for (final chunk in stream) {
+        if (chunk.error != null) {
+          hasError = true;
+          errorMessage = chunk.error;
+          break;
+        }
+        if (!chunk.isDone) {
+          accumulator.add(chunk);
+          _streamCache.updateRoundStream(
+            fileName,
+            round.id,
+            content: accumulator.content,
+            reasoning: accumulator.reasoning,
+            isStreaming: true,
+          );
+          if (accumulator.reasoning.isNotEmpty || accumulator.content.isNotEmpty) {
+            final updatedRound = round.copyWith(
+              assistantThinking: accumulator.reasoning,
+              assistantContent: accumulator.content,
+              isIncomplete: true,
+              hasUnseenUpdate: false,
+            );
+            await repository.updateRound(fileName, round.id, updatedRound);
+          }
+          continue;
+        }
+        if (_stoppingRoundIds.contains(round.id)) {
+          wasStopped = true;
+        }
+        break;
+      }
+    } catch (e) {
+      if (_stoppingRoundIds.contains(round.id)) {
+        wasStopped = true;
+      } else {
+        hasError = true;
+        errorMessage = e.toString();
+      }
+    } finally {
+      var finalContent = accumulator.content;
+      final finalReasoning = accumulator.reasoning;
+      if (hasError) {
+        finalContent = _appendErrorSuffix(finalContent, errorMessage);
+      } else if (wasStopped) {
+        finalContent = _appendStoppedSuffix(finalContent);
+      }
+      _streamCache.updateRoundStream(
+        fileName,
+        round.id,
+        content: finalContent,
+        reasoning: finalReasoning,
+        isStreaming: false,
+      );
+      await _finalizeRoundPersistence(round.id, finalContent, finalReasoning);
+      _stoppingRoundIds.remove(round.id);
+    }
+  }
+  String _appendStoppedSuffix(String content) {
+    final trimmed = content.trim();
+    if (trimmed.isEmpty) return '[已停止]';
+    return '$trimmed\n\n[已停止]';
+  }
+  String _appendErrorSuffix(String content, String? message) {
+    final trimmed = content.trim();
+    final cleanMessage = (message ?? '').trim();
+    final errorText = cleanMessage.isEmpty ? '[错误]' : '[错误]\n$cleanMessage';
+    if (trimmed.isEmpty) return errorText;
+    return '$trimmed\n\n$errorText';
+  }
+  Future<void> _finalizeRoundPersistence(
+    String roundId,
+    String content,
+    String reasoning,
+  ) async {
+    final repository = ref.read(conversationRepositoryProvider);
+    final session = state.session;
+    if (session == null) return;
+    final originalRound = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
+    if (originalRound == null) return;
+    final updatedRound = originalRound.copyWith(
+      assistantContent: content.trim().isEmpty ? null : content,
+      assistantThinking: reasoning.trim().isEmpty ? null : reasoning,
+      isIncomplete: false,
+      hasUnseenUpdate: true,
+    );
+    await repository.updateRound(fileName, roundId, updatedRound);
+    _streamCache.updateRoundStream(fileName, roundId, isStreaming: false);
+  }
+  void stopGeneration() {
+    if (state.pageList == null || state.pageList!.pages.isEmpty) return;
+    final viewingRound = state.pageList!.pages[_currentPageIndex].round;
+    final stream = _getRoundStream(viewingRound.id);
+    if (stream?.isStreaming != true) return;
+    _stoppingRoundIds.add(viewingRound.id);
+    final apiSource = ref.read(remoteApiSourceProvider);
+    apiSource.cancelRequest(viewingRound.id);
+  }
+  Future<void> switchBranch(String targetRoundId) async {
+    final session = state.session;
+    if (session == null) return;
+    final newRoundId = BranchNavigator.switchBranch(session, targetRoundId);
+    state = state.copyWithCurrentRoundId(newRoundId);
+    await ensureRoundLoaded(newRoundId);
+}
+  void changePage(int pageIndex) {
+    if (state.pageList == null) return;
+    final pages = state.pageList!.pages;
+    if (!PageUtils.isValidIndex(pageIndex, pages.length)) return;
+    final targetPage = pages[pageIndex];
+    final newRoundId = targetPage.round.id;
+    _currentPageIndex = pageIndex;
+    state = state.copyWith(
+      currentRoundId: newRoundId,
+      pageList: state.pageList!.copyWith(currentPageIndex: pageIndex),
+    );
+    ensureRoundLoaded(newRoundId);
+  }
+  Future<void> markRoundSeen(String roundId) async {
+    final session = state.session;
+    if (session == null) return;
+    final target = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
+    if (target == null || !target.hasUnseenUpdate) return;
+    final repository = ref.read(conversationRepositoryProvider);
+    final updatedRound = target.copyWith(hasUnseenUpdate: false);
+    await repository.updateRound(fileName, roundId, updatedRound);
+  }
+  @override
+  void dispose() {
+    _sessionSubscription?.cancel();
+    super.dispose();
+  }
+}
+final chatProvider = StateNotifierProvider.family<ChatNotifier, ChatState, String>(
+  (ref, fileName) {
+    return ChatNotifier(ref, fileName);
+  },
+);
 ```

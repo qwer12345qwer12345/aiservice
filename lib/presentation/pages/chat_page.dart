@@ -18,7 +18,7 @@ import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_toast.dart';
 import 'branch_tree_page.dart';
 import '../utils/page_utils.dart';
-
+import '../../domain/models/chat_page.dart';
 class ChatPage extends ConsumerStatefulWidget {
   final String fileName;
   final String? initialRoundId;
@@ -219,15 +219,8 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     final isEditMode = editSourceRoundId != null;
     final hasPages = state.pageList != null && state.pageList!.pages.isNotEmpty;
     final textTheme = Theme.of(context).textTheme;
-    final currentRoundId = state.currentRoundId;
-    final currentStream = currentRoundId == null
-        ? null
-        : ref.watch(
-            roundStreamProvider(
-              (fileName: widget.fileName, roundId: currentRoundId),
-            ),
-          );
-    final currentIsStreaming = currentStream?.isStreaming == true;
+    final currentRound = state.pageList?.currentPage?.round;
+    final currentIsStreaming = currentRound?.isIncomplete == true;
 
     return AppPageScaffold(
       appBar: AppBar(
@@ -473,8 +466,7 @@ class _ChatRoundPage extends StatelessWidget {
                 ),
               ],
               _RoundAnswerSection(
-                fileName: fileName,
-                roundId: round.id,
+                round: round,
                 onRetryReply: onRetryReply,
                 onCopyText: onCopyText,
               ),
@@ -486,35 +478,29 @@ class _ChatRoundPage extends StatelessWidget {
   }
 }
 
-class _RoundAnswerSection extends ConsumerWidget {
-  final String fileName;
-  final String roundId;
+class _RoundAnswerSection extends StatelessWidget {
+  final ChatRound round;
   final VoidCallback onRetryReply;
   final Future<void> Function(String text) onCopyText;
 
   const _RoundAnswerSection({
-    required this.fileName,
-    required this.roundId,
+    required this.round,
     required this.onRetryReply,
     required this.onCopyText,
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final stream = ref.watch(
-      roundStreamProvider((fileName: fileName, roundId: roundId)),
-    );
-    if (stream == null) {
-      return const SizedBox.shrink();
-    }
-    final thinking = stream.reasoning;
-    final assistantContent = stream.content;
+  Widget build(BuildContext context) {
+    final thinking = round.assistantThinking ?? '';
+    final assistantContent = round.assistantContent ?? '';
     final hasThinking = thinking.trim().isNotEmpty;
     final hasAssistant = assistantContent.trim().isNotEmpty;
-    final isStreaming = stream.isStreaming;
+    final isStreaming = round.isIncomplete;
+
     if (!hasThinking && !hasAssistant && !isStreaming) {
       return const SizedBox.shrink();
     }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -543,7 +529,7 @@ class _RoundAnswerSection extends ConsumerWidget {
               content: assistantContent,
               isUser: false,
               onCopy: () => onCopyText(assistantContent),
-              onRetryReply: onRetryReply,
+              onRetryReply: isStreaming ? null : onRetryReply,
             )
           else
             const Card(
