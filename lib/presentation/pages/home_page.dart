@@ -38,13 +38,16 @@ class HomePage extends ConsumerWidget {
             child: const Text('取消'),
           ),
           FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            onPressed: () =>
+                Navigator.of(ctx).pop(controller.text.trim()),
             child: const Text('保存'),
           ),
         ],
       ),
     );
-    if (result != null && result.isNotEmpty && result != session.title) {
+    if (result != null &&
+        result.isNotEmpty &&
+        result != session.title) {
       await notifier.updateSessionTitle('${session.id}.json', result);
     }
   }
@@ -77,6 +80,7 @@ class HomePage extends ConsumerWidget {
           ),
         ) ??
         false;
+
     if (confirmed == true) {
       await notifier.deleteSession('${session.id}.json');
     }
@@ -84,8 +88,12 @@ class HomePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // 关键修复：必须监听 homeSessionListProvider
     final sessionsAsync = ref.watch(homeSessionListProvider);
-    final notifier = ref.read(sessionListProvider.notifier);
+
+    // 操作类 notifier：仍用 sessionListProvider.notifier
+    final notifier = ref.read(sessionListNotifierProvider);
+
     return AppPageScaffold(
       appBar: AppBar(
         title: const Text('AI Chat'),
@@ -281,8 +289,10 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
   @override
   void didUpdateWidget(covariant _SessionCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.item.previewRoundId != widget.item.previewRoundId ||
-        oldWidget.item.session.id != widget.item.session.id) {
+    final oldItem = oldWidget.item;
+    final newItem = widget.item;
+    if (oldItem.previewRoundId != newItem.previewRoundId ||
+        oldItem.session.id != newItem.session.id) {
       _requested = false;
       _ensurePreviewLoaded();
     }
@@ -291,12 +301,15 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
   void _ensurePreviewLoaded() {
     final previewRoundId = widget.item.previewRoundId;
     if (_requested || previewRoundId == null) return;
+
     _requested = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+
       final fileName = '${widget.item.session.id}.json';
       final previewRound =
           widget.item.session.rounds.firstWhere((r) => r.id == previewRoundId);
+
       ref.read(globalStreamCacheProvider.notifier).ensureRoundLoaded(
             fileName,
             previewRound,
@@ -317,18 +330,22 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
     final session = widget.item.session;
     final fileName = '${session.id}.json';
     final updatedAt = TimeFormatUtils.formatTimestamp(widget.item.updatedAt);
+
     final previewRoundId = widget.item.previewRoundId;
     final stream = previewRoundId == null
         ? null
         : ref.watch(
             roundStreamProvider((fileName: fileName, roundId: previewRoundId)),
           );
+
     final aiPreview = stream == null
         ? '加载中...'
         : stream.content.trim().isEmpty
             ? (stream.isStreaming ? '正在生成...' : '（等待回复）')
             : stream.content;
+
     final isStreaming = stream?.isStreaming == true;
+
     return Slidable(
       key: ValueKey(fileName),
       endActionPane: ActionPane(
@@ -383,7 +400,7 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
                 const SizedBox(width: 8),
                 _buildMetaChip('生成中', icon: Icons.bolt_outlined),
               ],
-              if (widget.item.hasUnseen) ...[
+              if (widget.item.hasUnseen == true) ...[
                 const SizedBox(width: 8),
                 _buildMetaChip('未查看', icon: Icons.mark_chat_unread_outlined),
               ],
@@ -394,9 +411,15 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _PreviewLine(label: 'YOU', text: widget.item.userPreview),
+                _PreviewLine(
+                  label: 'YOU',
+                  text: widget.item.userPreview,
+                ),
                 const SizedBox(height: 4),
-                _PreviewLine(label: 'AI', text: aiPreview),
+                _PreviewLine(
+                  label: 'AI',
+                  text: aiPreview,
+                ),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
@@ -406,7 +429,10 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
                       '${widget.item.roundCount} 轮',
                       icon: Icons.chat_bubble_outline,
                     ),
-                    _buildMetaChip(updatedAt, icon: Icons.schedule_outlined),
+                    _buildMetaChip(
+                      updatedAt,
+                      icon: Icons.schedule_outlined,
+                    ),
                   ],
                 ),
               ],

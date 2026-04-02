@@ -1,3 +1,6 @@
+// data/repositories/config_repository.dart
+
+import 'dart:async';
 import '../../core/models/app_config.dart';
 import '../../core/models/app_config_store.dart';
 import '../../core/interfaces/config_service.dart';
@@ -7,6 +10,17 @@ class ConfigRepository {
 
   ConfigRepository(this._configService);
 
+  /// 监听配置Store的变更 - 使用真正的数据库流
+  Stream<AppConfigStore> watchConfigStore() {
+    return _configService.watchConfigStore();
+  }
+
+  /// 监听当前激活的配置
+  Stream<AppConfig> watchConfig() {
+    return _configService.watchConfig();
+  }
+
+  /// 获取配置（仅用于兼容性，优先使用 watch 方法）
   Future<AppConfig> getConfig() async {
     return await _configService.loadConfig();
   }
@@ -48,43 +62,47 @@ class ConfigRepository {
   }
 
   Future<void> saveAndRefreshModels(AppConfig config) async {
-    final clearedConfig = config.copyWith(
-      availableModels: [],
-    );
+    final clearedConfig = config.copyWith(availableModels: []);
     await _configService.saveConfig(clearedConfig);
     await _configService.refreshModels();
   }
 
-  Future<void> updateApiKey(String apiKey) async {
-    final config = await getConfig();
-    final updated = config.copyWith(apiKey: apiKey);
-    await saveConfig(updated);
-  }
-
+  /// 修改当前激活配置的基础URL（自动获取当前激活的配置ID）
   Future<void> updateBaseUrl(String baseUrl) async {
     final config = await getConfig();
     final updated = config.copyWith(baseUrl: baseUrl);
     await saveConfig(updated);
   }
 
+  /// 修改当前激活配置的API Key
+  Future<void> updateApiKey(String apiKey) async {
+    final config = await getConfig();
+    final updated = config.copyWith(apiKey: apiKey);
+    await saveConfig(updated);
+  }
+
+  /// 修改当前激活配置的模型路径
   Future<void> updateModelsPath(String modelsPath) async {
     final config = await getConfig();
     final updated = config.copyWith(modelsPath: modelsPath);
     await saveConfig(updated);
   }
 
+  /// 修改当前激活配置的聊天路径
   Future<void> updateChatPath(String chatPath) async {
     final config = await getConfig();
     final updated = config.copyWith(chatPath: chatPath);
     await saveConfig(updated);
   }
 
+  /// 修改当前激活配置的API模式
   Future<void> updateApiMode(String apiMode) async {
     final config = await getConfig();
     final updated = config.copyWith(apiMode: apiMode);
     await saveConfig(updated);
   }
 
+  /// 修改当前激活配置的选中的模型
   Future<void> updateSelectedModel(String? model) async {
     final config = await getConfig();
     final updated = config.copyWith(selectedModel: model);

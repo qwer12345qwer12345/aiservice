@@ -128,6 +128,3261 @@ lib/presentation/widgets/thought_bubble.dart
 
 # Files
 
+## File: lib/core/errors/exceptions.dart
+```dart
+/// 基础应用异常
+class AppException implements Exception {
+  final String message;
+  final String? code;
+  const AppException(this.message, {this.code});
+  @override
+  String toString() => 'AppException: $message (Code: $code)';
+}
+/// 文件操作异常
+class FileException extends AppException {
+  const FileException(super.message, {super.code});
+}
+/// 网络/API 异常
+class ApiException extends AppException {
+  const ApiException(super.message, {super.code});
+}
+/// 配置异常
+class ConfigException extends AppException {
+  const ConfigException(super.message, {super.code});
+}
+/// 数据解析异常
+class ParseException extends AppException {
+  const ParseException(super.message, {super.code});
+}
+```
+
+## File: lib/core/models/api_message.dart
+```dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+part 'api_message.freezed.dart';
+part 'api_message.g.dart';
+@Freezed(unionKey: 'runtimeType')
+class ApiMessageContentPart with _$ApiMessageContentPart {
+  const factory ApiMessageContentPart.text({
+    @Default('text') String type,
+    required String text,
+  }) = ApiMessageTextPart;
+  const factory ApiMessageContentPart.imageUrl({
+    @Default('image_url') String type,
+    @JsonKey(name: 'image_url') required ApiImageUrl imageUrl,
+  }) = ApiMessageImageUrlPart;
+  factory ApiMessageContentPart.fromJson(Map<String, dynamic> json) =>
+      _$ApiMessageContentPartFromJson(json);
+}
+@freezed
+class ApiImageUrl with _$ApiImageUrl {
+  const factory ApiImageUrl({
+    required String url,
+  }) = _ApiImageUrl;
+  factory ApiImageUrl.fromJson(Map<String, dynamic> json) =>
+      _$ApiImageUrlFromJson(json);
+}
+@freezed
+class ApiMessage with _$ApiMessage {
+  const factory ApiMessage({
+    required String role,
+    String? content,
+    String? reasoning,
+    @Default([]) List<ApiMessageContentPart> parts,
+  }) = _ApiMessage;
+  factory ApiMessage.fromJson(Map<String, dynamic> json) =>
+      _$ApiMessageFromJson(json);
+}
+```
+
+## File: lib/core/models/api_message.freezed.dart
+```dart
+// coverage:ignore-file
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint
+// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
+part of 'api_message.dart';
+// **************************************************************************
+// FreezedGenerator
+// **************************************************************************
+T _$identity<T>(T value) => value;
+final _privateConstructorUsedError = UnsupportedError(
+  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
+);
+ApiMessageContentPart _$ApiMessageContentPartFromJson(
+  Map<String, dynamic> json,
+) {
+  switch (json['runtimeType']) {
+    case 'text':
+      return ApiMessageTextPart.fromJson(json);
+    case 'imageUrl':
+      return ApiMessageImageUrlPart.fromJson(json);
+    default:
+      throw CheckedFromJsonException(
+        json,
+        'runtimeType',
+        'ApiMessageContentPart',
+        'Invalid union type "${json['runtimeType']}"!',
+      );
+  }
+}
+/// @nodoc
+mixin _$ApiMessageContentPart {
+  String get type => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function(String type, String text) text,
+    required TResult Function(
+      String type,
+      @JsonKey(name: 'image_url') ApiImageUrl imageUrl,
+    )
+    imageUrl,
+  }) => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function(String type, String text)? text,
+    TResult? Function(
+      String type,
+      @JsonKey(name: 'image_url') ApiImageUrl imageUrl,
+    )?
+    imageUrl,
+  }) => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function(String type, String text)? text,
+    TResult Function(
+      String type,
+      @JsonKey(name: 'image_url') ApiImageUrl imageUrl,
+    )?
+    imageUrl,
+    required TResult orElse(),
+  }) => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(ApiMessageTextPart value) text,
+    required TResult Function(ApiMessageImageUrlPart value) imageUrl,
+  }) => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(ApiMessageTextPart value)? text,
+    TResult? Function(ApiMessageImageUrlPart value)? imageUrl,
+  }) => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(ApiMessageTextPart value)? text,
+    TResult Function(ApiMessageImageUrlPart value)? imageUrl,
+    required TResult orElse(),
+  }) => throw _privateConstructorUsedError;
+  /// Serializes this ApiMessageContentPart to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+  /// Create a copy of ApiMessageContentPart
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $ApiMessageContentPartCopyWith<ApiMessageContentPart> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+/// @nodoc
+abstract class $ApiMessageContentPartCopyWith<$Res> {
+  factory $ApiMessageContentPartCopyWith(
+    ApiMessageContentPart value,
+    $Res Function(ApiMessageContentPart) then,
+  ) = _$ApiMessageContentPartCopyWithImpl<$Res, ApiMessageContentPart>;
+  @useResult
+  $Res call({String type});
+}
+/// @nodoc
+class _$ApiMessageContentPartCopyWithImpl<
+  $Res,
+  $Val extends ApiMessageContentPart
+>
+    implements $ApiMessageContentPartCopyWith<$Res> {
+  _$ApiMessageContentPartCopyWithImpl(this._value, this._then);
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+  /// Create a copy of ApiMessageContentPart
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? type = null}) {
+    return _then(
+      _value.copyWith(
+            type: null == type
+                ? _value.type
+                : type // ignore: cast_nullable_to_non_nullable
+                      as String,
+          )
+          as $Val,
+    );
+  }
+}
+/// @nodoc
+abstract class _$$ApiMessageTextPartImplCopyWith<$Res>
+    implements $ApiMessageContentPartCopyWith<$Res> {
+  factory _$$ApiMessageTextPartImplCopyWith(
+    _$ApiMessageTextPartImpl value,
+    $Res Function(_$ApiMessageTextPartImpl) then,
+  ) = __$$ApiMessageTextPartImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({String type, String text});
+}
+/// @nodoc
+class __$$ApiMessageTextPartImplCopyWithImpl<$Res>
+    extends _$ApiMessageContentPartCopyWithImpl<$Res, _$ApiMessageTextPartImpl>
+    implements _$$ApiMessageTextPartImplCopyWith<$Res> {
+  __$$ApiMessageTextPartImplCopyWithImpl(
+    _$ApiMessageTextPartImpl _value,
+    $Res Function(_$ApiMessageTextPartImpl) _then,
+  ) : super(_value, _then);
+  /// Create a copy of ApiMessageContentPart
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? type = null, Object? text = null}) {
+    return _then(
+      _$ApiMessageTextPartImpl(
+        type: null == type
+            ? _value.type
+            : type // ignore: cast_nullable_to_non_nullable
+                  as String,
+        text: null == text
+            ? _value.text
+            : text // ignore: cast_nullable_to_non_nullable
+                  as String,
+      ),
+    );
+  }
+}
+/// @nodoc
+@JsonSerializable()
+class _$ApiMessageTextPartImpl implements ApiMessageTextPart {
+  const _$ApiMessageTextPartImpl({
+    this.type = 'text',
+    required this.text,
+    final String? $type,
+  }) : $type = $type ?? 'text';
+  factory _$ApiMessageTextPartImpl.fromJson(Map<String, dynamic> json) =>
+      _$$ApiMessageTextPartImplFromJson(json);
+  @override
+  @JsonKey()
+  final String type;
+  @override
+  final String text;
+  @JsonKey(name: 'runtimeType')
+  final String $type;
+  @override
+  String toString() {
+    return 'ApiMessageContentPart.text(type: $type, text: $text)';
+  }
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$ApiMessageTextPartImpl &&
+            (identical(other.type, type) || other.type == type) &&
+            (identical(other.text, text) || other.text == text));
+  }
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(runtimeType, type, text);
+  /// Create a copy of ApiMessageContentPart
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$ApiMessageTextPartImplCopyWith<_$ApiMessageTextPartImpl> get copyWith =>
+      __$$ApiMessageTextPartImplCopyWithImpl<_$ApiMessageTextPartImpl>(
+        this,
+        _$identity,
+      );
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function(String type, String text) text,
+    required TResult Function(
+      String type,
+      @JsonKey(name: 'image_url') ApiImageUrl imageUrl,
+    )
+    imageUrl,
+  }) {
+    return text(type, this.text);
+  }
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function(String type, String text)? text,
+    TResult? Function(
+      String type,
+      @JsonKey(name: 'image_url') ApiImageUrl imageUrl,
+    )?
+    imageUrl,
+  }) {
+    return text?.call(type, this.text);
+  }
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function(String type, String text)? text,
+    TResult Function(
+      String type,
+      @JsonKey(name: 'image_url') ApiImageUrl imageUrl,
+    )?
+    imageUrl,
+    required TResult orElse(),
+  }) {
+    if (text != null) {
+      return text(type, this.text);
+    }
+    return orElse();
+  }
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(ApiMessageTextPart value) text,
+    required TResult Function(ApiMessageImageUrlPart value) imageUrl,
+  }) {
+    return text(this);
+  }
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(ApiMessageTextPart value)? text,
+    TResult? Function(ApiMessageImageUrlPart value)? imageUrl,
+  }) {
+    return text?.call(this);
+  }
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(ApiMessageTextPart value)? text,
+    TResult Function(ApiMessageImageUrlPart value)? imageUrl,
+    required TResult orElse(),
+  }) {
+    if (text != null) {
+      return text(this);
+    }
+    return orElse();
+  }
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$ApiMessageTextPartImplToJson(this);
+  }
+}
+abstract class ApiMessageTextPart implements ApiMessageContentPart {
+  const factory ApiMessageTextPart({
+    final String type,
+    required final String text,
+  }) = _$ApiMessageTextPartImpl;
+  factory ApiMessageTextPart.fromJson(Map<String, dynamic> json) =
+      _$ApiMessageTextPartImpl.fromJson;
+  @override
+  String get type;
+  String get text;
+  /// Create a copy of ApiMessageContentPart
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$ApiMessageTextPartImplCopyWith<_$ApiMessageTextPartImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+/// @nodoc
+abstract class _$$ApiMessageImageUrlPartImplCopyWith<$Res>
+    implements $ApiMessageContentPartCopyWith<$Res> {
+  factory _$$ApiMessageImageUrlPartImplCopyWith(
+    _$ApiMessageImageUrlPartImpl value,
+    $Res Function(_$ApiMessageImageUrlPartImpl) then,
+  ) = __$$ApiMessageImageUrlPartImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({String type, @JsonKey(name: 'image_url') ApiImageUrl imageUrl});
+  $ApiImageUrlCopyWith<$Res> get imageUrl;
+}
+/// @nodoc
+class __$$ApiMessageImageUrlPartImplCopyWithImpl<$Res>
+    extends
+        _$ApiMessageContentPartCopyWithImpl<$Res, _$ApiMessageImageUrlPartImpl>
+    implements _$$ApiMessageImageUrlPartImplCopyWith<$Res> {
+  __$$ApiMessageImageUrlPartImplCopyWithImpl(
+    _$ApiMessageImageUrlPartImpl _value,
+    $Res Function(_$ApiMessageImageUrlPartImpl) _then,
+  ) : super(_value, _then);
+  /// Create a copy of ApiMessageContentPart
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? type = null, Object? imageUrl = null}) {
+    return _then(
+      _$ApiMessageImageUrlPartImpl(
+        type: null == type
+            ? _value.type
+            : type // ignore: cast_nullable_to_non_nullable
+                  as String,
+        imageUrl: null == imageUrl
+            ? _value.imageUrl
+            : imageUrl // ignore: cast_nullable_to_non_nullable
+                  as ApiImageUrl,
+      ),
+    );
+  }
+  /// Create a copy of ApiMessageContentPart
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $ApiImageUrlCopyWith<$Res> get imageUrl {
+    return $ApiImageUrlCopyWith<$Res>(_value.imageUrl, (value) {
+      return _then(_value.copyWith(imageUrl: value));
+    });
+  }
+}
+/// @nodoc
+@JsonSerializable()
+class _$ApiMessageImageUrlPartImpl implements ApiMessageImageUrlPart {
+  const _$ApiMessageImageUrlPartImpl({
+    this.type = 'image_url',
+    @JsonKey(name: 'image_url') required this.imageUrl,
+    final String? $type,
+  }) : $type = $type ?? 'imageUrl';
+  factory _$ApiMessageImageUrlPartImpl.fromJson(Map<String, dynamic> json) =>
+      _$$ApiMessageImageUrlPartImplFromJson(json);
+  @override
+  @JsonKey()
+  final String type;
+  @override
+  @JsonKey(name: 'image_url')
+  final ApiImageUrl imageUrl;
+  @JsonKey(name: 'runtimeType')
+  final String $type;
+  @override
+  String toString() {
+    return 'ApiMessageContentPart.imageUrl(type: $type, imageUrl: $imageUrl)';
+  }
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$ApiMessageImageUrlPartImpl &&
+            (identical(other.type, type) || other.type == type) &&
+            (identical(other.imageUrl, imageUrl) ||
+                other.imageUrl == imageUrl));
+  }
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(runtimeType, type, imageUrl);
+  /// Create a copy of ApiMessageContentPart
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$ApiMessageImageUrlPartImplCopyWith<_$ApiMessageImageUrlPartImpl>
+  get copyWith =>
+      __$$ApiMessageImageUrlPartImplCopyWithImpl<_$ApiMessageImageUrlPartImpl>(
+        this,
+        _$identity,
+      );
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function(String type, String text) text,
+    required TResult Function(
+      String type,
+      @JsonKey(name: 'image_url') ApiImageUrl imageUrl,
+    )
+    imageUrl,
+  }) {
+    return imageUrl(type, this.imageUrl);
+  }
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function(String type, String text)? text,
+    TResult? Function(
+      String type,
+      @JsonKey(name: 'image_url') ApiImageUrl imageUrl,
+    )?
+    imageUrl,
+  }) {
+    return imageUrl?.call(type, this.imageUrl);
+  }
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function(String type, String text)? text,
+    TResult Function(
+      String type,
+      @JsonKey(name: 'image_url') ApiImageUrl imageUrl,
+    )?
+    imageUrl,
+    required TResult orElse(),
+  }) {
+    if (imageUrl != null) {
+      return imageUrl(type, this.imageUrl);
+    }
+    return orElse();
+  }
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(ApiMessageTextPart value) text,
+    required TResult Function(ApiMessageImageUrlPart value) imageUrl,
+  }) {
+    return imageUrl(this);
+  }
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(ApiMessageTextPart value)? text,
+    TResult? Function(ApiMessageImageUrlPart value)? imageUrl,
+  }) {
+    return imageUrl?.call(this);
+  }
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(ApiMessageTextPart value)? text,
+    TResult Function(ApiMessageImageUrlPart value)? imageUrl,
+    required TResult orElse(),
+  }) {
+    if (imageUrl != null) {
+      return imageUrl(this);
+    }
+    return orElse();
+  }
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$ApiMessageImageUrlPartImplToJson(this);
+  }
+}
+abstract class ApiMessageImageUrlPart implements ApiMessageContentPart {
+  const factory ApiMessageImageUrlPart({
+    final String type,
+    @JsonKey(name: 'image_url') required final ApiImageUrl imageUrl,
+  }) = _$ApiMessageImageUrlPartImpl;
+  factory ApiMessageImageUrlPart.fromJson(Map<String, dynamic> json) =
+      _$ApiMessageImageUrlPartImpl.fromJson;
+  @override
+  String get type;
+  @JsonKey(name: 'image_url')
+  ApiImageUrl get imageUrl;
+  /// Create a copy of ApiMessageContentPart
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$ApiMessageImageUrlPartImplCopyWith<_$ApiMessageImageUrlPartImpl>
+  get copyWith => throw _privateConstructorUsedError;
+}
+ApiImageUrl _$ApiImageUrlFromJson(Map<String, dynamic> json) {
+  return _ApiImageUrl.fromJson(json);
+}
+/// @nodoc
+mixin _$ApiImageUrl {
+  String get url => throw _privateConstructorUsedError;
+  /// Serializes this ApiImageUrl to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+  /// Create a copy of ApiImageUrl
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $ApiImageUrlCopyWith<ApiImageUrl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+/// @nodoc
+abstract class $ApiImageUrlCopyWith<$Res> {
+  factory $ApiImageUrlCopyWith(
+    ApiImageUrl value,
+    $Res Function(ApiImageUrl) then,
+  ) = _$ApiImageUrlCopyWithImpl<$Res, ApiImageUrl>;
+  @useResult
+  $Res call({String url});
+}
+/// @nodoc
+class _$ApiImageUrlCopyWithImpl<$Res, $Val extends ApiImageUrl>
+    implements $ApiImageUrlCopyWith<$Res> {
+  _$ApiImageUrlCopyWithImpl(this._value, this._then);
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+  /// Create a copy of ApiImageUrl
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? url = null}) {
+    return _then(
+      _value.copyWith(
+            url: null == url
+                ? _value.url
+                : url // ignore: cast_nullable_to_non_nullable
+                      as String,
+          )
+          as $Val,
+    );
+  }
+}
+/// @nodoc
+abstract class _$$ApiImageUrlImplCopyWith<$Res>
+    implements $ApiImageUrlCopyWith<$Res> {
+  factory _$$ApiImageUrlImplCopyWith(
+    _$ApiImageUrlImpl value,
+    $Res Function(_$ApiImageUrlImpl) then,
+  ) = __$$ApiImageUrlImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({String url});
+}
+/// @nodoc
+class __$$ApiImageUrlImplCopyWithImpl<$Res>
+    extends _$ApiImageUrlCopyWithImpl<$Res, _$ApiImageUrlImpl>
+    implements _$$ApiImageUrlImplCopyWith<$Res> {
+  __$$ApiImageUrlImplCopyWithImpl(
+    _$ApiImageUrlImpl _value,
+    $Res Function(_$ApiImageUrlImpl) _then,
+  ) : super(_value, _then);
+  /// Create a copy of ApiImageUrl
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? url = null}) {
+    return _then(
+      _$ApiImageUrlImpl(
+        url: null == url
+            ? _value.url
+            : url // ignore: cast_nullable_to_non_nullable
+                  as String,
+      ),
+    );
+  }
+}
+/// @nodoc
+@JsonSerializable()
+class _$ApiImageUrlImpl implements _ApiImageUrl {
+  const _$ApiImageUrlImpl({required this.url});
+  factory _$ApiImageUrlImpl.fromJson(Map<String, dynamic> json) =>
+      _$$ApiImageUrlImplFromJson(json);
+  @override
+  final String url;
+  @override
+  String toString() {
+    return 'ApiImageUrl(url: $url)';
+  }
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$ApiImageUrlImpl &&
+            (identical(other.url, url) || other.url == url));
+  }
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(runtimeType, url);
+  /// Create a copy of ApiImageUrl
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$ApiImageUrlImplCopyWith<_$ApiImageUrlImpl> get copyWith =>
+      __$$ApiImageUrlImplCopyWithImpl<_$ApiImageUrlImpl>(this, _$identity);
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$ApiImageUrlImplToJson(this);
+  }
+}
+abstract class _ApiImageUrl implements ApiImageUrl {
+  const factory _ApiImageUrl({required final String url}) = _$ApiImageUrlImpl;
+  factory _ApiImageUrl.fromJson(Map<String, dynamic> json) =
+      _$ApiImageUrlImpl.fromJson;
+  @override
+  String get url;
+  /// Create a copy of ApiImageUrl
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$ApiImageUrlImplCopyWith<_$ApiImageUrlImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+ApiMessage _$ApiMessageFromJson(Map<String, dynamic> json) {
+  return _ApiMessage.fromJson(json);
+}
+/// @nodoc
+mixin _$ApiMessage {
+  String get role => throw _privateConstructorUsedError;
+  String? get content => throw _privateConstructorUsedError;
+  String? get reasoning => throw _privateConstructorUsedError;
+  List<ApiMessageContentPart> get parts => throw _privateConstructorUsedError;
+  /// Serializes this ApiMessage to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+  /// Create a copy of ApiMessage
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $ApiMessageCopyWith<ApiMessage> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+/// @nodoc
+abstract class $ApiMessageCopyWith<$Res> {
+  factory $ApiMessageCopyWith(
+    ApiMessage value,
+    $Res Function(ApiMessage) then,
+  ) = _$ApiMessageCopyWithImpl<$Res, ApiMessage>;
+  @useResult
+  $Res call({
+    String role,
+    String? content,
+    String? reasoning,
+    List<ApiMessageContentPart> parts,
+  });
+}
+/// @nodoc
+class _$ApiMessageCopyWithImpl<$Res, $Val extends ApiMessage>
+    implements $ApiMessageCopyWith<$Res> {
+  _$ApiMessageCopyWithImpl(this._value, this._then);
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+  /// Create a copy of ApiMessage
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? role = null,
+    Object? content = freezed,
+    Object? reasoning = freezed,
+    Object? parts = null,
+  }) {
+    return _then(
+      _value.copyWith(
+            role: null == role
+                ? _value.role
+                : role // ignore: cast_nullable_to_non_nullable
+                      as String,
+            content: freezed == content
+                ? _value.content
+                : content // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            reasoning: freezed == reasoning
+                ? _value.reasoning
+                : reasoning // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            parts: null == parts
+                ? _value.parts
+                : parts // ignore: cast_nullable_to_non_nullable
+                      as List<ApiMessageContentPart>,
+          )
+          as $Val,
+    );
+  }
+}
+/// @nodoc
+abstract class _$$ApiMessageImplCopyWith<$Res>
+    implements $ApiMessageCopyWith<$Res> {
+  factory _$$ApiMessageImplCopyWith(
+    _$ApiMessageImpl value,
+    $Res Function(_$ApiMessageImpl) then,
+  ) = __$$ApiMessageImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({
+    String role,
+    String? content,
+    String? reasoning,
+    List<ApiMessageContentPart> parts,
+  });
+}
+/// @nodoc
+class __$$ApiMessageImplCopyWithImpl<$Res>
+    extends _$ApiMessageCopyWithImpl<$Res, _$ApiMessageImpl>
+    implements _$$ApiMessageImplCopyWith<$Res> {
+  __$$ApiMessageImplCopyWithImpl(
+    _$ApiMessageImpl _value,
+    $Res Function(_$ApiMessageImpl) _then,
+  ) : super(_value, _then);
+  /// Create a copy of ApiMessage
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? role = null,
+    Object? content = freezed,
+    Object? reasoning = freezed,
+    Object? parts = null,
+  }) {
+    return _then(
+      _$ApiMessageImpl(
+        role: null == role
+            ? _value.role
+            : role // ignore: cast_nullable_to_non_nullable
+                  as String,
+        content: freezed == content
+            ? _value.content
+            : content // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        reasoning: freezed == reasoning
+            ? _value.reasoning
+            : reasoning // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        parts: null == parts
+            ? _value._parts
+            : parts // ignore: cast_nullable_to_non_nullable
+                  as List<ApiMessageContentPart>,
+      ),
+    );
+  }
+}
+/// @nodoc
+@JsonSerializable()
+class _$ApiMessageImpl implements _ApiMessage {
+  const _$ApiMessageImpl({
+    required this.role,
+    this.content,
+    this.reasoning,
+    final List<ApiMessageContentPart> parts = const [],
+  }) : _parts = parts;
+  factory _$ApiMessageImpl.fromJson(Map<String, dynamic> json) =>
+      _$$ApiMessageImplFromJson(json);
+  @override
+  final String role;
+  @override
+  final String? content;
+  @override
+  final String? reasoning;
+  final List<ApiMessageContentPart> _parts;
+  @override
+  @JsonKey()
+  List<ApiMessageContentPart> get parts {
+    if (_parts is EqualUnmodifiableListView) return _parts;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_parts);
+  }
+  @override
+  String toString() {
+    return 'ApiMessage(role: $role, content: $content, reasoning: $reasoning, parts: $parts)';
+  }
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$ApiMessageImpl &&
+            (identical(other.role, role) || other.role == role) &&
+            (identical(other.content, content) || other.content == content) &&
+            (identical(other.reasoning, reasoning) ||
+                other.reasoning == reasoning) &&
+            const DeepCollectionEquality().equals(other._parts, _parts));
+  }
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(
+    runtimeType,
+    role,
+    content,
+    reasoning,
+    const DeepCollectionEquality().hash(_parts),
+  );
+  /// Create a copy of ApiMessage
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$ApiMessageImplCopyWith<_$ApiMessageImpl> get copyWith =>
+      __$$ApiMessageImplCopyWithImpl<_$ApiMessageImpl>(this, _$identity);
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$ApiMessageImplToJson(this);
+  }
+}
+abstract class _ApiMessage implements ApiMessage {
+  const factory _ApiMessage({
+    required final String role,
+    final String? content,
+    final String? reasoning,
+    final List<ApiMessageContentPart> parts,
+  }) = _$ApiMessageImpl;
+  factory _ApiMessage.fromJson(Map<String, dynamic> json) =
+      _$ApiMessageImpl.fromJson;
+  @override
+  String get role;
+  @override
+  String? get content;
+  @override
+  String? get reasoning;
+  @override
+  List<ApiMessageContentPart> get parts;
+  /// Create a copy of ApiMessage
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$ApiMessageImplCopyWith<_$ApiMessageImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+```
+
+## File: lib/core/models/api_message.g.dart
+```dart
+// GENERATED CODE - DO NOT MODIFY BY HAND
+part of 'api_message.dart';
+// **************************************************************************
+// JsonSerializableGenerator
+// **************************************************************************
+_$ApiMessageTextPartImpl _$$ApiMessageTextPartImplFromJson(
+  Map<String, dynamic> json,
+) => _$ApiMessageTextPartImpl(
+  type: json['type'] as String? ?? 'text',
+  text: json['text'] as String,
+  $type: json['runtimeType'] as String?,
+);
+Map<String, dynamic> _$$ApiMessageTextPartImplToJson(
+  _$ApiMessageTextPartImpl instance,
+) => <String, dynamic>{
+  'type': instance.type,
+  'text': instance.text,
+  'runtimeType': instance.$type,
+};
+_$ApiMessageImageUrlPartImpl _$$ApiMessageImageUrlPartImplFromJson(
+  Map<String, dynamic> json,
+) => _$ApiMessageImageUrlPartImpl(
+  type: json['type'] as String? ?? 'image_url',
+  imageUrl: ApiImageUrl.fromJson(json['image_url'] as Map<String, dynamic>),
+  $type: json['runtimeType'] as String?,
+);
+Map<String, dynamic> _$$ApiMessageImageUrlPartImplToJson(
+  _$ApiMessageImageUrlPartImpl instance,
+) => <String, dynamic>{
+  'type': instance.type,
+  'image_url': instance.imageUrl,
+  'runtimeType': instance.$type,
+};
+_$ApiImageUrlImpl _$$ApiImageUrlImplFromJson(Map<String, dynamic> json) =>
+    _$ApiImageUrlImpl(url: json['url'] as String);
+Map<String, dynamic> _$$ApiImageUrlImplToJson(_$ApiImageUrlImpl instance) =>
+    <String, dynamic>{'url': instance.url};
+_$ApiMessageImpl _$$ApiMessageImplFromJson(Map<String, dynamic> json) =>
+    _$ApiMessageImpl(
+      role: json['role'] as String,
+      content: json['content'] as String?,
+      reasoning: json['reasoning'] as String?,
+      parts:
+          (json['parts'] as List<dynamic>?)
+              ?.map(
+                (e) =>
+                    ApiMessageContentPart.fromJson(e as Map<String, dynamic>),
+              )
+              .toList() ??
+          const [],
+    );
+Map<String, dynamic> _$$ApiMessageImplToJson(_$ApiMessageImpl instance) =>
+    <String, dynamic>{
+      'role': instance.role,
+      'content': instance.content,
+      'reasoning': instance.reasoning,
+      'parts': instance.parts,
+    };
+```
+
+## File: lib/core/models/app_config_store.dart
+```dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+import 'app_config.dart';
+part 'app_config_store.freezed.dart';
+part 'app_config_store.g.dart';
+@freezed
+class ConfigProfile with _$ConfigProfile {
+  const factory ConfigProfile({
+    required String id,
+    required String name,
+    required AppConfig config,
+  }) = _ConfigProfile;
+  factory ConfigProfile.fromJson(Map<String, dynamic> json) =>
+      _$ConfigProfileFromJson(json);
+}
+@freezed
+class AppConfigStore with _$AppConfigStore {
+  const factory AppConfigStore({
+    required String activeProfileId,
+    @Default([]) List<ConfigProfile> profiles,
+  }) = _AppConfigStore;
+  factory AppConfigStore.fromJson(Map<String, dynamic> json) =>
+      _$AppConfigStoreFromJson(json);
+  factory AppConfigStore.defaultStore() => AppConfigStore(
+        activeProfileId: 'default',
+        profiles: [
+          ConfigProfile(
+            id: 'default',
+            name: '默认配置',
+            config: AppConfig.defaultConfig(),
+          ),
+        ],
+      );
+}
+```
+
+## File: lib/core/models/app_config_store.freezed.dart
+```dart
+// coverage:ignore-file
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint
+// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
+part of 'app_config_store.dart';
+// **************************************************************************
+// FreezedGenerator
+// **************************************************************************
+T _$identity<T>(T value) => value;
+final _privateConstructorUsedError = UnsupportedError(
+  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
+);
+ConfigProfile _$ConfigProfileFromJson(Map<String, dynamic> json) {
+  return _ConfigProfile.fromJson(json);
+}
+/// @nodoc
+mixin _$ConfigProfile {
+  String get id => throw _privateConstructorUsedError;
+  String get name => throw _privateConstructorUsedError;
+  AppConfig get config => throw _privateConstructorUsedError;
+  /// Serializes this ConfigProfile to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+  /// Create a copy of ConfigProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $ConfigProfileCopyWith<ConfigProfile> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+/// @nodoc
+abstract class $ConfigProfileCopyWith<$Res> {
+  factory $ConfigProfileCopyWith(
+    ConfigProfile value,
+    $Res Function(ConfigProfile) then,
+  ) = _$ConfigProfileCopyWithImpl<$Res, ConfigProfile>;
+  @useResult
+  $Res call({String id, String name, AppConfig config});
+  $AppConfigCopyWith<$Res> get config;
+}
+/// @nodoc
+class _$ConfigProfileCopyWithImpl<$Res, $Val extends ConfigProfile>
+    implements $ConfigProfileCopyWith<$Res> {
+  _$ConfigProfileCopyWithImpl(this._value, this._then);
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+  /// Create a copy of ConfigProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? id = null, Object? name = null, Object? config = null}) {
+    return _then(
+      _value.copyWith(
+            id: null == id
+                ? _value.id
+                : id // ignore: cast_nullable_to_non_nullable
+                      as String,
+            name: null == name
+                ? _value.name
+                : name // ignore: cast_nullable_to_non_nullable
+                      as String,
+            config: null == config
+                ? _value.config
+                : config // ignore: cast_nullable_to_non_nullable
+                      as AppConfig,
+          )
+          as $Val,
+    );
+  }
+  /// Create a copy of ConfigProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $AppConfigCopyWith<$Res> get config {
+    return $AppConfigCopyWith<$Res>(_value.config, (value) {
+      return _then(_value.copyWith(config: value) as $Val);
+    });
+  }
+}
+/// @nodoc
+abstract class _$$ConfigProfileImplCopyWith<$Res>
+    implements $ConfigProfileCopyWith<$Res> {
+  factory _$$ConfigProfileImplCopyWith(
+    _$ConfigProfileImpl value,
+    $Res Function(_$ConfigProfileImpl) then,
+  ) = __$$ConfigProfileImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({String id, String name, AppConfig config});
+  @override
+  $AppConfigCopyWith<$Res> get config;
+}
+/// @nodoc
+class __$$ConfigProfileImplCopyWithImpl<$Res>
+    extends _$ConfigProfileCopyWithImpl<$Res, _$ConfigProfileImpl>
+    implements _$$ConfigProfileImplCopyWith<$Res> {
+  __$$ConfigProfileImplCopyWithImpl(
+    _$ConfigProfileImpl _value,
+    $Res Function(_$ConfigProfileImpl) _then,
+  ) : super(_value, _then);
+  /// Create a copy of ConfigProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? id = null, Object? name = null, Object? config = null}) {
+    return _then(
+      _$ConfigProfileImpl(
+        id: null == id
+            ? _value.id
+            : id // ignore: cast_nullable_to_non_nullable
+                  as String,
+        name: null == name
+            ? _value.name
+            : name // ignore: cast_nullable_to_non_nullable
+                  as String,
+        config: null == config
+            ? _value.config
+            : config // ignore: cast_nullable_to_non_nullable
+                  as AppConfig,
+      ),
+    );
+  }
+}
+/// @nodoc
+@JsonSerializable()
+class _$ConfigProfileImpl implements _ConfigProfile {
+  const _$ConfigProfileImpl({
+    required this.id,
+    required this.name,
+    required this.config,
+  });
+  factory _$ConfigProfileImpl.fromJson(Map<String, dynamic> json) =>
+      _$$ConfigProfileImplFromJson(json);
+  @override
+  final String id;
+  @override
+  final String name;
+  @override
+  final AppConfig config;
+  @override
+  String toString() {
+    return 'ConfigProfile(id: $id, name: $name, config: $config)';
+  }
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$ConfigProfileImpl &&
+            (identical(other.id, id) || other.id == id) &&
+            (identical(other.name, name) || other.name == name) &&
+            (identical(other.config, config) || other.config == config));
+  }
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(runtimeType, id, name, config);
+  /// Create a copy of ConfigProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$ConfigProfileImplCopyWith<_$ConfigProfileImpl> get copyWith =>
+      __$$ConfigProfileImplCopyWithImpl<_$ConfigProfileImpl>(this, _$identity);
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$ConfigProfileImplToJson(this);
+  }
+}
+abstract class _ConfigProfile implements ConfigProfile {
+  const factory _ConfigProfile({
+    required final String id,
+    required final String name,
+    required final AppConfig config,
+  }) = _$ConfigProfileImpl;
+  factory _ConfigProfile.fromJson(Map<String, dynamic> json) =
+      _$ConfigProfileImpl.fromJson;
+  @override
+  String get id;
+  @override
+  String get name;
+  @override
+  AppConfig get config;
+  /// Create a copy of ConfigProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$ConfigProfileImplCopyWith<_$ConfigProfileImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+AppConfigStore _$AppConfigStoreFromJson(Map<String, dynamic> json) {
+  return _AppConfigStore.fromJson(json);
+}
+/// @nodoc
+mixin _$AppConfigStore {
+  String get activeProfileId => throw _privateConstructorUsedError;
+  List<ConfigProfile> get profiles => throw _privateConstructorUsedError;
+  /// Serializes this AppConfigStore to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+  /// Create a copy of AppConfigStore
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $AppConfigStoreCopyWith<AppConfigStore> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+/// @nodoc
+abstract class $AppConfigStoreCopyWith<$Res> {
+  factory $AppConfigStoreCopyWith(
+    AppConfigStore value,
+    $Res Function(AppConfigStore) then,
+  ) = _$AppConfigStoreCopyWithImpl<$Res, AppConfigStore>;
+  @useResult
+  $Res call({String activeProfileId, List<ConfigProfile> profiles});
+}
+/// @nodoc
+class _$AppConfigStoreCopyWithImpl<$Res, $Val extends AppConfigStore>
+    implements $AppConfigStoreCopyWith<$Res> {
+  _$AppConfigStoreCopyWithImpl(this._value, this._then);
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+  /// Create a copy of AppConfigStore
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? activeProfileId = null, Object? profiles = null}) {
+    return _then(
+      _value.copyWith(
+            activeProfileId: null == activeProfileId
+                ? _value.activeProfileId
+                : activeProfileId // ignore: cast_nullable_to_non_nullable
+                      as String,
+            profiles: null == profiles
+                ? _value.profiles
+                : profiles // ignore: cast_nullable_to_non_nullable
+                      as List<ConfigProfile>,
+          )
+          as $Val,
+    );
+  }
+}
+/// @nodoc
+abstract class _$$AppConfigStoreImplCopyWith<$Res>
+    implements $AppConfigStoreCopyWith<$Res> {
+  factory _$$AppConfigStoreImplCopyWith(
+    _$AppConfigStoreImpl value,
+    $Res Function(_$AppConfigStoreImpl) then,
+  ) = __$$AppConfigStoreImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({String activeProfileId, List<ConfigProfile> profiles});
+}
+/// @nodoc
+class __$$AppConfigStoreImplCopyWithImpl<$Res>
+    extends _$AppConfigStoreCopyWithImpl<$Res, _$AppConfigStoreImpl>
+    implements _$$AppConfigStoreImplCopyWith<$Res> {
+  __$$AppConfigStoreImplCopyWithImpl(
+    _$AppConfigStoreImpl _value,
+    $Res Function(_$AppConfigStoreImpl) _then,
+  ) : super(_value, _then);
+  /// Create a copy of AppConfigStore
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? activeProfileId = null, Object? profiles = null}) {
+    return _then(
+      _$AppConfigStoreImpl(
+        activeProfileId: null == activeProfileId
+            ? _value.activeProfileId
+            : activeProfileId // ignore: cast_nullable_to_non_nullable
+                  as String,
+        profiles: null == profiles
+            ? _value._profiles
+            : profiles // ignore: cast_nullable_to_non_nullable
+                  as List<ConfigProfile>,
+      ),
+    );
+  }
+}
+/// @nodoc
+@JsonSerializable()
+class _$AppConfigStoreImpl implements _AppConfigStore {
+  const _$AppConfigStoreImpl({
+    required this.activeProfileId,
+    final List<ConfigProfile> profiles = const [],
+  }) : _profiles = profiles;
+  factory _$AppConfigStoreImpl.fromJson(Map<String, dynamic> json) =>
+      _$$AppConfigStoreImplFromJson(json);
+  @override
+  final String activeProfileId;
+  final List<ConfigProfile> _profiles;
+  @override
+  @JsonKey()
+  List<ConfigProfile> get profiles {
+    if (_profiles is EqualUnmodifiableListView) return _profiles;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_profiles);
+  }
+  @override
+  String toString() {
+    return 'AppConfigStore(activeProfileId: $activeProfileId, profiles: $profiles)';
+  }
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$AppConfigStoreImpl &&
+            (identical(other.activeProfileId, activeProfileId) ||
+                other.activeProfileId == activeProfileId) &&
+            const DeepCollectionEquality().equals(other._profiles, _profiles));
+  }
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(
+    runtimeType,
+    activeProfileId,
+    const DeepCollectionEquality().hash(_profiles),
+  );
+  /// Create a copy of AppConfigStore
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$AppConfigStoreImplCopyWith<_$AppConfigStoreImpl> get copyWith =>
+      __$$AppConfigStoreImplCopyWithImpl<_$AppConfigStoreImpl>(
+        this,
+        _$identity,
+      );
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$AppConfigStoreImplToJson(this);
+  }
+}
+abstract class _AppConfigStore implements AppConfigStore {
+  const factory _AppConfigStore({
+    required final String activeProfileId,
+    final List<ConfigProfile> profiles,
+  }) = _$AppConfigStoreImpl;
+  factory _AppConfigStore.fromJson(Map<String, dynamic> json) =
+      _$AppConfigStoreImpl.fromJson;
+  @override
+  String get activeProfileId;
+  @override
+  List<ConfigProfile> get profiles;
+  /// Create a copy of AppConfigStore
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$AppConfigStoreImplCopyWith<_$AppConfigStoreImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+```
+
+## File: lib/core/models/app_config_store.g.dart
+```dart
+// GENERATED CODE - DO NOT MODIFY BY HAND
+part of 'app_config_store.dart';
+// **************************************************************************
+// JsonSerializableGenerator
+// **************************************************************************
+_$ConfigProfileImpl _$$ConfigProfileImplFromJson(Map<String, dynamic> json) =>
+    _$ConfigProfileImpl(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      config: AppConfig.fromJson(json['config'] as Map<String, dynamic>),
+    );
+Map<String, dynamic> _$$ConfigProfileImplToJson(_$ConfigProfileImpl instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'name': instance.name,
+      'config': instance.config,
+    };
+_$AppConfigStoreImpl _$$AppConfigStoreImplFromJson(Map<String, dynamic> json) =>
+    _$AppConfigStoreImpl(
+      activeProfileId: json['activeProfileId'] as String,
+      profiles:
+          (json['profiles'] as List<dynamic>?)
+              ?.map((e) => ConfigProfile.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const [],
+    );
+Map<String, dynamic> _$$AppConfigStoreImplToJson(
+  _$AppConfigStoreImpl instance,
+) => <String, dynamic>{
+  'activeProfileId': instance.activeProfileId,
+  'profiles': instance.profiles,
+};
+```
+
+## File: lib/core/models/app_config.dart
+```dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+import 'model_info.dart';
+part 'app_config.freezed.dart';
+part 'app_config.g.dart';
+List<ModelInfo>? _modelsFromJson(List<dynamic>? json) =>
+    json?.map((e) => ModelInfo.fromJson(e as Map<String, dynamic>)).toList();
+List<Map<String, dynamic>>? _modelsToJson(List<ModelInfo>? models) =>
+    models?.map((e) => e.toJson()).toList();
+@freezed
+class AppConfig with _$AppConfig {
+  const factory AppConfig({
+    required String baseUrl,
+    required String apiKey,
+    String? selectedModel,
+    @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
+    List<ModelInfo>? availableModels,
+    @Default('system') String theme,
+    @Default('v1/models') String modelsPath,
+    @Default('v1/chat/completions') String chatPath,
+    @Default('chat_completions') String apiMode,
+  }) = _AppConfig;
+  factory AppConfig.fromJson(Map<String, dynamic> json) =>
+      _$AppConfigFromJson(json);
+  factory AppConfig.defaultConfig() => const AppConfig(
+        baseUrl: 'https://api.openai.com',
+        apiKey: '',
+        theme: 'system',
+        modelsPath: 'v1/models',
+        chatPath: 'v1/chat/completions',
+        apiMode: 'chat_completions',
+      );
+}
+```
+
+## File: lib/core/models/app_config.freezed.dart
+```dart
+// coverage:ignore-file
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint
+// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
+part of 'app_config.dart';
+// **************************************************************************
+// FreezedGenerator
+// **************************************************************************
+T _$identity<T>(T value) => value;
+final _privateConstructorUsedError = UnsupportedError(
+  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
+);
+AppConfig _$AppConfigFromJson(Map<String, dynamic> json) {
+  return _AppConfig.fromJson(json);
+}
+/// @nodoc
+mixin _$AppConfig {
+  String get baseUrl => throw _privateConstructorUsedError;
+  String get apiKey => throw _privateConstructorUsedError;
+  String? get selectedModel => throw _privateConstructorUsedError;
+  @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
+  List<ModelInfo>? get availableModels => throw _privateConstructorUsedError;
+  String get theme => throw _privateConstructorUsedError;
+  String get modelsPath => throw _privateConstructorUsedError;
+  String get chatPath => throw _privateConstructorUsedError;
+  String get apiMode => throw _privateConstructorUsedError;
+  /// Serializes this AppConfig to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+  /// Create a copy of AppConfig
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $AppConfigCopyWith<AppConfig> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+/// @nodoc
+abstract class $AppConfigCopyWith<$Res> {
+  factory $AppConfigCopyWith(AppConfig value, $Res Function(AppConfig) then) =
+      _$AppConfigCopyWithImpl<$Res, AppConfig>;
+  @useResult
+  $Res call({
+    String baseUrl,
+    String apiKey,
+    String? selectedModel,
+    @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
+    List<ModelInfo>? availableModels,
+    String theme,
+    String modelsPath,
+    String chatPath,
+    String apiMode,
+  });
+}
+/// @nodoc
+class _$AppConfigCopyWithImpl<$Res, $Val extends AppConfig>
+    implements $AppConfigCopyWith<$Res> {
+  _$AppConfigCopyWithImpl(this._value, this._then);
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+  /// Create a copy of AppConfig
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? baseUrl = null,
+    Object? apiKey = null,
+    Object? selectedModel = freezed,
+    Object? availableModels = freezed,
+    Object? theme = null,
+    Object? modelsPath = null,
+    Object? chatPath = null,
+    Object? apiMode = null,
+  }) {
+    return _then(
+      _value.copyWith(
+            baseUrl: null == baseUrl
+                ? _value.baseUrl
+                : baseUrl // ignore: cast_nullable_to_non_nullable
+                      as String,
+            apiKey: null == apiKey
+                ? _value.apiKey
+                : apiKey // ignore: cast_nullable_to_non_nullable
+                      as String,
+            selectedModel: freezed == selectedModel
+                ? _value.selectedModel
+                : selectedModel // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            availableModels: freezed == availableModels
+                ? _value.availableModels
+                : availableModels // ignore: cast_nullable_to_non_nullable
+                      as List<ModelInfo>?,
+            theme: null == theme
+                ? _value.theme
+                : theme // ignore: cast_nullable_to_non_nullable
+                      as String,
+            modelsPath: null == modelsPath
+                ? _value.modelsPath
+                : modelsPath // ignore: cast_nullable_to_non_nullable
+                      as String,
+            chatPath: null == chatPath
+                ? _value.chatPath
+                : chatPath // ignore: cast_nullable_to_non_nullable
+                      as String,
+            apiMode: null == apiMode
+                ? _value.apiMode
+                : apiMode // ignore: cast_nullable_to_non_nullable
+                      as String,
+          )
+          as $Val,
+    );
+  }
+}
+/// @nodoc
+abstract class _$$AppConfigImplCopyWith<$Res>
+    implements $AppConfigCopyWith<$Res> {
+  factory _$$AppConfigImplCopyWith(
+    _$AppConfigImpl value,
+    $Res Function(_$AppConfigImpl) then,
+  ) = __$$AppConfigImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({
+    String baseUrl,
+    String apiKey,
+    String? selectedModel,
+    @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
+    List<ModelInfo>? availableModels,
+    String theme,
+    String modelsPath,
+    String chatPath,
+    String apiMode,
+  });
+}
+/// @nodoc
+class __$$AppConfigImplCopyWithImpl<$Res>
+    extends _$AppConfigCopyWithImpl<$Res, _$AppConfigImpl>
+    implements _$$AppConfigImplCopyWith<$Res> {
+  __$$AppConfigImplCopyWithImpl(
+    _$AppConfigImpl _value,
+    $Res Function(_$AppConfigImpl) _then,
+  ) : super(_value, _then);
+  /// Create a copy of AppConfig
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? baseUrl = null,
+    Object? apiKey = null,
+    Object? selectedModel = freezed,
+    Object? availableModels = freezed,
+    Object? theme = null,
+    Object? modelsPath = null,
+    Object? chatPath = null,
+    Object? apiMode = null,
+  }) {
+    return _then(
+      _$AppConfigImpl(
+        baseUrl: null == baseUrl
+            ? _value.baseUrl
+            : baseUrl // ignore: cast_nullable_to_non_nullable
+                  as String,
+        apiKey: null == apiKey
+            ? _value.apiKey
+            : apiKey // ignore: cast_nullable_to_non_nullable
+                  as String,
+        selectedModel: freezed == selectedModel
+            ? _value.selectedModel
+            : selectedModel // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        availableModels: freezed == availableModels
+            ? _value._availableModels
+            : availableModels // ignore: cast_nullable_to_non_nullable
+                  as List<ModelInfo>?,
+        theme: null == theme
+            ? _value.theme
+            : theme // ignore: cast_nullable_to_non_nullable
+                  as String,
+        modelsPath: null == modelsPath
+            ? _value.modelsPath
+            : modelsPath // ignore: cast_nullable_to_non_nullable
+                  as String,
+        chatPath: null == chatPath
+            ? _value.chatPath
+            : chatPath // ignore: cast_nullable_to_non_nullable
+                  as String,
+        apiMode: null == apiMode
+            ? _value.apiMode
+            : apiMode // ignore: cast_nullable_to_non_nullable
+                  as String,
+      ),
+    );
+  }
+}
+/// @nodoc
+@JsonSerializable()
+class _$AppConfigImpl implements _AppConfig {
+  const _$AppConfigImpl({
+    required this.baseUrl,
+    required this.apiKey,
+    this.selectedModel,
+    @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
+    final List<ModelInfo>? availableModels,
+    this.theme = 'system',
+    this.modelsPath = 'v1/models',
+    this.chatPath = 'v1/chat/completions',
+    this.apiMode = 'chat_completions',
+  }) : _availableModels = availableModels;
+  factory _$AppConfigImpl.fromJson(Map<String, dynamic> json) =>
+      _$$AppConfigImplFromJson(json);
+  @override
+  final String baseUrl;
+  @override
+  final String apiKey;
+  @override
+  final String? selectedModel;
+  final List<ModelInfo>? _availableModels;
+  @override
+  @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
+  List<ModelInfo>? get availableModels {
+    final value = _availableModels;
+    if (value == null) return null;
+    if (_availableModels is EqualUnmodifiableListView) return _availableModels;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(value);
+  }
+  @override
+  @JsonKey()
+  final String theme;
+  @override
+  @JsonKey()
+  final String modelsPath;
+  @override
+  @JsonKey()
+  final String chatPath;
+  @override
+  @JsonKey()
+  final String apiMode;
+  @override
+  String toString() {
+    return 'AppConfig(baseUrl: $baseUrl, apiKey: $apiKey, selectedModel: $selectedModel, availableModels: $availableModels, theme: $theme, modelsPath: $modelsPath, chatPath: $chatPath, apiMode: $apiMode)';
+  }
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$AppConfigImpl &&
+            (identical(other.baseUrl, baseUrl) || other.baseUrl == baseUrl) &&
+            (identical(other.apiKey, apiKey) || other.apiKey == apiKey) &&
+            (identical(other.selectedModel, selectedModel) ||
+                other.selectedModel == selectedModel) &&
+            const DeepCollectionEquality().equals(
+              other._availableModels,
+              _availableModels,
+            ) &&
+            (identical(other.theme, theme) || other.theme == theme) &&
+            (identical(other.modelsPath, modelsPath) ||
+                other.modelsPath == modelsPath) &&
+            (identical(other.chatPath, chatPath) ||
+                other.chatPath == chatPath) &&
+            (identical(other.apiMode, apiMode) || other.apiMode == apiMode));
+  }
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(
+    runtimeType,
+    baseUrl,
+    apiKey,
+    selectedModel,
+    const DeepCollectionEquality().hash(_availableModels),
+    theme,
+    modelsPath,
+    chatPath,
+    apiMode,
+  );
+  /// Create a copy of AppConfig
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$AppConfigImplCopyWith<_$AppConfigImpl> get copyWith =>
+      __$$AppConfigImplCopyWithImpl<_$AppConfigImpl>(this, _$identity);
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$AppConfigImplToJson(this);
+  }
+}
+abstract class _AppConfig implements AppConfig {
+  const factory _AppConfig({
+    required final String baseUrl,
+    required final String apiKey,
+    final String? selectedModel,
+    @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
+    final List<ModelInfo>? availableModels,
+    final String theme,
+    final String modelsPath,
+    final String chatPath,
+    final String apiMode,
+  }) = _$AppConfigImpl;
+  factory _AppConfig.fromJson(Map<String, dynamic> json) =
+      _$AppConfigImpl.fromJson;
+  @override
+  String get baseUrl;
+  @override
+  String get apiKey;
+  @override
+  String? get selectedModel;
+  @override
+  @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
+  List<ModelInfo>? get availableModels;
+  @override
+  String get theme;
+  @override
+  String get modelsPath;
+  @override
+  String get chatPath;
+  @override
+  String get apiMode;
+  /// Create a copy of AppConfig
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$AppConfigImplCopyWith<_$AppConfigImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+```
+
+## File: lib/core/models/app_config.g.dart
+```dart
+// GENERATED CODE - DO NOT MODIFY BY HAND
+part of 'app_config.dart';
+// **************************************************************************
+// JsonSerializableGenerator
+// **************************************************************************
+_$AppConfigImpl _$$AppConfigImplFromJson(Map<String, dynamic> json) =>
+    _$AppConfigImpl(
+      baseUrl: json['baseUrl'] as String,
+      apiKey: json['apiKey'] as String,
+      selectedModel: json['selectedModel'] as String?,
+      availableModels: _modelsFromJson(json['availableModels'] as List?),
+      theme: json['theme'] as String? ?? 'system',
+      modelsPath: json['modelsPath'] as String? ?? 'v1/models',
+      chatPath: json['chatPath'] as String? ?? 'v1/chat/completions',
+      apiMode: json['apiMode'] as String? ?? 'chat_completions',
+    );
+Map<String, dynamic> _$$AppConfigImplToJson(_$AppConfigImpl instance) =>
+    <String, dynamic>{
+      'baseUrl': instance.baseUrl,
+      'apiKey': instance.apiKey,
+      'selectedModel': instance.selectedModel,
+      'availableModels': _modelsToJson(instance.availableModels),
+      'theme': instance.theme,
+      'modelsPath': instance.modelsPath,
+      'chatPath': instance.chatPath,
+      'apiMode': instance.apiMode,
+    };
+```
+
+## File: lib/core/models/attachment.dart
+```dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+part 'attachment.freezed.dart';
+part 'attachment.g.dart';
+@freezed
+class Attachment with _$Attachment {
+  const factory Attachment({
+    required String id,
+    required String name,
+    required String relativePath,
+    @Default(false) bool isImage,
+    String? mimeType,
+  }) = _Attachment;
+  factory Attachment.fromJson(Map<String, dynamic> json) =>
+      _$AttachmentFromJson(json);
+}
+```
+
+## File: lib/core/models/attachment.freezed.dart
+```dart
+// coverage:ignore-file
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint
+// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
+part of 'attachment.dart';
+// **************************************************************************
+// FreezedGenerator
+// **************************************************************************
+T _$identity<T>(T value) => value;
+final _privateConstructorUsedError = UnsupportedError(
+  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
+);
+Attachment _$AttachmentFromJson(Map<String, dynamic> json) {
+  return _Attachment.fromJson(json);
+}
+/// @nodoc
+mixin _$Attachment {
+  String get id => throw _privateConstructorUsedError;
+  String get name => throw _privateConstructorUsedError;
+  String get relativePath => throw _privateConstructorUsedError;
+  bool get isImage => throw _privateConstructorUsedError;
+  String? get mimeType => throw _privateConstructorUsedError;
+  /// Serializes this Attachment to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+  /// Create a copy of Attachment
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $AttachmentCopyWith<Attachment> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+/// @nodoc
+abstract class $AttachmentCopyWith<$Res> {
+  factory $AttachmentCopyWith(
+    Attachment value,
+    $Res Function(Attachment) then,
+  ) = _$AttachmentCopyWithImpl<$Res, Attachment>;
+  @useResult
+  $Res call({
+    String id,
+    String name,
+    String relativePath,
+    bool isImage,
+    String? mimeType,
+  });
+}
+/// @nodoc
+class _$AttachmentCopyWithImpl<$Res, $Val extends Attachment>
+    implements $AttachmentCopyWith<$Res> {
+  _$AttachmentCopyWithImpl(this._value, this._then);
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+  /// Create a copy of Attachment
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? name = null,
+    Object? relativePath = null,
+    Object? isImage = null,
+    Object? mimeType = freezed,
+  }) {
+    return _then(
+      _value.copyWith(
+            id: null == id
+                ? _value.id
+                : id // ignore: cast_nullable_to_non_nullable
+                      as String,
+            name: null == name
+                ? _value.name
+                : name // ignore: cast_nullable_to_non_nullable
+                      as String,
+            relativePath: null == relativePath
+                ? _value.relativePath
+                : relativePath // ignore: cast_nullable_to_non_nullable
+                      as String,
+            isImage: null == isImage
+                ? _value.isImage
+                : isImage // ignore: cast_nullable_to_non_nullable
+                      as bool,
+            mimeType: freezed == mimeType
+                ? _value.mimeType
+                : mimeType // ignore: cast_nullable_to_non_nullable
+                      as String?,
+          )
+          as $Val,
+    );
+  }
+}
+/// @nodoc
+abstract class _$$AttachmentImplCopyWith<$Res>
+    implements $AttachmentCopyWith<$Res> {
+  factory _$$AttachmentImplCopyWith(
+    _$AttachmentImpl value,
+    $Res Function(_$AttachmentImpl) then,
+  ) = __$$AttachmentImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({
+    String id,
+    String name,
+    String relativePath,
+    bool isImage,
+    String? mimeType,
+  });
+}
+/// @nodoc
+class __$$AttachmentImplCopyWithImpl<$Res>
+    extends _$AttachmentCopyWithImpl<$Res, _$AttachmentImpl>
+    implements _$$AttachmentImplCopyWith<$Res> {
+  __$$AttachmentImplCopyWithImpl(
+    _$AttachmentImpl _value,
+    $Res Function(_$AttachmentImpl) _then,
+  ) : super(_value, _then);
+  /// Create a copy of Attachment
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? name = null,
+    Object? relativePath = null,
+    Object? isImage = null,
+    Object? mimeType = freezed,
+  }) {
+    return _then(
+      _$AttachmentImpl(
+        id: null == id
+            ? _value.id
+            : id // ignore: cast_nullable_to_non_nullable
+                  as String,
+        name: null == name
+            ? _value.name
+            : name // ignore: cast_nullable_to_non_nullable
+                  as String,
+        relativePath: null == relativePath
+            ? _value.relativePath
+            : relativePath // ignore: cast_nullable_to_non_nullable
+                  as String,
+        isImage: null == isImage
+            ? _value.isImage
+            : isImage // ignore: cast_nullable_to_non_nullable
+                  as bool,
+        mimeType: freezed == mimeType
+            ? _value.mimeType
+            : mimeType // ignore: cast_nullable_to_non_nullable
+                  as String?,
+      ),
+    );
+  }
+}
+/// @nodoc
+@JsonSerializable()
+class _$AttachmentImpl implements _Attachment {
+  const _$AttachmentImpl({
+    required this.id,
+    required this.name,
+    required this.relativePath,
+    this.isImage = false,
+    this.mimeType,
+  });
+  factory _$AttachmentImpl.fromJson(Map<String, dynamic> json) =>
+      _$$AttachmentImplFromJson(json);
+  @override
+  final String id;
+  @override
+  final String name;
+  @override
+  final String relativePath;
+  @override
+  @JsonKey()
+  final bool isImage;
+  @override
+  final String? mimeType;
+  @override
+  String toString() {
+    return 'Attachment(id: $id, name: $name, relativePath: $relativePath, isImage: $isImage, mimeType: $mimeType)';
+  }
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$AttachmentImpl &&
+            (identical(other.id, id) || other.id == id) &&
+            (identical(other.name, name) || other.name == name) &&
+            (identical(other.relativePath, relativePath) ||
+                other.relativePath == relativePath) &&
+            (identical(other.isImage, isImage) || other.isImage == isImage) &&
+            (identical(other.mimeType, mimeType) ||
+                other.mimeType == mimeType));
+  }
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode =>
+      Object.hash(runtimeType, id, name, relativePath, isImage, mimeType);
+  /// Create a copy of Attachment
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$AttachmentImplCopyWith<_$AttachmentImpl> get copyWith =>
+      __$$AttachmentImplCopyWithImpl<_$AttachmentImpl>(this, _$identity);
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$AttachmentImplToJson(this);
+  }
+}
+abstract class _Attachment implements Attachment {
+  const factory _Attachment({
+    required final String id,
+    required final String name,
+    required final String relativePath,
+    final bool isImage,
+    final String? mimeType,
+  }) = _$AttachmentImpl;
+  factory _Attachment.fromJson(Map<String, dynamic> json) =
+      _$AttachmentImpl.fromJson;
+  @override
+  String get id;
+  @override
+  String get name;
+  @override
+  String get relativePath;
+  @override
+  bool get isImage;
+  @override
+  String? get mimeType;
+  /// Create a copy of Attachment
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$AttachmentImplCopyWith<_$AttachmentImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+```
+
+## File: lib/core/models/attachment.g.dart
+```dart
+// GENERATED CODE - DO NOT MODIFY BY HAND
+part of 'attachment.dart';
+// **************************************************************************
+// JsonSerializableGenerator
+// **************************************************************************
+_$AttachmentImpl _$$AttachmentImplFromJson(Map<String, dynamic> json) =>
+    _$AttachmentImpl(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      relativePath: json['relativePath'] as String,
+      isImage: json['isImage'] as bool? ?? false,
+      mimeType: json['mimeType'] as String?,
+    );
+Map<String, dynamic> _$$AttachmentImplToJson(_$AttachmentImpl instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'name': instance.name,
+      'relativePath': instance.relativePath,
+      'isImage': instance.isImage,
+      'mimeType': instance.mimeType,
+    };
+```
+
+## File: lib/core/models/chat_chunk.dart
+```dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+part 'chat_chunk.freezed.dart';
+@freezed
+class ChatChunk with _$ChatChunk {
+  const factory ChatChunk({
+    String? content,          // 正式内容片段
+    String? reasoningContent, // 思考过程片段
+    required bool isDone,     // 是否结束
+    String? error,            // 错误信息
+  }) = _ChatChunk;
+}
+```
+
+## File: lib/core/models/chat_chunk.freezed.dart
+```dart
+// coverage:ignore-file
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint
+// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
+part of 'chat_chunk.dart';
+// **************************************************************************
+// FreezedGenerator
+// **************************************************************************
+T _$identity<T>(T value) => value;
+final _privateConstructorUsedError = UnsupportedError(
+  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
+);
+/// @nodoc
+mixin _$ChatChunk {
+  String? get content => throw _privateConstructorUsedError; // 正式内容片段
+  String? get reasoningContent => throw _privateConstructorUsedError; // 思考过程片段
+  bool get isDone => throw _privateConstructorUsedError; // 是否结束
+  String? get error => throw _privateConstructorUsedError;
+  /// Create a copy of ChatChunk
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $ChatChunkCopyWith<ChatChunk> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+/// @nodoc
+abstract class $ChatChunkCopyWith<$Res> {
+  factory $ChatChunkCopyWith(ChatChunk value, $Res Function(ChatChunk) then) =
+      _$ChatChunkCopyWithImpl<$Res, ChatChunk>;
+  @useResult
+  $Res call({
+    String? content,
+    String? reasoningContent,
+    bool isDone,
+    String? error,
+  });
+}
+/// @nodoc
+class _$ChatChunkCopyWithImpl<$Res, $Val extends ChatChunk>
+    implements $ChatChunkCopyWith<$Res> {
+  _$ChatChunkCopyWithImpl(this._value, this._then);
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+  /// Create a copy of ChatChunk
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? content = freezed,
+    Object? reasoningContent = freezed,
+    Object? isDone = null,
+    Object? error = freezed,
+  }) {
+    return _then(
+      _value.copyWith(
+            content: freezed == content
+                ? _value.content
+                : content // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            reasoningContent: freezed == reasoningContent
+                ? _value.reasoningContent
+                : reasoningContent // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            isDone: null == isDone
+                ? _value.isDone
+                : isDone // ignore: cast_nullable_to_non_nullable
+                      as bool,
+            error: freezed == error
+                ? _value.error
+                : error // ignore: cast_nullable_to_non_nullable
+                      as String?,
+          )
+          as $Val,
+    );
+  }
+}
+/// @nodoc
+abstract class _$$ChatChunkImplCopyWith<$Res>
+    implements $ChatChunkCopyWith<$Res> {
+  factory _$$ChatChunkImplCopyWith(
+    _$ChatChunkImpl value,
+    $Res Function(_$ChatChunkImpl) then,
+  ) = __$$ChatChunkImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({
+    String? content,
+    String? reasoningContent,
+    bool isDone,
+    String? error,
+  });
+}
+/// @nodoc
+class __$$ChatChunkImplCopyWithImpl<$Res>
+    extends _$ChatChunkCopyWithImpl<$Res, _$ChatChunkImpl>
+    implements _$$ChatChunkImplCopyWith<$Res> {
+  __$$ChatChunkImplCopyWithImpl(
+    _$ChatChunkImpl _value,
+    $Res Function(_$ChatChunkImpl) _then,
+  ) : super(_value, _then);
+  /// Create a copy of ChatChunk
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? content = freezed,
+    Object? reasoningContent = freezed,
+    Object? isDone = null,
+    Object? error = freezed,
+  }) {
+    return _then(
+      _$ChatChunkImpl(
+        content: freezed == content
+            ? _value.content
+            : content // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        reasoningContent: freezed == reasoningContent
+            ? _value.reasoningContent
+            : reasoningContent // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        isDone: null == isDone
+            ? _value.isDone
+            : isDone // ignore: cast_nullable_to_non_nullable
+                  as bool,
+        error: freezed == error
+            ? _value.error
+            : error // ignore: cast_nullable_to_non_nullable
+                  as String?,
+      ),
+    );
+  }
+}
+/// @nodoc
+class _$ChatChunkImpl implements _ChatChunk {
+  const _$ChatChunkImpl({
+    this.content,
+    this.reasoningContent,
+    required this.isDone,
+    this.error,
+  });
+  @override
+  final String? content;
+  // 正式内容片段
+  @override
+  final String? reasoningContent;
+  // 思考过程片段
+  @override
+  final bool isDone;
+  // 是否结束
+  @override
+  final String? error;
+  @override
+  String toString() {
+    return 'ChatChunk(content: $content, reasoningContent: $reasoningContent, isDone: $isDone, error: $error)';
+  }
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$ChatChunkImpl &&
+            (identical(other.content, content) || other.content == content) &&
+            (identical(other.reasoningContent, reasoningContent) ||
+                other.reasoningContent == reasoningContent) &&
+            (identical(other.isDone, isDone) || other.isDone == isDone) &&
+            (identical(other.error, error) || other.error == error));
+  }
+  @override
+  int get hashCode =>
+      Object.hash(runtimeType, content, reasoningContent, isDone, error);
+  /// Create a copy of ChatChunk
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$ChatChunkImplCopyWith<_$ChatChunkImpl> get copyWith =>
+      __$$ChatChunkImplCopyWithImpl<_$ChatChunkImpl>(this, _$identity);
+}
+abstract class _ChatChunk implements ChatChunk {
+  const factory _ChatChunk({
+    final String? content,
+    final String? reasoningContent,
+    required final bool isDone,
+    final String? error,
+  }) = _$ChatChunkImpl;
+  @override
+  String? get content; // 正式内容片段
+  @override
+  String? get reasoningContent; // 思考过程片段
+  @override
+  bool get isDone; // 是否结束
+  @override
+  String? get error;
+  /// Create a copy of ChatChunk
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$ChatChunkImplCopyWith<_$ChatChunkImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+```
+
+## File: lib/core/models/model_info.dart
+```dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+part 'model_info.freezed.dart';
+part 'model_info.g.dart';
+@freezed
+class ModelInfo with _$ModelInfo {
+  const factory ModelInfo({
+    required String id,
+    String? name,
+    // 最终生效能力（默认检测 + 手动覆盖后）
+    bool? supportsReasoning,
+    bool? supportsVision,
+    // 用户手动覆盖值
+    bool? overrideSupportsReasoning,
+    bool? overrideSupportsVision,
+  }) = _ModelInfo;
+  factory ModelInfo.fromJson(Map<String, dynamic> json) =>
+      _$ModelInfoFromJson(json);
+}
+```
+
+## File: lib/core/models/model_info.freezed.dart
+```dart
+// coverage:ignore-file
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint
+// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
+part of 'model_info.dart';
+// **************************************************************************
+// FreezedGenerator
+// **************************************************************************
+T _$identity<T>(T value) => value;
+final _privateConstructorUsedError = UnsupportedError(
+  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
+);
+ModelInfo _$ModelInfoFromJson(Map<String, dynamic> json) {
+  return _ModelInfo.fromJson(json);
+}
+/// @nodoc
+mixin _$ModelInfo {
+  String get id => throw _privateConstructorUsedError;
+  String? get name =>
+      throw _privateConstructorUsedError; // 最终生效能力（默认检测 + 手动覆盖后）
+  bool? get supportsReasoning => throw _privateConstructorUsedError;
+  bool? get supportsVision => throw _privateConstructorUsedError; // 用户手动覆盖值
+  bool? get overrideSupportsReasoning => throw _privateConstructorUsedError;
+  bool? get overrideSupportsVision => throw _privateConstructorUsedError;
+  /// Serializes this ModelInfo to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+  /// Create a copy of ModelInfo
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $ModelInfoCopyWith<ModelInfo> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+/// @nodoc
+abstract class $ModelInfoCopyWith<$Res> {
+  factory $ModelInfoCopyWith(ModelInfo value, $Res Function(ModelInfo) then) =
+      _$ModelInfoCopyWithImpl<$Res, ModelInfo>;
+  @useResult
+  $Res call({
+    String id,
+    String? name,
+    bool? supportsReasoning,
+    bool? supportsVision,
+    bool? overrideSupportsReasoning,
+    bool? overrideSupportsVision,
+  });
+}
+/// @nodoc
+class _$ModelInfoCopyWithImpl<$Res, $Val extends ModelInfo>
+    implements $ModelInfoCopyWith<$Res> {
+  _$ModelInfoCopyWithImpl(this._value, this._then);
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+  /// Create a copy of ModelInfo
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? name = freezed,
+    Object? supportsReasoning = freezed,
+    Object? supportsVision = freezed,
+    Object? overrideSupportsReasoning = freezed,
+    Object? overrideSupportsVision = freezed,
+  }) {
+    return _then(
+      _value.copyWith(
+            id: null == id
+                ? _value.id
+                : id // ignore: cast_nullable_to_non_nullable
+                      as String,
+            name: freezed == name
+                ? _value.name
+                : name // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            supportsReasoning: freezed == supportsReasoning
+                ? _value.supportsReasoning
+                : supportsReasoning // ignore: cast_nullable_to_non_nullable
+                      as bool?,
+            supportsVision: freezed == supportsVision
+                ? _value.supportsVision
+                : supportsVision // ignore: cast_nullable_to_non_nullable
+                      as bool?,
+            overrideSupportsReasoning: freezed == overrideSupportsReasoning
+                ? _value.overrideSupportsReasoning
+                : overrideSupportsReasoning // ignore: cast_nullable_to_non_nullable
+                      as bool?,
+            overrideSupportsVision: freezed == overrideSupportsVision
+                ? _value.overrideSupportsVision
+                : overrideSupportsVision // ignore: cast_nullable_to_non_nullable
+                      as bool?,
+          )
+          as $Val,
+    );
+  }
+}
+/// @nodoc
+abstract class _$$ModelInfoImplCopyWith<$Res>
+    implements $ModelInfoCopyWith<$Res> {
+  factory _$$ModelInfoImplCopyWith(
+    _$ModelInfoImpl value,
+    $Res Function(_$ModelInfoImpl) then,
+  ) = __$$ModelInfoImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({
+    String id,
+    String? name,
+    bool? supportsReasoning,
+    bool? supportsVision,
+    bool? overrideSupportsReasoning,
+    bool? overrideSupportsVision,
+  });
+}
+/// @nodoc
+class __$$ModelInfoImplCopyWithImpl<$Res>
+    extends _$ModelInfoCopyWithImpl<$Res, _$ModelInfoImpl>
+    implements _$$ModelInfoImplCopyWith<$Res> {
+  __$$ModelInfoImplCopyWithImpl(
+    _$ModelInfoImpl _value,
+    $Res Function(_$ModelInfoImpl) _then,
+  ) : super(_value, _then);
+  /// Create a copy of ModelInfo
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? name = freezed,
+    Object? supportsReasoning = freezed,
+    Object? supportsVision = freezed,
+    Object? overrideSupportsReasoning = freezed,
+    Object? overrideSupportsVision = freezed,
+  }) {
+    return _then(
+      _$ModelInfoImpl(
+        id: null == id
+            ? _value.id
+            : id // ignore: cast_nullable_to_non_nullable
+                  as String,
+        name: freezed == name
+            ? _value.name
+            : name // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        supportsReasoning: freezed == supportsReasoning
+            ? _value.supportsReasoning
+            : supportsReasoning // ignore: cast_nullable_to_non_nullable
+                  as bool?,
+        supportsVision: freezed == supportsVision
+            ? _value.supportsVision
+            : supportsVision // ignore: cast_nullable_to_non_nullable
+                  as bool?,
+        overrideSupportsReasoning: freezed == overrideSupportsReasoning
+            ? _value.overrideSupportsReasoning
+            : overrideSupportsReasoning // ignore: cast_nullable_to_non_nullable
+                  as bool?,
+        overrideSupportsVision: freezed == overrideSupportsVision
+            ? _value.overrideSupportsVision
+            : overrideSupportsVision // ignore: cast_nullable_to_non_nullable
+                  as bool?,
+      ),
+    );
+  }
+}
+/// @nodoc
+@JsonSerializable()
+class _$ModelInfoImpl implements _ModelInfo {
+  const _$ModelInfoImpl({
+    required this.id,
+    this.name,
+    this.supportsReasoning,
+    this.supportsVision,
+    this.overrideSupportsReasoning,
+    this.overrideSupportsVision,
+  });
+  factory _$ModelInfoImpl.fromJson(Map<String, dynamic> json) =>
+      _$$ModelInfoImplFromJson(json);
+  @override
+  final String id;
+  @override
+  final String? name;
+  // 最终生效能力（默认检测 + 手动覆盖后）
+  @override
+  final bool? supportsReasoning;
+  @override
+  final bool? supportsVision;
+  // 用户手动覆盖值
+  @override
+  final bool? overrideSupportsReasoning;
+  @override
+  final bool? overrideSupportsVision;
+  @override
+  String toString() {
+    return 'ModelInfo(id: $id, name: $name, supportsReasoning: $supportsReasoning, supportsVision: $supportsVision, overrideSupportsReasoning: $overrideSupportsReasoning, overrideSupportsVision: $overrideSupportsVision)';
+  }
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$ModelInfoImpl &&
+            (identical(other.id, id) || other.id == id) &&
+            (identical(other.name, name) || other.name == name) &&
+            (identical(other.supportsReasoning, supportsReasoning) ||
+                other.supportsReasoning == supportsReasoning) &&
+            (identical(other.supportsVision, supportsVision) ||
+                other.supportsVision == supportsVision) &&
+            (identical(
+                  other.overrideSupportsReasoning,
+                  overrideSupportsReasoning,
+                ) ||
+                other.overrideSupportsReasoning == overrideSupportsReasoning) &&
+            (identical(other.overrideSupportsVision, overrideSupportsVision) ||
+                other.overrideSupportsVision == overrideSupportsVision));
+  }
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(
+    runtimeType,
+    id,
+    name,
+    supportsReasoning,
+    supportsVision,
+    overrideSupportsReasoning,
+    overrideSupportsVision,
+  );
+  /// Create a copy of ModelInfo
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$ModelInfoImplCopyWith<_$ModelInfoImpl> get copyWith =>
+      __$$ModelInfoImplCopyWithImpl<_$ModelInfoImpl>(this, _$identity);
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$ModelInfoImplToJson(this);
+  }
+}
+abstract class _ModelInfo implements ModelInfo {
+  const factory _ModelInfo({
+    required final String id,
+    final String? name,
+    final bool? supportsReasoning,
+    final bool? supportsVision,
+    final bool? overrideSupportsReasoning,
+    final bool? overrideSupportsVision,
+  }) = _$ModelInfoImpl;
+  factory _ModelInfo.fromJson(Map<String, dynamic> json) =
+      _$ModelInfoImpl.fromJson;
+  @override
+  String get id;
+  @override
+  String? get name; // 最终生效能力（默认检测 + 手动覆盖后）
+  @override
+  bool? get supportsReasoning;
+  @override
+  bool? get supportsVision; // 用户手动覆盖值
+  @override
+  bool? get overrideSupportsReasoning;
+  @override
+  bool? get overrideSupportsVision;
+  /// Create a copy of ModelInfo
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$ModelInfoImplCopyWith<_$ModelInfoImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+```
+
+## File: lib/core/models/model_info.g.dart
+```dart
+// GENERATED CODE - DO NOT MODIFY BY HAND
+part of 'model_info.dart';
+// **************************************************************************
+// JsonSerializableGenerator
+// **************************************************************************
+_$ModelInfoImpl _$$ModelInfoImplFromJson(Map<String, dynamic> json) =>
+    _$ModelInfoImpl(
+      id: json['id'] as String,
+      name: json['name'] as String?,
+      supportsReasoning: json['supportsReasoning'] as bool?,
+      supportsVision: json['supportsVision'] as bool?,
+      overrideSupportsReasoning: json['overrideSupportsReasoning'] as bool?,
+      overrideSupportsVision: json['overrideSupportsVision'] as bool?,
+    );
+Map<String, dynamic> _$$ModelInfoImplToJson(_$ModelInfoImpl instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'name': instance.name,
+      'supportsReasoning': instance.supportsReasoning,
+      'supportsVision': instance.supportsVision,
+      'overrideSupportsReasoning': instance.overrideSupportsReasoning,
+      'overrideSupportsVision': instance.overrideSupportsVision,
+    };
+```
+
+## File: lib/core/models/sse_event.dart
+```dart
+class SseEvent {
+  final String? id;
+  final String? event;
+  final String data;
+  const SseEvent({
+    this.id,
+    this.event,
+    required this.data,
+  });
+  @override
+  String toString() => 'SseEvent(id: $id, event: $event, data: $data)';
+}
+```
+
+## File: lib/core/utils/app_route_observer.dart
+```dart
+import 'package:flutter/material.dart';
+final RouteObserver<ModalRoute<void>> appRouteObserver =
+    RouteObserver<ModalRoute<void>>();
+```
+
+## File: lib/core/utils/file_name_utils.dart
+```dart
+abstract class FileNameUtils {
+  // Windows/Android/iOS 通用非法字符
+  static final _illegalChars = RegExp(r'[<>:"/\\|?*]');
+  // 清理非法字符
+  static String sanitize(String name) {
+    return name.replaceAll(_illegalChars, '_').trim();
+  }
+  // 生成唯一文件名 (如果存在冲突，自动加数字)
+  // 注意：这里只处理字符串逻辑，实际文件存在性检查应在 Service 层
+  static String makeUnique(String baseName, List<String> existingNames) {
+    final cleanName = sanitize(baseName);
+    if (!existingNames.contains('$cleanName.json')) {
+      return '$cleanName.json';
+    }
+    int counter = 1;
+    while (existingNames.contains('$cleanName$counter.json')) {
+      counter++;
+    }
+    return '$cleanName$counter.json';
+  }
+  // 从文件名提取标题 (去掉 .json)
+  static String extractTitle(String fileName) {
+    return fileName.endsWith('.json') 
+        ? fileName.substring(0, fileName.length - 5) 
+        : fileName;
+  }
+}
+```
+
+## File: lib/core/utils/id_generator.dart
+```dart
+import 'package:uuid/uuid.dart';
+abstract class IdGenerator {
+  static final _uuid = const Uuid();
+  static String generate() {
+    return _uuid.v4();
+  }
+}
+```
+
+## File: lib/core/utils/json_utils.dart
+```dart
+import 'dart:convert';
+import '../errors/exceptions.dart';
+abstract class JsonUtils {
+  static Map<String, dynamic> decode(String source) {
+    try {
+      return jsonDecode(source) as Map<String, dynamic>;
+    } catch (e) {
+      throw const ParseException('JSON 解析失败', code: 'INVALID_JSON');
+    }
+  }
+  static String encode(Map<String, dynamic> data) {
+    try {
+      return jsonEncode(data);
+    } catch (e) {
+      throw const ParseException('JSON 编码失败', code: 'ENCODE_ERROR');
+    }
+  }
+}
+```
+
+## File: lib/core/utils/sse_parser.dart
+```dart
+import '../models/sse_event.dart';
+/// 标准 SSE 解析器
+///
+/// 负责：
+/// - 处理 HTTP 分块不等于 SSE 事件边界的问题
+/// - 支持 event/id/data/retry
+/// - 支持多行 data 拼接
+/// - 以空行作为一个 SSE event 的结束
+class SseParser {
+  String _buffer = '';
+  final List<String> _dataLines = [];
+  String? _event;
+  String? _id;
+  /// 输入任意一段文本，输出当前能够完整解析出的 SSE 事件列表
+  List<SseEvent> addChunk(String chunk) {
+    _buffer += chunk;
+    final events = <SseEvent>[];
+    while (true) {
+      final newlineIndex = _buffer.indexOf('\n');
+      if (newlineIndex == -1) break;
+      var line = _buffer.substring(0, newlineIndex);
+      _buffer = _buffer.substring(newlineIndex + 1);
+      if (line.endsWith('\r')) {
+        line = line.substring(0, line.length - 1);
+      }
+      // 空行 => 一个事件结束
+      if (line.isEmpty) {
+        final event = _flushEvent();
+        if (event != null) {
+          events.add(event);
+        }
+        continue;
+      }
+      // 注释行
+      if (line.startsWith(':')) {
+        continue;
+      }
+      final colonIndex = line.indexOf(':');
+      String field;
+      String value;
+      if (colonIndex == -1) {
+        field = line;
+        value = '';
+      } else {
+        field = line.substring(0, colonIndex);
+        value = line.substring(colonIndex + 1);
+        if (value.startsWith(' ')) {
+          value = value.substring(1);
+        }
+      }
+      switch (field) {
+        case 'event':
+          _event = value;
+          break;
+        case 'data':
+          _dataLines.add(value);
+          break;
+        case 'id':
+          _id = value;
+          break;
+        case 'retry':
+          // 目前不处理自动重试时间
+          break;
+        default:
+          // 未知字段忽略
+          break;
+      }
+    }
+    return events;
+  }
+  /// 在底层流结束时调用，尝试 flush 最后一个未结束事件
+  SseEvent? close() {
+    return _flushEvent();
+  }
+  SseEvent? _flushEvent() {
+    if (_dataLines.isEmpty && _event == null && _id == null) {
+      return null;
+    }
+    final event = SseEvent(
+      id: _id,
+      event: _event,
+      data: _dataLines.join('\n'),
+    );
+    _dataLines.clear();
+    _event = null;
+    _id = null;
+    return event;
+  }
+}
+```
+
+## File: lib/core/utils/time_format_utils.dart
+```dart
+import 'package:intl/intl.dart';
+abstract class TimeFormatUtils {
+  static final DateFormat _dateTimeFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
+  static String formatTimestamp(int timestamp) {
+    final dateTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    return _dateTimeFormat.format(dateTime);
+  }
+}
+```
+
+## File: lib/data/data_sources/remote_api_source.dart
+```dart
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../../core/errors/exceptions.dart';
+import '../../core/models/model_info.dart';
+import '../../core/models/api_message.dart';
+import '../../core/models/chat_chunk.dart';
+import '../../core/utils/sse_parser.dart';
+import '../../domain/services/model_capability_registry.dart';
+import 'sse_event_decoder.dart';
+abstract class IRemoteApiSource {
+  Future<List<ModelInfo>> fetchModels({
+    required String baseUrl,
+    required String apiKey,
+    required String modelsPath,
+  });
+  Stream<ChatChunk> chatStream({
+    required String taskId,
+    required String baseUrl,
+    required String apiKey,
+    required String chatPath,
+    required String apiMode,
+    required String model,
+    required List<ApiMessage> context,
+    bool enableReasoning = false,
+  });
+  void cancelRequest(String taskId);
+}
+class RemoteApiSource implements IRemoteApiSource {
+  final Map<String, http.Client> _activeClients = {};
+  final Set<String> _cancelledTasks = {};
+  String _buildUrl(String baseUrl, String path) {
+    final normalizedBase = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
+    final normalizedPath = path.trim().replaceAll(RegExp(r'^/+'), '');
+    return '$normalizedBase/$normalizedPath';
+  }
+  bool? _readBool(Map<String, dynamic> json, List<String> keys) {
+    for (final key in keys) {
+      if (!json.containsKey(key)) continue;
+      final value = json[key];
+      if (value is bool) return value;
+      if (value is num) return value != 0;
+      if (value is String) {
+        final lower = value.toLowerCase();
+        if (lower == 'true' || lower == '1' || lower == 'yes') return true;
+        if (lower == 'false' || lower == '0' || lower == 'no') return false;
+      }
+    }
+    return null;
+  }
+  ModelInfo _parseModelInfo(Map<String, dynamic> json) {
+    final raw = ModelInfo(
+      id: (json['id'] ?? '').toString(),
+      name: json['name']?.toString(),
+      supportsReasoning: _readBool(json, [
+        'supportsReasoning',
+        'supports_reasoning',
+      ]),
+      supportsVision: _readBool(json, [
+        'supportsVision',
+        'supports_vision',
+        'vision',
+        'supportsImageInput',
+        'supports_image_input',
+      ]),
+      overrideSupportsReasoning: _readBool(json, [
+        'overrideSupportsReasoning',
+        'override_supports_reasoning',
+      ]),
+      overrideSupportsVision: _readBool(json, [
+        'overrideSupportsVision',
+        'override_supports_vision',
+      ]),
+    );
+    return ModelCapabilityRegistry.enhance(raw);
+  }
+  bool _isOnlySingleTextPart(ApiMessage message) {
+    if (message.parts.length != 1) return false;
+    return message.parts.first.maybeWhen(
+      text: (_, text) => true,
+      orElse: () => false,
+    );
+  }
+  Map<String, dynamic> _buildChatCompletionAssistantMessage(ApiMessage message) {
+    final result = <String, dynamic>{
+      'role': 'assistant',
+      'content': message.content ?? '',
+    };
+    if ((message.reasoning ?? '').trim().isNotEmpty) {
+      result['reasoning_content'] = message.reasoning;
+    }
+    return result;
+  }
+  Map<String, dynamic> _buildChatCompletionMessage(ApiMessage message) {
+    if (message.role == 'assistant') {
+      return _buildChatCompletionAssistantMessage(message);
+    }
+    if (message.parts.isEmpty) {
+      return {
+        'role': message.role,
+        'content': message.content ?? '',
+      };
+    }
+    if (_isOnlySingleTextPart(message)) {
+      final text = message.parts.first.maybeWhen(
+        text: (_, text) => text,
+        orElse: () => message.content ?? '',
+      );
+      return {
+        'role': message.role,
+        'content': text,
+      };
+    }
+    return {
+      'role': message.role,
+      'content': message.parts.map((part) {
+        return part.when(
+          text: (type, text) => {
+            'type': 'text',
+            'text': text,
+          },
+          imageUrl: (type, imageUrl) => {
+            'type': 'image_url',
+            'image_url': {
+              'url': imageUrl.url,
+            },
+          },
+        );
+      }).toList(),
+    };
+  }
+  List<Map<String, dynamic>> _buildChatCompletionMessages(
+    List<ApiMessage> context,
+  ) {
+    return context.map(_buildChatCompletionMessage).toList();
+  }
+  Map<String, dynamic> _buildResponsesUserLikeMessage(ApiMessage message) {
+    if (message.parts.isEmpty) {
+      return {
+        'role': message.role,
+        'content': message.content ?? '',
+      };
+    }
+    if (_isOnlySingleTextPart(message)) {
+      final text = message.parts.first.maybeWhen(
+        text: (_, text) => text,
+        orElse: () => message.content ?? '',
+      );
+      return {
+        'role': message.role,
+        'content': text,
+      };
+    }
+    return {
+      'role': message.role,
+      'content': message.parts.map((part) {
+        return part.when(
+          text: (type, text) => {
+            'type': 'input_text',
+            'text': text,
+          },
+          imageUrl: (type, imageUrl) => {
+            'type': 'input_image',
+            'image_url': imageUrl.url,
+          },
+        );
+      }).toList(),
+    };
+  }
+  List<Map<String, dynamic>> _buildResponsesAssistantItems(ApiMessage message) {
+    final items = <Map<String, dynamic>>[];
+    if ((message.reasoning ?? '').trim().isNotEmpty) {
+      items.add({
+        'type': 'reasoning',
+        'summary': [
+          {
+            'type': 'summary_text',
+            'text': message.reasoning,
+          }
+        ],
+      });
+    }
+    if ((message.content ?? '').trim().isNotEmpty) {
+      items.add({
+        'role': 'assistant',
+        'content': message.content,
+      });
+    }
+    return items;
+  }
+  List<Map<String, dynamic>> _buildResponsesInput(
+    List<ApiMessage> context,
+  ) {
+    final result = <Map<String, dynamic>>[];
+    for (final message in context) {
+      if (message.role == 'assistant') {
+        result.addAll(_buildResponsesAssistantItems(message));
+      } else {
+        result.add(_buildResponsesUserLikeMessage(message));
+      }
+    }
+    return result;
+  }
+  Map<String, dynamic> _buildRequestBody({
+    required String apiMode,
+    required String model,
+    required List<ApiMessage> context,
+    required bool enableReasoning,
+  }) {
+    if (apiMode == 'responses') {
+      return {
+        'model': model,
+        'input': _buildResponsesInput(context),
+        'stream': true,
+        'store': false,
+        if (enableReasoning)
+          'reasoning': {
+            'effort': 'medium',
+          },
+      };
+    }
+    return {
+      'model': model,
+      'messages': _buildChatCompletionMessages(context),
+      'stream': true,
+      if (enableReasoning) 'reasoning_effort': 'medium',
+    };
+  }
+  @override
+  Future<List<ModelInfo>> fetchModels({
+    required String baseUrl,
+    required String apiKey,
+    required String modelsPath,
+  }) async {
+    try {
+      final url = Uri.parse(_buildUrl(baseUrl, modelsPath));
+      final response = await http.get(
+        url,
+        headers: {
+          'Authorization': 'Bearer $apiKey',
+          'Content-Type': 'application/json',
+        },
+      );
+      if (response.statusCode != 200) {
+        throw ApiException(
+          '获取模型列表失败：${response.statusCode}',
+          code: 'MODEL_FETCH_ERROR',
+        );
+      }
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      final data = json['data'] as List<dynamic>;
+      return data
+          .map((e) => _parseModelInfo(e as Map<String, dynamic>))
+          .toList();
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException('获取模型列表失败：$e', code: 'MODEL_FETCH_ERROR');
+    }
+  }
+  @override
+  Stream<ChatChunk> chatStream({
+    required String taskId,
+    required String baseUrl,
+    required String apiKey,
+    required String chatPath,
+    required String apiMode,
+    required String model,
+    required List<ApiMessage> context,
+    bool enableReasoning = false,
+  }) async* {
+    _cancelledTasks.remove(taskId);
+    final client = http.Client();
+    _activeClients[taskId] = client;
+    try {
+      final url = Uri.parse(_buildUrl(baseUrl, chatPath));
+      final requestBody = _buildRequestBody(
+        apiMode: apiMode,
+        model: model,
+        context: context,
+        enableReasoning: enableReasoning,
+      );
+      final body = jsonEncode(requestBody);
+      // 调试用：必要时打开
+      // print('REQUEST URL => $url');
+      // print('REQUEST BODY => $body');
+      final request = http.Request('POST', url)
+        ..headers.addAll({
+          'Authorization': 'Bearer $apiKey',
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+        })
+        ..body = body;
+      final streamedResponse = await client.send(request);
+      if (streamedResponse.statusCode < 200 ||
+          streamedResponse.statusCode >= 300) {
+        final errorBody = await streamedResponse.stream.bytesToString();
+        throw ApiException(
+          '流式请求失败：${streamedResponse.statusCode} $errorBody',
+          code: 'CHAT_STREAM_ERROR',
+        );
+      }
+      final parser = SseParser();
+      final stream = streamedResponse.stream.transform(utf8.decoder);
+      await for (final rawChunk in stream) {
+        if (_cancelledTasks.contains(taskId)) {
+          yield const ChatChunk(isDone: true);
+          return;
+        }
+        final events = parser.addChunk(rawChunk);
+        for (final event in events) {
+          if (_cancelledTasks.contains(taskId)) {
+            yield const ChatChunk(isDone: true);
+            return;
+          }
+          try {
+            final decoded = SseEventDecoder.decode(
+              apiMode: apiMode,
+              event: event,
+            );
+            if (decoded == null) continue;
+            yield decoded;
+            if (decoded.isDone) {
+              return;
+            }
+          } catch (e) {
+            // 保持原逻辑风格：单条 SSE 事件解析失败不让整个流崩掉
+            // 如需调试，可打开下面这行：
+            // print('SSE decode error: $e, event=$event');
+          }
+        }
+      }
+      // 流结束时 flush 一次，避免最后一个事件未被空行结尾
+      final lastEvent = parser.close();
+      if (lastEvent != null) {
+        try {
+          final decoded = SseEventDecoder.decode(
+            apiMode: apiMode,
+            event: lastEvent,
+          );
+          if (decoded != null) {
+            yield decoded;
+            if (decoded.isDone) return;
+          }
+        } catch (_) {
+          // 忽略最后一次 flush 解码错误
+        }
+      }
+      yield const ChatChunk(isDone: true);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      if (_cancelledTasks.contains(taskId)) {
+        yield const ChatChunk(isDone: true);
+      } else {
+        yield ChatChunk(isDone: true, error: '流式请求失败：$e');
+      }
+    } finally {
+      _activeClients[taskId]?.close();
+      _activeClients.remove(taskId);
+      _cancelledTasks.remove(taskId);
+    }
+  }
+  @override
+  void cancelRequest(String taskId) {
+    _cancelledTasks.add(taskId);
+    _activeClients[taskId]?.close();
+    _activeClients.remove(taskId);
+  }
+}
+```
+
+## File: lib/data/data_sources/sse_event_decoder.dart
+```dart
+import 'dart:convert';
+import '../../core/models/chat_chunk.dart';
+import '../../core/models/sse_event.dart';
+/// 按不同 API 协议把 SSEEvent 解释成统一的 ChatChunk
+class SseEventDecoder {
+  static ChatChunk? decode({
+    required String apiMode,
+    required SseEvent event,
+  }) {
+    final data = event.data.trim();
+    if (data.isEmpty) return null;
+    if (data == '[DONE]') {
+      return const ChatChunk(isDone: true);
+    }
+    switch (apiMode) {
+      case 'responses':
+        return _decodeResponses(event);
+      case 'chat_completions':
+      default:
+        return _decodeChatCompletions(event);
+    }
+  }
+  static ChatChunk? _decodeChatCompletions(SseEvent event) {
+    final json = jsonDecode(event.data) as Map<String, dynamic>;
+    if (json['error'] != null) {
+      return ChatChunk(
+        isDone: true,
+        error: _extractErrorMessage(json['error']),
+      );
+    }
+    final choices = json['choices'] as List<dynamic>?;
+    if (choices == null || choices.isEmpty) return null;
+    final choice = choices.first as Map<String, dynamic>;
+    final delta = (choice['delta'] as Map<String, dynamic>?) ??
+        (choice['message'] as Map<String, dynamic>?);
+    if (delta == null) return null;
+    final content = delta['content'] as String?;
+    final reasoning = (delta['reasoning_content'] as String?) ??
+        (delta['reasoning'] as String?);
+    // 某些服务会发 finish_reason 但没有内容
+    final finishReason = choice['finish_reason'];
+    if ((content == null || content.isEmpty) &&
+        (reasoning == null || reasoning.isEmpty) &&
+        finishReason != null) {
+      return const ChatChunk(isDone: false);
+    }
+    if (content != null || reasoning != null) {
+      return ChatChunk(
+        content: content,
+        reasoningContent: reasoning,
+        isDone: false,
+      );
+    }
+    return null;
+  }
+  static ChatChunk? _decodeResponses(SseEvent event) {
+    final json = jsonDecode(event.data) as Map<String, dynamic>;
+    final type = json['type'] as String?;
+    switch (type) {
+      case 'response.output_text.delta':
+        final delta = json['delta'] as String?;
+        if (delta == null || delta.isEmpty) return null;
+        return ChatChunk(content: delta, isDone: false);
+      case 'response.reasoning_summary_text.delta':
+      case 'response.reasoning_text.delta':
+        final delta = json['delta'] as String?;
+        if (delta == null || delta.isEmpty) return null;
+        return ChatChunk(reasoningContent: delta, isDone: false);
+      case 'response.completed':
+        return const ChatChunk(isDone: true);
+      case 'response.error':
+        return ChatChunk(
+          isDone: true,
+          error: _extractErrorMessage(json['error']),
+        );
+      default:
+        return null;
+    }
+  }
+  static String _extractErrorMessage(dynamic error) {
+    if (error == null) return '未知错误';
+    if (error is String) return error;
+    if (error is Map<String, dynamic>) {
+      if (error['message'] != null) return error['message'].toString();
+      if (error['error'] != null) return error['error'].toString();
+      return error.toString();
+    }
+    return error.toString();
+  }
+}
+```
+
 ## File: lib/data/database/database.dart
 ```dart
 import 'dart:convert';
@@ -3512,3374 +6767,6 @@ class $AppDatabaseManager {
 }
 ```
 
-## File: lib/core/errors/exceptions.dart
-```dart
-/// 基础应用异常
-class AppException implements Exception {
-  final String message;
-  final String? code;
-  const AppException(this.message, {this.code});
-  @override
-  String toString() => 'AppException: $message (Code: $code)';
-}
-/// 文件操作异常
-class FileException extends AppException {
-  const FileException(super.message, {super.code});
-}
-/// 网络/API 异常
-class ApiException extends AppException {
-  const ApiException(super.message, {super.code});
-}
-/// 配置异常
-class ConfigException extends AppException {
-  const ConfigException(super.message, {super.code});
-}
-/// 数据解析异常
-class ParseException extends AppException {
-  const ParseException(super.message, {super.code});
-}
-```
-
-## File: lib/core/models/api_message.dart
-```dart
-import 'package:freezed_annotation/freezed_annotation.dart';
-part 'api_message.freezed.dart';
-part 'api_message.g.dart';
-@Freezed(unionKey: 'runtimeType')
-class ApiMessageContentPart with _$ApiMessageContentPart {
-  const factory ApiMessageContentPart.text({
-    @Default('text') String type,
-    required String text,
-  }) = ApiMessageTextPart;
-  const factory ApiMessageContentPart.imageUrl({
-    @Default('image_url') String type,
-    @JsonKey(name: 'image_url') required ApiImageUrl imageUrl,
-  }) = ApiMessageImageUrlPart;
-  factory ApiMessageContentPart.fromJson(Map<String, dynamic> json) =>
-      _$ApiMessageContentPartFromJson(json);
-}
-@freezed
-class ApiImageUrl with _$ApiImageUrl {
-  const factory ApiImageUrl({
-    required String url,
-  }) = _ApiImageUrl;
-  factory ApiImageUrl.fromJson(Map<String, dynamic> json) =>
-      _$ApiImageUrlFromJson(json);
-}
-@freezed
-class ApiMessage with _$ApiMessage {
-  const factory ApiMessage({
-    required String role,
-    String? content,
-    String? reasoning,
-    @Default([]) List<ApiMessageContentPart> parts,
-  }) = _ApiMessage;
-  factory ApiMessage.fromJson(Map<String, dynamic> json) =>
-      _$ApiMessageFromJson(json);
-}
-```
-
-## File: lib/core/models/api_message.freezed.dart
-```dart
-// coverage:ignore-file
-// GENERATED CODE - DO NOT MODIFY BY HAND
-// ignore_for_file: type=lint
-// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
-part of 'api_message.dart';
-// **************************************************************************
-// FreezedGenerator
-// **************************************************************************
-T _$identity<T>(T value) => value;
-final _privateConstructorUsedError = UnsupportedError(
-  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
-);
-ApiMessageContentPart _$ApiMessageContentPartFromJson(
-  Map<String, dynamic> json,
-) {
-  switch (json['runtimeType']) {
-    case 'text':
-      return ApiMessageTextPart.fromJson(json);
-    case 'imageUrl':
-      return ApiMessageImageUrlPart.fromJson(json);
-    default:
-      throw CheckedFromJsonException(
-        json,
-        'runtimeType',
-        'ApiMessageContentPart',
-        'Invalid union type "${json['runtimeType']}"!',
-      );
-  }
-}
-/// @nodoc
-mixin _$ApiMessageContentPart {
-  String get type => throw _privateConstructorUsedError;
-  @optionalTypeArgs
-  TResult when<TResult extends Object?>({
-    required TResult Function(String type, String text) text,
-    required TResult Function(
-      String type,
-      @JsonKey(name: 'image_url') ApiImageUrl imageUrl,
-    )
-    imageUrl,
-  }) => throw _privateConstructorUsedError;
-  @optionalTypeArgs
-  TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function(String type, String text)? text,
-    TResult? Function(
-      String type,
-      @JsonKey(name: 'image_url') ApiImageUrl imageUrl,
-    )?
-    imageUrl,
-  }) => throw _privateConstructorUsedError;
-  @optionalTypeArgs
-  TResult maybeWhen<TResult extends Object?>({
-    TResult Function(String type, String text)? text,
-    TResult Function(
-      String type,
-      @JsonKey(name: 'image_url') ApiImageUrl imageUrl,
-    )?
-    imageUrl,
-    required TResult orElse(),
-  }) => throw _privateConstructorUsedError;
-  @optionalTypeArgs
-  TResult map<TResult extends Object?>({
-    required TResult Function(ApiMessageTextPart value) text,
-    required TResult Function(ApiMessageImageUrlPart value) imageUrl,
-  }) => throw _privateConstructorUsedError;
-  @optionalTypeArgs
-  TResult? mapOrNull<TResult extends Object?>({
-    TResult? Function(ApiMessageTextPart value)? text,
-    TResult? Function(ApiMessageImageUrlPart value)? imageUrl,
-  }) => throw _privateConstructorUsedError;
-  @optionalTypeArgs
-  TResult maybeMap<TResult extends Object?>({
-    TResult Function(ApiMessageTextPart value)? text,
-    TResult Function(ApiMessageImageUrlPart value)? imageUrl,
-    required TResult orElse(),
-  }) => throw _privateConstructorUsedError;
-  /// Serializes this ApiMessageContentPart to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-  /// Create a copy of ApiMessageContentPart
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $ApiMessageContentPartCopyWith<ApiMessageContentPart> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-/// @nodoc
-abstract class $ApiMessageContentPartCopyWith<$Res> {
-  factory $ApiMessageContentPartCopyWith(
-    ApiMessageContentPart value,
-    $Res Function(ApiMessageContentPart) then,
-  ) = _$ApiMessageContentPartCopyWithImpl<$Res, ApiMessageContentPart>;
-  @useResult
-  $Res call({String type});
-}
-/// @nodoc
-class _$ApiMessageContentPartCopyWithImpl<
-  $Res,
-  $Val extends ApiMessageContentPart
->
-    implements $ApiMessageContentPartCopyWith<$Res> {
-  _$ApiMessageContentPartCopyWithImpl(this._value, this._then);
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-  /// Create a copy of ApiMessageContentPart
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({Object? type = null}) {
-    return _then(
-      _value.copyWith(
-            type: null == type
-                ? _value.type
-                : type // ignore: cast_nullable_to_non_nullable
-                      as String,
-          )
-          as $Val,
-    );
-  }
-}
-/// @nodoc
-abstract class _$$ApiMessageTextPartImplCopyWith<$Res>
-    implements $ApiMessageContentPartCopyWith<$Res> {
-  factory _$$ApiMessageTextPartImplCopyWith(
-    _$ApiMessageTextPartImpl value,
-    $Res Function(_$ApiMessageTextPartImpl) then,
-  ) = __$$ApiMessageTextPartImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({String type, String text});
-}
-/// @nodoc
-class __$$ApiMessageTextPartImplCopyWithImpl<$Res>
-    extends _$ApiMessageContentPartCopyWithImpl<$Res, _$ApiMessageTextPartImpl>
-    implements _$$ApiMessageTextPartImplCopyWith<$Res> {
-  __$$ApiMessageTextPartImplCopyWithImpl(
-    _$ApiMessageTextPartImpl _value,
-    $Res Function(_$ApiMessageTextPartImpl) _then,
-  ) : super(_value, _then);
-  /// Create a copy of ApiMessageContentPart
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({Object? type = null, Object? text = null}) {
-    return _then(
-      _$ApiMessageTextPartImpl(
-        type: null == type
-            ? _value.type
-            : type // ignore: cast_nullable_to_non_nullable
-                  as String,
-        text: null == text
-            ? _value.text
-            : text // ignore: cast_nullable_to_non_nullable
-                  as String,
-      ),
-    );
-  }
-}
-/// @nodoc
-@JsonSerializable()
-class _$ApiMessageTextPartImpl implements ApiMessageTextPart {
-  const _$ApiMessageTextPartImpl({
-    this.type = 'text',
-    required this.text,
-    final String? $type,
-  }) : $type = $type ?? 'text';
-  factory _$ApiMessageTextPartImpl.fromJson(Map<String, dynamic> json) =>
-      _$$ApiMessageTextPartImplFromJson(json);
-  @override
-  @JsonKey()
-  final String type;
-  @override
-  final String text;
-  @JsonKey(name: 'runtimeType')
-  final String $type;
-  @override
-  String toString() {
-    return 'ApiMessageContentPart.text(type: $type, text: $text)';
-  }
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$ApiMessageTextPartImpl &&
-            (identical(other.type, type) || other.type == type) &&
-            (identical(other.text, text) || other.text == text));
-  }
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  int get hashCode => Object.hash(runtimeType, type, text);
-  /// Create a copy of ApiMessageContentPart
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$ApiMessageTextPartImplCopyWith<_$ApiMessageTextPartImpl> get copyWith =>
-      __$$ApiMessageTextPartImplCopyWithImpl<_$ApiMessageTextPartImpl>(
-        this,
-        _$identity,
-      );
-  @override
-  @optionalTypeArgs
-  TResult when<TResult extends Object?>({
-    required TResult Function(String type, String text) text,
-    required TResult Function(
-      String type,
-      @JsonKey(name: 'image_url') ApiImageUrl imageUrl,
-    )
-    imageUrl,
-  }) {
-    return text(type, this.text);
-  }
-  @override
-  @optionalTypeArgs
-  TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function(String type, String text)? text,
-    TResult? Function(
-      String type,
-      @JsonKey(name: 'image_url') ApiImageUrl imageUrl,
-    )?
-    imageUrl,
-  }) {
-    return text?.call(type, this.text);
-  }
-  @override
-  @optionalTypeArgs
-  TResult maybeWhen<TResult extends Object?>({
-    TResult Function(String type, String text)? text,
-    TResult Function(
-      String type,
-      @JsonKey(name: 'image_url') ApiImageUrl imageUrl,
-    )?
-    imageUrl,
-    required TResult orElse(),
-  }) {
-    if (text != null) {
-      return text(type, this.text);
-    }
-    return orElse();
-  }
-  @override
-  @optionalTypeArgs
-  TResult map<TResult extends Object?>({
-    required TResult Function(ApiMessageTextPart value) text,
-    required TResult Function(ApiMessageImageUrlPart value) imageUrl,
-  }) {
-    return text(this);
-  }
-  @override
-  @optionalTypeArgs
-  TResult? mapOrNull<TResult extends Object?>({
-    TResult? Function(ApiMessageTextPart value)? text,
-    TResult? Function(ApiMessageImageUrlPart value)? imageUrl,
-  }) {
-    return text?.call(this);
-  }
-  @override
-  @optionalTypeArgs
-  TResult maybeMap<TResult extends Object?>({
-    TResult Function(ApiMessageTextPart value)? text,
-    TResult Function(ApiMessageImageUrlPart value)? imageUrl,
-    required TResult orElse(),
-  }) {
-    if (text != null) {
-      return text(this);
-    }
-    return orElse();
-  }
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$ApiMessageTextPartImplToJson(this);
-  }
-}
-abstract class ApiMessageTextPart implements ApiMessageContentPart {
-  const factory ApiMessageTextPart({
-    final String type,
-    required final String text,
-  }) = _$ApiMessageTextPartImpl;
-  factory ApiMessageTextPart.fromJson(Map<String, dynamic> json) =
-      _$ApiMessageTextPartImpl.fromJson;
-  @override
-  String get type;
-  String get text;
-  /// Create a copy of ApiMessageContentPart
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$ApiMessageTextPartImplCopyWith<_$ApiMessageTextPartImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-/// @nodoc
-abstract class _$$ApiMessageImageUrlPartImplCopyWith<$Res>
-    implements $ApiMessageContentPartCopyWith<$Res> {
-  factory _$$ApiMessageImageUrlPartImplCopyWith(
-    _$ApiMessageImageUrlPartImpl value,
-    $Res Function(_$ApiMessageImageUrlPartImpl) then,
-  ) = __$$ApiMessageImageUrlPartImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({String type, @JsonKey(name: 'image_url') ApiImageUrl imageUrl});
-  $ApiImageUrlCopyWith<$Res> get imageUrl;
-}
-/// @nodoc
-class __$$ApiMessageImageUrlPartImplCopyWithImpl<$Res>
-    extends
-        _$ApiMessageContentPartCopyWithImpl<$Res, _$ApiMessageImageUrlPartImpl>
-    implements _$$ApiMessageImageUrlPartImplCopyWith<$Res> {
-  __$$ApiMessageImageUrlPartImplCopyWithImpl(
-    _$ApiMessageImageUrlPartImpl _value,
-    $Res Function(_$ApiMessageImageUrlPartImpl) _then,
-  ) : super(_value, _then);
-  /// Create a copy of ApiMessageContentPart
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({Object? type = null, Object? imageUrl = null}) {
-    return _then(
-      _$ApiMessageImageUrlPartImpl(
-        type: null == type
-            ? _value.type
-            : type // ignore: cast_nullable_to_non_nullable
-                  as String,
-        imageUrl: null == imageUrl
-            ? _value.imageUrl
-            : imageUrl // ignore: cast_nullable_to_non_nullable
-                  as ApiImageUrl,
-      ),
-    );
-  }
-  /// Create a copy of ApiMessageContentPart
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @pragma('vm:prefer-inline')
-  $ApiImageUrlCopyWith<$Res> get imageUrl {
-    return $ApiImageUrlCopyWith<$Res>(_value.imageUrl, (value) {
-      return _then(_value.copyWith(imageUrl: value));
-    });
-  }
-}
-/// @nodoc
-@JsonSerializable()
-class _$ApiMessageImageUrlPartImpl implements ApiMessageImageUrlPart {
-  const _$ApiMessageImageUrlPartImpl({
-    this.type = 'image_url',
-    @JsonKey(name: 'image_url') required this.imageUrl,
-    final String? $type,
-  }) : $type = $type ?? 'imageUrl';
-  factory _$ApiMessageImageUrlPartImpl.fromJson(Map<String, dynamic> json) =>
-      _$$ApiMessageImageUrlPartImplFromJson(json);
-  @override
-  @JsonKey()
-  final String type;
-  @override
-  @JsonKey(name: 'image_url')
-  final ApiImageUrl imageUrl;
-  @JsonKey(name: 'runtimeType')
-  final String $type;
-  @override
-  String toString() {
-    return 'ApiMessageContentPart.imageUrl(type: $type, imageUrl: $imageUrl)';
-  }
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$ApiMessageImageUrlPartImpl &&
-            (identical(other.type, type) || other.type == type) &&
-            (identical(other.imageUrl, imageUrl) ||
-                other.imageUrl == imageUrl));
-  }
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  int get hashCode => Object.hash(runtimeType, type, imageUrl);
-  /// Create a copy of ApiMessageContentPart
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$ApiMessageImageUrlPartImplCopyWith<_$ApiMessageImageUrlPartImpl>
-  get copyWith =>
-      __$$ApiMessageImageUrlPartImplCopyWithImpl<_$ApiMessageImageUrlPartImpl>(
-        this,
-        _$identity,
-      );
-  @override
-  @optionalTypeArgs
-  TResult when<TResult extends Object?>({
-    required TResult Function(String type, String text) text,
-    required TResult Function(
-      String type,
-      @JsonKey(name: 'image_url') ApiImageUrl imageUrl,
-    )
-    imageUrl,
-  }) {
-    return imageUrl(type, this.imageUrl);
-  }
-  @override
-  @optionalTypeArgs
-  TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function(String type, String text)? text,
-    TResult? Function(
-      String type,
-      @JsonKey(name: 'image_url') ApiImageUrl imageUrl,
-    )?
-    imageUrl,
-  }) {
-    return imageUrl?.call(type, this.imageUrl);
-  }
-  @override
-  @optionalTypeArgs
-  TResult maybeWhen<TResult extends Object?>({
-    TResult Function(String type, String text)? text,
-    TResult Function(
-      String type,
-      @JsonKey(name: 'image_url') ApiImageUrl imageUrl,
-    )?
-    imageUrl,
-    required TResult orElse(),
-  }) {
-    if (imageUrl != null) {
-      return imageUrl(type, this.imageUrl);
-    }
-    return orElse();
-  }
-  @override
-  @optionalTypeArgs
-  TResult map<TResult extends Object?>({
-    required TResult Function(ApiMessageTextPart value) text,
-    required TResult Function(ApiMessageImageUrlPart value) imageUrl,
-  }) {
-    return imageUrl(this);
-  }
-  @override
-  @optionalTypeArgs
-  TResult? mapOrNull<TResult extends Object?>({
-    TResult? Function(ApiMessageTextPart value)? text,
-    TResult? Function(ApiMessageImageUrlPart value)? imageUrl,
-  }) {
-    return imageUrl?.call(this);
-  }
-  @override
-  @optionalTypeArgs
-  TResult maybeMap<TResult extends Object?>({
-    TResult Function(ApiMessageTextPart value)? text,
-    TResult Function(ApiMessageImageUrlPart value)? imageUrl,
-    required TResult orElse(),
-  }) {
-    if (imageUrl != null) {
-      return imageUrl(this);
-    }
-    return orElse();
-  }
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$ApiMessageImageUrlPartImplToJson(this);
-  }
-}
-abstract class ApiMessageImageUrlPart implements ApiMessageContentPart {
-  const factory ApiMessageImageUrlPart({
-    final String type,
-    @JsonKey(name: 'image_url') required final ApiImageUrl imageUrl,
-  }) = _$ApiMessageImageUrlPartImpl;
-  factory ApiMessageImageUrlPart.fromJson(Map<String, dynamic> json) =
-      _$ApiMessageImageUrlPartImpl.fromJson;
-  @override
-  String get type;
-  @JsonKey(name: 'image_url')
-  ApiImageUrl get imageUrl;
-  /// Create a copy of ApiMessageContentPart
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$ApiMessageImageUrlPartImplCopyWith<_$ApiMessageImageUrlPartImpl>
-  get copyWith => throw _privateConstructorUsedError;
-}
-ApiImageUrl _$ApiImageUrlFromJson(Map<String, dynamic> json) {
-  return _ApiImageUrl.fromJson(json);
-}
-/// @nodoc
-mixin _$ApiImageUrl {
-  String get url => throw _privateConstructorUsedError;
-  /// Serializes this ApiImageUrl to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-  /// Create a copy of ApiImageUrl
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $ApiImageUrlCopyWith<ApiImageUrl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-/// @nodoc
-abstract class $ApiImageUrlCopyWith<$Res> {
-  factory $ApiImageUrlCopyWith(
-    ApiImageUrl value,
-    $Res Function(ApiImageUrl) then,
-  ) = _$ApiImageUrlCopyWithImpl<$Res, ApiImageUrl>;
-  @useResult
-  $Res call({String url});
-}
-/// @nodoc
-class _$ApiImageUrlCopyWithImpl<$Res, $Val extends ApiImageUrl>
-    implements $ApiImageUrlCopyWith<$Res> {
-  _$ApiImageUrlCopyWithImpl(this._value, this._then);
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-  /// Create a copy of ApiImageUrl
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({Object? url = null}) {
-    return _then(
-      _value.copyWith(
-            url: null == url
-                ? _value.url
-                : url // ignore: cast_nullable_to_non_nullable
-                      as String,
-          )
-          as $Val,
-    );
-  }
-}
-/// @nodoc
-abstract class _$$ApiImageUrlImplCopyWith<$Res>
-    implements $ApiImageUrlCopyWith<$Res> {
-  factory _$$ApiImageUrlImplCopyWith(
-    _$ApiImageUrlImpl value,
-    $Res Function(_$ApiImageUrlImpl) then,
-  ) = __$$ApiImageUrlImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({String url});
-}
-/// @nodoc
-class __$$ApiImageUrlImplCopyWithImpl<$Res>
-    extends _$ApiImageUrlCopyWithImpl<$Res, _$ApiImageUrlImpl>
-    implements _$$ApiImageUrlImplCopyWith<$Res> {
-  __$$ApiImageUrlImplCopyWithImpl(
-    _$ApiImageUrlImpl _value,
-    $Res Function(_$ApiImageUrlImpl) _then,
-  ) : super(_value, _then);
-  /// Create a copy of ApiImageUrl
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({Object? url = null}) {
-    return _then(
-      _$ApiImageUrlImpl(
-        url: null == url
-            ? _value.url
-            : url // ignore: cast_nullable_to_non_nullable
-                  as String,
-      ),
-    );
-  }
-}
-/// @nodoc
-@JsonSerializable()
-class _$ApiImageUrlImpl implements _ApiImageUrl {
-  const _$ApiImageUrlImpl({required this.url});
-  factory _$ApiImageUrlImpl.fromJson(Map<String, dynamic> json) =>
-      _$$ApiImageUrlImplFromJson(json);
-  @override
-  final String url;
-  @override
-  String toString() {
-    return 'ApiImageUrl(url: $url)';
-  }
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$ApiImageUrlImpl &&
-            (identical(other.url, url) || other.url == url));
-  }
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  int get hashCode => Object.hash(runtimeType, url);
-  /// Create a copy of ApiImageUrl
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$ApiImageUrlImplCopyWith<_$ApiImageUrlImpl> get copyWith =>
-      __$$ApiImageUrlImplCopyWithImpl<_$ApiImageUrlImpl>(this, _$identity);
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$ApiImageUrlImplToJson(this);
-  }
-}
-abstract class _ApiImageUrl implements ApiImageUrl {
-  const factory _ApiImageUrl({required final String url}) = _$ApiImageUrlImpl;
-  factory _ApiImageUrl.fromJson(Map<String, dynamic> json) =
-      _$ApiImageUrlImpl.fromJson;
-  @override
-  String get url;
-  /// Create a copy of ApiImageUrl
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$ApiImageUrlImplCopyWith<_$ApiImageUrlImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-ApiMessage _$ApiMessageFromJson(Map<String, dynamic> json) {
-  return _ApiMessage.fromJson(json);
-}
-/// @nodoc
-mixin _$ApiMessage {
-  String get role => throw _privateConstructorUsedError;
-  String? get content => throw _privateConstructorUsedError;
-  String? get reasoning => throw _privateConstructorUsedError;
-  List<ApiMessageContentPart> get parts => throw _privateConstructorUsedError;
-  /// Serializes this ApiMessage to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-  /// Create a copy of ApiMessage
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $ApiMessageCopyWith<ApiMessage> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-/// @nodoc
-abstract class $ApiMessageCopyWith<$Res> {
-  factory $ApiMessageCopyWith(
-    ApiMessage value,
-    $Res Function(ApiMessage) then,
-  ) = _$ApiMessageCopyWithImpl<$Res, ApiMessage>;
-  @useResult
-  $Res call({
-    String role,
-    String? content,
-    String? reasoning,
-    List<ApiMessageContentPart> parts,
-  });
-}
-/// @nodoc
-class _$ApiMessageCopyWithImpl<$Res, $Val extends ApiMessage>
-    implements $ApiMessageCopyWith<$Res> {
-  _$ApiMessageCopyWithImpl(this._value, this._then);
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-  /// Create a copy of ApiMessage
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? role = null,
-    Object? content = freezed,
-    Object? reasoning = freezed,
-    Object? parts = null,
-  }) {
-    return _then(
-      _value.copyWith(
-            role: null == role
-                ? _value.role
-                : role // ignore: cast_nullable_to_non_nullable
-                      as String,
-            content: freezed == content
-                ? _value.content
-                : content // ignore: cast_nullable_to_non_nullable
-                      as String?,
-            reasoning: freezed == reasoning
-                ? _value.reasoning
-                : reasoning // ignore: cast_nullable_to_non_nullable
-                      as String?,
-            parts: null == parts
-                ? _value.parts
-                : parts // ignore: cast_nullable_to_non_nullable
-                      as List<ApiMessageContentPart>,
-          )
-          as $Val,
-    );
-  }
-}
-/// @nodoc
-abstract class _$$ApiMessageImplCopyWith<$Res>
-    implements $ApiMessageCopyWith<$Res> {
-  factory _$$ApiMessageImplCopyWith(
-    _$ApiMessageImpl value,
-    $Res Function(_$ApiMessageImpl) then,
-  ) = __$$ApiMessageImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({
-    String role,
-    String? content,
-    String? reasoning,
-    List<ApiMessageContentPart> parts,
-  });
-}
-/// @nodoc
-class __$$ApiMessageImplCopyWithImpl<$Res>
-    extends _$ApiMessageCopyWithImpl<$Res, _$ApiMessageImpl>
-    implements _$$ApiMessageImplCopyWith<$Res> {
-  __$$ApiMessageImplCopyWithImpl(
-    _$ApiMessageImpl _value,
-    $Res Function(_$ApiMessageImpl) _then,
-  ) : super(_value, _then);
-  /// Create a copy of ApiMessage
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? role = null,
-    Object? content = freezed,
-    Object? reasoning = freezed,
-    Object? parts = null,
-  }) {
-    return _then(
-      _$ApiMessageImpl(
-        role: null == role
-            ? _value.role
-            : role // ignore: cast_nullable_to_non_nullable
-                  as String,
-        content: freezed == content
-            ? _value.content
-            : content // ignore: cast_nullable_to_non_nullable
-                  as String?,
-        reasoning: freezed == reasoning
-            ? _value.reasoning
-            : reasoning // ignore: cast_nullable_to_non_nullable
-                  as String?,
-        parts: null == parts
-            ? _value._parts
-            : parts // ignore: cast_nullable_to_non_nullable
-                  as List<ApiMessageContentPart>,
-      ),
-    );
-  }
-}
-/// @nodoc
-@JsonSerializable()
-class _$ApiMessageImpl implements _ApiMessage {
-  const _$ApiMessageImpl({
-    required this.role,
-    this.content,
-    this.reasoning,
-    final List<ApiMessageContentPart> parts = const [],
-  }) : _parts = parts;
-  factory _$ApiMessageImpl.fromJson(Map<String, dynamic> json) =>
-      _$$ApiMessageImplFromJson(json);
-  @override
-  final String role;
-  @override
-  final String? content;
-  @override
-  final String? reasoning;
-  final List<ApiMessageContentPart> _parts;
-  @override
-  @JsonKey()
-  List<ApiMessageContentPart> get parts {
-    if (_parts is EqualUnmodifiableListView) return _parts;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableListView(_parts);
-  }
-  @override
-  String toString() {
-    return 'ApiMessage(role: $role, content: $content, reasoning: $reasoning, parts: $parts)';
-  }
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$ApiMessageImpl &&
-            (identical(other.role, role) || other.role == role) &&
-            (identical(other.content, content) || other.content == content) &&
-            (identical(other.reasoning, reasoning) ||
-                other.reasoning == reasoning) &&
-            const DeepCollectionEquality().equals(other._parts, _parts));
-  }
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  int get hashCode => Object.hash(
-    runtimeType,
-    role,
-    content,
-    reasoning,
-    const DeepCollectionEquality().hash(_parts),
-  );
-  /// Create a copy of ApiMessage
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$ApiMessageImplCopyWith<_$ApiMessageImpl> get copyWith =>
-      __$$ApiMessageImplCopyWithImpl<_$ApiMessageImpl>(this, _$identity);
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$ApiMessageImplToJson(this);
-  }
-}
-abstract class _ApiMessage implements ApiMessage {
-  const factory _ApiMessage({
-    required final String role,
-    final String? content,
-    final String? reasoning,
-    final List<ApiMessageContentPart> parts,
-  }) = _$ApiMessageImpl;
-  factory _ApiMessage.fromJson(Map<String, dynamic> json) =
-      _$ApiMessageImpl.fromJson;
-  @override
-  String get role;
-  @override
-  String? get content;
-  @override
-  String? get reasoning;
-  @override
-  List<ApiMessageContentPart> get parts;
-  /// Create a copy of ApiMessage
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$ApiMessageImplCopyWith<_$ApiMessageImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-```
-
-## File: lib/core/models/api_message.g.dart
-```dart
-// GENERATED CODE - DO NOT MODIFY BY HAND
-part of 'api_message.dart';
-// **************************************************************************
-// JsonSerializableGenerator
-// **************************************************************************
-_$ApiMessageTextPartImpl _$$ApiMessageTextPartImplFromJson(
-  Map<String, dynamic> json,
-) => _$ApiMessageTextPartImpl(
-  type: json['type'] as String? ?? 'text',
-  text: json['text'] as String,
-  $type: json['runtimeType'] as String?,
-);
-Map<String, dynamic> _$$ApiMessageTextPartImplToJson(
-  _$ApiMessageTextPartImpl instance,
-) => <String, dynamic>{
-  'type': instance.type,
-  'text': instance.text,
-  'runtimeType': instance.$type,
-};
-_$ApiMessageImageUrlPartImpl _$$ApiMessageImageUrlPartImplFromJson(
-  Map<String, dynamic> json,
-) => _$ApiMessageImageUrlPartImpl(
-  type: json['type'] as String? ?? 'image_url',
-  imageUrl: ApiImageUrl.fromJson(json['image_url'] as Map<String, dynamic>),
-  $type: json['runtimeType'] as String?,
-);
-Map<String, dynamic> _$$ApiMessageImageUrlPartImplToJson(
-  _$ApiMessageImageUrlPartImpl instance,
-) => <String, dynamic>{
-  'type': instance.type,
-  'image_url': instance.imageUrl,
-  'runtimeType': instance.$type,
-};
-_$ApiImageUrlImpl _$$ApiImageUrlImplFromJson(Map<String, dynamic> json) =>
-    _$ApiImageUrlImpl(url: json['url'] as String);
-Map<String, dynamic> _$$ApiImageUrlImplToJson(_$ApiImageUrlImpl instance) =>
-    <String, dynamic>{'url': instance.url};
-_$ApiMessageImpl _$$ApiMessageImplFromJson(Map<String, dynamic> json) =>
-    _$ApiMessageImpl(
-      role: json['role'] as String,
-      content: json['content'] as String?,
-      reasoning: json['reasoning'] as String?,
-      parts:
-          (json['parts'] as List<dynamic>?)
-              ?.map(
-                (e) =>
-                    ApiMessageContentPart.fromJson(e as Map<String, dynamic>),
-              )
-              .toList() ??
-          const [],
-    );
-Map<String, dynamic> _$$ApiMessageImplToJson(_$ApiMessageImpl instance) =>
-    <String, dynamic>{
-      'role': instance.role,
-      'content': instance.content,
-      'reasoning': instance.reasoning,
-      'parts': instance.parts,
-    };
-```
-
-## File: lib/core/models/app_config_store.dart
-```dart
-import 'package:freezed_annotation/freezed_annotation.dart';
-import 'app_config.dart';
-part 'app_config_store.freezed.dart';
-part 'app_config_store.g.dart';
-@freezed
-class ConfigProfile with _$ConfigProfile {
-  const factory ConfigProfile({
-    required String id,
-    required String name,
-    required AppConfig config,
-  }) = _ConfigProfile;
-  factory ConfigProfile.fromJson(Map<String, dynamic> json) =>
-      _$ConfigProfileFromJson(json);
-}
-@freezed
-class AppConfigStore with _$AppConfigStore {
-  const factory AppConfigStore({
-    required String activeProfileId,
-    @Default([]) List<ConfigProfile> profiles,
-  }) = _AppConfigStore;
-  factory AppConfigStore.fromJson(Map<String, dynamic> json) =>
-      _$AppConfigStoreFromJson(json);
-  factory AppConfigStore.defaultStore() => AppConfigStore(
-        activeProfileId: 'default',
-        profiles: [
-          ConfigProfile(
-            id: 'default',
-            name: '默认配置',
-            config: AppConfig.defaultConfig(),
-          ),
-        ],
-      );
-}
-```
-
-## File: lib/core/models/app_config_store.freezed.dart
-```dart
-// coverage:ignore-file
-// GENERATED CODE - DO NOT MODIFY BY HAND
-// ignore_for_file: type=lint
-// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
-part of 'app_config_store.dart';
-// **************************************************************************
-// FreezedGenerator
-// **************************************************************************
-T _$identity<T>(T value) => value;
-final _privateConstructorUsedError = UnsupportedError(
-  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
-);
-ConfigProfile _$ConfigProfileFromJson(Map<String, dynamic> json) {
-  return _ConfigProfile.fromJson(json);
-}
-/// @nodoc
-mixin _$ConfigProfile {
-  String get id => throw _privateConstructorUsedError;
-  String get name => throw _privateConstructorUsedError;
-  AppConfig get config => throw _privateConstructorUsedError;
-  /// Serializes this ConfigProfile to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-  /// Create a copy of ConfigProfile
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $ConfigProfileCopyWith<ConfigProfile> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-/// @nodoc
-abstract class $ConfigProfileCopyWith<$Res> {
-  factory $ConfigProfileCopyWith(
-    ConfigProfile value,
-    $Res Function(ConfigProfile) then,
-  ) = _$ConfigProfileCopyWithImpl<$Res, ConfigProfile>;
-  @useResult
-  $Res call({String id, String name, AppConfig config});
-  $AppConfigCopyWith<$Res> get config;
-}
-/// @nodoc
-class _$ConfigProfileCopyWithImpl<$Res, $Val extends ConfigProfile>
-    implements $ConfigProfileCopyWith<$Res> {
-  _$ConfigProfileCopyWithImpl(this._value, this._then);
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-  /// Create a copy of ConfigProfile
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({Object? id = null, Object? name = null, Object? config = null}) {
-    return _then(
-      _value.copyWith(
-            id: null == id
-                ? _value.id
-                : id // ignore: cast_nullable_to_non_nullable
-                      as String,
-            name: null == name
-                ? _value.name
-                : name // ignore: cast_nullable_to_non_nullable
-                      as String,
-            config: null == config
-                ? _value.config
-                : config // ignore: cast_nullable_to_non_nullable
-                      as AppConfig,
-          )
-          as $Val,
-    );
-  }
-  /// Create a copy of ConfigProfile
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @pragma('vm:prefer-inline')
-  $AppConfigCopyWith<$Res> get config {
-    return $AppConfigCopyWith<$Res>(_value.config, (value) {
-      return _then(_value.copyWith(config: value) as $Val);
-    });
-  }
-}
-/// @nodoc
-abstract class _$$ConfigProfileImplCopyWith<$Res>
-    implements $ConfigProfileCopyWith<$Res> {
-  factory _$$ConfigProfileImplCopyWith(
-    _$ConfigProfileImpl value,
-    $Res Function(_$ConfigProfileImpl) then,
-  ) = __$$ConfigProfileImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({String id, String name, AppConfig config});
-  @override
-  $AppConfigCopyWith<$Res> get config;
-}
-/// @nodoc
-class __$$ConfigProfileImplCopyWithImpl<$Res>
-    extends _$ConfigProfileCopyWithImpl<$Res, _$ConfigProfileImpl>
-    implements _$$ConfigProfileImplCopyWith<$Res> {
-  __$$ConfigProfileImplCopyWithImpl(
-    _$ConfigProfileImpl _value,
-    $Res Function(_$ConfigProfileImpl) _then,
-  ) : super(_value, _then);
-  /// Create a copy of ConfigProfile
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({Object? id = null, Object? name = null, Object? config = null}) {
-    return _then(
-      _$ConfigProfileImpl(
-        id: null == id
-            ? _value.id
-            : id // ignore: cast_nullable_to_non_nullable
-                  as String,
-        name: null == name
-            ? _value.name
-            : name // ignore: cast_nullable_to_non_nullable
-                  as String,
-        config: null == config
-            ? _value.config
-            : config // ignore: cast_nullable_to_non_nullable
-                  as AppConfig,
-      ),
-    );
-  }
-}
-/// @nodoc
-@JsonSerializable()
-class _$ConfigProfileImpl implements _ConfigProfile {
-  const _$ConfigProfileImpl({
-    required this.id,
-    required this.name,
-    required this.config,
-  });
-  factory _$ConfigProfileImpl.fromJson(Map<String, dynamic> json) =>
-      _$$ConfigProfileImplFromJson(json);
-  @override
-  final String id;
-  @override
-  final String name;
-  @override
-  final AppConfig config;
-  @override
-  String toString() {
-    return 'ConfigProfile(id: $id, name: $name, config: $config)';
-  }
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$ConfigProfileImpl &&
-            (identical(other.id, id) || other.id == id) &&
-            (identical(other.name, name) || other.name == name) &&
-            (identical(other.config, config) || other.config == config));
-  }
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  int get hashCode => Object.hash(runtimeType, id, name, config);
-  /// Create a copy of ConfigProfile
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$ConfigProfileImplCopyWith<_$ConfigProfileImpl> get copyWith =>
-      __$$ConfigProfileImplCopyWithImpl<_$ConfigProfileImpl>(this, _$identity);
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$ConfigProfileImplToJson(this);
-  }
-}
-abstract class _ConfigProfile implements ConfigProfile {
-  const factory _ConfigProfile({
-    required final String id,
-    required final String name,
-    required final AppConfig config,
-  }) = _$ConfigProfileImpl;
-  factory _ConfigProfile.fromJson(Map<String, dynamic> json) =
-      _$ConfigProfileImpl.fromJson;
-  @override
-  String get id;
-  @override
-  String get name;
-  @override
-  AppConfig get config;
-  /// Create a copy of ConfigProfile
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$ConfigProfileImplCopyWith<_$ConfigProfileImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-AppConfigStore _$AppConfigStoreFromJson(Map<String, dynamic> json) {
-  return _AppConfigStore.fromJson(json);
-}
-/// @nodoc
-mixin _$AppConfigStore {
-  String get activeProfileId => throw _privateConstructorUsedError;
-  List<ConfigProfile> get profiles => throw _privateConstructorUsedError;
-  /// Serializes this AppConfigStore to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-  /// Create a copy of AppConfigStore
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $AppConfigStoreCopyWith<AppConfigStore> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-/// @nodoc
-abstract class $AppConfigStoreCopyWith<$Res> {
-  factory $AppConfigStoreCopyWith(
-    AppConfigStore value,
-    $Res Function(AppConfigStore) then,
-  ) = _$AppConfigStoreCopyWithImpl<$Res, AppConfigStore>;
-  @useResult
-  $Res call({String activeProfileId, List<ConfigProfile> profiles});
-}
-/// @nodoc
-class _$AppConfigStoreCopyWithImpl<$Res, $Val extends AppConfigStore>
-    implements $AppConfigStoreCopyWith<$Res> {
-  _$AppConfigStoreCopyWithImpl(this._value, this._then);
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-  /// Create a copy of AppConfigStore
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({Object? activeProfileId = null, Object? profiles = null}) {
-    return _then(
-      _value.copyWith(
-            activeProfileId: null == activeProfileId
-                ? _value.activeProfileId
-                : activeProfileId // ignore: cast_nullable_to_non_nullable
-                      as String,
-            profiles: null == profiles
-                ? _value.profiles
-                : profiles // ignore: cast_nullable_to_non_nullable
-                      as List<ConfigProfile>,
-          )
-          as $Val,
-    );
-  }
-}
-/// @nodoc
-abstract class _$$AppConfigStoreImplCopyWith<$Res>
-    implements $AppConfigStoreCopyWith<$Res> {
-  factory _$$AppConfigStoreImplCopyWith(
-    _$AppConfigStoreImpl value,
-    $Res Function(_$AppConfigStoreImpl) then,
-  ) = __$$AppConfigStoreImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({String activeProfileId, List<ConfigProfile> profiles});
-}
-/// @nodoc
-class __$$AppConfigStoreImplCopyWithImpl<$Res>
-    extends _$AppConfigStoreCopyWithImpl<$Res, _$AppConfigStoreImpl>
-    implements _$$AppConfigStoreImplCopyWith<$Res> {
-  __$$AppConfigStoreImplCopyWithImpl(
-    _$AppConfigStoreImpl _value,
-    $Res Function(_$AppConfigStoreImpl) _then,
-  ) : super(_value, _then);
-  /// Create a copy of AppConfigStore
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({Object? activeProfileId = null, Object? profiles = null}) {
-    return _then(
-      _$AppConfigStoreImpl(
-        activeProfileId: null == activeProfileId
-            ? _value.activeProfileId
-            : activeProfileId // ignore: cast_nullable_to_non_nullable
-                  as String,
-        profiles: null == profiles
-            ? _value._profiles
-            : profiles // ignore: cast_nullable_to_non_nullable
-                  as List<ConfigProfile>,
-      ),
-    );
-  }
-}
-/// @nodoc
-@JsonSerializable()
-class _$AppConfigStoreImpl implements _AppConfigStore {
-  const _$AppConfigStoreImpl({
-    required this.activeProfileId,
-    final List<ConfigProfile> profiles = const [],
-  }) : _profiles = profiles;
-  factory _$AppConfigStoreImpl.fromJson(Map<String, dynamic> json) =>
-      _$$AppConfigStoreImplFromJson(json);
-  @override
-  final String activeProfileId;
-  final List<ConfigProfile> _profiles;
-  @override
-  @JsonKey()
-  List<ConfigProfile> get profiles {
-    if (_profiles is EqualUnmodifiableListView) return _profiles;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableListView(_profiles);
-  }
-  @override
-  String toString() {
-    return 'AppConfigStore(activeProfileId: $activeProfileId, profiles: $profiles)';
-  }
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$AppConfigStoreImpl &&
-            (identical(other.activeProfileId, activeProfileId) ||
-                other.activeProfileId == activeProfileId) &&
-            const DeepCollectionEquality().equals(other._profiles, _profiles));
-  }
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  int get hashCode => Object.hash(
-    runtimeType,
-    activeProfileId,
-    const DeepCollectionEquality().hash(_profiles),
-  );
-  /// Create a copy of AppConfigStore
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$AppConfigStoreImplCopyWith<_$AppConfigStoreImpl> get copyWith =>
-      __$$AppConfigStoreImplCopyWithImpl<_$AppConfigStoreImpl>(
-        this,
-        _$identity,
-      );
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$AppConfigStoreImplToJson(this);
-  }
-}
-abstract class _AppConfigStore implements AppConfigStore {
-  const factory _AppConfigStore({
-    required final String activeProfileId,
-    final List<ConfigProfile> profiles,
-  }) = _$AppConfigStoreImpl;
-  factory _AppConfigStore.fromJson(Map<String, dynamic> json) =
-      _$AppConfigStoreImpl.fromJson;
-  @override
-  String get activeProfileId;
-  @override
-  List<ConfigProfile> get profiles;
-  /// Create a copy of AppConfigStore
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$AppConfigStoreImplCopyWith<_$AppConfigStoreImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-```
-
-## File: lib/core/models/app_config_store.g.dart
-```dart
-// GENERATED CODE - DO NOT MODIFY BY HAND
-part of 'app_config_store.dart';
-// **************************************************************************
-// JsonSerializableGenerator
-// **************************************************************************
-_$ConfigProfileImpl _$$ConfigProfileImplFromJson(Map<String, dynamic> json) =>
-    _$ConfigProfileImpl(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      config: AppConfig.fromJson(json['config'] as Map<String, dynamic>),
-    );
-Map<String, dynamic> _$$ConfigProfileImplToJson(_$ConfigProfileImpl instance) =>
-    <String, dynamic>{
-      'id': instance.id,
-      'name': instance.name,
-      'config': instance.config,
-    };
-_$AppConfigStoreImpl _$$AppConfigStoreImplFromJson(Map<String, dynamic> json) =>
-    _$AppConfigStoreImpl(
-      activeProfileId: json['activeProfileId'] as String,
-      profiles:
-          (json['profiles'] as List<dynamic>?)
-              ?.map((e) => ConfigProfile.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          const [],
-    );
-Map<String, dynamic> _$$AppConfigStoreImplToJson(
-  _$AppConfigStoreImpl instance,
-) => <String, dynamic>{
-  'activeProfileId': instance.activeProfileId,
-  'profiles': instance.profiles,
-};
-```
-
-## File: lib/core/models/app_config.dart
-```dart
-import 'package:freezed_annotation/freezed_annotation.dart';
-import 'model_info.dart';
-part 'app_config.freezed.dart';
-part 'app_config.g.dart';
-List<ModelInfo>? _modelsFromJson(List<dynamic>? json) =>
-    json?.map((e) => ModelInfo.fromJson(e as Map<String, dynamic>)).toList();
-List<Map<String, dynamic>>? _modelsToJson(List<ModelInfo>? models) =>
-    models?.map((e) => e.toJson()).toList();
-@freezed
-class AppConfig with _$AppConfig {
-  const factory AppConfig({
-    required String baseUrl,
-    required String apiKey,
-    String? selectedModel,
-    @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
-    List<ModelInfo>? availableModels,
-    @Default('system') String theme,
-    @Default('v1/models') String modelsPath,
-    @Default('v1/chat/completions') String chatPath,
-    @Default('chat_completions') String apiMode,
-  }) = _AppConfig;
-  factory AppConfig.fromJson(Map<String, dynamic> json) =>
-      _$AppConfigFromJson(json);
-  factory AppConfig.defaultConfig() => const AppConfig(
-        baseUrl: 'https://api.openai.com',
-        apiKey: '',
-        theme: 'system',
-        modelsPath: 'v1/models',
-        chatPath: 'v1/chat/completions',
-        apiMode: 'chat_completions',
-      );
-}
-```
-
-## File: lib/core/models/app_config.freezed.dart
-```dart
-// coverage:ignore-file
-// GENERATED CODE - DO NOT MODIFY BY HAND
-// ignore_for_file: type=lint
-// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
-part of 'app_config.dart';
-// **************************************************************************
-// FreezedGenerator
-// **************************************************************************
-T _$identity<T>(T value) => value;
-final _privateConstructorUsedError = UnsupportedError(
-  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
-);
-AppConfig _$AppConfigFromJson(Map<String, dynamic> json) {
-  return _AppConfig.fromJson(json);
-}
-/// @nodoc
-mixin _$AppConfig {
-  String get baseUrl => throw _privateConstructorUsedError;
-  String get apiKey => throw _privateConstructorUsedError;
-  String? get selectedModel => throw _privateConstructorUsedError;
-  @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
-  List<ModelInfo>? get availableModels => throw _privateConstructorUsedError;
-  String get theme => throw _privateConstructorUsedError;
-  String get modelsPath => throw _privateConstructorUsedError;
-  String get chatPath => throw _privateConstructorUsedError;
-  String get apiMode => throw _privateConstructorUsedError;
-  /// Serializes this AppConfig to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-  /// Create a copy of AppConfig
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $AppConfigCopyWith<AppConfig> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-/// @nodoc
-abstract class $AppConfigCopyWith<$Res> {
-  factory $AppConfigCopyWith(AppConfig value, $Res Function(AppConfig) then) =
-      _$AppConfigCopyWithImpl<$Res, AppConfig>;
-  @useResult
-  $Res call({
-    String baseUrl,
-    String apiKey,
-    String? selectedModel,
-    @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
-    List<ModelInfo>? availableModels,
-    String theme,
-    String modelsPath,
-    String chatPath,
-    String apiMode,
-  });
-}
-/// @nodoc
-class _$AppConfigCopyWithImpl<$Res, $Val extends AppConfig>
-    implements $AppConfigCopyWith<$Res> {
-  _$AppConfigCopyWithImpl(this._value, this._then);
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-  /// Create a copy of AppConfig
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? baseUrl = null,
-    Object? apiKey = null,
-    Object? selectedModel = freezed,
-    Object? availableModels = freezed,
-    Object? theme = null,
-    Object? modelsPath = null,
-    Object? chatPath = null,
-    Object? apiMode = null,
-  }) {
-    return _then(
-      _value.copyWith(
-            baseUrl: null == baseUrl
-                ? _value.baseUrl
-                : baseUrl // ignore: cast_nullable_to_non_nullable
-                      as String,
-            apiKey: null == apiKey
-                ? _value.apiKey
-                : apiKey // ignore: cast_nullable_to_non_nullable
-                      as String,
-            selectedModel: freezed == selectedModel
-                ? _value.selectedModel
-                : selectedModel // ignore: cast_nullable_to_non_nullable
-                      as String?,
-            availableModels: freezed == availableModels
-                ? _value.availableModels
-                : availableModels // ignore: cast_nullable_to_non_nullable
-                      as List<ModelInfo>?,
-            theme: null == theme
-                ? _value.theme
-                : theme // ignore: cast_nullable_to_non_nullable
-                      as String,
-            modelsPath: null == modelsPath
-                ? _value.modelsPath
-                : modelsPath // ignore: cast_nullable_to_non_nullable
-                      as String,
-            chatPath: null == chatPath
-                ? _value.chatPath
-                : chatPath // ignore: cast_nullable_to_non_nullable
-                      as String,
-            apiMode: null == apiMode
-                ? _value.apiMode
-                : apiMode // ignore: cast_nullable_to_non_nullable
-                      as String,
-          )
-          as $Val,
-    );
-  }
-}
-/// @nodoc
-abstract class _$$AppConfigImplCopyWith<$Res>
-    implements $AppConfigCopyWith<$Res> {
-  factory _$$AppConfigImplCopyWith(
-    _$AppConfigImpl value,
-    $Res Function(_$AppConfigImpl) then,
-  ) = __$$AppConfigImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({
-    String baseUrl,
-    String apiKey,
-    String? selectedModel,
-    @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
-    List<ModelInfo>? availableModels,
-    String theme,
-    String modelsPath,
-    String chatPath,
-    String apiMode,
-  });
-}
-/// @nodoc
-class __$$AppConfigImplCopyWithImpl<$Res>
-    extends _$AppConfigCopyWithImpl<$Res, _$AppConfigImpl>
-    implements _$$AppConfigImplCopyWith<$Res> {
-  __$$AppConfigImplCopyWithImpl(
-    _$AppConfigImpl _value,
-    $Res Function(_$AppConfigImpl) _then,
-  ) : super(_value, _then);
-  /// Create a copy of AppConfig
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? baseUrl = null,
-    Object? apiKey = null,
-    Object? selectedModel = freezed,
-    Object? availableModels = freezed,
-    Object? theme = null,
-    Object? modelsPath = null,
-    Object? chatPath = null,
-    Object? apiMode = null,
-  }) {
-    return _then(
-      _$AppConfigImpl(
-        baseUrl: null == baseUrl
-            ? _value.baseUrl
-            : baseUrl // ignore: cast_nullable_to_non_nullable
-                  as String,
-        apiKey: null == apiKey
-            ? _value.apiKey
-            : apiKey // ignore: cast_nullable_to_non_nullable
-                  as String,
-        selectedModel: freezed == selectedModel
-            ? _value.selectedModel
-            : selectedModel // ignore: cast_nullable_to_non_nullable
-                  as String?,
-        availableModels: freezed == availableModels
-            ? _value._availableModels
-            : availableModels // ignore: cast_nullable_to_non_nullable
-                  as List<ModelInfo>?,
-        theme: null == theme
-            ? _value.theme
-            : theme // ignore: cast_nullable_to_non_nullable
-                  as String,
-        modelsPath: null == modelsPath
-            ? _value.modelsPath
-            : modelsPath // ignore: cast_nullable_to_non_nullable
-                  as String,
-        chatPath: null == chatPath
-            ? _value.chatPath
-            : chatPath // ignore: cast_nullable_to_non_nullable
-                  as String,
-        apiMode: null == apiMode
-            ? _value.apiMode
-            : apiMode // ignore: cast_nullable_to_non_nullable
-                  as String,
-      ),
-    );
-  }
-}
-/// @nodoc
-@JsonSerializable()
-class _$AppConfigImpl implements _AppConfig {
-  const _$AppConfigImpl({
-    required this.baseUrl,
-    required this.apiKey,
-    this.selectedModel,
-    @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
-    final List<ModelInfo>? availableModels,
-    this.theme = 'system',
-    this.modelsPath = 'v1/models',
-    this.chatPath = 'v1/chat/completions',
-    this.apiMode = 'chat_completions',
-  }) : _availableModels = availableModels;
-  factory _$AppConfigImpl.fromJson(Map<String, dynamic> json) =>
-      _$$AppConfigImplFromJson(json);
-  @override
-  final String baseUrl;
-  @override
-  final String apiKey;
-  @override
-  final String? selectedModel;
-  final List<ModelInfo>? _availableModels;
-  @override
-  @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
-  List<ModelInfo>? get availableModels {
-    final value = _availableModels;
-    if (value == null) return null;
-    if (_availableModels is EqualUnmodifiableListView) return _availableModels;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableListView(value);
-  }
-  @override
-  @JsonKey()
-  final String theme;
-  @override
-  @JsonKey()
-  final String modelsPath;
-  @override
-  @JsonKey()
-  final String chatPath;
-  @override
-  @JsonKey()
-  final String apiMode;
-  @override
-  String toString() {
-    return 'AppConfig(baseUrl: $baseUrl, apiKey: $apiKey, selectedModel: $selectedModel, availableModels: $availableModels, theme: $theme, modelsPath: $modelsPath, chatPath: $chatPath, apiMode: $apiMode)';
-  }
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$AppConfigImpl &&
-            (identical(other.baseUrl, baseUrl) || other.baseUrl == baseUrl) &&
-            (identical(other.apiKey, apiKey) || other.apiKey == apiKey) &&
-            (identical(other.selectedModel, selectedModel) ||
-                other.selectedModel == selectedModel) &&
-            const DeepCollectionEquality().equals(
-              other._availableModels,
-              _availableModels,
-            ) &&
-            (identical(other.theme, theme) || other.theme == theme) &&
-            (identical(other.modelsPath, modelsPath) ||
-                other.modelsPath == modelsPath) &&
-            (identical(other.chatPath, chatPath) ||
-                other.chatPath == chatPath) &&
-            (identical(other.apiMode, apiMode) || other.apiMode == apiMode));
-  }
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  int get hashCode => Object.hash(
-    runtimeType,
-    baseUrl,
-    apiKey,
-    selectedModel,
-    const DeepCollectionEquality().hash(_availableModels),
-    theme,
-    modelsPath,
-    chatPath,
-    apiMode,
-  );
-  /// Create a copy of AppConfig
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$AppConfigImplCopyWith<_$AppConfigImpl> get copyWith =>
-      __$$AppConfigImplCopyWithImpl<_$AppConfigImpl>(this, _$identity);
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$AppConfigImplToJson(this);
-  }
-}
-abstract class _AppConfig implements AppConfig {
-  const factory _AppConfig({
-    required final String baseUrl,
-    required final String apiKey,
-    final String? selectedModel,
-    @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
-    final List<ModelInfo>? availableModels,
-    final String theme,
-    final String modelsPath,
-    final String chatPath,
-    final String apiMode,
-  }) = _$AppConfigImpl;
-  factory _AppConfig.fromJson(Map<String, dynamic> json) =
-      _$AppConfigImpl.fromJson;
-  @override
-  String get baseUrl;
-  @override
-  String get apiKey;
-  @override
-  String? get selectedModel;
-  @override
-  @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
-  List<ModelInfo>? get availableModels;
-  @override
-  String get theme;
-  @override
-  String get modelsPath;
-  @override
-  String get chatPath;
-  @override
-  String get apiMode;
-  /// Create a copy of AppConfig
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$AppConfigImplCopyWith<_$AppConfigImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-```
-
-## File: lib/core/models/app_config.g.dart
-```dart
-// GENERATED CODE - DO NOT MODIFY BY HAND
-part of 'app_config.dart';
-// **************************************************************************
-// JsonSerializableGenerator
-// **************************************************************************
-_$AppConfigImpl _$$AppConfigImplFromJson(Map<String, dynamic> json) =>
-    _$AppConfigImpl(
-      baseUrl: json['baseUrl'] as String,
-      apiKey: json['apiKey'] as String,
-      selectedModel: json['selectedModel'] as String?,
-      availableModels: _modelsFromJson(json['availableModels'] as List?),
-      theme: json['theme'] as String? ?? 'system',
-      modelsPath: json['modelsPath'] as String? ?? 'v1/models',
-      chatPath: json['chatPath'] as String? ?? 'v1/chat/completions',
-      apiMode: json['apiMode'] as String? ?? 'chat_completions',
-    );
-Map<String, dynamic> _$$AppConfigImplToJson(_$AppConfigImpl instance) =>
-    <String, dynamic>{
-      'baseUrl': instance.baseUrl,
-      'apiKey': instance.apiKey,
-      'selectedModel': instance.selectedModel,
-      'availableModels': _modelsToJson(instance.availableModels),
-      'theme': instance.theme,
-      'modelsPath': instance.modelsPath,
-      'chatPath': instance.chatPath,
-      'apiMode': instance.apiMode,
-    };
-```
-
-## File: lib/core/models/attachment.dart
-```dart
-import 'package:freezed_annotation/freezed_annotation.dart';
-part 'attachment.freezed.dart';
-part 'attachment.g.dart';
-@freezed
-class Attachment with _$Attachment {
-  const factory Attachment({
-    required String id,
-    required String name,
-    required String relativePath,
-    @Default(false) bool isImage,
-    String? mimeType,
-  }) = _Attachment;
-  factory Attachment.fromJson(Map<String, dynamic> json) =>
-      _$AttachmentFromJson(json);
-}
-```
-
-## File: lib/core/models/attachment.freezed.dart
-```dart
-// coverage:ignore-file
-// GENERATED CODE - DO NOT MODIFY BY HAND
-// ignore_for_file: type=lint
-// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
-part of 'attachment.dart';
-// **************************************************************************
-// FreezedGenerator
-// **************************************************************************
-T _$identity<T>(T value) => value;
-final _privateConstructorUsedError = UnsupportedError(
-  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
-);
-Attachment _$AttachmentFromJson(Map<String, dynamic> json) {
-  return _Attachment.fromJson(json);
-}
-/// @nodoc
-mixin _$Attachment {
-  String get id => throw _privateConstructorUsedError;
-  String get name => throw _privateConstructorUsedError;
-  String get relativePath => throw _privateConstructorUsedError;
-  bool get isImage => throw _privateConstructorUsedError;
-  String? get mimeType => throw _privateConstructorUsedError;
-  /// Serializes this Attachment to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-  /// Create a copy of Attachment
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $AttachmentCopyWith<Attachment> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-/// @nodoc
-abstract class $AttachmentCopyWith<$Res> {
-  factory $AttachmentCopyWith(
-    Attachment value,
-    $Res Function(Attachment) then,
-  ) = _$AttachmentCopyWithImpl<$Res, Attachment>;
-  @useResult
-  $Res call({
-    String id,
-    String name,
-    String relativePath,
-    bool isImage,
-    String? mimeType,
-  });
-}
-/// @nodoc
-class _$AttachmentCopyWithImpl<$Res, $Val extends Attachment>
-    implements $AttachmentCopyWith<$Res> {
-  _$AttachmentCopyWithImpl(this._value, this._then);
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-  /// Create a copy of Attachment
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? id = null,
-    Object? name = null,
-    Object? relativePath = null,
-    Object? isImage = null,
-    Object? mimeType = freezed,
-  }) {
-    return _then(
-      _value.copyWith(
-            id: null == id
-                ? _value.id
-                : id // ignore: cast_nullable_to_non_nullable
-                      as String,
-            name: null == name
-                ? _value.name
-                : name // ignore: cast_nullable_to_non_nullable
-                      as String,
-            relativePath: null == relativePath
-                ? _value.relativePath
-                : relativePath // ignore: cast_nullable_to_non_nullable
-                      as String,
-            isImage: null == isImage
-                ? _value.isImage
-                : isImage // ignore: cast_nullable_to_non_nullable
-                      as bool,
-            mimeType: freezed == mimeType
-                ? _value.mimeType
-                : mimeType // ignore: cast_nullable_to_non_nullable
-                      as String?,
-          )
-          as $Val,
-    );
-  }
-}
-/// @nodoc
-abstract class _$$AttachmentImplCopyWith<$Res>
-    implements $AttachmentCopyWith<$Res> {
-  factory _$$AttachmentImplCopyWith(
-    _$AttachmentImpl value,
-    $Res Function(_$AttachmentImpl) then,
-  ) = __$$AttachmentImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({
-    String id,
-    String name,
-    String relativePath,
-    bool isImage,
-    String? mimeType,
-  });
-}
-/// @nodoc
-class __$$AttachmentImplCopyWithImpl<$Res>
-    extends _$AttachmentCopyWithImpl<$Res, _$AttachmentImpl>
-    implements _$$AttachmentImplCopyWith<$Res> {
-  __$$AttachmentImplCopyWithImpl(
-    _$AttachmentImpl _value,
-    $Res Function(_$AttachmentImpl) _then,
-  ) : super(_value, _then);
-  /// Create a copy of Attachment
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? id = null,
-    Object? name = null,
-    Object? relativePath = null,
-    Object? isImage = null,
-    Object? mimeType = freezed,
-  }) {
-    return _then(
-      _$AttachmentImpl(
-        id: null == id
-            ? _value.id
-            : id // ignore: cast_nullable_to_non_nullable
-                  as String,
-        name: null == name
-            ? _value.name
-            : name // ignore: cast_nullable_to_non_nullable
-                  as String,
-        relativePath: null == relativePath
-            ? _value.relativePath
-            : relativePath // ignore: cast_nullable_to_non_nullable
-                  as String,
-        isImage: null == isImage
-            ? _value.isImage
-            : isImage // ignore: cast_nullable_to_non_nullable
-                  as bool,
-        mimeType: freezed == mimeType
-            ? _value.mimeType
-            : mimeType // ignore: cast_nullable_to_non_nullable
-                  as String?,
-      ),
-    );
-  }
-}
-/// @nodoc
-@JsonSerializable()
-class _$AttachmentImpl implements _Attachment {
-  const _$AttachmentImpl({
-    required this.id,
-    required this.name,
-    required this.relativePath,
-    this.isImage = false,
-    this.mimeType,
-  });
-  factory _$AttachmentImpl.fromJson(Map<String, dynamic> json) =>
-      _$$AttachmentImplFromJson(json);
-  @override
-  final String id;
-  @override
-  final String name;
-  @override
-  final String relativePath;
-  @override
-  @JsonKey()
-  final bool isImage;
-  @override
-  final String? mimeType;
-  @override
-  String toString() {
-    return 'Attachment(id: $id, name: $name, relativePath: $relativePath, isImage: $isImage, mimeType: $mimeType)';
-  }
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$AttachmentImpl &&
-            (identical(other.id, id) || other.id == id) &&
-            (identical(other.name, name) || other.name == name) &&
-            (identical(other.relativePath, relativePath) ||
-                other.relativePath == relativePath) &&
-            (identical(other.isImage, isImage) || other.isImage == isImage) &&
-            (identical(other.mimeType, mimeType) ||
-                other.mimeType == mimeType));
-  }
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  int get hashCode =>
-      Object.hash(runtimeType, id, name, relativePath, isImage, mimeType);
-  /// Create a copy of Attachment
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$AttachmentImplCopyWith<_$AttachmentImpl> get copyWith =>
-      __$$AttachmentImplCopyWithImpl<_$AttachmentImpl>(this, _$identity);
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$AttachmentImplToJson(this);
-  }
-}
-abstract class _Attachment implements Attachment {
-  const factory _Attachment({
-    required final String id,
-    required final String name,
-    required final String relativePath,
-    final bool isImage,
-    final String? mimeType,
-  }) = _$AttachmentImpl;
-  factory _Attachment.fromJson(Map<String, dynamic> json) =
-      _$AttachmentImpl.fromJson;
-  @override
-  String get id;
-  @override
-  String get name;
-  @override
-  String get relativePath;
-  @override
-  bool get isImage;
-  @override
-  String? get mimeType;
-  /// Create a copy of Attachment
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$AttachmentImplCopyWith<_$AttachmentImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-```
-
-## File: lib/core/models/attachment.g.dart
-```dart
-// GENERATED CODE - DO NOT MODIFY BY HAND
-part of 'attachment.dart';
-// **************************************************************************
-// JsonSerializableGenerator
-// **************************************************************************
-_$AttachmentImpl _$$AttachmentImplFromJson(Map<String, dynamic> json) =>
-    _$AttachmentImpl(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      relativePath: json['relativePath'] as String,
-      isImage: json['isImage'] as bool? ?? false,
-      mimeType: json['mimeType'] as String?,
-    );
-Map<String, dynamic> _$$AttachmentImplToJson(_$AttachmentImpl instance) =>
-    <String, dynamic>{
-      'id': instance.id,
-      'name': instance.name,
-      'relativePath': instance.relativePath,
-      'isImage': instance.isImage,
-      'mimeType': instance.mimeType,
-    };
-```
-
-## File: lib/core/models/chat_chunk.dart
-```dart
-import 'package:freezed_annotation/freezed_annotation.dart';
-part 'chat_chunk.freezed.dart';
-@freezed
-class ChatChunk with _$ChatChunk {
-  const factory ChatChunk({
-    String? content,          // 正式内容片段
-    String? reasoningContent, // 思考过程片段
-    required bool isDone,     // 是否结束
-    String? error,            // 错误信息
-  }) = _ChatChunk;
-}
-```
-
-## File: lib/core/models/chat_chunk.freezed.dart
-```dart
-// coverage:ignore-file
-// GENERATED CODE - DO NOT MODIFY BY HAND
-// ignore_for_file: type=lint
-// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
-part of 'chat_chunk.dart';
-// **************************************************************************
-// FreezedGenerator
-// **************************************************************************
-T _$identity<T>(T value) => value;
-final _privateConstructorUsedError = UnsupportedError(
-  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
-);
-/// @nodoc
-mixin _$ChatChunk {
-  String? get content => throw _privateConstructorUsedError; // 正式内容片段
-  String? get reasoningContent => throw _privateConstructorUsedError; // 思考过程片段
-  bool get isDone => throw _privateConstructorUsedError; // 是否结束
-  String? get error => throw _privateConstructorUsedError;
-  /// Create a copy of ChatChunk
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $ChatChunkCopyWith<ChatChunk> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-/// @nodoc
-abstract class $ChatChunkCopyWith<$Res> {
-  factory $ChatChunkCopyWith(ChatChunk value, $Res Function(ChatChunk) then) =
-      _$ChatChunkCopyWithImpl<$Res, ChatChunk>;
-  @useResult
-  $Res call({
-    String? content,
-    String? reasoningContent,
-    bool isDone,
-    String? error,
-  });
-}
-/// @nodoc
-class _$ChatChunkCopyWithImpl<$Res, $Val extends ChatChunk>
-    implements $ChatChunkCopyWith<$Res> {
-  _$ChatChunkCopyWithImpl(this._value, this._then);
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-  /// Create a copy of ChatChunk
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? content = freezed,
-    Object? reasoningContent = freezed,
-    Object? isDone = null,
-    Object? error = freezed,
-  }) {
-    return _then(
-      _value.copyWith(
-            content: freezed == content
-                ? _value.content
-                : content // ignore: cast_nullable_to_non_nullable
-                      as String?,
-            reasoningContent: freezed == reasoningContent
-                ? _value.reasoningContent
-                : reasoningContent // ignore: cast_nullable_to_non_nullable
-                      as String?,
-            isDone: null == isDone
-                ? _value.isDone
-                : isDone // ignore: cast_nullable_to_non_nullable
-                      as bool,
-            error: freezed == error
-                ? _value.error
-                : error // ignore: cast_nullable_to_non_nullable
-                      as String?,
-          )
-          as $Val,
-    );
-  }
-}
-/// @nodoc
-abstract class _$$ChatChunkImplCopyWith<$Res>
-    implements $ChatChunkCopyWith<$Res> {
-  factory _$$ChatChunkImplCopyWith(
-    _$ChatChunkImpl value,
-    $Res Function(_$ChatChunkImpl) then,
-  ) = __$$ChatChunkImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({
-    String? content,
-    String? reasoningContent,
-    bool isDone,
-    String? error,
-  });
-}
-/// @nodoc
-class __$$ChatChunkImplCopyWithImpl<$Res>
-    extends _$ChatChunkCopyWithImpl<$Res, _$ChatChunkImpl>
-    implements _$$ChatChunkImplCopyWith<$Res> {
-  __$$ChatChunkImplCopyWithImpl(
-    _$ChatChunkImpl _value,
-    $Res Function(_$ChatChunkImpl) _then,
-  ) : super(_value, _then);
-  /// Create a copy of ChatChunk
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? content = freezed,
-    Object? reasoningContent = freezed,
-    Object? isDone = null,
-    Object? error = freezed,
-  }) {
-    return _then(
-      _$ChatChunkImpl(
-        content: freezed == content
-            ? _value.content
-            : content // ignore: cast_nullable_to_non_nullable
-                  as String?,
-        reasoningContent: freezed == reasoningContent
-            ? _value.reasoningContent
-            : reasoningContent // ignore: cast_nullable_to_non_nullable
-                  as String?,
-        isDone: null == isDone
-            ? _value.isDone
-            : isDone // ignore: cast_nullable_to_non_nullable
-                  as bool,
-        error: freezed == error
-            ? _value.error
-            : error // ignore: cast_nullable_to_non_nullable
-                  as String?,
-      ),
-    );
-  }
-}
-/// @nodoc
-class _$ChatChunkImpl implements _ChatChunk {
-  const _$ChatChunkImpl({
-    this.content,
-    this.reasoningContent,
-    required this.isDone,
-    this.error,
-  });
-  @override
-  final String? content;
-  // 正式内容片段
-  @override
-  final String? reasoningContent;
-  // 思考过程片段
-  @override
-  final bool isDone;
-  // 是否结束
-  @override
-  final String? error;
-  @override
-  String toString() {
-    return 'ChatChunk(content: $content, reasoningContent: $reasoningContent, isDone: $isDone, error: $error)';
-  }
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$ChatChunkImpl &&
-            (identical(other.content, content) || other.content == content) &&
-            (identical(other.reasoningContent, reasoningContent) ||
-                other.reasoningContent == reasoningContent) &&
-            (identical(other.isDone, isDone) || other.isDone == isDone) &&
-            (identical(other.error, error) || other.error == error));
-  }
-  @override
-  int get hashCode =>
-      Object.hash(runtimeType, content, reasoningContent, isDone, error);
-  /// Create a copy of ChatChunk
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$ChatChunkImplCopyWith<_$ChatChunkImpl> get copyWith =>
-      __$$ChatChunkImplCopyWithImpl<_$ChatChunkImpl>(this, _$identity);
-}
-abstract class _ChatChunk implements ChatChunk {
-  const factory _ChatChunk({
-    final String? content,
-    final String? reasoningContent,
-    required final bool isDone,
-    final String? error,
-  }) = _$ChatChunkImpl;
-  @override
-  String? get content; // 正式内容片段
-  @override
-  String? get reasoningContent; // 思考过程片段
-  @override
-  bool get isDone; // 是否结束
-  @override
-  String? get error;
-  /// Create a copy of ChatChunk
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$ChatChunkImplCopyWith<_$ChatChunkImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-```
-
-## File: lib/core/models/model_info.dart
-```dart
-import 'package:freezed_annotation/freezed_annotation.dart';
-part 'model_info.freezed.dart';
-part 'model_info.g.dart';
-@freezed
-class ModelInfo with _$ModelInfo {
-  const factory ModelInfo({
-    required String id,
-    String? name,
-    // 最终生效能力（默认检测 + 手动覆盖后）
-    bool? supportsReasoning,
-    bool? supportsVision,
-    // 用户手动覆盖值
-    bool? overrideSupportsReasoning,
-    bool? overrideSupportsVision,
-  }) = _ModelInfo;
-  factory ModelInfo.fromJson(Map<String, dynamic> json) =>
-      _$ModelInfoFromJson(json);
-}
-```
-
-## File: lib/core/models/model_info.freezed.dart
-```dart
-// coverage:ignore-file
-// GENERATED CODE - DO NOT MODIFY BY HAND
-// ignore_for_file: type=lint
-// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
-part of 'model_info.dart';
-// **************************************************************************
-// FreezedGenerator
-// **************************************************************************
-T _$identity<T>(T value) => value;
-final _privateConstructorUsedError = UnsupportedError(
-  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
-);
-ModelInfo _$ModelInfoFromJson(Map<String, dynamic> json) {
-  return _ModelInfo.fromJson(json);
-}
-/// @nodoc
-mixin _$ModelInfo {
-  String get id => throw _privateConstructorUsedError;
-  String? get name =>
-      throw _privateConstructorUsedError; // 最终生效能力（默认检测 + 手动覆盖后）
-  bool? get supportsReasoning => throw _privateConstructorUsedError;
-  bool? get supportsVision => throw _privateConstructorUsedError; // 用户手动覆盖值
-  bool? get overrideSupportsReasoning => throw _privateConstructorUsedError;
-  bool? get overrideSupportsVision => throw _privateConstructorUsedError;
-  /// Serializes this ModelInfo to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-  /// Create a copy of ModelInfo
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $ModelInfoCopyWith<ModelInfo> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-/// @nodoc
-abstract class $ModelInfoCopyWith<$Res> {
-  factory $ModelInfoCopyWith(ModelInfo value, $Res Function(ModelInfo) then) =
-      _$ModelInfoCopyWithImpl<$Res, ModelInfo>;
-  @useResult
-  $Res call({
-    String id,
-    String? name,
-    bool? supportsReasoning,
-    bool? supportsVision,
-    bool? overrideSupportsReasoning,
-    bool? overrideSupportsVision,
-  });
-}
-/// @nodoc
-class _$ModelInfoCopyWithImpl<$Res, $Val extends ModelInfo>
-    implements $ModelInfoCopyWith<$Res> {
-  _$ModelInfoCopyWithImpl(this._value, this._then);
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-  /// Create a copy of ModelInfo
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? id = null,
-    Object? name = freezed,
-    Object? supportsReasoning = freezed,
-    Object? supportsVision = freezed,
-    Object? overrideSupportsReasoning = freezed,
-    Object? overrideSupportsVision = freezed,
-  }) {
-    return _then(
-      _value.copyWith(
-            id: null == id
-                ? _value.id
-                : id // ignore: cast_nullable_to_non_nullable
-                      as String,
-            name: freezed == name
-                ? _value.name
-                : name // ignore: cast_nullable_to_non_nullable
-                      as String?,
-            supportsReasoning: freezed == supportsReasoning
-                ? _value.supportsReasoning
-                : supportsReasoning // ignore: cast_nullable_to_non_nullable
-                      as bool?,
-            supportsVision: freezed == supportsVision
-                ? _value.supportsVision
-                : supportsVision // ignore: cast_nullable_to_non_nullable
-                      as bool?,
-            overrideSupportsReasoning: freezed == overrideSupportsReasoning
-                ? _value.overrideSupportsReasoning
-                : overrideSupportsReasoning // ignore: cast_nullable_to_non_nullable
-                      as bool?,
-            overrideSupportsVision: freezed == overrideSupportsVision
-                ? _value.overrideSupportsVision
-                : overrideSupportsVision // ignore: cast_nullable_to_non_nullable
-                      as bool?,
-          )
-          as $Val,
-    );
-  }
-}
-/// @nodoc
-abstract class _$$ModelInfoImplCopyWith<$Res>
-    implements $ModelInfoCopyWith<$Res> {
-  factory _$$ModelInfoImplCopyWith(
-    _$ModelInfoImpl value,
-    $Res Function(_$ModelInfoImpl) then,
-  ) = __$$ModelInfoImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({
-    String id,
-    String? name,
-    bool? supportsReasoning,
-    bool? supportsVision,
-    bool? overrideSupportsReasoning,
-    bool? overrideSupportsVision,
-  });
-}
-/// @nodoc
-class __$$ModelInfoImplCopyWithImpl<$Res>
-    extends _$ModelInfoCopyWithImpl<$Res, _$ModelInfoImpl>
-    implements _$$ModelInfoImplCopyWith<$Res> {
-  __$$ModelInfoImplCopyWithImpl(
-    _$ModelInfoImpl _value,
-    $Res Function(_$ModelInfoImpl) _then,
-  ) : super(_value, _then);
-  /// Create a copy of ModelInfo
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? id = null,
-    Object? name = freezed,
-    Object? supportsReasoning = freezed,
-    Object? supportsVision = freezed,
-    Object? overrideSupportsReasoning = freezed,
-    Object? overrideSupportsVision = freezed,
-  }) {
-    return _then(
-      _$ModelInfoImpl(
-        id: null == id
-            ? _value.id
-            : id // ignore: cast_nullable_to_non_nullable
-                  as String,
-        name: freezed == name
-            ? _value.name
-            : name // ignore: cast_nullable_to_non_nullable
-                  as String?,
-        supportsReasoning: freezed == supportsReasoning
-            ? _value.supportsReasoning
-            : supportsReasoning // ignore: cast_nullable_to_non_nullable
-                  as bool?,
-        supportsVision: freezed == supportsVision
-            ? _value.supportsVision
-            : supportsVision // ignore: cast_nullable_to_non_nullable
-                  as bool?,
-        overrideSupportsReasoning: freezed == overrideSupportsReasoning
-            ? _value.overrideSupportsReasoning
-            : overrideSupportsReasoning // ignore: cast_nullable_to_non_nullable
-                  as bool?,
-        overrideSupportsVision: freezed == overrideSupportsVision
-            ? _value.overrideSupportsVision
-            : overrideSupportsVision // ignore: cast_nullable_to_non_nullable
-                  as bool?,
-      ),
-    );
-  }
-}
-/// @nodoc
-@JsonSerializable()
-class _$ModelInfoImpl implements _ModelInfo {
-  const _$ModelInfoImpl({
-    required this.id,
-    this.name,
-    this.supportsReasoning,
-    this.supportsVision,
-    this.overrideSupportsReasoning,
-    this.overrideSupportsVision,
-  });
-  factory _$ModelInfoImpl.fromJson(Map<String, dynamic> json) =>
-      _$$ModelInfoImplFromJson(json);
-  @override
-  final String id;
-  @override
-  final String? name;
-  // 最终生效能力（默认检测 + 手动覆盖后）
-  @override
-  final bool? supportsReasoning;
-  @override
-  final bool? supportsVision;
-  // 用户手动覆盖值
-  @override
-  final bool? overrideSupportsReasoning;
-  @override
-  final bool? overrideSupportsVision;
-  @override
-  String toString() {
-    return 'ModelInfo(id: $id, name: $name, supportsReasoning: $supportsReasoning, supportsVision: $supportsVision, overrideSupportsReasoning: $overrideSupportsReasoning, overrideSupportsVision: $overrideSupportsVision)';
-  }
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$ModelInfoImpl &&
-            (identical(other.id, id) || other.id == id) &&
-            (identical(other.name, name) || other.name == name) &&
-            (identical(other.supportsReasoning, supportsReasoning) ||
-                other.supportsReasoning == supportsReasoning) &&
-            (identical(other.supportsVision, supportsVision) ||
-                other.supportsVision == supportsVision) &&
-            (identical(
-                  other.overrideSupportsReasoning,
-                  overrideSupportsReasoning,
-                ) ||
-                other.overrideSupportsReasoning == overrideSupportsReasoning) &&
-            (identical(other.overrideSupportsVision, overrideSupportsVision) ||
-                other.overrideSupportsVision == overrideSupportsVision));
-  }
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  int get hashCode => Object.hash(
-    runtimeType,
-    id,
-    name,
-    supportsReasoning,
-    supportsVision,
-    overrideSupportsReasoning,
-    overrideSupportsVision,
-  );
-  /// Create a copy of ModelInfo
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$ModelInfoImplCopyWith<_$ModelInfoImpl> get copyWith =>
-      __$$ModelInfoImplCopyWithImpl<_$ModelInfoImpl>(this, _$identity);
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$ModelInfoImplToJson(this);
-  }
-}
-abstract class _ModelInfo implements ModelInfo {
-  const factory _ModelInfo({
-    required final String id,
-    final String? name,
-    final bool? supportsReasoning,
-    final bool? supportsVision,
-    final bool? overrideSupportsReasoning,
-    final bool? overrideSupportsVision,
-  }) = _$ModelInfoImpl;
-  factory _ModelInfo.fromJson(Map<String, dynamic> json) =
-      _$ModelInfoImpl.fromJson;
-  @override
-  String get id;
-  @override
-  String? get name; // 最终生效能力（默认检测 + 手动覆盖后）
-  @override
-  bool? get supportsReasoning;
-  @override
-  bool? get supportsVision; // 用户手动覆盖值
-  @override
-  bool? get overrideSupportsReasoning;
-  @override
-  bool? get overrideSupportsVision;
-  /// Create a copy of ModelInfo
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$ModelInfoImplCopyWith<_$ModelInfoImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-```
-
-## File: lib/core/models/model_info.g.dart
-```dart
-// GENERATED CODE - DO NOT MODIFY BY HAND
-part of 'model_info.dart';
-// **************************************************************************
-// JsonSerializableGenerator
-// **************************************************************************
-_$ModelInfoImpl _$$ModelInfoImplFromJson(Map<String, dynamic> json) =>
-    _$ModelInfoImpl(
-      id: json['id'] as String,
-      name: json['name'] as String?,
-      supportsReasoning: json['supportsReasoning'] as bool?,
-      supportsVision: json['supportsVision'] as bool?,
-      overrideSupportsReasoning: json['overrideSupportsReasoning'] as bool?,
-      overrideSupportsVision: json['overrideSupportsVision'] as bool?,
-    );
-Map<String, dynamic> _$$ModelInfoImplToJson(_$ModelInfoImpl instance) =>
-    <String, dynamic>{
-      'id': instance.id,
-      'name': instance.name,
-      'supportsReasoning': instance.supportsReasoning,
-      'supportsVision': instance.supportsVision,
-      'overrideSupportsReasoning': instance.overrideSupportsReasoning,
-      'overrideSupportsVision': instance.overrideSupportsVision,
-    };
-```
-
-## File: lib/core/models/sse_event.dart
-```dart
-class SseEvent {
-  final String? id;
-  final String? event;
-  final String data;
-  const SseEvent({
-    this.id,
-    this.event,
-    required this.data,
-  });
-  @override
-  String toString() => 'SseEvent(id: $id, event: $event, data: $data)';
-}
-```
-
-## File: lib/core/utils/app_route_observer.dart
-```dart
-import 'package:flutter/material.dart';
-final RouteObserver<ModalRoute<void>> appRouteObserver =
-    RouteObserver<ModalRoute<void>>();
-```
-
-## File: lib/core/utils/file_name_utils.dart
-```dart
-abstract class FileNameUtils {
-  // Windows/Android/iOS 通用非法字符
-  static final _illegalChars = RegExp(r'[<>:"/\\|?*]');
-  // 清理非法字符
-  static String sanitize(String name) {
-    return name.replaceAll(_illegalChars, '_').trim();
-  }
-  // 生成唯一文件名 (如果存在冲突，自动加数字)
-  // 注意：这里只处理字符串逻辑，实际文件存在性检查应在 Service 层
-  static String makeUnique(String baseName, List<String> existingNames) {
-    final cleanName = sanitize(baseName);
-    if (!existingNames.contains('$cleanName.json')) {
-      return '$cleanName.json';
-    }
-    int counter = 1;
-    while (existingNames.contains('$cleanName$counter.json')) {
-      counter++;
-    }
-    return '$cleanName$counter.json';
-  }
-  // 从文件名提取标题 (去掉 .json)
-  static String extractTitle(String fileName) {
-    return fileName.endsWith('.json') 
-        ? fileName.substring(0, fileName.length - 5) 
-        : fileName;
-  }
-}
-```
-
-## File: lib/core/utils/id_generator.dart
-```dart
-import 'package:uuid/uuid.dart';
-abstract class IdGenerator {
-  static final _uuid = const Uuid();
-  static String generate() {
-    return _uuid.v4();
-  }
-}
-```
-
-## File: lib/core/utils/json_utils.dart
-```dart
-import 'dart:convert';
-import '../errors/exceptions.dart';
-abstract class JsonUtils {
-  static Map<String, dynamic> decode(String source) {
-    try {
-      return jsonDecode(source) as Map<String, dynamic>;
-    } catch (e) {
-      throw const ParseException('JSON 解析失败', code: 'INVALID_JSON');
-    }
-  }
-  static String encode(Map<String, dynamic> data) {
-    try {
-      return jsonEncode(data);
-    } catch (e) {
-      throw const ParseException('JSON 编码失败', code: 'ENCODE_ERROR');
-    }
-  }
-}
-```
-
-## File: lib/core/utils/sse_parser.dart
-```dart
-import '../models/sse_event.dart';
-/// 标准 SSE 解析器
-///
-/// 负责：
-/// - 处理 HTTP 分块不等于 SSE 事件边界的问题
-/// - 支持 event/id/data/retry
-/// - 支持多行 data 拼接
-/// - 以空行作为一个 SSE event 的结束
-class SseParser {
-  String _buffer = '';
-  final List<String> _dataLines = [];
-  String? _event;
-  String? _id;
-  /// 输入任意一段文本，输出当前能够完整解析出的 SSE 事件列表
-  List<SseEvent> addChunk(String chunk) {
-    _buffer += chunk;
-    final events = <SseEvent>[];
-    while (true) {
-      final newlineIndex = _buffer.indexOf('\n');
-      if (newlineIndex == -1) break;
-      var line = _buffer.substring(0, newlineIndex);
-      _buffer = _buffer.substring(newlineIndex + 1);
-      if (line.endsWith('\r')) {
-        line = line.substring(0, line.length - 1);
-      }
-      // 空行 => 一个事件结束
-      if (line.isEmpty) {
-        final event = _flushEvent();
-        if (event != null) {
-          events.add(event);
-        }
-        continue;
-      }
-      // 注释行
-      if (line.startsWith(':')) {
-        continue;
-      }
-      final colonIndex = line.indexOf(':');
-      String field;
-      String value;
-      if (colonIndex == -1) {
-        field = line;
-        value = '';
-      } else {
-        field = line.substring(0, colonIndex);
-        value = line.substring(colonIndex + 1);
-        if (value.startsWith(' ')) {
-          value = value.substring(1);
-        }
-      }
-      switch (field) {
-        case 'event':
-          _event = value;
-          break;
-        case 'data':
-          _dataLines.add(value);
-          break;
-        case 'id':
-          _id = value;
-          break;
-        case 'retry':
-          // 目前不处理自动重试时间
-          break;
-        default:
-          // 未知字段忽略
-          break;
-      }
-    }
-    return events;
-  }
-  /// 在底层流结束时调用，尝试 flush 最后一个未结束事件
-  SseEvent? close() {
-    return _flushEvent();
-  }
-  SseEvent? _flushEvent() {
-    if (_dataLines.isEmpty && _event == null && _id == null) {
-      return null;
-    }
-    final event = SseEvent(
-      id: _id,
-      event: _event,
-      data: _dataLines.join('\n'),
-    );
-    _dataLines.clear();
-    _event = null;
-    _id = null;
-    return event;
-  }
-}
-```
-
-## File: lib/core/utils/time_format_utils.dart
-```dart
-import 'package:intl/intl.dart';
-abstract class TimeFormatUtils {
-  static final DateFormat _dateTimeFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
-  static String formatTimestamp(int timestamp) {
-    final dateTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
-    return _dateTimeFormat.format(dateTime);
-  }
-}
-```
-
-## File: lib/data/data_sources/remote_api_source.dart
-```dart
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import '../../core/errors/exceptions.dart';
-import '../../core/models/model_info.dart';
-import '../../core/models/api_message.dart';
-import '../../core/models/chat_chunk.dart';
-import '../../core/utils/sse_parser.dart';
-import '../../domain/services/model_capability_registry.dart';
-import 'sse_event_decoder.dart';
-abstract class IRemoteApiSource {
-  Future<List<ModelInfo>> fetchModels({
-    required String baseUrl,
-    required String apiKey,
-    required String modelsPath,
-  });
-  Stream<ChatChunk> chatStream({
-    required String taskId,
-    required String baseUrl,
-    required String apiKey,
-    required String chatPath,
-    required String apiMode,
-    required String model,
-    required List<ApiMessage> context,
-    bool enableReasoning = false,
-  });
-  void cancelRequest(String taskId);
-}
-class RemoteApiSource implements IRemoteApiSource {
-  final Map<String, http.Client> _activeClients = {};
-  final Set<String> _cancelledTasks = {};
-  String _buildUrl(String baseUrl, String path) {
-    final normalizedBase = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
-    final normalizedPath = path.trim().replaceAll(RegExp(r'^/+'), '');
-    return '$normalizedBase/$normalizedPath';
-  }
-  bool? _readBool(Map<String, dynamic> json, List<String> keys) {
-    for (final key in keys) {
-      if (!json.containsKey(key)) continue;
-      final value = json[key];
-      if (value is bool) return value;
-      if (value is num) return value != 0;
-      if (value is String) {
-        final lower = value.toLowerCase();
-        if (lower == 'true' || lower == '1' || lower == 'yes') return true;
-        if (lower == 'false' || lower == '0' || lower == 'no') return false;
-      }
-    }
-    return null;
-  }
-  ModelInfo _parseModelInfo(Map<String, dynamic> json) {
-    final raw = ModelInfo(
-      id: (json['id'] ?? '').toString(),
-      name: json['name']?.toString(),
-      supportsReasoning: _readBool(json, [
-        'supportsReasoning',
-        'supports_reasoning',
-      ]),
-      supportsVision: _readBool(json, [
-        'supportsVision',
-        'supports_vision',
-        'vision',
-        'supportsImageInput',
-        'supports_image_input',
-      ]),
-      overrideSupportsReasoning: _readBool(json, [
-        'overrideSupportsReasoning',
-        'override_supports_reasoning',
-      ]),
-      overrideSupportsVision: _readBool(json, [
-        'overrideSupportsVision',
-        'override_supports_vision',
-      ]),
-    );
-    return ModelCapabilityRegistry.enhance(raw);
-  }
-  bool _isOnlySingleTextPart(ApiMessage message) {
-    if (message.parts.length != 1) return false;
-    return message.parts.first.maybeWhen(
-      text: (_, text) => true,
-      orElse: () => false,
-    );
-  }
-  Map<String, dynamic> _buildChatCompletionAssistantMessage(ApiMessage message) {
-    final result = <String, dynamic>{
-      'role': 'assistant',
-      'content': message.content ?? '',
-    };
-    if ((message.reasoning ?? '').trim().isNotEmpty) {
-      result['reasoning_content'] = message.reasoning;
-    }
-    return result;
-  }
-  Map<String, dynamic> _buildChatCompletionMessage(ApiMessage message) {
-    if (message.role == 'assistant') {
-      return _buildChatCompletionAssistantMessage(message);
-    }
-    if (message.parts.isEmpty) {
-      return {
-        'role': message.role,
-        'content': message.content ?? '',
-      };
-    }
-    if (_isOnlySingleTextPart(message)) {
-      final text = message.parts.first.maybeWhen(
-        text: (_, text) => text,
-        orElse: () => message.content ?? '',
-      );
-      return {
-        'role': message.role,
-        'content': text,
-      };
-    }
-    return {
-      'role': message.role,
-      'content': message.parts.map((part) {
-        return part.when(
-          text: (type, text) => {
-            'type': 'text',
-            'text': text,
-          },
-          imageUrl: (type, imageUrl) => {
-            'type': 'image_url',
-            'image_url': {
-              'url': imageUrl.url,
-            },
-          },
-        );
-      }).toList(),
-    };
-  }
-  List<Map<String, dynamic>> _buildChatCompletionMessages(
-    List<ApiMessage> context,
-  ) {
-    return context.map(_buildChatCompletionMessage).toList();
-  }
-  Map<String, dynamic> _buildResponsesUserLikeMessage(ApiMessage message) {
-    if (message.parts.isEmpty) {
-      return {
-        'role': message.role,
-        'content': message.content ?? '',
-      };
-    }
-    if (_isOnlySingleTextPart(message)) {
-      final text = message.parts.first.maybeWhen(
-        text: (_, text) => text,
-        orElse: () => message.content ?? '',
-      );
-      return {
-        'role': message.role,
-        'content': text,
-      };
-    }
-    return {
-      'role': message.role,
-      'content': message.parts.map((part) {
-        return part.when(
-          text: (type, text) => {
-            'type': 'input_text',
-            'text': text,
-          },
-          imageUrl: (type, imageUrl) => {
-            'type': 'input_image',
-            'image_url': imageUrl.url,
-          },
-        );
-      }).toList(),
-    };
-  }
-  List<Map<String, dynamic>> _buildResponsesAssistantItems(ApiMessage message) {
-    final items = <Map<String, dynamic>>[];
-    if ((message.reasoning ?? '').trim().isNotEmpty) {
-      items.add({
-        'type': 'reasoning',
-        'summary': [
-          {
-            'type': 'summary_text',
-            'text': message.reasoning,
-          }
-        ],
-      });
-    }
-    if ((message.content ?? '').trim().isNotEmpty) {
-      items.add({
-        'role': 'assistant',
-        'content': message.content,
-      });
-    }
-    return items;
-  }
-  List<Map<String, dynamic>> _buildResponsesInput(
-    List<ApiMessage> context,
-  ) {
-    final result = <Map<String, dynamic>>[];
-    for (final message in context) {
-      if (message.role == 'assistant') {
-        result.addAll(_buildResponsesAssistantItems(message));
-      } else {
-        result.add(_buildResponsesUserLikeMessage(message));
-      }
-    }
-    return result;
-  }
-  Map<String, dynamic> _buildRequestBody({
-    required String apiMode,
-    required String model,
-    required List<ApiMessage> context,
-    required bool enableReasoning,
-  }) {
-    if (apiMode == 'responses') {
-      return {
-        'model': model,
-        'input': _buildResponsesInput(context),
-        'stream': true,
-        'store': false,
-        if (enableReasoning)
-          'reasoning': {
-            'effort': 'medium',
-          },
-      };
-    }
-    return {
-      'model': model,
-      'messages': _buildChatCompletionMessages(context),
-      'stream': true,
-      if (enableReasoning) 'reasoning_effort': 'medium',
-    };
-  }
-  @override
-  Future<List<ModelInfo>> fetchModels({
-    required String baseUrl,
-    required String apiKey,
-    required String modelsPath,
-  }) async {
-    try {
-      final url = Uri.parse(_buildUrl(baseUrl, modelsPath));
-      final response = await http.get(
-        url,
-        headers: {
-          'Authorization': 'Bearer $apiKey',
-          'Content-Type': 'application/json',
-        },
-      );
-      if (response.statusCode != 200) {
-        throw ApiException(
-          '获取模型列表失败：${response.statusCode}',
-          code: 'MODEL_FETCH_ERROR',
-        );
-      }
-      final json = jsonDecode(response.body) as Map<String, dynamic>;
-      final data = json['data'] as List<dynamic>;
-      return data
-          .map((e) => _parseModelInfo(e as Map<String, dynamic>))
-          .toList();
-    } on ApiException {
-      rethrow;
-    } catch (e) {
-      throw ApiException('获取模型列表失败：$e', code: 'MODEL_FETCH_ERROR');
-    }
-  }
-  @override
-  Stream<ChatChunk> chatStream({
-    required String taskId,
-    required String baseUrl,
-    required String apiKey,
-    required String chatPath,
-    required String apiMode,
-    required String model,
-    required List<ApiMessage> context,
-    bool enableReasoning = false,
-  }) async* {
-    _cancelledTasks.remove(taskId);
-    final client = http.Client();
-    _activeClients[taskId] = client;
-    try {
-      final url = Uri.parse(_buildUrl(baseUrl, chatPath));
-      final requestBody = _buildRequestBody(
-        apiMode: apiMode,
-        model: model,
-        context: context,
-        enableReasoning: enableReasoning,
-      );
-      final body = jsonEncode(requestBody);
-      // 调试用：必要时打开
-      // print('REQUEST URL => $url');
-      // print('REQUEST BODY => $body');
-      final request = http.Request('POST', url)
-        ..headers.addAll({
-          'Authorization': 'Bearer $apiKey',
-          'Content-Type': 'application/json',
-          'Accept': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-        })
-        ..body = body;
-      final streamedResponse = await client.send(request);
-      if (streamedResponse.statusCode < 200 ||
-          streamedResponse.statusCode >= 300) {
-        final errorBody = await streamedResponse.stream.bytesToString();
-        throw ApiException(
-          '流式请求失败：${streamedResponse.statusCode} $errorBody',
-          code: 'CHAT_STREAM_ERROR',
-        );
-      }
-      final parser = SseParser();
-      final stream = streamedResponse.stream.transform(utf8.decoder);
-      await for (final rawChunk in stream) {
-        if (_cancelledTasks.contains(taskId)) {
-          yield const ChatChunk(isDone: true);
-          return;
-        }
-        final events = parser.addChunk(rawChunk);
-        for (final event in events) {
-          if (_cancelledTasks.contains(taskId)) {
-            yield const ChatChunk(isDone: true);
-            return;
-          }
-          try {
-            final decoded = SseEventDecoder.decode(
-              apiMode: apiMode,
-              event: event,
-            );
-            if (decoded == null) continue;
-            yield decoded;
-            if (decoded.isDone) {
-              return;
-            }
-          } catch (e) {
-            // 保持原逻辑风格：单条 SSE 事件解析失败不让整个流崩掉
-            // 如需调试，可打开下面这行：
-            // print('SSE decode error: $e, event=$event');
-          }
-        }
-      }
-      // 流结束时 flush 一次，避免最后一个事件未被空行结尾
-      final lastEvent = parser.close();
-      if (lastEvent != null) {
-        try {
-          final decoded = SseEventDecoder.decode(
-            apiMode: apiMode,
-            event: lastEvent,
-          );
-          if (decoded != null) {
-            yield decoded;
-            if (decoded.isDone) return;
-          }
-        } catch (_) {
-          // 忽略最后一次 flush 解码错误
-        }
-      }
-      yield const ChatChunk(isDone: true);
-    } on ApiException {
-      rethrow;
-    } catch (e) {
-      if (_cancelledTasks.contains(taskId)) {
-        yield const ChatChunk(isDone: true);
-      } else {
-        yield ChatChunk(isDone: true, error: '流式请求失败：$e');
-      }
-    } finally {
-      _activeClients[taskId]?.close();
-      _activeClients.remove(taskId);
-      _cancelledTasks.remove(taskId);
-    }
-  }
-  @override
-  void cancelRequest(String taskId) {
-    _cancelledTasks.add(taskId);
-    _activeClients[taskId]?.close();
-    _activeClients.remove(taskId);
-  }
-}
-```
-
-## File: lib/data/data_sources/sse_event_decoder.dart
-```dart
-import 'dart:convert';
-import '../../core/models/chat_chunk.dart';
-import '../../core/models/sse_event.dart';
-/// 按不同 API 协议把 SSEEvent 解释成统一的 ChatChunk
-class SseEventDecoder {
-  static ChatChunk? decode({
-    required String apiMode,
-    required SseEvent event,
-  }) {
-    final data = event.data.trim();
-    if (data.isEmpty) return null;
-    if (data == '[DONE]') {
-      return const ChatChunk(isDone: true);
-    }
-    switch (apiMode) {
-      case 'responses':
-        return _decodeResponses(event);
-      case 'chat_completions':
-      default:
-        return _decodeChatCompletions(event);
-    }
-  }
-  static ChatChunk? _decodeChatCompletions(SseEvent event) {
-    final json = jsonDecode(event.data) as Map<String, dynamic>;
-    if (json['error'] != null) {
-      return ChatChunk(
-        isDone: true,
-        error: _extractErrorMessage(json['error']),
-      );
-    }
-    final choices = json['choices'] as List<dynamic>?;
-    if (choices == null || choices.isEmpty) return null;
-    final choice = choices.first as Map<String, dynamic>;
-    final delta = (choice['delta'] as Map<String, dynamic>?) ??
-        (choice['message'] as Map<String, dynamic>?);
-    if (delta == null) return null;
-    final content = delta['content'] as String?;
-    final reasoning = (delta['reasoning_content'] as String?) ??
-        (delta['reasoning'] as String?);
-    // 某些服务会发 finish_reason 但没有内容
-    final finishReason = choice['finish_reason'];
-    if ((content == null || content.isEmpty) &&
-        (reasoning == null || reasoning.isEmpty) &&
-        finishReason != null) {
-      return const ChatChunk(isDone: false);
-    }
-    if (content != null || reasoning != null) {
-      return ChatChunk(
-        content: content,
-        reasoningContent: reasoning,
-        isDone: false,
-      );
-    }
-    return null;
-  }
-  static ChatChunk? _decodeResponses(SseEvent event) {
-    final json = jsonDecode(event.data) as Map<String, dynamic>;
-    final type = json['type'] as String?;
-    switch (type) {
-      case 'response.output_text.delta':
-        final delta = json['delta'] as String?;
-        if (delta == null || delta.isEmpty) return null;
-        return ChatChunk(content: delta, isDone: false);
-      case 'response.reasoning_summary_text.delta':
-      case 'response.reasoning_text.delta':
-        final delta = json['delta'] as String?;
-        if (delta == null || delta.isEmpty) return null;
-        return ChatChunk(reasoningContent: delta, isDone: false);
-      case 'response.completed':
-        return const ChatChunk(isDone: true);
-      case 'response.error':
-        return ChatChunk(
-          isDone: true,
-          error: _extractErrorMessage(json['error']),
-        );
-      default:
-        return null;
-    }
-  }
-  static String _extractErrorMessage(dynamic error) {
-    if (error == null) return '未知错误';
-    if (error is String) return error;
-    if (error is Map<String, dynamic>) {
-      if (error['message'] != null) return error['message'].toString();
-      if (error['error'] != null) return error['error'].toString();
-      return error.toString();
-    }
-    return error.toString();
-  }
-}
-```
-
-## File: lib/di/providers.dart
-```dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
-import '../data/data_sources/local_file_source.dart';
-import '../data/data_sources/remote_api_source.dart';
-import '../data/database/database.dart';
-import '../data/services/file_service.dart';
-import '../data/services/config_service.dart';
-import '../data/repositories/conversation_repository.dart';
-import '../data/repositories/config_repository.dart';
-import '../core/interfaces/file_service.dart';
-import '../core/interfaces/config_service.dart';
-enum InitStatus { idle, loading, success, error }
-class InitState {
-  final InitStatus status;
-  final String? errorMessage;
-  final AppDatabase? appDatabase;
-  final ILocalFileSource? fileSource;
-  final IFileService? fileService;
-  final IRemoteApiSource? remoteApiSource;
-  final IConfigService? configService;
-  final ConversationRepository? conversationRepository;
-  final ConfigRepository? configRepository;
-  InitState({
-    this.status = InitStatus.idle,
-    this.errorMessage,
-    this.appDatabase,
-    this.fileSource,
-    this.fileService,
-    this.remoteApiSource,
-    this.configService,
-    this.conversationRepository,
-    this.configRepository,
-  });
-  InitState copyWith({
-    InitStatus? status,
-    String? errorMessage,
-    AppDatabase? appDatabase,
-    ILocalFileSource? fileSource,
-    IFileService? fileService,
-    IRemoteApiSource? remoteApiSource,
-    IConfigService? configService,
-    ConversationRepository? conversationRepository,
-    ConfigRepository? configRepository,
-  }) {
-    return InitState(
-      status: status ?? this.status,
-      errorMessage: errorMessage ?? this.errorMessage,
-      appDatabase: appDatabase ?? this.appDatabase,
-      fileSource: fileSource ?? this.fileSource,
-      fileService: fileService ?? this.fileService,
-      remoteApiSource: remoteApiSource ?? this.remoteApiSource,
-      configService: configService ?? this.configService,
-      conversationRepository: conversationRepository ?? this.conversationRepository,
-      configRepository: configRepository ?? this.configRepository,
-    );
-  }
-}
-class InitNotifier extends StateNotifier<InitState> {
-  InitNotifier() : super(InitState());
-  Future<void> initialize() async {
-    state = state.copyWith(status: InitStatus.loading);
-    try {
-      // 1. 初始化文件目录
-      final appDir = await getApplicationDocumentsDirectory();
-      final basePath = appDir.path;
-      final fileSource = LocalFileSource(basePath);
-      await fileSource.initDirectories();
-      // 2. 初始化数据库
-      final appDatabase = AppDatabase();
-      // 3. 构建服务与 Repositories
-      final fileService = FileService(fileSource);
-      final remoteApiSource = RemoteApiSource();
-      final configService = ConfigService(appDatabase, remoteApiSource);
-      final conversationRepository = ConversationRepository(appDatabase, fileService);
-      final configRepository = ConfigRepository(configService);
-      state = state.copyWith(
-        status: InitStatus.success,
-        appDatabase: appDatabase,
-        fileSource: fileSource,
-        fileService: fileService,
-        remoteApiSource: remoteApiSource,
-        configService: configService,
-        conversationRepository: conversationRepository,
-        configRepository: configRepository,
-      );
-    } catch (e) {
-      state = state.copyWith(
-        status: InitStatus.error,
-        errorMessage: e.toString(),
-      );
-    }
-  }
-}
-final initProvider = StateNotifierProvider<InitNotifier, InitState>((ref) => InitNotifier());
-final conversationRepositoryProvider = Provider<ConversationRepository>((ref) {
-  final initState = ref.watch(initProvider);
-  if (initState.conversationRepository == null) throw StateError('应用未初始化');
-  return initState.conversationRepository!;
-});
-final configRepositoryProvider = Provider<ConfigRepository>((ref) {
-  final initState = ref.watch(initProvider);
-  if (initState.configRepository == null) throw StateError('应用未初始化');
-  return initState.configRepository!;
-});
-final remoteApiSourceProvider = Provider<IRemoteApiSource>((ref) {
-  final initState = ref.watch(initProvider);
-  if (initState.remoteApiSource == null) throw StateError('应用未初始化');
-  return initState.remoteApiSource!;
-});
-```
-
 ## File: lib/domain/models/tree_node.g.dart
 ```dart
 // GENERATED CODE - DO NOT MODIFY BY HAND
@@ -7658,9 +7545,11 @@ abstract class AppConstants {
 
 ## File: lib/core/interfaces/config_service.dart
 ```dart
+// core/interfaces/config_service.dart
 import '../models/app_config.dart';
 import '../models/app_config_store.dart';
 abstract class IConfigService {
+  // 现有的同步方法
   Future<AppConfigStore> loadConfigStore();
   Future<AppConfig> loadConfig();
   Future<void> saveConfig(AppConfig config);
@@ -7671,16 +7560,11 @@ abstract class IConfigService {
   Future<void> createProfile(String name);
   Future<void> renameProfile(String profileId, String name);
   Future<void> deleteProfile(String profileId);
-}
-```
-
-## File: lib/core/interfaces/file_service.dart
-```dart
-import 'dart:typed_data';
-abstract class IFileService {
-  Future<String> saveAttachment(Uint8List data, String fileName);
-  Future<Uint8List> readAttachment(String relativePath);
-  Future<void> deleteAttachment(String relativePath);
+  // ========== 新增：watch 方法 ==========
+  /// 监听配置Store的变更
+  Stream<AppConfigStore> watchConfigStore();
+  /// 监听当前配置
+  Stream<AppConfig> watchConfig();
 }
 ```
 
@@ -8768,12 +8652,23 @@ class LocalFileSource implements ILocalFileSource {
 
 ## File: lib/data/repositories/config_repository.dart
 ```dart
+// data/repositories/config_repository.dart
+import 'dart:async';
 import '../../core/models/app_config.dart';
 import '../../core/models/app_config_store.dart';
 import '../../core/interfaces/config_service.dart';
 class ConfigRepository {
   final IConfigService _configService;
   ConfigRepository(this._configService);
+  /// 监听配置Store的变更 - 使用真正的数据库流
+  Stream<AppConfigStore> watchConfigStore() {
+    return _configService.watchConfigStore();
+  }
+  /// 监听当前激活的配置
+  Stream<AppConfig> watchConfig() {
+    return _configService.watchConfig();
+  }
+  // ========== 以下保留原有的同步方法 ==========
   Future<AppConfig> getConfig() async {
     return await _configService.loadConfig();
   }
@@ -8852,386 +8747,117 @@ class ConfigRepository {
 }
 ```
 
-## File: lib/data/repositories/conversation_repository.dart
+## File: lib/di/providers.dart
 ```dart
-import 'dart:typed_data';
-import 'package:drift/drift.dart';
-import '../../core/interfaces/file_service.dart';
-import '../../core/models/attachment.dart';
-import '../../core/models/chat_round.dart';
-import '../../core/models/session.dart';
-import '../../core/utils/id_generator.dart';
-import '../database/database.dart';
-class ConversationRepository {
-  final AppDatabase _db;
-  final IFileService _fileService;
-  ConversationRepository(this._db, this._fileService);
-  String _getId(String fileName) => fileName.replaceAll('.json', '');
-  // 检查附件是否被其他 Round 引用
-  Future<bool> _isAttachmentUsedElsewhere(String relativePath, String excludeSessionId) async {
-    final query = _db.select(_db.dbAttachments).join([
-      innerJoin(
-        _db.dbChatRounds,
-        _db.dbChatRounds.id.equalsExp(_db.dbAttachments.roundId),
-      )
-    ])
-      ..where(_db.dbAttachments.relativePath.equals(relativePath))
-      ..where(_db.dbChatRounds.sessionId.isNotValue(excludeSessionId));
-    final result = await query.get();
-    return result.isNotEmpty;
-  }
-  Future<List<String>> getAllSessionFileNames() async {
-    final sessions = await (_db.select(_db.dbSessions)
-          ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]))
-        .get();
-    return sessions.map((s) => '${s.id}.json').toList();
-  }
-  Future<Session> getSession(String fileName) async {
-    final sessionId = _getId(fileName);
-    // 1. 获取 Session Metadata
-    final sessionRow = await (_db.select(_db.dbSessions)
-          ..where((t) => t.id.equals(sessionId)))
-        .getSingle();
-    // 2. 获取所有的 Rounds
-    final roundsRow = await (_db.select(_db.dbChatRounds)
-          ..where((t) => t.sessionId.equals(sessionId))
-          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
-        .get();
-    if (roundsRow.isEmpty) {
-      return Session(
-        id: sessionRow.id, title: sessionRow.title, createdAt: sessionRow.createdAt,
-        updatedAt: sessionRow.updatedAt, config: sessionRow.config, 
-        hasUnseenUpdate: sessionRow.hasUnseenUpdate, rounds: [],
-      );
-    }
-    // 3. 获取这些 Rounds 的所有附件
-    final roundIds = roundsRow.map((r) => r.id).toList();
-    final attachmentsRow = await (_db.select(_db.dbAttachments)
-          ..where((t) => t.roundId.isIn(roundIds)))
-        .get();
-    // 组装 Attachments Map
-    final attachMap = <String, List<Attachment>>{};
-    for (final a in attachmentsRow) {
-      attachMap.putIfAbsent(a.roundId, () => []).add(
-        Attachment(
-          id: a.id, name: a.name, relativePath: a.relativePath,
-          isImage: a.isImage, mimeType: a.mimeType,
-        ),
-      );
-    }
-    // 组装 Rounds
-    final rounds = roundsRow.map((r) => ChatRound(
-      id: r.id, parentId: r.parentId, createdAt: r.createdAt,
-      userContent: r.userContent, assistantThinking: r.assistantThinking,
-      assistantContent: r.assistantContent, isIncomplete: r.isIncomplete,
-      hasUnseenUpdate: r.hasUnseenUpdate, userAttachments: attachMap[r.id] ?? [],
-    )).toList();
-    return Session(
-      id: sessionRow.id, title: sessionRow.title, createdAt: sessionRow.createdAt,
-      updatedAt: sessionRow.updatedAt, config: sessionRow.config,
-      hasUnseenUpdate: sessionRow.hasUnseenUpdate, rounds: rounds,
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
+import '../data/data_sources/local_file_source.dart';
+import '../data/data_sources/remote_api_source.dart';
+import '../data/database/database.dart';
+import '../data/services/file_service.dart';
+import '../data/services/config_service.dart';
+import '../data/repositories/conversation_repository.dart';
+import '../data/repositories/config_repository.dart';
+import '../core/interfaces/file_service.dart';
+import '../core/interfaces/config_service.dart';
+enum InitStatus { idle, loading, success, error }
+class InitState {
+  final InitStatus status;
+  final String? errorMessage;
+  final AppDatabase? appDatabase;
+  final ILocalFileSource? fileSource;
+  final IFileService? fileService;
+  final IRemoteApiSource? remoteApiSource;
+  final IConfigService? configService;
+  final ConversationRepository? conversationRepository;
+  final ConfigRepository? configRepository;
+  InitState({
+    this.status = InitStatus.idle,
+    this.errorMessage,
+    this.appDatabase,
+    this.fileSource,
+    this.fileService,
+    this.remoteApiSource,
+    this.configService,
+    this.conversationRepository,
+    this.configRepository,
+  });
+  InitState copyWith({
+    InitStatus? status,
+    String? errorMessage,
+    AppDatabase? appDatabase,
+    ILocalFileSource? fileSource,
+    IFileService? fileService,
+    IRemoteApiSource? remoteApiSource,
+    IConfigService? configService,
+    ConversationRepository? conversationRepository,
+    ConfigRepository? configRepository,
+  }) {
+    return InitState(
+      status: status ?? this.status,
+      errorMessage: errorMessage ?? this.errorMessage,
+      appDatabase: appDatabase ?? this.appDatabase,
+      fileSource: fileSource ?? this.fileSource,
+      fileService: fileService ?? this.fileService,
+      remoteApiSource: remoteApiSource ?? this.remoteApiSource,
+      configService: configService ?? this.configService,
+      conversationRepository: conversationRepository ?? this.conversationRepository,
+      configRepository: configRepository ?? this.configRepository,
     );
   }
-  /// 业务极简版 SaveSession：自动处理增改，无需比对
-  Future<void> saveSession(String fileName, Session newSession) async {
-    final sessionId = _getId(fileName);
-    // 开启事务
-    await _db.transaction(() async {
-      final allAttachments = <DbAttachmentsCompanion>[];
-      // 1. 遍历所有 Round，逐条 Upsert
-      for (final round in newSession.rounds) {
-        // ✅ 直接使用表的 insertOnConflictUpdate 方法
-        // Drift 内部会自动优化，性能依然很高
-        await _db.into(_db.dbChatRounds).insertOnConflictUpdate(
-              DbChatRoundsCompanion.insert(
-                id: round.id,
-                sessionId: sessionId,
-                parentId: Value(round.parentId),
-                createdAt: round.createdAt,
-                userContent: round.userContent,
-                assistantThinking: Value(round.assistantThinking),
-                assistantContent: Value(round.assistantContent),
-                isIncomplete: Value(round.isIncomplete),
-                hasUnseenUpdate: Value(round.hasUnseenUpdate),
-              ),
-            );
-        // 收集附件
-        allAttachments.addAll(round.userAttachments.map((a) => DbAttachmentsCompanion.insert(
-              id: a.id,
-              roundId: round.id,
-              name: a.name,
-              relativePath: a.relativePath,
-              isImage: Value(a.isImage),
-              mimeType: Value(a.mimeType),
-            )));
-      }
-      // 2. 批量 Upsert 附件
-      // 因为附件通常较多，这里为了保持一致性也用循环，或者你可以用 batch.insert (如果确定无冲突)
-      for (final attach in allAttachments) {
-        await _db.into(_db.dbAttachments).insertOnConflictUpdate(attach);
-      }
-      // 3. 更新会话元信息
-      await _db.into(_db.dbSessions).insertOnConflictUpdate(
-            DbSessionsCompanion(
-              id: Value(sessionId),
-              title: Value(newSession.title),
-              createdAt: Value(newSession.createdAt),
-              updatedAt: Value(newSession.updatedAt),
-              config: Value(newSession.config),
-              hasUnseenUpdate: Value(newSession.hasUnseenUpdate),
-            ),
-          );
-    });
-  }
-  Future<void> deleteRounds(String sessionId, List<String> roundIds) async {
-    if (roundIds.isEmpty) return;
-    await (_db.delete(_db.dbChatRounds)
-          ..where((t) => t.sessionId.equals(sessionId) & t.id.isIn(roundIds)))
-        .go();
-  }
-  Future<void> saveSessionAndCleanupOrphanAttachments(
-    String fileName, Session oldSession, Session newSession,
-  ) async {
-    final oldPaths = oldSession.rounds.expand((r) => r.userAttachments).map((a) => a.relativePath).toSet();
-    final newPaths = newSession.rounds.expand((r) => r.userAttachments).map((a) => a.relativePath).toSet();
-    final removedPaths = oldPaths.difference(newPaths);
-    await saveSession(fileName, newSession);
-    for (final path in removedPaths) {
-      if (!await _isAttachmentUsedElsewhere(path, newSession.id)) {
-        try { await _fileService.deleteAttachment(path); } catch (_) {}
-      }
-    }
-  }
-  Future<void> deleteSession(String fileName) async {
-    final sessionId = _getId(fileName);
-    Session? targetSession;
+}
+class InitNotifier extends StateNotifier<InitState> {
+  InitNotifier() : super(InitState());
+  Future<void> initialize() async {
+    state = state.copyWith(status: InitStatus.loading);
     try {
-      targetSession = await getSession(fileName);
-    } catch (_) {}
-    if (targetSession != null) {
-      final paths = targetSession.rounds.expand((r) => r.userAttachments).map((a) => a.relativePath).toSet();
-      for (final path in paths) {
-        if (!await _isAttachmentUsedElsewhere(path, sessionId)) {
-          try { await _fileService.deleteAttachment(path); } catch (_) {}
-        }
-      }
-    }
-    // 外键级联删除：只需删 Session，对应的 Rounds 和 Attachments 会由 SQLite 自动清理
-    await (_db.delete(_db.dbSessions)..where((t) => t.id.equals(sessionId))).go();
-  }
-  // 附件读写通过 FileService 物理落盘
-  Future<String> saveAttachment(Uint8List data, String fileName) async => await _fileService.saveAttachment(data, fileName);
-  Future<Uint8List> getAttachment(String relativePath) async => await _fileService.readAttachment(relativePath);
-  Future<void> deleteAttachment(String relativePath) async => await _fileService.deleteAttachment(relativePath);
-  Future<Session> createSession({required String fileName, required String title}) async {
-    final sessionId = _getId(fileName);
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final session = Session(id: sessionId, title: title, createdAt: now, updatedAt: now, rounds: []);
-    await _db.into(_db.dbSessions).insert(
-      DbSessionsCompanion.insert(
-        id: session.id, title: session.title, createdAt: session.createdAt, updatedAt: session.updatedAt,
-      ),
-    );
-    return session;
-  }
-  Future<Session> createSessionWithGeneratedId({required String title}) async {
-    final sessionId = IdGenerator.generate();
-    return await createSession(fileName: '$sessionId.json', title: title);
-  }
-  Future<void> updateSessionTitle(String fileName, String title) async {
-    final sessionId = _getId(fileName);
-    await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-        .write(DbSessionsCompanion(
-          title: Value(title), updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
-        ));
-  }
-  Future<List<Session>> getAllSessions() async {
-    final ids = await getAllSessionFileNames();
-    final sessions = <Session>[];
-    for (final id in ids) {
-      try {
-        sessions.add(await getSession(id));
-      } catch (_) {} // 忽略损坏记录
-    }
-    return sessions;
-  }
-  // 增量插入，无需重写整个 JSON
-  Future<void> appendRound(String fileName, ChatRound round) async {
-    final sessionId = _getId(fileName);
-    await _db.transaction(() async {
-      await _db.into(_db.dbChatRounds).insert(
-        DbChatRoundsCompanion.insert(
-          id: round.id, sessionId: sessionId, parentId: Value(round.parentId),
-          createdAt: round.createdAt, userContent: round.userContent,
-          assistantThinking: Value(round.assistantThinking),
-          assistantContent: Value(round.assistantContent),
-          isIncomplete: Value(round.isIncomplete), hasUnseenUpdate: Value(round.hasUnseenUpdate),
-        ),
+      // 1. 初始化文件目录
+      final appDir = await getApplicationDocumentsDirectory();
+      final basePath = appDir.path;
+      final fileSource = LocalFileSource(basePath);
+      await fileSource.initDirectories();
+      // 2. 初始化数据库
+      final appDatabase = AppDatabase();
+      // 3. 构建服务与 Repositories
+      final fileService = FileService(fileSource);
+      final remoteApiSource = RemoteApiSource();
+      final configService = ConfigService(appDatabase, remoteApiSource);
+      final conversationRepository = ConversationRepository(appDatabase, fileService);
+      final configRepository = ConfigRepository(configService);
+      state = state.copyWith(
+        status: InitStatus.success,
+        appDatabase: appDatabase,
+        fileSource: fileSource,
+        fileService: fileService,
+        remoteApiSource: remoteApiSource,
+        configService: configService,
+        conversationRepository: conversationRepository,
+        configRepository: configRepository,
       );
-      for (final attach in round.userAttachments) {
-        await _db.into(_db.dbAttachments).insert(
-          DbAttachmentsCompanion.insert(
-            id: attach.id, roundId: round.id, name: attach.name,
-            relativePath: attach.relativePath, isImage: Value(attach.isImage), mimeType: Value(attach.mimeType),
-          ),
-        );
-      }
-      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-          .write(DbSessionsCompanion(updatedAt: Value(DateTime.now().millisecondsSinceEpoch)));
-    });
-  }
-  // 增量更新单轮
-  Future<void> updateRound(String fileName, String roundId, ChatRound updatedRound) async {
-    final sessionId = _getId(fileName);
-    await _db.transaction(() async {
-      await (_db.update(_db.dbChatRounds)..where((t) => t.id.equals(roundId))).write(
-        DbChatRoundsCompanion(
-          assistantThinking: Value(updatedRound.assistantThinking),
-          assistantContent: Value(updatedRound.assistantContent),
-          isIncomplete: Value(updatedRound.isIncomplete),
-          hasUnseenUpdate: Value(updatedRound.hasUnseenUpdate),
-        ),
+    } catch (e) {
+      state = state.copyWith(
+        status: InitStatus.error,
+        errorMessage: e.toString(),
       );
-      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-          .write(DbSessionsCompanion(updatedAt: Value(DateTime.now().millisecondsSinceEpoch)));
-    });
-  }
-}
-```
-
-## File: lib/data/services/config_service.dart
-```dart
-import 'package:drift/drift.dart';
-import '../../core/interfaces/config_service.dart';
-import '../../core/models/app_config.dart';
-import '../../core/models/app_config_store.dart';
-import '../../core/utils/id_generator.dart';
-import '../../data/data_sources/remote_api_source.dart';
-import '../database/database.dart';
-class ConfigService implements IConfigService {
-  final AppDatabase _db;
-  final IRemoteApiSource _apiSource;
-  ConfigService(this._db, this._apiSource);
-  @override
-  Future<AppConfigStore> loadConfigStore() async {
-    final storeRow = await _db.select(_db.dbConfigStore).getSingleOrNull();
-    final activeId = storeRow?.activeProfileId ?? 'default';
-    final profileRows = await _db.select(_db.dbConfigProfiles).get();
-    // 初始化默认数据
-    if (profileRows.isEmpty) {
-      final defaultProfile = ConfigProfile(
-        id: 'default',
-        name: '默认配置',
-        config: AppConfig.defaultConfig(),
-      );
-      await _db.into(_db.dbConfigProfiles).insert(
-        DbConfigProfilesCompanion.insert(
-          id: defaultProfile.id,
-          name: defaultProfile.name,
-          config: defaultProfile.config,
-        ),
-      );
-      await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
-        const DbConfigStoreCompanion(id: Value(1), activeProfileId: Value('default')),
-      );
-      return AppConfigStore(activeProfileId: 'default', profiles: [defaultProfile]);
-    }
-    final profiles = profileRows.map((p) => ConfigProfile(
-      id: p.id, name: p.name, config: p.config,
-    )).toList();
-    return AppConfigStore(activeProfileId: activeId, profiles: profiles);
-  }
-  @override
-  Future<AppConfig> loadConfig() async {
-    final store = await loadConfigStore();
-    return store.profiles.firstWhere((p) => p.id == store.activeProfileId).config;
-  }
-  @override
-  Future<void> saveConfig(AppConfig config) async {
-    final activeId = await getActiveProfileId();
-    await _db.update(_db.dbConfigProfiles)
-      ..where((t) => t.id.equals(activeId))
-      ..write(DbConfigProfilesCompanion(config: Value(config)));
-  }
-  @override
-  Future<void> refreshModels() async {
-    final activeConfig = await loadConfig();
-    final models = await _apiSource.fetchModels(
-      baseUrl: activeConfig.baseUrl,
-      apiKey: activeConfig.apiKey,
-      modelsPath: activeConfig.modelsPath,
-    );
-    final updatedConfig = activeConfig.copyWith(availableModels: models);
-    await saveConfig(updatedConfig);
-  }
-  @override
-  Future<List<ConfigProfile>> getProfiles() async {
-    final store = await loadConfigStore();
-    return store.profiles;
-  }
-  @override
-  Future<String> getActiveProfileId() async {
-    final storeRow = await _db.select(_db.dbConfigStore).getSingleOrNull();
-    return storeRow?.activeProfileId ?? 'default';
-  }
-  @override
-  Future<void> switchProfile(String profileId) async {
-    await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
-      DbConfigStoreCompanion(id: const Value(1), activeProfileId: Value(profileId)),
-    );
-  }
-  @override
-  Future<void> createProfile(String name) async {
-    final activeConfig = await loadConfig();
-    final newId = IdGenerator.generate();
-    final cleanName = name.trim().isEmpty ? '新配置' : name.trim();
-    await _db.into(_db.dbConfigProfiles).insert(
-      DbConfigProfilesCompanion.insert(
-        id: newId, name: cleanName, config: activeConfig,
-      ),
-    );
-    await switchProfile(newId);
-  }
-  @override
-  Future<void> renameProfile(String profileId, String name) async {
-    if (name.trim().isEmpty) return;
-    await (_db.update(_db.dbConfigProfiles)..where((t) => t.id.equals(profileId)))
-        .write(DbConfigProfilesCompanion(name: Value(name.trim())));
-  }
-  @override
-  Future<void> deleteProfile(String profileId) async {
-    final store = await loadConfigStore();
-    if (store.profiles.length <= 1) return;
-    await (_db.delete(_db.dbConfigProfiles)..where((t) => t.id.equals(profileId))).go();
-    if (store.activeProfileId == profileId) {
-      final remaining = await _db.select(_db.dbConfigProfiles).get();
-      await switchProfile(remaining.first.id);
     }
   }
 }
-```
-
-## File: lib/data/services/file_service.dart
-```dart
-import 'dart:typed_data';
-import '../../core/interfaces/file_service.dart';
-import '../data_sources/local_file_source.dart';
-class FileService implements IFileService {
-  final ILocalFileSource _fileSource;
-  FileService(this._fileSource);
-  @override
-  Future<String> saveAttachment(Uint8List data, String fileName) async {
-    return await _fileSource.saveAttachment(data, fileName);
-  }
-  @override
-  Future<Uint8List> readAttachment(String relativePath) async {
-    return await _fileSource.readAttachment(relativePath);
-  }
-  @override
-  Future<void> deleteAttachment(String relativePath) async {
-    await _fileSource.deleteFile(relativePath);
-  }
-}
+final initProvider = StateNotifierProvider<InitNotifier, InitState>((ref) => InitNotifier());
+final conversationRepositoryProvider = Provider<ConversationRepository>((ref) {
+  final initState = ref.watch(initProvider);
+  if (initState.conversationRepository == null) throw StateError('应用未初始化');
+  return initState.conversationRepository!;
+});
+final configRepositoryProvider = Provider<ConfigRepository>((ref) {
+  final initState = ref.watch(initProvider);
+  if (initState.configRepository == null) throw StateError('应用未初始化');
+  return initState.configRepository!;
+});
+final remoteApiSourceProvider = Provider<IRemoteApiSource>((ref) {
+  final initState = ref.watch(initProvider);
+  if (initState.remoteApiSource == null) throw StateError('应用未初始化');
+  return initState.remoteApiSource!;
+});
 ```
 
 ## File: lib/domain/models/chat_page.dart
@@ -10655,9 +10281,11 @@ class TextAttachmentViewerPage extends StatelessWidget {
 
 ## File: lib/presentation/providers/attachment_bytes_provider.dart
 ```dart
+// presentation/providers/attachment_bytes_provider.dart
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../di/providers.dart';
+// 使用 autoDispose，组件销毁时自动释放内存
 final attachmentBytesProvider =
     FutureProvider.autoDispose.family<Uint8List, String>(
   (ref, relativePath) async {
@@ -10669,128 +10297,104 @@ final attachmentBytesProvider =
 
 ## File: lib/presentation/providers/config_notifier.dart
 ```dart
+// presentation/providers/config_notifier.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/app_config.dart';
 import '../../core/models/app_config_store.dart';
 import '../../di/providers.dart';
+// ✅ 使用纯声明式 StreamProvider - 无需手动管理生命周期
+final configProvider = StreamProvider<AppConfig>((ref) {
+  final repository = ref.watch(configRepositoryProvider);
+  return repository.watchConfig();
+});
+final configProfilesProvider = StreamProvider<AppConfigStore>((ref) {
+  final repository = ref.watch(configRepositoryProvider);
+  return repository.watchConfigStore();
+});
+// ✅ 保留旧的 StateNotifier 方式用于需要命令式调用的场景
+// 内部委托给上面的 StreamProvider
 class ConfigNotifier extends StateNotifier<AsyncValue<AppConfig>> {
   final Ref ref;
   ConfigNotifier(this.ref) : super(const AsyncValue.loading()) {
-    _loadInitialConfig();
-  }
-  Future<void> _loadInitialConfig() async {
-    try {
-      final repository = ref.read(configRepositoryProvider);
-      final config = await repository.getConfig();
-      state = AsyncValue.data(config);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
-  }
-  Future<AppConfig> _fetchLatestConfig() async {
-    final repository = ref.read(configRepositoryProvider);
-    return await repository.getConfig();
-  }
-  Future<void> _reloadConfigWithoutLoading() async {
-    final config = await _fetchLatestConfig();
-    state = AsyncValue.data(config);
+    // 监听上面的 StreamProvider
+    ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
+      state = next;
+    });
   }
   Future<void> updateApiKey(String apiKey) async {
     final repository = ref.read(configRepositoryProvider);
     await repository.updateApiKey(apiKey);
-    await _reloadConfigWithoutLoading();
   }
   Future<void> updateBaseUrl(String baseUrl) async {
     final repository = ref.read(configRepositoryProvider);
     await repository.updateBaseUrl(baseUrl);
-    await _reloadConfigWithoutLoading();
   }
   Future<void> updateModelsPath(String modelsPath) async {
     final repository = ref.read(configRepositoryProvider);
     await repository.updateModelsPath(modelsPath);
-    await _reloadConfigWithoutLoading();
   }
   Future<void> updateChatPath(String chatPath) async {
     final repository = ref.read(configRepositoryProvider);
     await repository.updateChatPath(chatPath);
-    await _reloadConfigWithoutLoading();
   }
   Future<void> updateApiMode(String apiMode) async {
     final repository = ref.read(configRepositoryProvider);
     await repository.updateApiMode(apiMode);
-    await _reloadConfigWithoutLoading();
   }
   Future<void> updateSelectedModel(String? model) async {
     final repository = ref.read(configRepositoryProvider);
     await repository.updateSelectedModel(model);
-    await _reloadConfigWithoutLoading();
   }
   Future<void> saveFullConfig(AppConfig config) async {
     final repository = ref.read(configRepositoryProvider);
     await repository.saveFullConfig(config);
-    state = AsyncValue.data(config);
   }
   Future<void> saveAndRefreshModels(AppConfig config) async {
+    // 先标记为加载中
+    state = const AsyncValue.loading();
     final repository = ref.read(configRepositoryProvider);
-    state = AsyncValue.data(
-      config.copyWith(
-        availableModels: [],
-      ),
-    );
-    await repository.saveAndRefreshModels(config);
-    await _reloadConfigWithoutLoading();
+    // 先保存空模型列表
+    await repository.saveConfig(config.copyWith(availableModels: []));
+    await repository.refreshModels();
+    // Stream 会自动更新状态
   }
   Future<void> refreshModels() async {
     final repository = ref.read(configRepositoryProvider);
     await repository.refreshModels();
-    await _reloadConfigWithoutLoading();
   }
 }
-final configProvider =
-    StateNotifierProvider<ConfigNotifier, AsyncValue<AppConfig>>((ref) {
+// ✅ 使用 Provider 而非 StateNotifierProvider，让生命周期完全自动化
+final configNotifierProvider = Provider<ConfigNotifier>((ref) {
   return ConfigNotifier(ref);
 });
-class ConfigProfilesNotifier
-    extends StateNotifier<AsyncValue<AppConfigStore>> {
+class ConfigProfilesNotifier extends StateNotifier<AsyncValue<AppConfigStore>> {
   final Ref ref;
   ConfigProfilesNotifier(this.ref) : super(const AsyncValue.loading()) {
-    load();
+    ref.listen<AsyncValue<AppConfigStore>>(configProfilesProvider, (previous, next) {
+      state = next;
+    });
   }
   Future<void> load() async {
-    try {
-      final repository = ref.read(configRepositoryProvider);
-      final store = await repository.getConfigStore();
-      state = AsyncValue.data(store);
-      final config = await repository.getConfig();
-      ref.read(configProvider.notifier).state = AsyncValue.data(config);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+    // Stream 会自动同步，无需手动操作
   }
   Future<void> switchProfile(String profileId) async {
     final repository = ref.read(configRepositoryProvider);
     await repository.switchProfile(profileId);
-    await load();
   }
   Future<void> createProfile(String name) async {
     final repository = ref.read(configRepositoryProvider);
     await repository.createProfile(name);
-    await load();
   }
   Future<void> renameProfile(String profileId, String name) async {
     final repository = ref.read(configRepositoryProvider);
     await repository.renameProfile(profileId, name);
-    await load();
   }
   Future<void> deleteProfile(String profileId) async {
     final repository = ref.read(configRepositoryProvider);
     await repository.deleteProfile(profileId);
-    await load();
   }
 }
-final configProfilesProvider =
-    StateNotifierProvider<ConfigProfilesNotifier, AsyncValue<AppConfigStore>>(
-        (ref) {
+final configProfilesNotifierProvider = Provider<ConfigProfilesNotifier>((ref) {
   return ConfigProfilesNotifier(ref);
 });
 ```
@@ -10808,40 +10412,34 @@ final globalEditSourceRoundIdProvider =
 
 ## File: lib/presentation/providers/session_list_notifier.dart
 ```dart
+// presentation/providers/session_list_notifier.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/session.dart';
 import '../../di/providers.dart';
+// ✅ 使用纯声明式 StreamProvider
+final sessionListProvider = StreamProvider<List<Session>>((ref) {
+  final repository = ref.watch(conversationRepositoryProvider);
+  return repository.watchAllSessions();
+});
+// ✅ 保留命令式 notifier 用于需要直接调用方法的场景
 class SessionListNotifier extends StateNotifier<AsyncValue<List<Session>>> {
   final Ref ref;
   SessionListNotifier(this.ref) : super(const AsyncValue.loading()) {
-    _loadSessions(initial: true);
-  }
-  Future<void> _loadSessions({bool initial = false}) async {
-    if (initial || !state.hasValue) {
-      state = const AsyncValue.loading();
-    }
-    try {
-      final repository = ref.read(conversationRepositoryProvider);
-      final sessions = await repository.getAllSessions();
-      state = AsyncValue.data(sessions);
-    } catch (e, st) {
-      if (initial || !state.hasValue) {
-        state = AsyncValue.error(e, st);
-      }
-    }
+    // 监听上面的 StreamProvider
+    ref.listen<AsyncValue<List<Session>>>(sessionListProvider, (previous, next) {
+      state = next;
+    });
   }
   Future<void> refresh() async {
-    await _loadSessions(initial: false);
+    // Stream 会自动同步，保留此方法用于兼容性
   }
   Future<void> deleteSession(String fileName) async {
     try {
       final repository = ref.read(conversationRepositoryProvider);
       await repository.deleteSession(fileName);
-      await _loadSessions(initial: false);
+      // Stream 会自动同步
     } catch (e, st) {
-      if (!state.hasValue) {
-        state = AsyncValue.error(e, st);
-      }
+      state = AsyncValue.error(e, st);
     }
   }
   Future<void> updateSessionTitle(String fileName, String newTitle) async {
@@ -10850,25 +10448,24 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<Session>>> {
       final cleanTitle = newTitle.trim();
       if (cleanTitle.isEmpty) return;
       await repository.updateSessionTitle(fileName, cleanTitle);
-      await _loadSessions(initial: false);
+      // Stream 会自动同步
     } catch (e, st) {
-      if (!state.hasValue) {
-        state = AsyncValue.error(e, st);
-      }
+      state = AsyncValue.error(e, st);
     }
   }
   Future<String> createSession(String title) async {
     final repository = ref.read(conversationRepositoryProvider);
     final cleanTitle = title.trim().isEmpty ? '新对话' : title.trim();
-    final session = await repository.createSessionWithGeneratedId(
-      title: cleanTitle,
-    );
-    await _loadSessions(initial: false);
-    return '${session.id}.json';
+    // 使用时间戳生成临时 ID
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final sessionId = now.toString();
+    final fileName = '$sessionId.json';
+    await repository.createSession(fileName: fileName, title: cleanTitle);
+    return fileName;
   }
 }
-final sessionListProvider =
-    StateNotifierProvider<SessionListNotifier, AsyncValue<List<Session>>>((ref) {
+// ✅ 使用 Provider 而非 StateNotifierProvider
+final sessionListNotifierProvider = Provider<SessionListNotifier>((ref) {
   return SessionListNotifier(ref);
 });
 ```
@@ -11402,6 +10999,565 @@ class ThoughtBubble extends StatelessWidget {
 }
 ```
 
+## File: lib/core/interfaces/file_service.dart
+```dart
+import 'dart:typed_data';
+abstract class IFileService {
+  Future<String> saveAttachment(Uint8List data, String fileName);
+  Future<Uint8List> readAttachment(String relativePath);
+  Future<void> deleteAttachment(String relativePath);
+}
+```
+
+## File: lib/data/repositories/conversation_repository.dart
+```dart
+// data/repositories/conversation_repository.dart
+import 'dart:async';
+import 'dart:typed_data';
+import 'package:drift/drift.dart';
+import '../../core/interfaces/file_service.dart';
+import '../../core/models/attachment.dart';
+import '../../core/models/chat_round.dart';
+import '../../core/models/session.dart';
+import '../database/database.dart';
+import '../../core/utils/id_generator.dart';
+class ConversationRepository {
+  final AppDatabase _db;
+  final IFileService _fileService;
+  ConversationRepository(this._db, this._fileService);
+  String _getId(String fileName) => fileName.replaceAll('.json', '');
+  // 检查附件是否被其他 Round 引用
+  Future<bool> _isAttachmentUsedElsewhere(
+      String relativePath, List<String> excludeRoundIds) async {
+    final query = _db.select(_db.dbAttachments).join([
+      innerJoin(
+        _db.dbChatRounds,
+        _db.dbChatRounds.id.equalsExp(_db.dbAttachments.roundId),
+      )
+    ])
+      ..where(_db.dbAttachments.relativePath.equals(relativePath))
+      ..where(_db.dbChatRounds.id.isNotIn(excludeRoundIds));
+    final result = await query.get();
+    return result.isNotEmpty;
+  }
+  // ========== 核心改造：添加 watch 方法 ==========
+  /// 监听所有会话列表，返回按更新时间倒序的会话 Stream
+  Stream<List<Session>> watchAllSessions() {
+    final query = _db.select(_db.dbSessions)
+      ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]);
+    return query.watch().asyncMap((sessionRows) async {
+      final sessions = <Session>[];
+      for (final sessionRow in sessionRows) {
+        final session = await _buildSessionFromRow(sessionRow);
+        sessions.add(session);
+      }
+      return sessions;
+    });
+  }
+  /// 监听单个会话的完整数据（包含所有轮次和附件）
+  Stream<Session?> watchSession(String fileName) {
+    final sessionId = _getId(fileName);
+    // 监听会话元数据变更
+    final sessionQuery = _db.select(_db.dbSessions)
+      ..where((t) => t.id.equals(sessionId));
+    return sessionQuery.watchSingleOrNull().asyncMap((sessionRow) async {
+      if (sessionRow == null) return null;
+      return _buildSessionFromRow(sessionRow);
+    });
+  }
+  /// 监听会话的轮次列表
+  Stream<List<ChatRound>> watchRounds(String sessionId) {
+    final roundsQuery = _db.select(_db.dbChatRounds)
+      ..where((t) => t.sessionId.equals(sessionId))
+      ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]);
+    return roundsQuery.watch().asyncMap((roundRows) async {
+      final rounds = <ChatRound>[];
+      for (final round in roundRows) {
+        final attachments = await _getAttachmentsForRound(round.id);
+        rounds.add(_mapToChatRound(round, attachments));
+      }
+      return rounds;
+    });
+  }
+  /// 监听单个轮次的数据
+  Stream<ChatRound?> watchRound(String roundId) {
+    final query = _db.select(_db.dbChatRounds)
+      ..where((t) => t.id.equals(roundId));
+    return query.watchSingleOrNull().asyncMap((roundRow) async {
+      if (roundRow == null) return null;
+      final attachments = await _getAttachmentsForRound(roundId);
+      return _mapToChatRound(roundRow, attachments);
+    });
+  }
+  // ========== 私有辅助方法 ==========
+  Future<Session> _buildSessionFromRow(DbSession sessionRow) async {
+    final sessionId = sessionRow.id;
+    // 查询所有轮次
+    final roundsQuery = _db.select(_db.dbChatRounds)
+      ..where((t) => t.sessionId.equals(sessionId))
+      ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]);
+    final roundRows = await roundsQuery.get();
+    if (roundRows.isEmpty) {
+      return Session(
+        id: sessionRow.id,
+        title: sessionRow.title,
+        createdAt: sessionRow.createdAt,
+        updatedAt: sessionRow.updatedAt,
+        config: sessionRow.config,
+        hasUnseenUpdate: sessionRow.hasUnseenUpdate,
+        rounds: const [],
+      );
+    }
+    // 查询所有相关附件
+    final roundIds = roundRows.map((r) => r.id).toList();
+    final attachmentsQuery = _db.select(_db.dbAttachments)
+      ..where((t) => t.roundId.isIn(roundIds));
+    final attachmentRows = await attachmentsQuery.get();
+    // 组装 Attachments Map
+    final attachMap = <String, List<Attachment>>{};
+    for (final a in attachmentRows) {
+      attachMap.putIfAbsent(a.roundId, () => []).add(
+            Attachment(
+              id: a.id,
+              name: a.name,
+              relativePath: a.relativePath,
+              isImage: a.isImage,
+              mimeType: a.mimeType,
+            ),
+          );
+    }
+    // 组装 Rounds
+    final rounds = roundRows
+        .map((r) => _mapToChatRound(r, attachMap[r.id] ?? []))
+        .toList();
+    return Session(
+      id: sessionRow.id,
+      title: sessionRow.title,
+      createdAt: sessionRow.createdAt,
+      updatedAt: sessionRow.updatedAt,
+      config: sessionRow.config,
+      hasUnseenUpdate: sessionRow.hasUnseenUpdate,
+      rounds: rounds,
+    );
+  }
+  Future<List<Attachment>> _getAttachmentsForRound(String roundId) async {
+    final query = _db.select(_db.dbAttachments)
+      ..where((t) => t.roundId.equals(roundId));
+    final rows = await query.get();
+    return rows
+        .map((a) => Attachment(
+              id: a.id,
+              name: a.name,
+              relativePath: a.relativePath,
+              isImage: a.isImage,
+              mimeType: a.mimeType,
+            ))
+        .toList();
+  }
+  ChatRound _mapToChatRound(DbChatRound row, List<Attachment> attachments) {
+    return ChatRound(
+      id: row.id,
+      parentId: row.parentId,
+      createdAt: row.createdAt,
+      userContent: row.userContent,
+      userAttachments: attachments,
+      assistantThinking: row.assistantThinking,
+      assistantContent: row.assistantContent,
+      isIncomplete: row.isIncomplete,
+      hasUnseenUpdate: row.hasUnseenUpdate,
+    );
+  }
+  // ========== 现有的同步方法保留，用于初始化和一次性读取 ==========
+  Future<List<String>> getAllSessionFileNames() async {
+    final sessions = await (_db.select(_db.dbSessions)
+          ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]))
+        .get();
+    return sessions.map((s) => '${s.id}.json').toList();
+  }
+  Future<Session> getSession(String fileName) async {
+    final sessionId = _getId(fileName);
+    final sessionRow = await (_db.select(_db.dbSessions)
+          ..where((t) => t.id.equals(sessionId)))
+        .getSingle();
+    return _buildSessionFromRow(sessionRow);
+  }
+  Future<void> deleteRounds(String sessionId, List<String> roundIds) async {
+    if (roundIds.isEmpty) return;
+    await (_db.delete(_db.dbChatRounds)
+          ..where((t) => t.sessionId.equals(sessionId) & t.id.isIn(roundIds)))
+        .go();
+  }
+  Future<void> saveSession(
+      String fileName, Session newSession) async {
+    final sessionId = _getId(fileName);
+    await _db.transaction(() async {
+      final allAttachments = <DbAttachmentsCompanion>[];
+      for (final round in newSession.rounds) {
+        await _db.into(_db.dbChatRounds).insertOnConflictUpdate(
+              DbChatRoundsCompanion.insert(
+                id: round.id,
+                sessionId: sessionId,
+                parentId: Value(round.parentId),
+                createdAt: round.createdAt,
+                userContent: round.userContent,
+                assistantThinking: Value(round.assistantThinking),
+                assistantContent: Value(round.assistantContent),
+                isIncomplete: Value(round.isIncomplete),
+                hasUnseenUpdate: Value(round.hasUnseenUpdate),
+              ),
+            );
+        allAttachments.addAll(round.userAttachments
+            .map((a) => DbAttachmentsCompanion.insert(
+                  id: a.id,
+                  roundId: round.id,
+                  name: a.name,
+                  relativePath: a.relativePath,
+                  isImage: Value(a.isImage),
+                  mimeType: Value(a.mimeType),
+                )));
+      }
+      for (final attach in allAttachments) {
+        await _db.into(_db.dbAttachments).insertOnConflictUpdate(attach);
+      }
+      await _db.into(_db.dbSessions).insertOnConflictUpdate(
+            DbSessionsCompanion(
+              id: Value(sessionId),
+              title: Value(newSession.title),
+              createdAt: Value(newSession.createdAt),
+              updatedAt: Value(newSession.updatedAt),
+              config: Value(newSession.config),
+              hasUnseenUpdate: Value(newSession.hasUnseenUpdate),
+            ),
+          );
+    });
+  }
+  Future<void> saveSessionAndCleanupOrphanAttachments(
+    String fileName, Session oldSession, Session newSession,
+  ) async {
+    final oldPaths = oldSession.rounds
+        .expand((r) => r.userAttachments)
+        .map((a) => a.relativePath)
+        .toSet();
+    final newPaths = newSession.rounds
+        .expand((r) => r.userAttachments)
+        .map((a) => a.relativePath)
+        .toSet();
+    final removedPaths = oldPaths.difference(newPaths);
+    final deletedRoundIds = oldSession.rounds
+        .where((oldR) => !newSession.rounds.any((newR) => newR.id == oldR.id))
+        .map((r) => r.id)
+        .toList();
+    await saveSession(fileName, newSession);
+    for (final path in removedPaths) {
+      if (!await _isAttachmentUsedElsewhere(path, deletedRoundIds)) {
+        try {
+          await _fileService.deleteAttachment(path);
+        } catch (_) {}
+      }
+    }
+  }
+  Future<void> deleteSession(String fileName) async {
+    final sessionId = _getId(fileName);
+    Session? targetSession;
+    try {
+      targetSession = await getSession(fileName);
+    } catch (_) {}
+    if (targetSession != null) {
+      final paths = targetSession.rounds
+          .expand((r) => r.userAttachments)
+          .map((a) => a.relativePath)
+          .toSet();
+      final allRoundIds = targetSession.rounds.map((r) => r.id).toList();
+      for (final path in paths) {
+        if (!await _isAttachmentUsedElsewhere(path, allRoundIds)) {
+          try {
+            await _fileService.deleteAttachment(path);
+          } catch (_) {}
+        }
+      }
+    }
+    await (_db.delete(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
+        .go();
+  }
+  Future<String> saveAttachment(Uint8List data, String fileName) async =>
+      await _fileService.saveAttachment(data, fileName);
+  Future<Uint8List> getAttachment(String relativePath) async =>
+      await _fileService.readAttachment(relativePath);
+  Future<void> deleteAttachment(String relativePath) async =>
+      await _fileService.deleteAttachment(relativePath);
+  Future<Session> createSession({required String fileName, required String title}) async {
+    final sessionId = _getId(fileName);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final session = Session(
+        id: sessionId,
+        title: title,
+        createdAt: now,
+        updatedAt: now,
+        rounds: []);
+    await _db.into(_db.dbSessions).insert(
+          DbSessionsCompanion.insert(
+            id: session.id,
+            title: session.title,
+            createdAt: session.createdAt,
+            updatedAt: session.updatedAt,
+          ),
+        );
+    return session;
+  }
+  Future<Session> createSessionWithGeneratedId({required String title}) async {
+    final sessionId = IdGenerator.generate();
+    return createSession(fileName: '$sessionId.json', title: title);
+  }
+  Future<void> updateSessionTitle(String fileName, String title) async {
+    final sessionId = _getId(fileName);
+    await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
+        .write(DbSessionsCompanion(
+          title: Value(title),
+          updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+        ));
+  }
+  Future<List<Session>> getAllSessions() async {
+    final ids = await getAllSessionFileNames();
+    final sessions = <Session>[];
+    for (final id in ids) {
+      try {
+        sessions.add(await getSession(id));
+      } catch (_) {}
+    }
+    return sessions;
+  }
+  Future<void> appendRound(String fileName, ChatRound round) async {
+    final sessionId = _getId(fileName);
+    await _db.transaction(() async {
+      await _db.into(_db.dbChatRounds).insert(
+            DbChatRoundsCompanion.insert(
+              id: round.id,
+              sessionId: sessionId,
+              parentId: Value(round.parentId),
+              createdAt: round.createdAt,
+              userContent: round.userContent,
+              assistantThinking: Value(round.assistantThinking),
+              assistantContent: Value(round.assistantContent),
+              isIncomplete: Value(round.isIncomplete),
+              hasUnseenUpdate: Value(round.hasUnseenUpdate),
+            ),
+          );
+      for (final attach in round.userAttachments) {
+        await _db.into(_db.dbAttachments).insert(
+              DbAttachmentsCompanion.insert(
+                id: attach.id,
+                roundId: round.id,
+                name: attach.name,
+                relativePath: attach.relativePath,
+                isImage: Value(attach.isImage),
+                mimeType: Value(attach.mimeType),
+              ),
+            );
+      }
+      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
+          .write(DbSessionsCompanion(
+              updatedAt: Value(DateTime.now().millisecondsSinceEpoch)));
+    });
+  }
+  Future<void> updateRound(
+      String fileName, String roundId, ChatRound updatedRound) async {
+    final sessionId = _getId(fileName);
+    await _db.transaction(() async {
+      await (_db.update(_db.dbChatRounds)
+            ..where((t) => t.id.equals(roundId)))
+          .write(
+            DbChatRoundsCompanion(
+              assistantThinking: Value(updatedRound.assistantThinking),
+              assistantContent: Value(updatedRound.assistantContent),
+              isIncomplete: Value(updatedRound.isIncomplete),
+              hasUnseenUpdate: Value(updatedRound.hasUnseenUpdate),
+            ),
+          );
+      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
+          .write(DbSessionsCompanion(
+              updatedAt: Value(DateTime.now().millisecondsSinceEpoch)));
+    });
+  }
+}
+```
+
+## File: lib/data/services/config_service.dart
+```dart
+// data/services/config_service.dart
+import 'dart:async';
+import 'package:drift/drift.dart';
+import '../../core/interfaces/config_service.dart';
+import '../../core/models/app_config.dart';
+import '../../core/models/app_config_store.dart';
+import '../../core/utils/id_generator.dart';
+import '../../data/data_sources/remote_api_source.dart';
+import '../database/database.dart';
+class ConfigService implements IConfigService {
+  final AppDatabase _db;
+  final IRemoteApiSource _apiSource;
+  ConfigService(this._db, this._apiSource);
+  @override
+  Future<AppConfigStore> loadConfigStore() async {
+    final storeRow = await _db.select(_db.dbConfigStore).getSingleOrNull();
+    final activeId = storeRow?.activeProfileId ?? 'default';
+    final profileRows = await _db.select(_db.dbConfigProfiles).get();
+    // 初始化默认数据
+    if (profileRows.isEmpty) {
+      final defaultProfile = ConfigProfile(
+        id: 'default',
+        name: '默认配置',
+        config: AppConfig.defaultConfig(),
+      );
+      await _db.into(_db.dbConfigProfiles).insert(
+        DbConfigProfilesCompanion.insert(
+          id: defaultProfile.id,
+          name: defaultProfile.name,
+          config: defaultProfile.config,
+        ),
+      );
+      await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
+        const DbConfigStoreCompanion(id: Value(1), activeProfileId: Value('default')),
+      );
+      return AppConfigStore(activeProfileId: 'default', profiles: [defaultProfile]);
+    }
+    final profiles = profileRows.map((p) => ConfigProfile(
+      id: p.id, 
+      name: p.name, 
+      config: p.config,
+    )).toList();
+    return AppConfigStore(activeProfileId: activeId, profiles: profiles);
+  }
+  @override
+  Future<AppConfig> loadConfig() async {
+    final store = await loadConfigStore();
+    return store.profiles.firstWhere((p) => p.id == store.activeProfileId).config;
+  }
+  @override
+  Future<void> saveConfig(AppConfig config) async {
+    final activeId = await getActiveProfileId();
+    await _db.update(_db.dbConfigProfiles)
+      ..where((t) => t.id.equals(activeId))
+      ..write(DbConfigProfilesCompanion(config: Value(config)));
+  }
+  @override
+  Future<void> refreshModels() async {
+    final activeConfig = await loadConfig();
+    final models = await _apiSource.fetchModels(
+      baseUrl: activeConfig.baseUrl,
+      apiKey: activeConfig.apiKey,
+      modelsPath: activeConfig.modelsPath,
+    );
+    final updatedConfig = activeConfig.copyWith(availableModels: models);
+    await saveConfig(updatedConfig);
+  }
+  @override
+  Future<List<ConfigProfile>> getProfiles() async {
+    final store = await loadConfigStore();
+    return store.profiles;
+  }
+  @override
+  Future<String> getActiveProfileId() async {
+    final storeRow = await _db.select(_db.dbConfigStore).getSingleOrNull();
+    return storeRow?.activeProfileId ?? 'default';
+  }
+  @override
+  Future<void> switchProfile(String profileId) async {
+    await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
+      DbConfigStoreCompanion(id: const Value(1), activeProfileId: Value(profileId)),
+    );
+  }
+  @override
+  Future<void> createProfile(String name) async {
+    final activeConfig = await loadConfig();
+    final newId = IdGenerator.generate();
+    final cleanName = name.trim().isEmpty ? '新配置' : name.trim();
+    await _db.into(_db.dbConfigProfiles).insert(
+      DbConfigProfilesCompanion.insert(
+        id: newId, 
+        name: cleanName, 
+        config: activeConfig,
+      ),
+    );
+    await switchProfile(newId);
+  }
+  @override
+  Future<void> renameProfile(String profileId, String name) async {
+    if (name.trim().isEmpty) return;
+    await (_db.update(_db.dbConfigProfiles)..where((t) => t.id.equals(profileId)))
+        .write(DbConfigProfilesCompanion(name: Value(name.trim())));
+  }
+  @override
+  Future<void> deleteProfile(String profileId) async {
+    // ✅ 原子操作：先获取当前状态
+    final store = await loadConfigStore();
+    // 只有一个配置文件时不允许删除
+    if (store.profiles.length <= 1) return;
+    // ✅ 如果要删除的是当前激活的配置，先切换到其他配置
+    if (store.activeProfileId == profileId) {
+      // 找到剩余配置中的第一个
+      final remaining = store.profiles.where((p) => p.id != profileId).toList();
+      if (remaining.isNotEmpty) {
+        await switchProfile(remaining.first.id);
+      }
+    }
+    // 最后删除目标配置
+    await (_db.delete(_db.dbConfigProfiles)..where((t) => t.id.equals(profileId))).go();
+  }
+  @override
+  Stream<AppConfigStore> watchConfigStore() {
+    // 监听 dbConfigStore 表
+    final storeStream = _db.select(_db.dbConfigStore).watchSingleOrNull();
+    return storeStream.asyncExpand((storeRow) async* {
+      final activeId = storeRow?.activeProfileId ?? 'default';
+      // 监听 profiles 表变化
+      final profilesStream = _db.select(_db.dbConfigProfiles).watch();
+      await for (final profileRows in profilesStream) {
+        final profiles = profileRows.map((p) => ConfigProfile(
+          id: p.id,
+          name: p.name,
+          config: p.config,
+        )).toList();
+        yield AppConfigStore(
+          activeProfileId: activeId,
+          profiles: profiles,
+        );
+      }
+    });
+  }
+  @override
+  Stream<AppConfig> watchConfig() {
+    return watchConfigStore().map((store) {
+      return store.profiles
+          .firstWhere((p) => p.id == store.activeProfileId)
+          .config;
+    });
+  }
+}
+```
+
+## File: lib/data/services/file_service.dart
+```dart
+import 'dart:typed_data';
+import '../../core/interfaces/file_service.dart';
+import '../data_sources/local_file_source.dart';
+class FileService implements IFileService {
+  final ILocalFileSource _fileSource;
+  FileService(this._fileSource);
+  @override
+  Future<String> saveAttachment(Uint8List data, String fileName) async {
+    return await _fileSource.saveAttachment(data, fileName);
+  }
+  @override
+  Future<Uint8List> readAttachment(String relativePath) async {
+    return await _fileSource.readAttachment(relativePath);
+  }
+  @override
+  Future<void> deleteAttachment(String relativePath) async {
+    await _fileSource.deleteFile(relativePath);
+  }
+}
+```
+
 ## File: lib/domain/services/chat_round_factory.dart
 ```dart
 import '../../core/models/attachment.dart';
@@ -11456,11 +11612,15 @@ class ChatRoundFactory {
 
 ## File: lib/presentation/providers/global_streaming_provider.dart
 ```dart
+// presentation/providers/global_streaming_provider.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/chat_round.dart';
 import '../../domain/states/chat_state.dart';
 typedef SessionStreamMap = Map<String, StreamStatus>;
 typedef GlobalStreamMap = Map<String, SessionStreamMap>;
+// 这个 Provider 持有正在流式生成的数据
+// 当流式结束时，数据会写入数据库，UI 通过 watch 获取
+// 此 Provider 主要用于避免重复请求和实时显示
 class GlobalStreamCacheNotifier extends StateNotifier<GlobalStreamMap> {
   GlobalStreamCacheNotifier() : super(const {});
   StreamStatus? getRoundStream(String fileName, String roundId) {
@@ -11513,6 +11673,25 @@ class GlobalStreamCacheNotifier extends StateNotifier<GlobalStreamMap> {
       fileName: sessionMap,
     };
   }
+  void ensureRoundLoadedWithContent(
+    String fileName,
+    String roundId,
+    String content,
+    String reasoning,
+  ) {
+    final sessionMap = Map<String, StreamStatus>.from(state[fileName] ?? {});
+    if (!sessionMap.containsKey(roundId)) {
+      sessionMap[roundId] = StreamStatus(
+        content: content,
+        reasoning: reasoning,
+        isStreaming: false,
+      );
+    }
+    state = {
+      ...state,
+      fileName: sessionMap,
+    };
+  }
   void ensureRoundsLoaded(String fileName, List<ChatRound> rounds) {
     if (rounds.isEmpty) return;
     final sessionMap = Map<String, StreamStatus>.from(state[fileName] ?? {});
@@ -11531,6 +11710,22 @@ class GlobalStreamCacheNotifier extends StateNotifier<GlobalStreamMap> {
       ...state,
       fileName: sessionMap,
     };
+  }
+  void clearRoundStream(String fileName, String roundId) {
+    final sessionMap = state[fileName];
+    if (sessionMap == null) return;
+    final next = Map<String, StreamStatus>.from(sessionMap);
+    next.remove(roundId);
+    if (next.isEmpty) {
+      final global = Map<String, SessionStreamMap>.from(state);
+      global.remove(fileName);
+      state = global;
+    } else {
+      state = {
+        ...state,
+        fileName: next,
+      };
+    }
   }
   void clearNonStreamingForSession(String fileName) {
     final sessionMap = state[fileName];
@@ -11554,6 +11749,10 @@ class GlobalStreamCacheNotifier extends StateNotifier<GlobalStreamMap> {
 }
 final globalStreamCacheProvider =
     StateNotifierProvider<GlobalStreamCacheNotifier, GlobalStreamMap>((ref) {
+  // 当没有任何监听时可以自动清理
+  ref.onDispose(() {
+    // 可以在这里做一些清理工作
+  });
   return GlobalStreamCacheNotifier();
 });
 final sessionStreamMapProvider =
@@ -11896,6 +12095,7 @@ class MyApp extends StatelessWidget {
 
 ## File: lib/presentation/pages/settings_page.dart
 ```dart
+// presentation/pages/settings_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/app_config.dart';
@@ -11916,11 +12116,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   final _apiKeyController = TextEditingController();
   final _modelsPathController = TextEditingController();
   final _chatPathController = TextEditingController();
-  bool _initialized = false;
-  bool _isRefreshingModels = false;
   String? _selectedModel;
   String _apiMode = 'chat_completions';
   List<ModelInfo> _models = const [];
+  bool _isRefreshingModels = false;
   @override
   void dispose() {
     _baseUrlController.dispose();
@@ -11929,254 +12128,286 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     _chatPathController.dispose();
     super.dispose();
   }
-  String _defaultChatPathForApiMode(String apiMode) {
-    switch (apiMode) {
-      case 'responses':
-        return 'v1/responses';
-      case 'chat_completions':
-      default:
-        return 'v1/chat/completions';
-    }
-  }
-  void _applyConfig(AppConfig config) {
-    _baseUrlController.text = config.baseUrl;
-    _apiKeyController.text = config.apiKey;
-    _modelsPathController.text = config.modelsPath;
-    _chatPathController.text = config.chatPath;
-    _selectedModel = config.selectedModel;
-    _apiMode = config.apiMode;
-    _models = config.availableModels ?? const [];
-    _initialized = true;
-  }
-  ModelInfo? _selectedModelInfo() {
-    final selectedId = _selectedModel;
-    if (selectedId == null || selectedId.trim().isEmpty) return null;
-    for (final model in _models) {
-      if (model.id == selectedId) return model;
-    }
-    return null;
-  }
-  String _getSelectedModelDisplayText(List<ModelInfo> models) {
-    if (_selectedModel == null || _selectedModel!.trim().isEmpty) {
-      return '请选择模型';
-    }
-    for (final model in models) {
-      if (model.id == _selectedModel) {
-        final name = (model.name ?? '').trim();
-        return name.isNotEmpty ? name : model.id;
-      }
-    }
-    return _selectedModel!;
-  }
-  List<Widget> _buildModelChips(ModelInfo model) {
-    final widgets = <Widget>[];
-    if (model.supportsVision == true) {
-      widgets.add(
-        const Chip(
-          avatar: Icon(Icons.image_outlined, size: 16),
-          label: Text('Vision'),
-          visualDensity: VisualDensity.compact,
-        ),
-      );
-    }
-    if (model.supportsReasoning == true) {
-      widgets.add(
-        const Chip(
-          avatar: Icon(Icons.psychology_alt_outlined, size: 16),
-          label: Text('Reasoning'),
-          visualDensity: VisualDensity.compact,
-        ),
-      );
-    }
-    return widgets;
-  }
-  Widget _buildSelectedModelSupportsCard() {
-    final model = _selectedModelInfo();
-    if (model == null) return const SizedBox.shrink();
-    final chips = _buildModelChips(model);
-    if (chips.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: chips,
-        ),
-      ),
-    );
-  }
-  void _updateSelectedModelOverride({
-    bool? overrideVision,
-    bool? overrideReasoning,
-  }) {
-    final selected = _selectedModelInfo();
-    if (selected == null) return;
-    final updated = selected.copyWith(
-      overrideSupportsVision:
-          overrideVision ?? selected.overrideSupportsVision,
-      overrideSupportsReasoning:
-          overrideReasoning ?? selected.overrideSupportsReasoning,
-      supportsVision: overrideVision ?? selected.supportsVision,
-      supportsReasoning: overrideReasoning ?? selected.supportsReasoning,
-    );
-    setState(() {
-      _models = _models.map((m) {
-        if (m.id == selected.id) return updated;
-        return m;
-      }).toList();
+  void _syncControllersWithConfig(AppConfig config) {
+    setState(() {  // ✅ 加这个
+      _baseUrlController.text = config.baseUrl;
+      _apiKeyController.text = config.apiKey;
+      _modelsPathController.text = config.modelsPath;
+      _chatPathController.text = config.chatPath;
+      _selectedModel = config.selectedModel;
+      _apiMode = config.apiMode;
+      _models = config.availableModels ?? const [];
     });
   }
-  Future<void> _showCustomModelDialog() async {
-    final controller = TextEditingController(text: _selectedModel ?? '');
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('自定义模型'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: '模型 ID',
-            border: OutlineInputBorder(),
-          ),
-        ),
+  void _saveConfig(AppConfig config) {
+    // ✅ 自动保存
+    ref.read(configNotifierProvider).saveFullConfig(config);
+  }
+  @override
+  Widget build(BuildContext context) {
+    final configState = ref.watch(configProvider);
+    final profilesState = ref.watch(configProfilesProvider);
+    // ✅ 监听配置变化，同步 Controller（但不重建页面）
+    ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
+      next.whenData((config) {
+        _syncControllersWithConfig(config);
+      });
+    });
+    final isBusy = configState.isLoading || _isRefreshingModels;
+    return AppPageScaffold(
+      appBar: AppBar(
+        title: const Text('设置'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-            child: const Text('确定'),
+          IconButton(
+            onPressed: isBusy ? null : _confirmRestoreDefaults,
+            icon: const Icon(Icons.restart_alt),
+            tooltip: '恢复默认',
+            style: IconButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
           ),
         ],
       ),
+      body: profilesState.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('加载配置存档失败：$e')),
+        data: (store) {
+          return configState.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('加载配置失败：$e')),
+            data: (config) {
+              // ✅ 首次加载或 Controller 为空时同步
+              if (_baseUrlController.text.isEmpty) {
+                _syncControllersWithConfig(config);
+              }
+              return _buildSettingsContent(context, store, config, isBusy);
+            },
+          );
+        },
+      ),
     );
-    if (result != null && result.isNotEmpty) {
-      setState(() {
-        _selectedModel = result;
-      });
-    }
   }
-  Future<void> _saveSettings() async {
-    final current = ref.read(configProvider).value;
-    if (current == null) return;
-    final updated = current.copyWith(
-      baseUrl: _baseUrlController.text.trim(),
-      apiKey: _apiKeyController.text.trim(),
-      modelsPath: _modelsPathController.text.trim().isEmpty
-          ? _defaultModelsPath
-          : _modelsPathController.text.trim(),
-      chatPath: _chatPathController.text.trim().isEmpty
-          ? _defaultChatPathForApiMode(_apiMode)
-          : _chatPathController.text.trim(),
-      selectedModel: (_selectedModel?.trim().isEmpty ?? true)
-          ? null
-          : _selectedModel!.trim(),
-      apiMode: _apiMode,
-      availableModels: _models,
+  Widget _buildSettingsContent(BuildContext context, AppConfigStore store, AppConfig config, bool isBusy) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // 配置存档
+        AppSection(
+          title: '配置存档',
+          subtitle: '切换后自动同步到表单',
+          children: [
+            DropdownButtonFormField<String>(
+              value: store.activeProfileId,
+              decoration: const InputDecoration(labelText: '当前配置存档'),
+              items: store.profiles.map((p) => DropdownMenuItem(value: p.id, child: Text(p.name))).toList(),
+              onChanged: isBusy ? null : (value) async {
+                if (value == null) return;
+                await ref.read(configProfilesNotifierProvider).switchProfile(value);
+                // ✅ 监听器会自动同步 Controller
+              },
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              children: [
+                OutlinedButton(onPressed: isBusy ? null : _showCreateProfileDialog, child: const Text('新建')),
+                OutlinedButton(
+                  onPressed: isBusy ? null : () => _showRenameProfileDialog(store.profiles.firstWhere((p) => p.id == store.activeProfileId)),
+                  child: const Text('重命名'),
+                ),
+                OutlinedButton(
+                  onPressed: isBusy ? null : () => _deleteProfile(store.profiles.firstWhere((p) => p.id == store.activeProfileId), store.profiles.length),
+                  child: const Text('删除'),
+                ),
+              ],
+            ),
+          ],
+        ),
+        // 连接配置 - ✅ 使用 Controller，自动保存
+        AppSection(
+          title: '连接配置',
+          subtitle: '修改后自动保存',
+          children: [
+            TextField(
+              controller: _baseUrlController,
+              enabled: !isBusy,
+              decoration: const InputDecoration(labelText: 'Base URL', hintText: 'https://api.openai.com'),
+              // ✅ 自动保存
+              onChanged: (v) => _saveConfig(config.copyWith(baseUrl: v)),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _apiKeyController,
+              enabled: !isBusy,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'API Key'),
+              onChanged: (v) => _saveConfig(config.copyWith(apiKey: v)),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _modelsPathController,
+              enabled: !isBusy,
+              decoration: const InputDecoration(labelText: 'Models Path', hintText: _defaultModelsPath),
+              onChanged: (v) => _saveConfig(config.copyWith(modelsPath: v.isEmpty ? _defaultModelsPath : v)),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _chatPathController,
+              enabled: !isBusy,
+              decoration: InputDecoration(labelText: 'Chat Path', hintText: _defaultChatPathForApiMode(_apiMode)),
+              onChanged: (v) => _saveConfig(config.copyWith(chatPath: v.isEmpty ? _defaultChatPathForApiMode(_apiMode) : v)),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _apiMode,
+              decoration: const InputDecoration(labelText: 'API Mode'),
+              items: const [
+                DropdownMenuItem(value: 'chat_completions', child: Text('chat_completions')),
+                DropdownMenuItem(value: 'responses', child: Text('responses')),
+              ],
+              onChanged: isBusy ? null : (value) {
+                if (value == null) return;
+                setState(() => _apiMode = value);
+                // 自动更新 chatPath
+                if (_chatPathController.text.isEmpty) {
+                  _chatPathController.text = _defaultChatPathForApiMode(value);
+                }
+                _saveConfig(config.copyWith(apiMode: value, chatPath: _chatPathController.text));
+              },
+            ),
+          ],
+        ),
+        // 模型配置
+        AppSection(
+          title: '模型配置',
+          subtitle: '选择后自动保存',
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _buildModelSelector(context, isBusy)),
+                const SizedBox(width: 12),
+                FilledButton(
+                  onPressed: isBusy ? null : _refreshModels,
+                  child: _isRefreshingModels
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('同步模型'),
+                ),
+              ],
+            ),
+            _buildModelChips(),
+          ],
+        ),
+      ],
     );
-    try {
-      await ref.read(configProvider.notifier).saveFullConfig(updated);
-      await ref.read(configProfilesProvider.notifier).load();
-      await AppToast.show('设置已保存');
-    } catch (e) {
-      await AppToast.show('保存失败：$e');
+  }
+  Widget _buildModelSelector(BuildContext context, bool isBusy) {
+    return SearchAnchor(
+      builder: (context, controller) {
+        return GestureDetector(
+          onTap: isBusy ? null : () => controller.openView(),
+          child: InputDecorator(
+            decoration: const InputDecoration(labelText: '当前模型', suffixIcon: Icon(Icons.arrow_drop_down)),
+            child: Text(_getSelectedModelDisplayText(), overflow: TextOverflow.ellipsis),
+          ),
+        );
+      },
+      suggestionsBuilder: (context, controller) {
+        final query = controller.text.trim().toLowerCase();
+        final filtered = _models.where((m) {
+          final id = m.id.toLowerCase();
+          final name = (m.name ?? '').toLowerCase();
+          return query.isEmpty || id.contains(query) || name.contains(query);
+        }).toList();
+        if (filtered.isEmpty) return const [ListTile(title: Text('没有匹配的模型'))];
+        return [
+          ...filtered.map((model) => ListTile(
+            title: Text((model.name ?? '').trim().isNotEmpty ? model.name! : model.id),
+            trailing: model.id == _selectedModel ? const Icon(Icons.check) : null,
+            onTap: () {
+              setState(() => _selectedModel = model.id);
+              _saveConfig(ref.read(configProvider).valueOrNull!.copyWith(selectedModel: model.id));
+              controller.closeView(model.id);
+            },
+          )),
+          ListTile(
+            title: const Text('自定义模型 ID'),
+            onTap: () {
+              final text = controller.text;
+              controller.closeView(null);
+              if (text.isNotEmpty) {
+                setState(() => _selectedModel = text);
+                _saveConfig(ref.read(configProvider).valueOrNull!.copyWith(selectedModel: text));
+              }
+            },
+          ),
+        ];
+      },
+    );
+  }
+  Widget _buildModelChips() {
+    if (_selectedModel == null) return const SizedBox.shrink();
+    final model = _models.where((m) => m.id == _selectedModel).firstOrNull;
+    if (model == null) return const SizedBox.shrink();
+    final chips = <Widget>[];
+    if (model.supportsVision == true) {
+      chips.add(const Chip(avatar: Icon(Icons.image_outlined, size: 16), label: Text('Vision'), visualDensity: VisualDensity.compact));
     }
+    if (model.supportsReasoning == true) {
+      chips.add(const Chip(avatar: Icon(Icons.psychology_alt_outlined, size: 16), label: Text('Reasoning'), visualDensity: VisualDensity.compact));
+    }
+    if (chips.isEmpty) return const SizedBox.shrink();
+    return Padding(padding: const EdgeInsets.only(top: 12), child: Wrap(spacing: 8, runSpacing: 8, children: chips));
+  }
+  String _getSelectedModelDisplayText() {
+    if (_selectedModel == null || _selectedModel!.trim().isEmpty) return '请选择模型';
+    for (final m in _models) {
+      if (m.id == _selectedModel) return (m.name ?? '').trim().isNotEmpty ? m.name! : m.id;
+    }
+    return _selectedModel!;
+  }
+  String _defaultChatPathForApiMode(String apiMode) {
+    return apiMode == 'responses' ? 'v1/responses' : 'v1/chat/completions';
   }
   Future<void> _refreshModels() async {
-    final current = ref.read(configProvider).value;
+    final current = ref.read(configProvider).valueOrNull;
     if (current == null) return;
-    final previousOverrides = {
-      for (final model in _models) model.id: model,
-    };
-    final draft = current.copyWith(
-      baseUrl: _baseUrlController.text.trim(),
-      apiKey: _apiKeyController.text.trim(),
-      modelsPath: _modelsPathController.text.trim().isEmpty
-          ? _defaultModelsPath
-          : _modelsPathController.text.trim(),
-      chatPath: _chatPathController.text.trim().isEmpty
-          ? _defaultChatPathForApiMode(_apiMode)
-          : _chatPathController.text.trim(),
-      selectedModel: (_selectedModel?.trim().isEmpty ?? true)
-          ? null
-          : _selectedModel!.trim(),
-      apiMode: _apiMode,
-      availableModels: _models,
-    );
-    setState(() {
-      _isRefreshingModels = true;
-    });
+    setState(() => _isRefreshingModels = true);
     try {
-      await ref.read(configProvider.notifier).saveAndRefreshModels(draft);
-      final refreshed = ref.read(configProvider).value;
-      if (refreshed != null) {
-        final mergedModels = (refreshed.availableModels ?? const []).map((model) {
-          final old = previousOverrides[model.id];
-          if (old == null) return model;
-          return model.copyWith(
-            overrideSupportsVision: old.overrideSupportsVision,
-            overrideSupportsReasoning: old.overrideSupportsReasoning,
-            supportsVision: old.overrideSupportsVision ?? model.supportsVision,
-            supportsReasoning:
-                old.overrideSupportsReasoning ?? model.supportsReasoning,
-          );
-        }).toList();
-        setState(() {
-          _models = mergedModels;
-          final exists = _models.any((m) => m.id == _selectedModel);
-          if (!exists) {
-            _selectedModel = _models.isNotEmpty ? _models.first.id : null;
-          }
-        });
-      }
-      await ref.read(configProfilesProvider.notifier).load();
+      await ref.read(configNotifierProvider).saveAndRefreshModels(current);
+      await ref.read(configProfilesNotifierProvider).load();
       await AppToast.show('模型列表已同步');
     } catch (e) {
       await AppToast.show('同步模型失败：$e');
     } finally {
-      if (mounted) {
-        setState(() {
-          _isRefreshingModels = false;
-        });
-      }
+      if (mounted) setState(() => _isRefreshingModels = false);
     }
   }
-  Widget _buildManualCapabilityEditor() {
-    final model = _selectedModelInfo();
-    if (model == null) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 12),
-        const Text(
-          '手动覆盖模型能力',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('支持 Vision'),
-          subtitle: const Text('用于图片输入能力声明'),
-          value: model.supportsVision == true,
-          onChanged: (value) {
-            _updateSelectedModelOverride(overrideVision: value);
-          },
-        ),
-        const Divider(),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('支持 Reasoning'),
-          subtitle: const Text('用于推理过程能力声明'),
-          value: model.supportsReasoning == true,
-          onChanged: (value) {
-            _updateSelectedModelOverride(overrideReasoning: value);
-          },
-        ),
-      ],
-    );
+  Future<void> _confirmRestoreDefaults() async {
+    final colorScheme = Theme.of(context).colorScheme;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('恢复默认设置'),
+        content: const Text('确定要将当前配置存档恢复为默认设置吗？'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: colorScheme.error, foregroundColor: colorScheme.onError),
+            child: const Text('恢复默认'),
+          ),
+        ],
+      ),
+    ) ?? false;
+    if (!confirmed) return;
+    try {
+      await ref.read(configNotifierProvider).saveFullConfig(AppConfig.defaultConfig());
+      await ref.read(configProfilesNotifierProvider).load();
+    } catch (e) {
+      await AppToast.show('恢复默认失败：$e');
+    }
   }
   Future<void> _showCreateProfileDialog() async {
     final controller = TextEditingController();
@@ -12184,29 +12415,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('新建配置存档'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: '输入配置名称',
-          ),
-          onSubmitted: (value) => Navigator.of(ctx).pop(value.trim()),
-        ),
+        content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(hintText: '输入配置名称')),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-            child: const Text('创建'),
-          ),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(controller.text.trim()), child: const Text('创建')),
         ],
       ),
     );
     if (result == null) return;
-    await ref.read(configProfilesProvider.notifier).createProfile(result);
-    _initialized = false;
+    await ref.read(configProfilesNotifierProvider).createProfile(result);
   }
   Future<void> _showRenameProfileDialog(ConfigProfile profile) async {
     final controller = TextEditingController(text: profile.name);
@@ -12214,30 +12431,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('重命名配置存档'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: '输入配置名称',
-          ),
-          onSubmitted: (value) => Navigator.of(ctx).pop(value.trim()),
-        ),
+        content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(hintText: '输入配置名称')),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-            child: const Text('保存'),
-          ),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(controller.text.trim()), child: const Text('保存')),
         ],
       ),
     );
     if (result == null || result.isEmpty) return;
-    await ref
-        .read(configProfilesProvider.notifier)
-        .renameProfile(profile.id, result);
+    await ref.read(configProfilesNotifierProvider).renameProfile(profile.id, result);
   }
   Future<void> _deleteProfile(ConfigProfile profile, int profileCount) async {
     if (profileCount <= 1) {
@@ -12245,388 +12447,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       return;
     }
     final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('删除配置存档'),
-            content: Text('确定删除"${profile.name}"吗？'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                child: const Text('删除'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-    if (!confirmed) return;
-    await ref.read(configProfilesProvider.notifier).deleteProfile(profile.id);
-    _initialized = false;
-  }
-  Future<void> _confirmRestoreDefaults() async {
-    final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('恢复默认设置'),
-            content: const Text(
-              '确定要将当前配置存档恢复为默认设置吗？\n\n仅会影响当前选中的配置存档，不会影响其他配置存档。',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                child: const Text('恢复默认'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-    if (!confirmed) return;
-    await _restoreCurrentProfileDefaults();
-  }
-  Future<void> _restoreCurrentProfileDefaults() async {
-    try {
-      final defaultConfig = AppConfig.defaultConfig();
-      await ref.read(configProvider.notifier).saveFullConfig(defaultConfig);
-      await ref.read(configProfilesProvider.notifier).load();
-      setState(() {
-        _applyConfig(defaultConfig);
-      });
-    } catch (e) {
-      await AppToast.show('恢复默认失败：$e');
-    }
-  }
-  @override
-  Widget build(BuildContext context) {
-    final configState = ref.watch(configProvider);
-    final profilesState = ref.watch(configProfilesProvider);
-    ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
-      next.whenData((config) {
-        if (!_initialized) {
-          setState(() {
-            _applyConfig(config);
-          });
-        }
-      });
-    });
-    final isBusy = configState.isLoading || _isRefreshingModels;
-    return AppPageScaffold(
-      appBar: AppBar(
-        title: const Text('设置'),
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('删除配置存档'),
+        content: Text('确定删除"${profile.name}"吗？'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('删除')),
+        ],
       ),
-      body: profilesState.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text('加载配置存档失败：$e'),
-          ),
-        ),
-        data: (store) {
-          final activeProfile = store.profiles.firstWhere(
-            (p) => p.id == store.activeProfileId,
-          );
-          return configState.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text('加载配置失败：$e'),
-              ),
-            ),
-            data: (config) {
-              if (!_initialized) {
-                _applyConfig(config);
-              }
-              final models = _models;
-              return ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  AppSection(
-                    title: '配置存档',
-                    subtitle: '可保存多套 API 与模型配置，并快速切换。',
-                    children: [
-                      DropdownButtonFormField<String>(
-                        value: store.activeProfileId,
-                        decoration: const InputDecoration(
-                          labelText: '当前配置存档',
-                        ),
-                        items: store.profiles.map((profile) {
-                          return DropdownMenuItem(
-                            value: profile.id,
-                            child: Text(profile.name),
-                          );
-                        }).toList(),
-                        onChanged: isBusy
-                            ? null
-                            : (value) async {
-                                if (value == null) return;
-                                await ref
-                                    .read(configProfilesProvider.notifier)
-                                    .switchProfile(value);
-                                _initialized = false;
-                              },
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: [
-                          OutlinedButton(
-                            onPressed: isBusy ? null : _showCreateProfileDialog,
-                            child: const Text('新建'),
-                          ),
-                          OutlinedButton(
-                            onPressed: isBusy
-                                ? null
-                                : () => _showRenameProfileDialog(activeProfile),
-                            child: const Text('重命名'),
-                          ),
-                          OutlinedButton(
-                            onPressed: isBusy
-                                ? null
-                                : () => _deleteProfile(
-                                      activeProfile,
-                                      store.profiles.length,
-                                    ),
-                            child: const Text('删除'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  AppSection(
-                    title: '连接配置',
-                    subtitle: '用于配置 API 服务地址与接口路径。',
-                    children: [
-                      TextField(
-                        controller: _baseUrlController,
-                        enabled: !isBusy,
-                        decoration: const InputDecoration(
-                          labelText: 'Base URL',
-                          hintText: 'https://api.openai.com',
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _apiKeyController,
-                        enabled: !isBusy,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'API Key',
-                          hintText: '输入 API Key',
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _modelsPathController,
-                        enabled: !isBusy,
-                        decoration: const InputDecoration(
-                          labelText: 'Models Path',
-                          hintText: _defaultModelsPath,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _chatPathController,
-                        enabled: !isBusy,
-                        decoration: InputDecoration(
-                          labelText: 'Chat Path',
-                          hintText: _defaultChatPathForApiMode(_apiMode),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        value: _apiMode,
-                        decoration: const InputDecoration(
-                          labelText: 'API Mode',
-                        ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'chat_completions',
-                            child: Text('chat_completions'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'responses',
-                            child: Text('responses'),
-                          ),
-                        ],
-                        onChanged: isBusy
-                            ? null
-                            : (value) {
-                                if (value == null) return;
-                                setState(() {
-                                  _apiMode = value;
-                                  if (_chatPathController.text.trim().isEmpty ||
-                                      _chatPathController.text ==
-                                          _defaultChatPathForApiMode(
-                                              'chat_completions') ||
-                                      _chatPathController.text ==
-                                          _defaultChatPathForApiMode(
-                                              'responses')) {
-                                    _chatPathController.text =
-                                        _defaultChatPathForApiMode(value);
-                                  }
-                                });
-                              },
-                      ),
-                    ],
-                  ),
-                  AppSection(
-                    title: '模型配置',
-                    subtitle: '选择当前模型，并同步远端模型列表。',
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: SearchAnchor(
-                              builder: (context, controller) {
-                                return GestureDetector(
-                                  onTap: isBusy
-                                      ? null
-                                      : () {
-                                          controller.openView();
-                                        },
-                                  child: InputDecorator(
-                                    decoration: const InputDecoration(
-                                      labelText: '当前模型',
-                                      suffixIcon: Icon(Icons.arrow_drop_down),
-                                    ),
-                                    child: Text(
-                                      _getSelectedModelDisplayText(models),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                );
-                              },
-                              suggestionsBuilder: (context, controller) {
-                                final query =
-                                    controller.text.trim().toLowerCase();
-                                final filteredModels = models.where((model) {
-                                  final id = model.id.toLowerCase();
-                                  final name =
-                                      (model.name ?? '').toLowerCase();
-                                  return query.isEmpty ||
-                                      id.contains(query) ||
-                                      name.contains(query);
-                                }).toList();
-                                if (filteredModels.isEmpty) {
-                                  return const [
-                                    ListTile(title: Text('没有匹配的模型')),
-                                  ];
-                                }
-                                return [
-                                  ...filteredModels.map((model) {
-                                    final isSelected = model.id == _selectedModel;
-                                    final title =
-                                        (model.name ?? '').trim().isNotEmpty
-                                            ? model.name!
-                                            : model.id;
-                                    final showSubtitle =
-                                        (model.name ?? '').trim().isNotEmpty &&
-                                            model.name != model.id;
-                                    final chips = _buildModelChips(model);
-                                    return ListTile(
-                                      title: Text(
-                                        title,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      subtitle: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          if (showSubtitle) Text(model.id),
-                                          if (chips.isNotEmpty) ...[
-                                            const SizedBox(height: 6),
-                                            Wrap(
-                                              spacing: 6,
-                                              runSpacing: 6,
-                                              children: chips,
-                                            ),
-                                          ],
-                                        ],
-                                      ),
-                                      trailing: isSelected
-                                          ? const Icon(Icons.check)
-                                          : null,
-                                      onTap: () {
-                                        setState(() {
-                                          _selectedModel = model.id;
-                                        });
-                                        controller.closeView(model.id);
-                                      },
-                                    );
-                                  }),
-                                  ListTile(
-                                    title: const Text('自定义模型 ID'),
-                                    onTap: () {
-                                      controller.closeView(null);
-                                      _showCustomModelDialog();
-                                    },
-                                  ),
-                                ];
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          FilledButton(
-                            onPressed: isBusy ? null : _refreshModels,
-                            child: _isRefreshingModels
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Text('同步模型'),
-                          ),
-                        ],
-                      ),
-                      _buildSelectedModelSupportsCard(),
-                      _buildManualCapabilityEditor(),
-                    ],
-                  ),
-                  AppSection(
-                    title: '操作',
-                    subtitle: '保存或重置当前配置存档。',
-                    children: [
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: [
-                          OutlinedButton(
-                            onPressed: isBusy ? null : _confirmRestoreDefaults,
-                            child: const Text('恢复默认'),
-                          ),
-                          FilledButton(
-                            onPressed: isBusy ? null : _saveSettings,
-                            child: const Text('保存设置'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
-              );
-            },
-          );
-        },
-      ),
-    );
+    ) ?? false;
+    if (!confirmed) return;
+    await ref.read(configProfilesNotifierProvider).deleteProfile(profile.id);
   }
 }
 ```
 
 ## File: lib/presentation/providers/home_session_list_provider.dart
 ```dart
+// presentation/providers/home_session_list_provider.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/session.dart';
 import 'session_list_notifier.dart';
@@ -12646,14 +12485,14 @@ class HomeSessionItem {
     required this.previewRoundId,
   });
 }
-final homeSessionListProvider =
-    Provider<AsyncValue<List<HomeSessionItem>>>((ref) {
+// 简化：直接监听 sessionListProvider，无需额外处理
+final homeSessionListProvider = Provider<AsyncValue<List<HomeSessionItem>>>((ref) {
   final sessionsAsync = ref.watch(sessionListProvider);
   return sessionsAsync.whenData((sessions) {
     final items = sessions.map((session) {
       final hasUnseen = session.rounds.any((r) => r.hasUnseenUpdate);
       final roundCount = session.rounds.length;
-      // ✅ 简化：直接获取最后一个 round 作为预览
+      // 直接获取最后一个 round 作为预览
       final previewRound = session.rounds.isEmpty 
           ? null 
           : session.rounds.last;
@@ -12866,13 +12705,16 @@ class HomePage extends ConsumerWidget {
             child: const Text('取消'),
           ),
           FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            onPressed: () =>
+                Navigator.of(ctx).pop(controller.text.trim()),
             child: const Text('保存'),
           ),
         ],
       ),
     );
-    if (result != null && result.isNotEmpty && result != session.title) {
+    if (result != null &&
+        result.isNotEmpty &&
+        result != session.title) {
       await notifier.updateSessionTitle('${session.id}.json', result);
     }
   }
@@ -12910,8 +12752,10 @@ class HomePage extends ConsumerWidget {
   }
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // 关键修复：必须监听 homeSessionListProvider
     final sessionsAsync = ref.watch(homeSessionListProvider);
-    final notifier = ref.read(sessionListProvider.notifier);
+    // 操作类 notifier：仍用 sessionListProvider.notifier
+    final notifier = ref.read(sessionListNotifierProvider);
     return AppPageScaffold(
       appBar: AppBar(
         title: const Text('AI Chat'),
@@ -13096,14 +12940,16 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
   @override
   void didUpdateWidget(covariant _SessionCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.item.previewRoundId != widget.item.previewRoundId ||
-        oldWidget.item.session.id != widget.item.session.id) {
+    final oldItem = oldWidget.item;
+    final newItem = widget.item;
+    if (oldItem.previewRoundId != newItem.previewRoundId ||
+        oldItem.session.id != newItem.session.id) {
       _requested = false;
       _ensurePreviewLoaded();
     }
   }
   void _ensurePreviewLoaded() {
-    final previewRoundId = widget.item.previewRoundId;
+    final previewRoundId = widget.item.previewRoundId as String?;
     if (_requested || previewRoundId == null) return;
     _requested = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -13128,8 +12974,8 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
   Widget build(BuildContext context) {
     final session = widget.item.session;
     final fileName = '${session.id}.json';
-    final updatedAt = TimeFormatUtils.formatTimestamp(widget.item.updatedAt);
-    final previewRoundId = widget.item.previewRoundId;
+    final updatedAt = TimeFormatUtils.formatTimestamp(widget.item.updatedAt as int);
+    final previewRoundId = widget.item.previewRoundId as String?;
     final stream = previewRoundId == null
         ? null
         : ref.watch(
@@ -13195,7 +13041,7 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
                 const SizedBox(width: 8),
                 _buildMetaChip('生成中', icon: Icons.bolt_outlined),
               ],
-              if (widget.item.hasUnseen) ...[
+              if (widget.item.hasUnseen == true) ...[
                 const SizedBox(width: 8),
                 _buildMetaChip('未查看', icon: Icons.mark_chat_unread_outlined),
               ],
@@ -13206,9 +13052,15 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _PreviewLine(label: 'YOU', text: widget.item.userPreview),
+                _PreviewLine(
+                  label: 'YOU',
+                  text: widget.item.userPreview,
+                ),
                 const SizedBox(height: 4),
-                _PreviewLine(label: 'AI', text: aiPreview),
+                _PreviewLine(
+                  label: 'AI',
+                  text: aiPreview,
+                ),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
@@ -13218,7 +13070,10 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
                       '${widget.item.roundCount} 轮',
                       icon: Icons.chat_bubble_outline,
                     ),
-                    _buildMetaChip(updatedAt, icon: Icons.schedule_outlined),
+                    _buildMetaChip(
+                      updatedAt,
+                      icon: Icons.schedule_outlined,
+                    ),
                   ],
                 ),
               ],
@@ -13901,31 +13756,91 @@ class _PaginationBar extends StatelessWidget {
 
 ## File: lib/presentation/providers/chat_notifier.dart
 ```dart
-import 'package:collection/collection.dart';
+// presentation/providers/chat_notifier.dart
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/api_message.dart';
 import '../../core/models/app_config.dart';
 import '../../core/models/chat_round.dart';
 import '../../core/models/model_info.dart';
+import '../../core/models/session.dart';
+import '../../core/models/attachment.dart';
 import '../../di/providers.dart';
 import '../../domain/models/chat_page.dart';
 import '../../domain/services/attachment_preparer.dart';
 import '../../domain/services/branch_navigator.dart';
 import '../../domain/services/chat_context_builder.dart';
-import '../../domain/services/chat_round_factory.dart';
 import '../../domain/services/chat_stream_accumulator.dart';
-import '../../domain/services/chat_view_state_builder.dart';
 import '../../domain/states/chat_state.dart';
 import '../models/pending_attachment.dart';
 import '../utils/page_utils.dart';
 import 'global_streaming_provider.dart';
-import 'session_card_provider.dart';
-import 'session_list_notifier.dart';
+import '../../core/utils/id_generator.dart';
+import 'config_notifier.dart';  // ✅ 添加这一行
+// 辅助函数：找到第一个匹配的元素，否则返回null
+T? _firstWhereOrNull<T>(List<T> list, bool Function(T) test) {
+  for (final element in list) {
+    if (test(element)) return element;
+  }
+  return null;
+}
 class ChatNotifier extends StateNotifier<ChatState> {
   final Ref ref;
   final String fileName;
-  final Set<String> _stoppingRoundIds = <String>{};
-  ChatNotifier(this.ref, this.fileName) : super(ChatState.initial());
+  final Set<String> _stoppingRoundIds = {};
+  // Stream 订阅
+  StreamSubscription? _sessionSubscription;
+  // 纯 UI 状态
+  int _currentPageIndex = 0;
+  ChatNotifier(this.ref, this.fileName) : super(ChatState.initial()) {
+    _initWatch();
+  }
+  void _initWatch() {
+    final repository = ref.read(conversationRepositoryProvider);
+    // 监听会话变更
+    _sessionSubscription = repository.watchSession(fileName).listen((session) {
+      if (session == null) {
+        state = state.copyWith(
+          session: null,
+          error: '会话不存在',
+          isLoading: false,
+        );
+        return;
+      }
+      // ========== 修复：每次打开会话都定位到最新页 ==========
+      // 获取所有分支叶子节点（最新创建的轮次）
+      final leaves = BranchNavigator.getAllBranchLeaves(session);
+      // 确定当前应该显示的轮次ID
+      String? currentRoundId;
+      List<ChatRound> branchPath;
+      int targetPageIndex;
+      if (leaves.isNotEmpty) {
+        // 默认显示最新创建的轮次
+        currentRoundId = leaves.last.id;
+        branchPath = BranchNavigator.getCurrentBranchPath(session, currentRoundId);
+        targetPageIndex = branchPath.isNotEmpty ? branchPath.length - 1 : 0;
+      } else {
+        // 如果没有轮次，显示空页面
+        currentRoundId = null;
+        branchPath = [];
+        targetPageIndex = 0;
+      }
+      _currentPageIndex = targetPageIndex;
+      // 将 ChatRound 转换为 ChatPage
+      final chatPages = branchPath.map((round) => ChatPage(round: round)).toList();
+      state = state.copyWith(
+        session: session,
+        currentRoundId: currentRoundId,
+        pageList: ChatPageList.fromPages(chatPages, _currentPageIndex),
+        error: null,
+        isLoading: false,
+      );
+      // 确保当前轮次的数据已加载到流式缓存
+      if (currentRoundId != null && branchPath.isNotEmpty) {
+        final round = branchPath.last;
+        _streamCache.ensureRoundLoaded(fileName, round);
+      }
+    });
+  }
   GlobalStreamCacheNotifier get _streamCache =>
       ref.read(globalStreamCacheProvider.notifier);
   StreamStatus? _getRoundStream(String roundId) {
@@ -13935,49 +13850,20 @@ class ChatNotifier extends StateNotifier<ChatState> {
   Future<void> ensureRoundLoaded(String roundId) async {
     final session = state.session;
     if (session == null) return;
-    final round = session.rounds.firstWhereOrNull((r) => r.id == roundId);
+    final round = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
     if (round == null) return;
     _streamCache.ensureRoundLoaded(fileName, round);
   }
-  Future<void> ensureRoundsLoaded(List<String> roundIds) async {
-    final session = state.session;
-    if (session == null || roundIds.isEmpty) return;
-    final ids = roundIds.toSet();
-    final rounds = session.rounds.where((r) => ids.contains(r.id)).toList();
-    _streamCache.ensureRoundsLoaded(fileName, rounds);
-  }
   Future<void> loadSession({String? initialRoundId}) async {
-    state = ChatState.initial().copyWithLoading(true);
-    try {
-      final repository = ref.read(conversationRepositoryProvider);
-      var session = await repository.getSession(fileName);
-      if (session.hasUnseenUpdate) {
-        final cleared = session.copyWith(hasUnseenUpdate: false);
-        await repository.saveSession(fileName, cleared);
-        session = cleared;
-        await ref.read(sessionListProvider.notifier).refresh();
-      }
-      final viewState = initialRoundId != null
-          ? ChatViewStateBuilder.buildForRound(session, initialRoundId)
-          : ChatViewStateBuilder.buildInitial(session);
-      state = state.copyWithSession(session).copyWith(
-            currentRoundId: viewState.currentRoundId,
-            pageList: viewState.pageList,
-            error: null,
-          );
-      if (viewState.currentRoundId != null) {
-        await ensureRoundLoaded(viewState.currentRoundId!);
-      }
-      ref.invalidate(sessionCardProvider(fileName));
-    } catch (e) {
-      state = state.copyWithError(e.toString());
+    if (initialRoundId != null) {
+      state = state.copyWith(currentRoundId: initialRoundId);
     }
   }
   ModelInfo? _findSelectedModelInfo(AppConfig config) {
     final selectedId = config.selectedModel;
     if (selectedId == null || selectedId.trim().isEmpty) return null;
     final models = config.availableModels ?? const <ModelInfo>[];
-    return models.firstWhereOrNull((m) => m.id == selectedId);
+    return _firstWhereOrNull(models, (m) => m.id == selectedId);
   }
   bool _shouldEnableReasoning(AppConfig config) {
     final selectedModel = _findSelectedModelInfo(config);
@@ -13994,44 +13880,19 @@ class ChatNotifier extends StateNotifier<ChatState> {
       throw Exception('当前模型未声明支持图片输入');
     }
   }
-  Future<void> markRoundSeen(String roundId) async {
-    final session = state.session;
-    if (session == null) return;
-    final target = session.rounds.firstWhereOrNull((r) => r.id == roundId);
-    if (target == null || !target.hasUnseenUpdate) return;
-    final updatedRound = target.copyWith(hasUnseenUpdate: false);
-    final updatedSession = session.copyWith(
-      rounds: session.rounds.map((r) {
-        if (r.id == roundId) return updatedRound;
-        return r;
-      }).toList(),
-      hasUnseenUpdate:
-          session.rounds.any((r) => r.id != roundId && r.hasUnseenUpdate),
-    );
-    final repository = ref.read(conversationRepositoryProvider);
-    await repository.saveSession(fileName, updatedSession);
-    final updatedPageList = _replaceRoundInPageList(
-      state.pageList,
-      updatedRound,
-    );
-    state = state.copyWith(
-      session: updatedSession,
-      pageList: updatedPageList,
-    );
-    ref.invalidate(sessionCardProvider(fileName));
-    await ref.read(sessionListProvider.notifier).refresh();
-  }
   Future<void> sendMessage(
     String content, {
     List<PendingAttachment>? attachments,
   }) async {
-    if (state.session == null) {
+    final session = state.session;
+    if (session == null) {
       state = state.copyWithError('会话未初始化');
       return;
     }
     try {
       final pendingAttachments = attachments ?? const <PendingAttachment>[];
       final repository = ref.read(conversationRepositoryProvider);
+      final configAsync = ref.read(configProvider);
       final config = await ref.read(configRepositoryProvider).getConfig();
       _validateRequestCapability(
         config: config,
@@ -14041,34 +13902,47 @@ class ChatNotifier extends StateNotifier<ChatState> {
         repository,
         pendingAttachments,
       );
-      final round = ChatRoundFactory.createUserRound(
-        content: content,
+      // 构建新轮次
+      final newRound = ChatRound(
+        id: IdGenerator.generate(),
         parentId: state.currentRoundId,
-        attachments: savedAttachments,
+        createdAt: DateTime.now().millisecondsSinceEpoch,
+        userContent: content,
+        userAttachments: savedAttachments,
+        isIncomplete: true,
+        hasUnseenUpdate: false,
       );
-      await _appendRoundAndEnterStreaming(round);
-      final updatedSession = await repository.getSession(fileName);
-      final contextRounds =
-          BranchNavigator.getCurrentBranchPath(updatedSession, round.id);
-      final apiContext = await ChatContextBuilder.buildFromRounds(
-        contextRounds,
-        repository,
+      // 写入数据库（watch 会自动更新状态）
+      await repository.appendRound(fileName, newRound);
+      // 设置当前轮次ID，等待 watch 更新后同步
+      state = state.copyWith(currentRoundId: newRound.id);
+      // 进入流式生成状态
+      _streamCache.setRoundStream(
+        fileName,
+        newRound.id,
+        const StreamStatus(
+          content: '',
+          reasoning: '',
+          isStreaming: true,
+        ),
       );
-      _handleStreamTask(round, apiContext, config);
+      // 触发流式请求
+      _handleStreamTask(newRound, session, config);
     } catch (e) {
       state = state.copyWithError(e.toString());
     }
   }
   Future<void> retryFromRound(String roundId) async {
-    if (state.session == null) {
+    final session = state.session;
+    if (session == null) {
       state = state.copyWithError('会话未初始化');
       return;
     }
     try {
       final repository = ref.read(conversationRepositoryProvider);
+      final configAsync = ref.read(configProvider);
       final config = await ref.read(configRepositoryProvider).getConfig();
-      final sourceRound =
-          state.session!.rounds.firstWhereOrNull((round) => round.id == roundId);
+      final sourceRound = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
       if (sourceRound == null) {
         state = state.copyWithError('未找到要重新回复的对话');
         return;
@@ -14081,18 +13955,27 @@ class ChatNotifier extends StateNotifier<ChatState> {
           return;
         }
       }
-      final newRound = ChatRoundFactory.createRetryRound(
-        sourceRound: sourceRound,
+      final newRound = ChatRound(
+        id: IdGenerator.generate(),
+        parentId: sourceRound.parentId,
+        createdAt: DateTime.now().millisecondsSinceEpoch,
+        userContent: sourceRound.userContent,
+        userAttachments: sourceRound.userAttachments,
+        isIncomplete: true,
+        hasUnseenUpdate: false,
       );
-      await _appendRoundAndEnterStreaming(newRound);
-      final updatedSession = await repository.getSession(fileName);
-      final contextRounds =
-          BranchNavigator.getCurrentBranchPath(updatedSession, newRound.id);
-      final apiContext = await ChatContextBuilder.buildFromRounds(
-        contextRounds,
-        repository,
+      await repository.appendRound(fileName, newRound);
+      state = state.copyWith(currentRoundId: newRound.id);
+      _streamCache.setRoundStream(
+        fileName,
+        newRound.id,
+        const StreamStatus(
+          content: '',
+          reasoning: '',
+          isStreaming: true,
+        ),
       );
-      _handleStreamTask(newRound, apiContext, config);
+      _handleStreamTask(newRound, session, config);
     } catch (e) {
       state = state.copyWithError(e.toString());
     }
@@ -14102,20 +13985,21 @@ class ChatNotifier extends StateNotifier<ChatState> {
     String newContent, {
     List<PendingAttachment>? attachments,
   }) async {
-    if (state.session == null) {
+    final session = state.session;
+    if (session == null) {
       state = state.copyWithError('会话未初始化');
       return;
     }
     try {
       final repository = ref.read(conversationRepositoryProvider);
+      final configAsync = ref.read(configProvider);
       final config = await ref.read(configRepositoryProvider).getConfig();
       final pendingAttachments = attachments ?? const <PendingAttachment>[];
       _validateRequestCapability(
         config: config,
         attachments: pendingAttachments,
       );
-      final sourceRound =
-          state.session!.rounds.firstWhereOrNull((round) => round.id == roundId);
+      final sourceRound = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
       if (sourceRound == null) {
         state = state.copyWithError('未找到要编辑重试的对话');
         return;
@@ -14133,73 +14017,53 @@ class ChatNotifier extends StateNotifier<ChatState> {
         repository,
         pendingAttachments,
       );
-      final mergedAttachments = [
+      final mergedAttachments = <Attachment>[
         ...sourceRound.userAttachments,
         ...savedAttachments,
       ];
-      final newRound = ChatRoundFactory.createEditedRetryRound(
-        sourceRound: sourceRound,
-        newContent: newContent,
-        attachments: mergedAttachments,
+      final newRound = ChatRound(
+        id: IdGenerator.generate(),
+        parentId: sourceRound.parentId,
+        createdAt: DateTime.now().millisecondsSinceEpoch,
+        userContent: newContent,
+        userAttachments: mergedAttachments,
+        isIncomplete: true,
+        hasUnseenUpdate: false,
       );
-      await _appendRoundAndEnterStreaming(newRound);
-      final updatedSession = await repository.getSession(fileName);
-      final contextRounds =
-          BranchNavigator.getCurrentBranchPath(updatedSession, newRound.id);
-      final apiContext = await ChatContextBuilder.buildFromRounds(
-        contextRounds,
-        repository,
+      await repository.appendRound(fileName, newRound);
+      state = state.copyWith(currentRoundId: newRound.id);
+      _streamCache.setRoundStream(
+        fileName,
+        newRound.id,
+        const StreamStatus(
+          content: '',
+          reasoning: '',
+          isStreaming: true,
+        ),
       );
-      _handleStreamTask(newRound, apiContext, config);
+      _handleStreamTask(newRound, session, config);
     } catch (e) {
       state = state.copyWithError(e.toString());
     }
   }
-  Future<void> _appendRoundAndEnterStreaming(ChatRound round) async {
-    final repository = ref.read(conversationRepositoryProvider);
-    await repository.appendRound(fileName, round);
-    final updatedSession = await repository.getSession(fileName);
-    final viewState = ChatViewStateBuilder.buildForRound(updatedSession, round.id);
-    state = state.copyWithSession(updatedSession).copyWith(
-          currentRoundId: viewState.currentRoundId,
-          pageList: viewState.pageList,
-          error: null,
-        );
-    _streamCache.setRoundStream(
-      fileName,
-      round.id,
-      const StreamStatus(
-        content: '',
-        reasoning: '',
-        isStreaming: true,
-      ),
-    );
-    ref.invalidate(sessionCardProvider(fileName));
-    await ref.read(sessionListProvider.notifier).refresh();
-  }
-  String _appendStoppedSuffix(String content) {
-    final trimmed = content.trim();
-    if (trimmed.isEmpty) return '[已停止]';
-    return '$trimmed\n\n[已停止]';
-  }
-  String _appendErrorSuffix(String content, String? message) {
-    final trimmed = content.trim();
-    final cleanMessage = (message ?? '').trim();
-    final errorText = cleanMessage.isEmpty ? '[错误]' : '[错误]\n$cleanMessage';
-    if (trimmed.isEmpty) return errorText;
-    return '$trimmed\n\n$errorText';
-  }
   Future<void> _handleStreamTask(
     ChatRound round,
-    List<ApiMessage> apiContext,
+    Session session,
     AppConfig config,
   ) async {
     final apiSource = ref.read(remoteApiSourceProvider);
+    final repository = ref.read(conversationRepositoryProvider);
     final accumulator = ChatStreamAccumulator();
     var hasError = false;
     String? errorMessage;
     var wasStopped = false;
     try {
+      // 构建 API 上下文
+      final contextRounds = BranchNavigator.getCurrentBranchPath(session, round.id);
+      final apiContext = await ChatContextBuilder.buildFromRounds(
+        contextRounds,
+        repository,
+      );
       final stream = apiSource.chatStream(
         taskId: round.id,
         baseUrl: config.baseUrl,
@@ -14225,6 +14089,16 @@ class ChatNotifier extends StateNotifier<ChatState> {
             reasoning: accumulator.reasoning,
             isStreaming: true,
           );
+          // 增量写入数据库（实时保存思考过程）
+          if (accumulator.reasoning.isNotEmpty || accumulator.content.isNotEmpty) {
+            final updatedRound = round.copyWith(
+              assistantThinking: accumulator.reasoning,
+              assistantContent: accumulator.content,
+              isIncomplete: true,
+              hasUnseenUpdate: false,
+            );
+            await repository.updateRound(fileName, round.id, updatedRound);
+          }
           continue;
         }
         if (_stoppingRoundIds.contains(round.id)) {
@@ -14247,76 +14121,60 @@ class ChatNotifier extends StateNotifier<ChatState> {
       } else if (wasStopped) {
         finalContent = _appendStoppedSuffix(finalContent);
       }
+      // 更新流式缓存
       _streamCache.updateRoundStream(
         fileName,
         round.id,
         content: finalContent,
         reasoning: finalReasoning,
-        isStreaming: true,
+        isStreaming: false,
       );
-      await _finalizeRoundPersistence(round.id);
+      // 持久化最终结果
+      await _finalizeRoundPersistence(round.id, finalContent, finalReasoning);
       _stoppingRoundIds.remove(round.id);
     }
   }
-  Future<void> _finalizeRoundPersistence(String roundId) async {
+  String _appendStoppedSuffix(String content) {
+    final trimmed = content.trim();
+    if (trimmed.isEmpty) return '[已停止]';
+    return '$trimmed\n\n[已停止]';
+  }
+  String _appendErrorSuffix(String content, String? message) {
+    final trimmed = content.trim();
+    final cleanMessage = (message ?? '').trim();
+    final errorText = cleanMessage.isEmpty ? '[错误]' : '[错误]\n$cleanMessage';
+    if (trimmed.isEmpty) return errorText;
+    return '$trimmed\n\n$errorText';
+  }
+  Future<void> _finalizeRoundPersistence(
+    String roundId,
+    String content,
+    String reasoning,
+  ) async {
     final repository = ref.read(conversationRepositoryProvider);
     final session = state.session;
     if (session == null) return;
-    final stream = _getRoundStream(roundId);
-    if (stream == null) return;
-    final updatedRounds = session.rounds.map((round) {
-      if (round.id != roundId) return round;
-      return round.copyWith(
-        assistantContent: stream.content.trim().isEmpty ? null : stream.content,
-        assistantThinking:
-            stream.reasoning.trim().isEmpty ? null : stream.reasoning,
-        isIncomplete: false,
-        hasUnseenUpdate: true,
-      );
-    }).toList();
-    final updatedRound = updatedRounds.firstWhere((r) => r.id == roundId);
-    final updatedSession = session.copyWith(
-      rounds: updatedRounds,
+    // 从 session 中获取原始轮次数据
+    final originalRound = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
+    if (originalRound == null) return;
+    // 使用原始数据更新
+    final updatedRound = originalRound.copyWith(
+      assistantContent: content.trim().isEmpty ? null : content,
+      assistantThinking: reasoning.trim().isEmpty ? null : reasoning,
+      isIncomplete: false,
       hasUnseenUpdate: true,
-      updatedAt: DateTime.now().millisecondsSinceEpoch,
     );
-    await repository.saveSession(fileName, updatedSession);
-    state = state.copyWith(
-      session: updatedSession,
-      pageList: _replaceRoundInCurrentPages(updatedRound),
-      error: null,
-    );
+    await repository.updateRound(fileName, roundId, updatedRound);
+    // 清理流式缓存
     _streamCache.updateRoundStream(
       fileName,
       roundId,
       isStreaming: false,
     );
-    ref.invalidate(sessionCardProvider(fileName));
-    await ref.read(sessionListProvider.notifier).refresh();
-  }
-  ChatPageList? _replaceRoundInCurrentPages(ChatRound updatedRound) {
-    final currentPageList = state.pageList;
-    if (currentPageList == null) return null;
-    return _replaceRoundInPageList(currentPageList, updatedRound);
-  }
-  ChatPageList? _replaceRoundInPageList(
-    ChatPageList? pageList,
-    ChatRound updatedRound,
-  ) {
-    if (pageList == null) return null;
-    // ✅ 简化逻辑，无需处理 pageIndex
-    final updatedPages = pageList.pages.map((page) {
-      if (page.round.id == updatedRound.id) {
-        return page.copyWith(round: updatedRound);
-      }
-      return page;
-    }).toList();
-    return pageList.copyWith(pages: updatedPages);
   }
   void stopGeneration() {
     if (state.pageList == null || state.pageList!.pages.isEmpty) return;
-    // ✅ 直接使用 currentPageIndex 获取当前页
-    final viewingRound = state.pageList!.pages[state.pageList!.currentPageIndex].round;
+    final viewingRound = state.pageList!.pages[_currentPageIndex].round;
     final stream = _getRoundStream(viewingRound.id);
     if (stream?.isStreaming != true) return;
     _stoppingRoundIds.add(viewingRound.id);
@@ -14324,26 +14182,39 @@ class ChatNotifier extends StateNotifier<ChatState> {
     apiSource.cancelRequest(viewingRound.id);
   }
   Future<void> switchBranch(String targetRoundId) async {
-    if (state.session == null) return;
-    final session = state.session!;
+    final session = state.session;
+    if (session == null) return;
     final newRoundId = BranchNavigator.switchBranch(session, targetRoundId);
-    final viewState = ChatViewStateBuilder.buildForRound(session, newRoundId);
-    state = state.copyWithCurrentRoundId(newRoundId).copyWith(
-          pageList: viewState.pageList,
-        );
+    state = state.copyWithCurrentRoundId(newRoundId);
     await ensureRoundLoaded(newRoundId);
   }
   void changePage(int pageIndex) {
     if (state.pageList == null) return;
     final pages = state.pageList!.pages;
-    // ✅ 使用工具类验证索引
     if (!PageUtils.isValidIndex(pageIndex, pages.length)) return;
     final targetPage = pages[pageIndex];
     final newRoundId = targetPage.round.id;
-    state = state.copyWithCurrentRoundId(newRoundId).copyWith(
-          pageList: state.pageList!.copyWith(currentPageIndex: pageIndex),
-        );
+    _currentPageIndex = pageIndex;
+    state = state.copyWith(
+      currentRoundId: newRoundId,
+      pageList: state.pageList!.copyWith(currentPageIndex: pageIndex),
+    );
     ensureRoundLoaded(newRoundId);
+  }
+  Future<void> markRoundSeen(String roundId) async {
+    final session = state.session;
+    if (session == null) return;
+    final target = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
+    if (target == null || !target.hasUnseenUpdate) return;
+    // 更新数据库
+    final repository = ref.read(conversationRepositoryProvider);
+    final updatedRound = target.copyWith(hasUnseenUpdate: false);
+    await repository.updateRound(fileName, roundId, updatedRound);
+  }
+  @override
+  void dispose() {
+    _sessionSubscription?.cancel();
+    super.dispose();
   }
 }
 final chatProvider =

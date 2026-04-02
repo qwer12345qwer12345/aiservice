@@ -13,7 +13,7 @@ abstract class AppConstants {
   static const String keyModel = 'selectedModel';
 
   // 默认值
-  static const String defaultBaseUrl = 'https://api.openai.com/v1';
+  static const String defaultBaseUrl = 'https://api.openai.com';
   static const String defaultTheme = 'system';
 
   // 文件扩展名

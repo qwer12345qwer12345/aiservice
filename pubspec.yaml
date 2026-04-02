@@ -20,7 +20,7 @@ dependencies:
   json_annotation: ^4.8.1
 
   # ========== HTTP 网络请求 ==========
-  http: ^1.2.0
+  http: ^1.6.0
 
   # ========== 本地存储/文件操作 ==========
   path_provider: ^2.1.2
@@ -42,6 +42,8 @@ dependencies:
 
   drift: ^2.14.0
   sqlite3_flutter_libs: ^0.5.0
+
+  flutter_client_sse: ^2.0.3
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -73,5 +75,7 @@ dev_dependencies:
   fluttertoast: ^8.2.6
 
   drift_dev: ^2.14.0
+
+  dart_openai: ^6.1.1
 flutter:
   uses-material-design: true

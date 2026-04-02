@@ -1,3 +1,5 @@
+// presentation/pages/settings_page.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/app_config.dart';
@@ -17,15 +19,13 @@ class SettingsPage extends ConsumerStatefulWidget {
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   static const String _defaultModelsPath = 'v1/models';
+
   final _baseUrlController = TextEditingController();
   final _apiKeyController = TextEditingController();
   final _modelsPathController = TextEditingController();
   final _chatPathController = TextEditingController();
-  bool _initialized = false;
-  bool _isRefreshingModels = false;
-  String? _selectedModel;
-  String _apiMode = 'chat_completions';
-  List<ModelInfo> _models = const [];
+
+  bool _isSyncing = false;
 
   @override
   void dispose() {
@@ -36,264 +36,333 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     super.dispose();
   }
 
-  String _defaultChatPathForApiMode(String apiMode) {
-    switch (apiMode) {
-      case 'responses':
-        return 'v1/responses';
-      case 'chat_completions':
-      default:
-        return 'v1/chat/completions';
-    }
-  }
-
-  void _applyConfig(AppConfig config) {
-    _baseUrlController.text = config.baseUrl;
-    _apiKeyController.text = config.apiKey;
-    _modelsPathController.text = config.modelsPath;
-    _chatPathController.text = config.chatPath;
-    _selectedModel = config.selectedModel;
-    _apiMode = config.apiMode;
-    _models = config.availableModels ?? const [];
-    _initialized = true;
-  }
-
-  ModelInfo? _selectedModelInfo() {
-    final selectedId = _selectedModel;
-    if (selectedId == null || selectedId.trim().isEmpty) return null;
-    for (final model in _models) {
-      if (model.id == selectedId) return model;
-    }
-    return null;
-  }
-
-  String _getSelectedModelDisplayText(List<ModelInfo> models) {
-    if (_selectedModel == null || _selectedModel!.trim().isEmpty) {
-      return '请选择模型';
-    }
-    for (final model in models) {
-      if (model.id == _selectedModel) {
-        final name = (model.name ?? '').trim();
-        return name.isNotEmpty ? name : model.id;
-      }
-    }
-    return _selectedModel!;
-  }
-
-  List<Widget> _buildModelChips(ModelInfo model) {
-    final widgets = <Widget>[];
-    if (model.supportsVision == true) {
-      widgets.add(
-        const Chip(
-          avatar: Icon(Icons.image_outlined, size: 16),
-          label: Text('Vision'),
-          visualDensity: VisualDensity.compact,
-        ),
-      );
-    }
-    if (model.supportsReasoning == true) {
-      widgets.add(
-        const Chip(
-          avatar: Icon(Icons.psychology_alt_outlined, size: 16),
-          label: Text('Reasoning'),
-          visualDensity: VisualDensity.compact,
-        ),
-      );
-    }
-    return widgets;
-  }
-
-  Widget _buildSelectedModelSupportsCard() {
-    final model = _selectedModelInfo();
-    if (model == null) return const SizedBox.shrink();
-    final chips = _buildModelChips(model);
-    if (chips.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: chips,
-        ),
-      ),
-    );
-  }
-
-  void _updateSelectedModelOverride({
-    bool? overrideVision,
-    bool? overrideReasoning,
-  }) {
-    final selected = _selectedModelInfo();
-    if (selected == null) return;
-    final updated = selected.copyWith(
-      overrideSupportsVision:
-          overrideVision ?? selected.overrideSupportsVision,
-      overrideSupportsReasoning:
-          overrideReasoning ?? selected.overrideSupportsReasoning,
-      supportsVision: overrideVision ?? selected.supportsVision,
-      supportsReasoning: overrideReasoning ?? selected.supportsReasoning,
-    );
+  /// 同步表单值到配置流，自动触发，无需手动保存
+  void _syncControllersWithConfig(AppConfig config) {
+    _isSyncing = true;
     setState(() {
-      _models = _models.map((m) {
-        if (m.id == selected.id) return updated;
-        return m;
-      }).toList();
+      _baseUrlController.text = config.baseUrl;
+      _apiKeyController.text = config.apiKey;
+      _modelsPathController.text = config.modelsPath;
+      _chatPathController.text = config.chatPath;
     });
+    _isSyncing = false;
   }
 
-  Future<void> _showCustomModelDialog() async {
-    final controller = TextEditingController(text: _selectedModel ?? '');
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('自定义模型'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: '模型 ID',
-            border: OutlineInputBorder(),
-          ),
-        ),
+  String _defaultChatPathForApiMode(String apiMode) {
+    return apiMode == 'responses' ? 'v1/responses' : 'v1/chat/completions';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final configAsync = ref.watch(configProvider);
+    final profilesAsync = ref.watch(configProfilesProvider);
+
+    // 监听配置变化，自动同步到表单
+    ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
+      next.whenData((config) {
+        _syncControllersWithConfig(config);
+      });
+    });
+
+    final isBusy = configAsync.isLoading || profilesAsync.isLoading;
+
+    return AppPageScaffold(
+      appBar: AppBar(
+        title: const Text('设置'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-            child: const Text('确定'),
+          IconButton(
+            onPressed: isBusy ? null : _confirmRestoreDefaults,
+            icon: const Icon(Icons.restart_alt),
+            tooltip: '恢复默认',
+            style: IconButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
           ),
         ],
       ),
-    );
-    if (result != null && result.isNotEmpty) {
-      setState(() {
-        _selectedModel = result;
-      });
-    }
-  }
-
-  Future<void> _saveSettings() async {
-    final current = ref.read(configProvider).value;
-    if (current == null) return;
-    final updated = current.copyWith(
-      baseUrl: _baseUrlController.text.trim(),
-      apiKey: _apiKeyController.text.trim(),
-      modelsPath: _modelsPathController.text.trim().isEmpty
-          ? _defaultModelsPath
-          : _modelsPathController.text.trim(),
-      chatPath: _chatPathController.text.trim().isEmpty
-          ? _defaultChatPathForApiMode(_apiMode)
-          : _chatPathController.text.trim(),
-      selectedModel: (_selectedModel?.trim().isEmpty ?? true)
-          ? null
-          : _selectedModel!.trim(),
-      apiMode: _apiMode,
-      availableModels: _models,
-    );
-    try {
-      await ref.read(configProvider.notifier).saveFullConfig(updated);
-      await ref.read(configProfilesProvider.notifier).load();
-      await AppToast.show('设置已保存');
-    } catch (e) {
-      await AppToast.show('保存失败：$e');
-    }
-  }
-
-  Future<void> _refreshModels() async {
-    final current = ref.read(configProvider).value;
-    if (current == null) return;
-    final previousOverrides = {
-      for (final model in _models) model.id: model,
-    };
-    final draft = current.copyWith(
-      baseUrl: _baseUrlController.text.trim(),
-      apiKey: _apiKeyController.text.trim(),
-      modelsPath: _modelsPathController.text.trim().isEmpty
-          ? _defaultModelsPath
-          : _modelsPathController.text.trim(),
-      chatPath: _chatPathController.text.trim().isEmpty
-          ? _defaultChatPathForApiMode(_apiMode)
-          : _chatPathController.text.trim(),
-      selectedModel: (_selectedModel?.trim().isEmpty ?? true)
-          ? null
-          : _selectedModel!.trim(),
-      apiMode: _apiMode,
-      availableModels: _models,
-    );
-    setState(() {
-      _isRefreshingModels = true;
-    });
-    try {
-      await ref.read(configProvider.notifier).saveAndRefreshModels(draft);
-      final refreshed = ref.read(configProvider).value;
-      if (refreshed != null) {
-        final mergedModels = (refreshed.availableModels ?? const []).map((model) {
-          final old = previousOverrides[model.id];
-          if (old == null) return model;
-          return model.copyWith(
-            overrideSupportsVision: old.overrideSupportsVision,
-            overrideSupportsReasoning: old.overrideSupportsReasoning,
-            supportsVision: old.overrideSupportsVision ?? model.supportsVision,
-            supportsReasoning:
-                old.overrideSupportsReasoning ?? model.supportsReasoning,
+      body: profilesAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('加载配置存档失败：$e')),
+        data: (store) {
+          return configAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('加载配置失败：$e')),
+            data: (config) {
+              // 首次加载时同步 Controller
+              if (_baseUrlController.text.isEmpty) {
+                _syncControllersWithConfig(config);
+              }
+              return _buildSettingsContent(context, store, config, isBusy);
+            },
           );
-        }).toList();
-        setState(() {
-          _models = mergedModels;
-          final exists = _models.any((m) => m.id == _selectedModel);
-          if (!exists) {
-            _selectedModel = _models.isNotEmpty ? _models.first.id : null;
-          }
-        });
-      }
-      await ref.read(configProfilesProvider.notifier).load();
-      await AppToast.show('模型列表已同步');
-    } catch (e) {
-      await AppToast.show('同步模型失败：$e');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isRefreshingModels = false;
-        });
-      }
-    }
+        },
+      ),
+    );
   }
 
-  Widget _buildManualCapabilityEditor() {
-    final model = _selectedModelInfo();
-    if (model == null) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildSettingsContent(
+    BuildContext context,
+    AppConfigStore store,
+    AppConfig config,
+    bool isBusy,
+  ) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
       children: [
-        const SizedBox(height: 12),
-        const Text(
-          '手动覆盖模型能力',
-          style: TextStyle(fontWeight: FontWeight.w600),
+        // 配置存档
+        AppSection(
+          title: '配置存档',
+          subtitle: '切换后自动同步到表单',
+          children: [
+            DropdownButtonFormField<String>(
+              value: store.activeProfileId,
+              decoration: const InputDecoration(labelText: '当前配置存档'),
+              items: store.profiles
+                  .map((p) => DropdownMenuItem(value: p.id, child: Text(p.name)))
+                  .toList(),
+              onChanged: isBusy
+                  ? null
+                  : (value) async {
+                      if (value == null) return;
+                      await ref.read(configProfilesNotifierProvider).switchProfile(value);
+                    },
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              children: [
+                OutlinedButton(
+                  onPressed: isBusy ? null : _showCreateProfileDialog,
+                  child: const Text('新建'),
+                ),
+                OutlinedButton(
+                  onPressed: isBusy
+                      ? null
+                      : () => _showRenameProfileDialog(
+                          store.profiles.firstWhere((p) => p.id == store.activeProfileId)),
+                  child: const Text('重命名'),
+                ),
+                OutlinedButton(
+                  onPressed: isBusy
+                      ? null
+                      : () => _deleteProfile(
+                          store.profiles.firstWhere((p) => p.id == store.activeProfileId),
+                          store.profiles.length),
+                  child: const Text('删除'),
+                ),
+              ],
+            ),
+          ],
         ),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('支持 Vision'),
-          subtitle: const Text('用于图片输入能力声明'),
-          value: model.supportsVision == true,
-          onChanged: (value) {
-            _updateSelectedModelOverride(overrideVision: value);
-          },
+
+        // 连接配置
+        AppSection(
+          title: '连接配置',
+          subtitle: '修改后自动保存到当前配置',
+          children: [
+            TextField(
+              controller: _baseUrlController,
+              enabled: !isBusy,
+              decoration: const InputDecoration(labelText: 'Base URL', hintText: 'https://api.openai.com'),
+              onChanged: (v) {
+                if (_isSyncing) return;
+                ref.read(configNotifierProvider).updateBaseUrl(v);
+              },
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _apiKeyController,
+              enabled: !isBusy,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'API Key'),
+              onChanged: (v) {
+                if (_isSyncing) return;
+                ref.read(configNotifierProvider).updateApiKey(v);
+              },
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _modelsPathController,
+              enabled: !isBusy,
+              decoration: const InputDecoration(labelText: 'Models Path', hintText: _defaultModelsPath),
+              onChanged: (v) {
+                if (_isSyncing) return;
+                ref.read(configNotifierProvider).updateModelsPath(v.isEmpty ? _defaultModelsPath : v);
+              },
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _chatPathController,
+              enabled: !isBusy,
+              decoration: InputDecoration(labelText: 'Chat Path', hintText: _defaultChatPathForApiMode(config.apiMode)),
+              onChanged: (v) {
+                if (_isSyncing) return;
+                ref.read(configNotifierProvider).updateChatPath(v.isEmpty ? _defaultChatPathForApiMode(config.apiMode) : v);
+              },
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: config.apiMode,
+              decoration: const InputDecoration(labelText: 'API Mode'),
+              items: const [
+                DropdownMenuItem(value: 'chat_completions', child: Text('chat_completions')),
+                DropdownMenuItem(value: 'responses', child: Text('responses')),
+              ],
+              onChanged: isBusy
+                  ? null
+                  : (value) {
+                      if (value == null || _isSyncing) return;
+                      ref.read(configNotifierProvider).updateApiMode(value);
+                      if (_chatPathController.text.isEmpty) {
+                        _chatPathController.text = _defaultChatPathForApiMode(value);
+                        ref.read(configNotifierProvider).updateChatPath(_chatPathController.text);
+                      }
+                    },
+            ),
+          ],
         ),
-        const Divider(),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('支持 Reasoning'),
-          subtitle: const Text('用于推理过程能力声明'),
-          value: model.supportsReasoning == true,
-          onChanged: (value) {
-            _updateSelectedModelOverride(overrideReasoning: value);
-          },
+
+        // 模型配置
+        AppSection(
+          title: '模型配置',
+          subtitle: '选择后自动保存到当前配置',
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: _buildModelSelector(context, config, isBusy)),
+                const SizedBox(width: 12),
+                FilledButton(
+                  onPressed: isBusy ? null : _refreshModels,
+                  child: const Text('同步模型'),
+                ),
+              ],
+            ),
+            _buildModelChips(config),
+          ],
         ),
       ],
     );
+  }
+
+  Widget _buildModelSelector(BuildContext context, AppConfig config, bool isBusy) {
+    final models = config.availableModels ?? const [];
+    final selectedId = config.selectedModel;
+
+    return SearchAnchor(
+      builder: (context, controller) {
+        return GestureDetector(
+          onTap: isBusy ? null : () => controller.openView(),
+          child: InputDecorator(
+            decoration: const InputDecoration(labelText: '当前模型', suffixIcon: Icon(Icons.arrow_drop_down)),
+            child: Text(_getSelectedModelDisplayText(models, selectedId), overflow: TextOverflow.ellipsis),
+          ),
+        );
+      },
+      suggestionsBuilder: (context, controller) {
+        final query = controller.text.trim().toLowerCase();
+        final filtered = models.where((m) {
+          final id = m.id.toLowerCase();
+          final name = (m.name ?? '').toLowerCase();
+          return query.isEmpty || id.contains(query) || name.contains(query);
+        }).toList();
+
+        if (filtered.isEmpty) return const [ListTile(title: Text('没有匹配的模型'))];
+
+        return [
+          ...filtered.map((model) => ListTile(
+                title: Text((model.name ?? '').trim().isNotEmpty ? model.name! : model.id),
+                trailing: model.id == selectedId ? const Icon(Icons.check) : null,
+                onTap: () {
+                  if (_isSyncing) return;
+                  ref.read(configNotifierProvider).updateSelectedModel(model.id);
+                  controller.closeView(model.id);
+                },
+              )),
+          ListTile(
+            title: const Text('自定义模型 ID'),
+            onTap: () {
+              final text = controller.text;
+              controller.closeView(null);
+              if (text.isNotEmpty && !_isSyncing) {
+                ref.read(configNotifierProvider).updateSelectedModel(text);
+              }
+            },
+          ),
+        ];
+      },
+    );
+  }
+
+  Widget _buildModelChips(AppConfig config) {
+    final selectedId = config.selectedModel;
+    if (selectedId == null || selectedId.trim().isEmpty) return const SizedBox.shrink();
+
+    final model = (config.availableModels ?? const []).where((m) => m.id == selectedId).firstOrNull;
+    if (model == null) return const SizedBox.shrink();
+
+    final chips = <Widget>[];
+    if (model.supportsVision == true) {
+      chips.add(const Chip(avatar: Icon(Icons.image_outlined, size: 16), label: Text('Vision'), visualDensity: VisualDensity.compact));
+    }
+    if (model.supportsReasoning == true) {
+      chips.add(const Chip(avatar: Icon(Icons.psychology_alt_outlined, size: 16), label: Text('Reasoning'), visualDensity: VisualDensity.compact));
+    }
+    if (chips.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Wrap(spacing: 8, runSpacing: 8, children: chips),
+    );
+  }
+
+  String _getSelectedModelDisplayText(List<ModelInfo> models, String? selectedId) {
+    if (selectedId == null || selectedId.trim().isEmpty) return '请选择模型';
+    for (final m in models) {
+      if (m.id == selectedId) return (m.name ?? '').trim().isNotEmpty ? m.name! : m.id;
+    }
+    return selectedId;
+  }
+
+  Future<void> _refreshModels() async {
+    final configAsync = ref.read(configProvider);
+    final config = configAsync.valueOrNull;
+    if (config == null) return;
+
+    try {
+      await ref.read(configNotifierProvider).saveAndRefreshModels(config);
+      await AppToast.show('模型列表已同步');
+    } catch (e) {
+      await AppToast.show('同步模型失败：$e');
+    }
+  }
+
+  Future<void> _confirmRestoreDefaults() async {
+    final colorScheme = Theme.of(context).colorScheme;
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('恢复默认设置'),
+            content: const Text('确定要将当前配置存档恢复为默认设置吗？'),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                style: FilledButton.styleFrom(backgroundColor: colorScheme.error, foregroundColor: colorScheme.onError),
+                child: const Text('恢复默认'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!confirmed) return;
+
+    try {
+      await ref.read(configNotifierProvider).saveFullConfig(AppConfig.defaultConfig());
+    } catch (e) {
+      await AppToast.show('恢复默认失败：$e');
+    }
   }
 
   Future<void> _showCreateProfileDialog() async {
@@ -302,29 +371,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('新建配置存档'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: '输入配置名称',
-          ),
-          onSubmitted: (value) => Navigator.of(ctx).pop(value.trim()),
-        ),
+        content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(hintText: '输入配置名称')),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-            child: const Text('创建'),
-          ),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(controller.text.trim()), child: const Text('创建')),
         ],
       ),
     );
-    if (result == null) return;
-    await ref.read(configProfilesProvider.notifier).createProfile(result);
-    _initialized = false;
+
+    if (result == null || result.isEmpty) return;
+    await ref.read(configProfilesNotifierProvider).createProfile(result);
   }
 
   Future<void> _showRenameProfileDialog(ConfigProfile profile) async {
@@ -333,30 +389,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('重命名配置存档'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: '输入配置名称',
-          ),
-          onSubmitted: (value) => Navigator.of(ctx).pop(value.trim()),
-        ),
+        content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(hintText: '输入配置名称')),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-            child: const Text('保存'),
-          ),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(controller.text.trim()), child: const Text('保存')),
         ],
       ),
     );
+
     if (result == null || result.isEmpty) return;
-    await ref
-        .read(configProfilesProvider.notifier)
-        .renameProfile(profile.id, result);
+    await ref.read(configProfilesNotifierProvider).renameProfile(profile.id, result);
   }
 
   Future<void> _deleteProfile(ConfigProfile profile, int profileCount) async {
@@ -364,385 +406,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       await AppToast.show('至少保留一个配置存档');
       return;
     }
+
     final confirmed = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('删除配置存档'),
-            content: Text('确定删除"${profile.name}"吗？'),
+            content: Text('确定删除 "${profile.name}" 吗？'),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                child: const Text('删除'),
-              ),
+              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
+              FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('删除')),
             ],
           ),
         ) ??
         false;
+
     if (!confirmed) return;
-    await ref.read(configProfilesProvider.notifier).deleteProfile(profile.id);
-    _initialized = false;
-  }
-
-  Future<void> _confirmRestoreDefaults() async {
-    final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('恢复默认设置'),
-            content: const Text(
-              '确定要将当前配置存档恢复为默认设置吗？\n\n仅会影响当前选中的配置存档，不会影响其他配置存档。',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                child: const Text('恢复默认'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-    if (!confirmed) return;
-    await _restoreCurrentProfileDefaults();
-  }
-
-  Future<void> _restoreCurrentProfileDefaults() async {
-    try {
-      final defaultConfig = AppConfig.defaultConfig();
-      await ref.read(configProvider.notifier).saveFullConfig(defaultConfig);
-      await ref.read(configProfilesProvider.notifier).load();
-      setState(() {
-        _applyConfig(defaultConfig);
-      });
-    } catch (e) {
-      await AppToast.show('恢复默认失败：$e');
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final configState = ref.watch(configProvider);
-    final profilesState = ref.watch(configProfilesProvider);
-    ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
-      next.whenData((config) {
-        if (!_initialized) {
-          setState(() {
-            _applyConfig(config);
-          });
-        }
-      });
-    });
-    final isBusy = configState.isLoading || _isRefreshingModels;
-    return AppPageScaffold(
-      appBar: AppBar(
-        title: const Text('设置'),
-      ),
-      body: profilesState.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text('加载配置存档失败：$e'),
-          ),
-        ),
-        data: (store) {
-          final activeProfile = store.profiles.firstWhere(
-            (p) => p.id == store.activeProfileId,
-          );
-          return configState.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text('加载配置失败：$e'),
-              ),
-            ),
-            data: (config) {
-              if (!_initialized) {
-                _applyConfig(config);
-              }
-              final models = _models;
-              return ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  AppSection(
-                    title: '配置存档',
-                    subtitle: '可保存多套 API 与模型配置，并快速切换。',
-                    children: [
-                      DropdownButtonFormField<String>(
-                        value: store.activeProfileId,
-                        decoration: const InputDecoration(
-                          labelText: '当前配置存档',
-                        ),
-                        items: store.profiles.map((profile) {
-                          return DropdownMenuItem(
-                            value: profile.id,
-                            child: Text(profile.name),
-                          );
-                        }).toList(),
-                        onChanged: isBusy
-                            ? null
-                            : (value) async {
-                                if (value == null) return;
-                                await ref
-                                    .read(configProfilesProvider.notifier)
-                                    .switchProfile(value);
-                                _initialized = false;
-                              },
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: [
-                          OutlinedButton(
-                            onPressed: isBusy ? null : _showCreateProfileDialog,
-                            child: const Text('新建'),
-                          ),
-                          OutlinedButton(
-                            onPressed: isBusy
-                                ? null
-                                : () => _showRenameProfileDialog(activeProfile),
-                            child: const Text('重命名'),
-                          ),
-                          OutlinedButton(
-                            onPressed: isBusy
-                                ? null
-                                : () => _deleteProfile(
-                                      activeProfile,
-                                      store.profiles.length,
-                                    ),
-                            child: const Text('删除'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  AppSection(
-                    title: '连接配置',
-                    subtitle: '用于配置 API 服务地址与接口路径。',
-                    children: [
-                      TextField(
-                        controller: _baseUrlController,
-                        enabled: !isBusy,
-                        decoration: const InputDecoration(
-                          labelText: 'Base URL',
-                          hintText: 'https://api.openai.com',
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _apiKeyController,
-                        enabled: !isBusy,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'API Key',
-                          hintText: '输入 API Key',
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _modelsPathController,
-                        enabled: !isBusy,
-                        decoration: const InputDecoration(
-                          labelText: 'Models Path',
-                          hintText: _defaultModelsPath,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _chatPathController,
-                        enabled: !isBusy,
-                        decoration: InputDecoration(
-                          labelText: 'Chat Path',
-                          hintText: _defaultChatPathForApiMode(_apiMode),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        value: _apiMode,
-                        decoration: const InputDecoration(
-                          labelText: 'API Mode',
-                        ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'chat_completions',
-                            child: Text('chat_completions'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'responses',
-                            child: Text('responses'),
-                          ),
-                        ],
-                        onChanged: isBusy
-                            ? null
-                            : (value) {
-                                if (value == null) return;
-                                setState(() {
-                                  _apiMode = value;
-                                  if (_chatPathController.text.trim().isEmpty ||
-                                      _chatPathController.text ==
-                                          _defaultChatPathForApiMode(
-                                              'chat_completions') ||
-                                      _chatPathController.text ==
-                                          _defaultChatPathForApiMode(
-                                              'responses')) {
-                                    _chatPathController.text =
-                                        _defaultChatPathForApiMode(value);
-                                  }
-                                });
-                              },
-                      ),
-                    ],
-                  ),
-                  AppSection(
-                    title: '模型配置',
-                    subtitle: '选择当前模型，并同步远端模型列表。',
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: SearchAnchor(
-                              builder: (context, controller) {
-                                return GestureDetector(
-                                  onTap: isBusy
-                                      ? null
-                                      : () {
-                                          controller.openView();
-                                        },
-                                  child: InputDecorator(
-                                    decoration: const InputDecoration(
-                                      labelText: '当前模型',
-                                      suffixIcon: Icon(Icons.arrow_drop_down),
-                                    ),
-                                    child: Text(
-                                      _getSelectedModelDisplayText(models),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                );
-                              },
-                              suggestionsBuilder: (context, controller) {
-                                final query =
-                                    controller.text.trim().toLowerCase();
-                                final filteredModels = models.where((model) {
-                                  final id = model.id.toLowerCase();
-                                  final name =
-                                      (model.name ?? '').toLowerCase();
-                                  return query.isEmpty ||
-                                      id.contains(query) ||
-                                      name.contains(query);
-                                }).toList();
-                                if (filteredModels.isEmpty) {
-                                  return const [
-                                    ListTile(title: Text('没有匹配的模型')),
-                                  ];
-                                }
-                                return [
-                                  ...filteredModels.map((model) {
-                                    final isSelected = model.id == _selectedModel;
-                                    final title =
-                                        (model.name ?? '').trim().isNotEmpty
-                                            ? model.name!
-                                            : model.id;
-                                    final showSubtitle =
-                                        (model.name ?? '').trim().isNotEmpty &&
-                                            model.name != model.id;
-                                    final chips = _buildModelChips(model);
-                                    return ListTile(
-                                      title: Text(
-                                        title,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      subtitle: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          if (showSubtitle) Text(model.id),
-                                          if (chips.isNotEmpty) ...[
-                                            const SizedBox(height: 6),
-                                            Wrap(
-                                              spacing: 6,
-                                              runSpacing: 6,
-                                              children: chips,
-                                            ),
-                                          ],
-                                        ],
-                                      ),
-                                      trailing: isSelected
-                                          ? const Icon(Icons.check)
-                                          : null,
-                                      onTap: () {
-                                        setState(() {
-                                          _selectedModel = model.id;
-                                        });
-                                        controller.closeView(model.id);
-                                      },
-                                    );
-                                  }),
-                                  ListTile(
-                                    title: const Text('自定义模型 ID'),
-                                    onTap: () {
-                                      controller.closeView(null);
-                                      _showCustomModelDialog();
-                                    },
-                                  ),
-                                ];
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          FilledButton(
-                            onPressed: isBusy ? null : _refreshModels,
-                            child: _isRefreshingModels
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Text('同步模型'),
-                          ),
-                        ],
-                      ),
-                      _buildSelectedModelSupportsCard(),
-                      _buildManualCapabilityEditor(),
-                    ],
-                  ),
-                  AppSection(
-                    title: '操作',
-                    subtitle: '保存或重置当前配置存档。',
-                    children: [
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: [
-                          OutlinedButton(
-                            onPressed: isBusy ? null : _confirmRestoreDefaults,
-                            child: const Text('恢复默认'),
-                          ),
-                          FilledButton(
-                            onPressed: isBusy ? null : _saveSettings,
-                            child: const Text('保存设置'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
-              );
-            },
-          );
-        },
-      ),
-    );
+    await ref.read(configProfilesNotifierProvider).deleteProfile(profile.id);
   }
 }

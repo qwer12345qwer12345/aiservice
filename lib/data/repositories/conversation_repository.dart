@@ -1,11 +1,14 @@
+// data/repositories/conversation_repository.dart
+
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:drift/drift.dart';
 import '../../core/interfaces/file_service.dart';
 import '../../core/models/attachment.dart';
 import '../../core/models/chat_round.dart';
 import '../../core/models/session.dart';
-import '../../core/utils/id_generator.dart';
 import '../database/database.dart';
+import '../../core/utils/id_generator.dart';
 
 class ConversationRepository {
   final AppDatabase _db;
@@ -16,20 +19,168 @@ class ConversationRepository {
   String _getId(String fileName) => fileName.replaceAll('.json', '');
 
   // 检查附件是否被其他 Round 引用
-  // ✅ 替换原来的方法，入参从排除会话改成排除【本次要删除的轮次ID列表】
-  Future<bool> _isAttachmentUsedElsewhere(String relativePath, List<String> excludeRoundIds) async {
+  Future<bool> _isAttachmentUsedElsewhere(
+      String relativePath, List<String> excludeRoundIds) async {
     final query = _db.select(_db.dbAttachments).join([
       innerJoin(
         _db.dbChatRounds,
         _db.dbChatRounds.id.equalsExp(_db.dbAttachments.roundId),
       )
     ])
-      // ✅ 只排除本次要删除的轮次，其他所有轮次（含同会话未被删除的）都算有效引用
       ..where(_db.dbAttachments.relativePath.equals(relativePath))
       ..where(_db.dbChatRounds.id.isNotIn(excludeRoundIds));
     final result = await query.get();
     return result.isNotEmpty;
   }
+
+  // ========== 核心改造：添加 watch 方法 ==========
+
+  /// 监听所有会话列表，返回按更新时间倒序的会话 Stream
+  Stream<List<Session>> watchAllSessions() {
+    final query = _db.select(_db.dbSessions)
+      ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]);
+
+    return query.watch().asyncMap((sessionRows) async {
+      final sessions = <Session>[];
+      for (final sessionRow in sessionRows) {
+        final session = await _buildSessionFromRow(sessionRow);
+        sessions.add(session);
+      }
+      return sessions;
+    });
+  }
+
+  /// 监听单个会话的完整数据（包含所有轮次和附件）
+  Stream<Session?> watchSession(String fileName) {
+    final sessionId = _getId(fileName);
+
+    // 监听会话元数据变更
+    final sessionQuery = _db.select(_db.dbSessions)
+      ..where((t) => t.id.equals(sessionId));
+
+    return sessionQuery.watchSingleOrNull().asyncMap((sessionRow) async {
+      if (sessionRow == null) return null;
+      return _buildSessionFromRow(sessionRow);
+    });
+  }
+
+  /// 监听会话的轮次列表
+  Stream<List<ChatRound>> watchRounds(String sessionId) {
+    final roundsQuery = _db.select(_db.dbChatRounds)
+      ..where((t) => t.sessionId.equals(sessionId))
+      ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]);
+
+    return roundsQuery.watch().asyncMap((roundRows) async {
+      final rounds = <ChatRound>[];
+      for (final round in roundRows) {
+        final attachments = await _getAttachmentsForRound(round.id);
+        rounds.add(_mapToChatRound(round, attachments));
+      }
+      return rounds;
+    });
+  }
+
+  /// 监听单个轮次的数据
+  Stream<ChatRound?> watchRound(String roundId) {
+    final query = _db.select(_db.dbChatRounds)
+      ..where((t) => t.id.equals(roundId));
+
+    return query.watchSingleOrNull().asyncMap((roundRow) async {
+      if (roundRow == null) return null;
+      final attachments = await _getAttachmentsForRound(roundId);
+      return _mapToChatRound(roundRow, attachments);
+    });
+  }
+
+  // ========== 私有辅助方法 ==========
+
+  Future<Session> _buildSessionFromRow(DbSession sessionRow) async {
+    final sessionId = sessionRow.id;
+
+    // 查询所有轮次
+    final roundsQuery = _db.select(_db.dbChatRounds)
+      ..where((t) => t.sessionId.equals(sessionId))
+      ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]);
+    final roundRows = await roundsQuery.get();
+
+    if (roundRows.isEmpty) {
+      return Session(
+        id: sessionRow.id,
+        title: sessionRow.title,
+        createdAt: sessionRow.createdAt,
+        updatedAt: sessionRow.updatedAt,
+        config: sessionRow.config,
+        hasUnseenUpdate: sessionRow.hasUnseenUpdate,
+        rounds: const [],
+      );
+    }
+
+    // 查询所有相关附件
+    final roundIds = roundRows.map((r) => r.id).toList();
+    final attachmentsQuery = _db.select(_db.dbAttachments)
+      ..where((t) => t.roundId.isIn(roundIds));
+    final attachmentRows = await attachmentsQuery.get();
+
+    // 组装 Attachments Map
+    final attachMap = <String, List<Attachment>>{};
+    for (final a in attachmentRows) {
+      attachMap.putIfAbsent(a.roundId, () => []).add(
+            Attachment(
+              id: a.id,
+              name: a.name,
+              relativePath: a.relativePath,
+              isImage: a.isImage,
+              mimeType: a.mimeType,
+            ),
+          );
+    }
+
+    // 组装 Rounds
+    final rounds = roundRows
+        .map((r) => _mapToChatRound(r, attachMap[r.id] ?? []))
+        .toList();
+
+    return Session(
+      id: sessionRow.id,
+      title: sessionRow.title,
+      createdAt: sessionRow.createdAt,
+      updatedAt: sessionRow.updatedAt,
+      config: sessionRow.config,
+      hasUnseenUpdate: sessionRow.hasUnseenUpdate,
+      rounds: rounds,
+    );
+  }
+
+  Future<List<Attachment>> _getAttachmentsForRound(String roundId) async {
+    final query = _db.select(_db.dbAttachments)
+      ..where((t) => t.roundId.equals(roundId));
+    final rows = await query.get();
+    return rows
+        .map((a) => Attachment(
+              id: a.id,
+              name: a.name,
+              relativePath: a.relativePath,
+              isImage: a.isImage,
+              mimeType: a.mimeType,
+            ))
+        .toList();
+  }
+
+  ChatRound _mapToChatRound(DbChatRound row, List<Attachment> attachments) {
+    return ChatRound(
+      id: row.id,
+      parentId: row.parentId,
+      createdAt: row.createdAt,
+      userContent: row.userContent,
+      userAttachments: attachments,
+      assistantThinking: row.assistantThinking,
+      assistantContent: row.assistantContent,
+      isIncomplete: row.isIncomplete,
+      hasUnseenUpdate: row.hasUnseenUpdate,
+    );
+  }
+
+  // ========== 现有的同步方法保留，用于初始化和一次性读取 ==========
 
   Future<List<String>> getAllSessionFileNames() async {
     final sessions = await (_db.select(_db.dbSessions)
@@ -40,70 +191,27 @@ class ConversationRepository {
 
   Future<Session> getSession(String fileName) async {
     final sessionId = _getId(fileName);
-
-    // 1. 获取 Session Metadata
     final sessionRow = await (_db.select(_db.dbSessions)
           ..where((t) => t.id.equals(sessionId)))
         .getSingle();
-
-    // 2. 获取所有的 Rounds
-    final roundsRow = await (_db.select(_db.dbChatRounds)
-          ..where((t) => t.sessionId.equals(sessionId))
-          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
-        .get();
-
-    if (roundsRow.isEmpty) {
-      return Session(
-        id: sessionRow.id, title: sessionRow.title, createdAt: sessionRow.createdAt,
-        updatedAt: sessionRow.updatedAt, config: sessionRow.config, 
-        hasUnseenUpdate: sessionRow.hasUnseenUpdate, rounds: [],
-      );
-    }
-
-    // 3. 获取这些 Rounds 的所有附件
-    final roundIds = roundsRow.map((r) => r.id).toList();
-    final attachmentsRow = await (_db.select(_db.dbAttachments)
-          ..where((t) => t.roundId.isIn(roundIds)))
-        .get();
-
-    // 组装 Attachments Map
-    final attachMap = <String, List<Attachment>>{};
-    for (final a in attachmentsRow) {
-      attachMap.putIfAbsent(a.roundId, () => []).add(
-        Attachment(
-          id: a.id, name: a.name, relativePath: a.relativePath,
-          isImage: a.isImage, mimeType: a.mimeType,
-        ),
-      );
-    }
-
-    // 组装 Rounds
-    final rounds = roundsRow.map((r) => ChatRound(
-      id: r.id, parentId: r.parentId, createdAt: r.createdAt,
-      userContent: r.userContent, assistantThinking: r.assistantThinking,
-      assistantContent: r.assistantContent, isIncomplete: r.isIncomplete,
-      hasUnseenUpdate: r.hasUnseenUpdate, userAttachments: attachMap[r.id] ?? [],
-    )).toList();
-
-    return Session(
-      id: sessionRow.id, title: sessionRow.title, createdAt: sessionRow.createdAt,
-      updatedAt: sessionRow.updatedAt, config: sessionRow.config,
-      hasUnseenUpdate: sessionRow.hasUnseenUpdate, rounds: rounds,
-    );
+    return _buildSessionFromRow(sessionRow);
   }
 
-  /// 业务极简版 SaveSession：自动处理增改，无需比对
-  Future<void> saveSession(String fileName, Session newSession) async {
+  Future<void> deleteRounds(String sessionId, List<String> roundIds) async {
+    if (roundIds.isEmpty) return;
+    await (_db.delete(_db.dbChatRounds)
+          ..where((t) => t.sessionId.equals(sessionId) & t.id.isIn(roundIds)))
+        .go();
+  }
+
+  Future<void> saveSession(
+      String fileName, Session newSession) async {
     final sessionId = _getId(fileName);
-    
-    // 开启事务
+
     await _db.transaction(() async {
       final allAttachments = <DbAttachmentsCompanion>[];
 
-      // 1. 遍历所有 Round，逐条 Upsert
       for (final round in newSession.rounds) {
-        // ✅ 直接使用表的 insertOnConflictUpdate 方法
-        // Drift 内部会自动优化，性能依然很高
         await _db.into(_db.dbChatRounds).insertOnConflictUpdate(
               DbChatRoundsCompanion.insert(
                 id: round.id,
@@ -118,24 +226,21 @@ class ConversationRepository {
               ),
             );
 
-        // 收集附件
-        allAttachments.addAll(round.userAttachments.map((a) => DbAttachmentsCompanion.insert(
-              id: a.id,
-              roundId: round.id,
-              name: a.name,
-              relativePath: a.relativePath,
-              isImage: Value(a.isImage),
-              mimeType: Value(a.mimeType),
-            )));
+        allAttachments.addAll(round.userAttachments
+            .map((a) => DbAttachmentsCompanion.insert(
+                  id: a.id,
+                  roundId: round.id,
+                  name: a.name,
+                  relativePath: a.relativePath,
+                  isImage: Value(a.isImage),
+                  mimeType: Value(a.mimeType),
+                )));
       }
 
-      // 2. 批量 Upsert 附件
-      // 因为附件通常较多，这里为了保持一致性也用循环，或者你可以用 batch.insert (如果确定无冲突)
       for (final attach in allAttachments) {
         await _db.into(_db.dbAttachments).insertOnConflictUpdate(attach);
       }
 
-      // 3. 更新会话元信息
       await _db.into(_db.dbSessions).insertOnConflictUpdate(
             DbSessionsCompanion(
               id: Value(sessionId),
@@ -149,27 +254,30 @@ class ConversationRepository {
     });
   }
 
-  Future<void> deleteRounds(String sessionId, List<String> roundIds) async {
-    if (roundIds.isEmpty) return;
-    await (_db.delete(_db.dbChatRounds)
-          ..where((t) => t.sessionId.equals(sessionId) & t.id.isIn(roundIds)))
-        .go();
-  }
-
   Future<void> saveSessionAndCleanupOrphanAttachments(
     String fileName, Session oldSession, Session newSession,
   ) async {
-    final oldPaths = oldSession.rounds.expand((r) => r.userAttachments).map((a) => a.relativePath).toSet();
-    final newPaths = newSession.rounds.expand((r) => r.userAttachments).map((a) => a.relativePath).toSet();
+    final oldPaths = oldSession.rounds
+        .expand((r) => r.userAttachments)
+        .map((a) => a.relativePath)
+        .toSet();
+    final newPaths = newSession.rounds
+        .expand((r) => r.userAttachments)
+        .map((a) => a.relativePath)
+        .toSet();
     final removedPaths = oldPaths.difference(newPaths);
-    // ✅ 计算出本次要删除的轮次ID：旧会话有、新会话没有的轮次
-    final deletedRoundIds = oldSession.rounds.where((oldR) => !newSession.rounds.any((newR) => newR.id == oldR.id)).map((r) => r.id).toList();
+    final deletedRoundIds = oldSession.rounds
+        .where((oldR) => !newSession.rounds.any((newR) => newR.id == oldR.id))
+        .map((r) => r.id)
+        .toList();
 
     await saveSession(fileName, newSession);
 
     for (final path in removedPaths) {
       if (!await _isAttachmentUsedElsewhere(path, deletedRoundIds)) {
-        try { await _fileService.deleteAttachment(path); } catch (_) {}
+        try {
+          await _fileService.deleteAttachment(path);
+        } catch (_) {}
       }
     }
   }
@@ -182,46 +290,62 @@ class ConversationRepository {
     } catch (_) {}
 
     if (targetSession != null) {
-      final paths = targetSession.rounds.expand((r) => r.userAttachments).map((a) => a.relativePath).toSet();
+      final paths = targetSession.rounds
+          .expand((r) => r.userAttachments)
+          .map((a) => a.relativePath)
+          .toSet();
       final allRoundIds = targetSession.rounds.map((r) => r.id).toList();
       for (final path in paths) {
         if (!await _isAttachmentUsedElsewhere(path, allRoundIds)) {
-          try { await _fileService.deleteAttachment(path); } catch (_) {}
+          try {
+            await _fileService.deleteAttachment(path);
+          } catch (_) {}
         }
       }
     }
-    // 外键级联删除：只需删 Session，对应的 Rounds 和 Attachments 会由 SQLite 自动清理
-    await (_db.delete(_db.dbSessions)..where((t) => t.id.equals(sessionId))).go();
+    await (_db.delete(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
+        .go();
   }
 
-  // 附件读写通过 FileService 物理落盘
-  Future<String> saveAttachment(Uint8List data, String fileName) async => await _fileService.saveAttachment(data, fileName);
-  Future<Uint8List> getAttachment(String relativePath) async => await _fileService.readAttachment(relativePath);
-  Future<void> deleteAttachment(String relativePath) async => await _fileService.deleteAttachment(relativePath);
+  Future<String> saveAttachment(Uint8List data, String fileName) async =>
+      await _fileService.saveAttachment(data, fileName);
+  Future<Uint8List> getAttachment(String relativePath) async =>
+      await _fileService.readAttachment(relativePath);
+  Future<void> deleteAttachment(String relativePath) async =>
+      await _fileService.deleteAttachment(relativePath);
 
   Future<Session> createSession({required String fileName, required String title}) async {
     final sessionId = _getId(fileName);
     final now = DateTime.now().millisecondsSinceEpoch;
-    final session = Session(id: sessionId, title: title, createdAt: now, updatedAt: now, rounds: []);
-    
+    final session = Session(
+        id: sessionId,
+        title: title,
+        createdAt: now,
+        updatedAt: now,
+        rounds: []);
+
     await _db.into(_db.dbSessions).insert(
-      DbSessionsCompanion.insert(
-        id: session.id, title: session.title, createdAt: session.createdAt, updatedAt: session.updatedAt,
-      ),
-    );
+          DbSessionsCompanion.insert(
+            id: session.id,
+            title: session.title,
+            createdAt: session.createdAt,
+            updatedAt: session.updatedAt,
+          ),
+        );
     return session;
   }
 
   Future<Session> createSessionWithGeneratedId({required String title}) async {
     final sessionId = IdGenerator.generate();
-    return await createSession(fileName: '$sessionId.json', title: title);
+    return createSession(fileName: '$sessionId.json', title: title);
   }
 
   Future<void> updateSessionTitle(String fileName, String title) async {
     final sessionId = _getId(fileName);
     await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
         .write(DbSessionsCompanion(
-          title: Value(title), updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+          title: Value(title),
+          updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
         ));
   }
 
@@ -231,51 +355,62 @@ class ConversationRepository {
     for (final id in ids) {
       try {
         sessions.add(await getSession(id));
-      } catch (_) {} // 忽略损坏记录
+      } catch (_) {}
     }
     return sessions;
   }
 
-  // 增量插入，无需重写整个 JSON
   Future<void> appendRound(String fileName, ChatRound round) async {
     final sessionId = _getId(fileName);
     await _db.transaction(() async {
       await _db.into(_db.dbChatRounds).insert(
-        DbChatRoundsCompanion.insert(
-          id: round.id, sessionId: sessionId, parentId: Value(round.parentId),
-          createdAt: round.createdAt, userContent: round.userContent,
-          assistantThinking: Value(round.assistantThinking),
-          assistantContent: Value(round.assistantContent),
-          isIncomplete: Value(round.isIncomplete), hasUnseenUpdate: Value(round.hasUnseenUpdate),
-        ),
-      );
+            DbChatRoundsCompanion.insert(
+              id: round.id,
+              sessionId: sessionId,
+              parentId: Value(round.parentId),
+              createdAt: round.createdAt,
+              userContent: round.userContent,
+              assistantThinking: Value(round.assistantThinking),
+              assistantContent: Value(round.assistantContent),
+              isIncomplete: Value(round.isIncomplete),
+              hasUnseenUpdate: Value(round.hasUnseenUpdate),
+            ),
+          );
       for (final attach in round.userAttachments) {
         await _db.into(_db.dbAttachments).insert(
-          DbAttachmentsCompanion.insert(
-            id: attach.id, roundId: round.id, name: attach.name,
-            relativePath: attach.relativePath, isImage: Value(attach.isImage), mimeType: Value(attach.mimeType),
-          ),
-        );
+              DbAttachmentsCompanion.insert(
+                id: attach.id,
+                roundId: round.id,
+                name: attach.name,
+                relativePath: attach.relativePath,
+                isImage: Value(attach.isImage),
+                mimeType: Value(attach.mimeType),
+              ),
+            );
       }
       await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-          .write(DbSessionsCompanion(updatedAt: Value(DateTime.now().millisecondsSinceEpoch)));
+          .write(DbSessionsCompanion(
+              updatedAt: Value(DateTime.now().millisecondsSinceEpoch)));
     });
   }
 
-  // 增量更新单轮
-  Future<void> updateRound(String fileName, String roundId, ChatRound updatedRound) async {
+  Future<void> updateRound(
+      String fileName, String roundId, ChatRound updatedRound) async {
     final sessionId = _getId(fileName);
     await _db.transaction(() async {
-      await (_db.update(_db.dbChatRounds)..where((t) => t.id.equals(roundId))).write(
-        DbChatRoundsCompanion(
-          assistantThinking: Value(updatedRound.assistantThinking),
-          assistantContent: Value(updatedRound.assistantContent),
-          isIncomplete: Value(updatedRound.isIncomplete),
-          hasUnseenUpdate: Value(updatedRound.hasUnseenUpdate),
-        ),
-      );
+      await (_db.update(_db.dbChatRounds)
+            ..where((t) => t.id.equals(roundId)))
+          .write(
+            DbChatRoundsCompanion(
+              assistantThinking: Value(updatedRound.assistantThinking),
+              assistantContent: Value(updatedRound.assistantContent),
+              isIncomplete: Value(updatedRound.isIncomplete),
+              hasUnseenUpdate: Value(updatedRound.hasUnseenUpdate),
+            ),
+          );
       await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-          .write(DbSessionsCompanion(updatedAt: Value(DateTime.now().millisecondsSinceEpoch)));
+          .write(DbSessionsCompanion(
+              updatedAt: Value(DateTime.now().millisecondsSinceEpoch)));
     });
   }
 }

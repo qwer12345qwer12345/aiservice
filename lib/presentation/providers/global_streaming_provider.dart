@@ -1,3 +1,5 @@
+// presentation/providers/global_streaming_provider.dart
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/chat_round.dart';
 import '../../domain/states/chat_state.dart';
@@ -5,6 +7,9 @@ import '../../domain/states/chat_state.dart';
 typedef SessionStreamMap = Map<String, StreamStatus>;
 typedef GlobalStreamMap = Map<String, SessionStreamMap>;
 
+// 这个 Provider 持有正在流式生成的数据
+// 当流式结束时，数据会写入数据库，UI 通过 watch 获取
+// 此 Provider 主要用于避免重复请求和实时显示
 class GlobalStreamCacheNotifier extends StateNotifier<GlobalStreamMap> {
   GlobalStreamCacheNotifier() : super(const {});
 
@@ -63,6 +68,26 @@ class GlobalStreamCacheNotifier extends StateNotifier<GlobalStreamMap> {
     };
   }
 
+  void ensureRoundLoadedWithContent(
+    String fileName,
+    String roundId,
+    String content,
+    String reasoning,
+  ) {
+    final sessionMap = Map<String, StreamStatus>.from(state[fileName] ?? {});
+    if (!sessionMap.containsKey(roundId)) {
+      sessionMap[roundId] = StreamStatus(
+        content: content,
+        reasoning: reasoning,
+        isStreaming: false,
+      );
+    }
+    state = {
+      ...state,
+      fileName: sessionMap,
+    };
+  }
+
   void ensureRoundsLoaded(String fileName, List<ChatRound> rounds) {
     if (rounds.isEmpty) return;
     final sessionMap = Map<String, StreamStatus>.from(state[fileName] ?? {});
@@ -84,6 +109,25 @@ class GlobalStreamCacheNotifier extends StateNotifier<GlobalStreamMap> {
       ...state,
       fileName: sessionMap,
     };
+  }
+
+  void clearRoundStream(String fileName, String roundId) {
+    final sessionMap = state[fileName];
+    if (sessionMap == null) return;
+
+    final next = Map<String, StreamStatus>.from(sessionMap);
+    next.remove(roundId);
+
+    if (next.isEmpty) {
+      final global = Map<String, SessionStreamMap>.from(state);
+      global.remove(fileName);
+      state = global;
+    } else {
+      state = {
+        ...state,
+        fileName: next,
+      };
+    }
   }
 
   void clearNonStreamingForSession(String fileName) {
@@ -112,6 +156,10 @@ class GlobalStreamCacheNotifier extends StateNotifier<GlobalStreamMap> {
 
 final globalStreamCacheProvider =
     StateNotifierProvider<GlobalStreamCacheNotifier, GlobalStreamMap>((ref) {
+  // 当没有任何监听时可以自动清理
+  ref.onDispose(() {
+    // 可以在这里做一些清理工作
+  });
   return GlobalStreamCacheNotifier();
 });
 

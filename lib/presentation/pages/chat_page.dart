@@ -52,32 +52,51 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     _chatSubscription = ref.listenManual<ChatState>(
       chatProvider(widget.fileName),
       (previous, next) {
+        // 原有分页逻辑保持不变
         final nextPageList = next.pageList;
-        if (nextPageList == null || nextPageList.pages.isEmpty) return;
-
-        if (_pageController == null) {
-          final initialIndex = nextPageList.currentPageIndex;
-          _pageController = PageController(initialPage: initialIndex);
-          if (mounted) {
-            setState(() {});
+        if (nextPageList != null && nextPageList.pages.isNotEmpty) {
+          if (_pageController == null) {
+            final initialIndex = nextPageList.currentPageIndex;
+            _pageController = PageController(initialPage: initialIndex);
+            if (mounted) {
+              setState(() {});
+            }
+            return;
           }
-          return;
+
+          final controller = _pageController!;
+          if (controller.hasClients) {
+            final prevIndex = previous?.pageList?.currentPageIndex;
+            final nextIndex = nextPageList.currentPageIndex;
+            if (prevIndex != nextIndex) {
+              final currentPage = controller.page?.round() ?? controller.initialPage;
+              if (currentPage != nextIndex) {
+                controller.jumpToPage(nextIndex);
+              }
+            }
+          }
         }
 
-        final controller = _pageController;
-        if (controller == null || !controller.hasClients) return;
+        // ========== 新增：会话加载完成后处理初始消息 ==========
+        if (next.session != null && !_initialMessageHandled && mounted) {
+          final message = widget.initialMessage?.trim() ?? '';
+          final attachments = widget.initialAttachments ?? const <PendingAttachment>[];
+          final hasContent = message.isNotEmpty || attachments.isNotEmpty;
 
-        final prevIndex = previous?.pageList?.currentPageIndex;
-        final nextIndex = nextPageList.currentPageIndex;
-        if (prevIndex == nextIndex) return;
-
-        final currentPage = controller.page?.round() ?? controller.initialPage;
-        if (currentPage == nextIndex) return;
-
-        controller.jumpToPage(nextIndex);
+          if (hasContent) {
+            _initialMessageHandled = true;
+            // 异步发送不阻塞UI，添加错误捕获
+            ref.read(chatProvider(widget.fileName).notifier)
+                .sendMessage(message, attachments: attachments)
+                .catchError((e) {
+                  if (mounted) AppToast.show('发送失败：${e.toString()}');
+                });
+          }
+        }
       },
     );
 
+    // 原有微任务逻辑删除初始消息处理部分
     Future.microtask(() async {
       final notifier = ref.read(chatProvider(widget.fileName).notifier);
       await notifier.loadSession(initialRoundId: widget.initialRoundId);
@@ -86,20 +105,6 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
       final currentRoundId = state.currentRoundId;
       if (currentRoundId != null) {
         await notifier.ensureRoundLoaded(currentRoundId);
-      }
-
-      final message = widget.initialMessage?.trim() ?? '';
-      final attachments =
-          widget.initialAttachments ?? const <PendingAttachment>[];
-      final hasMessage = message.isNotEmpty;
-      final hasAttachments = attachments.isNotEmpty;
-
-      if (!_initialMessageHandled && (hasMessage || hasAttachments) && mounted) {
-        _initialMessageHandled = true;
-        await notifier.sendMessage(
-          message,
-          attachments: attachments,
-        );
       }
     });
   }

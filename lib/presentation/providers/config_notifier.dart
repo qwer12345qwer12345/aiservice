@@ -1,148 +1,120 @@
+// presentation/providers/config_notifier.dart
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/app_config.dart';
 import '../../core/models/app_config_store.dart';
 import '../../di/providers.dart';
 
+/// 使用纯声明式 StreamProvider - 所有状态来自 Drift 数据库流
+final configProvider = StreamProvider<AppConfig>((ref) {
+  final repository = ref.watch(configRepositoryProvider);
+  return repository.watchConfig();
+});
+
+final configProfilesProvider = StreamProvider<AppConfigStore>((ref) {
+  final repository = ref.watch(configRepositoryProvider);
+  return repository.watchConfigStore();
+});
+
+/// 直接使用 StreamProvider，不额外维护本地状态
+/// 所有配置操作直接调用 Repository 方法，写入数据库后流自动更新
 class ConfigNotifier extends StateNotifier<AsyncValue<AppConfig>> {
   final Ref ref;
 
   ConfigNotifier(this.ref) : super(const AsyncValue.loading()) {
-    _loadInitialConfig();
-  }
-
-  Future<void> _loadInitialConfig() async {
-    try {
-      final repository = ref.read(configRepositoryProvider);
-      final config = await repository.getConfig();
-      state = AsyncValue.data(config);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
-  }
-
-  Future<AppConfig> _fetchLatestConfig() async {
-    final repository = ref.read(configRepositoryProvider);
-    return await repository.getConfig();
-  }
-
-  Future<void> _reloadConfigWithoutLoading() async {
-    final config = await _fetchLatestConfig();
-    state = AsyncValue.data(config);
-  }
-
-  Future<void> updateApiKey(String apiKey) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.updateApiKey(apiKey);
-    await _reloadConfigWithoutLoading();
+    // 监听 StreamProvider，自动同步本地状态
+    ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
+      state = next;
+    });
   }
 
   Future<void> updateBaseUrl(String baseUrl) async {
     final repository = ref.read(configRepositoryProvider);
     await repository.updateBaseUrl(baseUrl);
-    await _reloadConfigWithoutLoading();
+    // 无需手动更新状态，流会自动推送
+  }
+
+  Future<void> updateApiKey(String apiKey) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.updateApiKey(apiKey);
   }
 
   Future<void> updateModelsPath(String modelsPath) async {
     final repository = ref.read(configRepositoryProvider);
     await repository.updateModelsPath(modelsPath);
-    await _reloadConfigWithoutLoading();
   }
 
   Future<void> updateChatPath(String chatPath) async {
     final repository = ref.read(configRepositoryProvider);
     await repository.updateChatPath(chatPath);
-    await _reloadConfigWithoutLoading();
   }
 
   Future<void> updateApiMode(String apiMode) async {
     final repository = ref.read(configRepositoryProvider);
     await repository.updateApiMode(apiMode);
-    await _reloadConfigWithoutLoading();
   }
 
   Future<void> updateSelectedModel(String? model) async {
     final repository = ref.read(configRepositoryProvider);
     await repository.updateSelectedModel(model);
-    await _reloadConfigWithoutLoading();
   }
 
   Future<void> saveFullConfig(AppConfig config) async {
     final repository = ref.read(configRepositoryProvider);
     await repository.saveFullConfig(config);
-    state = AsyncValue.data(config);
   }
 
   Future<void> saveAndRefreshModels(AppConfig config) async {
+    state = const AsyncValue.loading();
     final repository = ref.read(configRepositoryProvider);
-    state = AsyncValue.data(
-      config.copyWith(
-        availableModels: [],
-      ),
-    );
-    await repository.saveAndRefreshModels(config);
-    await _reloadConfigWithoutLoading();
+    await repository.saveConfig(config.copyWith(availableModels: []));
+    await repository.refreshModels();
   }
 
   Future<void> refreshModels() async {
     final repository = ref.read(configRepositoryProvider);
     await repository.refreshModels();
-    await _reloadConfigWithoutLoading();
   }
 }
 
-final configProvider =
-    StateNotifierProvider<ConfigNotifier, AsyncValue<AppConfig>>((ref) {
+final configNotifierProvider = Provider<ConfigNotifier>((ref) {
   return ConfigNotifier(ref);
 });
 
-class ConfigProfilesNotifier
-    extends StateNotifier<AsyncValue<AppConfigStore>> {
+class ConfigProfilesNotifier extends StateNotifier<AsyncValue<AppConfigStore>> {
   final Ref ref;
 
   ConfigProfilesNotifier(this.ref) : super(const AsyncValue.loading()) {
-    load();
+    ref.listen<AsyncValue<AppConfigStore>>(configProfilesProvider, (previous, next) {
+      state = next;
+    });
   }
 
   Future<void> load() async {
-    try {
-      final repository = ref.read(configRepositoryProvider);
-      final store = await repository.getConfigStore();
-      state = AsyncValue.data(store);
-
-      final config = await repository.getConfig();
-      ref.read(configProvider.notifier).state = AsyncValue.data(config);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+    // Stream 会自动同步，无需手动操作
   }
 
   Future<void> switchProfile(String profileId) async {
     final repository = ref.read(configRepositoryProvider);
     await repository.switchProfile(profileId);
-    await load();
   }
 
   Future<void> createProfile(String name) async {
     final repository = ref.read(configRepositoryProvider);
     await repository.createProfile(name);
-    await load();
   }
 
   Future<void> renameProfile(String profileId, String name) async {
     final repository = ref.read(configRepositoryProvider);
     await repository.renameProfile(profileId, name);
-    await load();
   }
 
   Future<void> deleteProfile(String profileId) async {
     final repository = ref.read(configRepositoryProvider);
     await repository.deleteProfile(profileId);
-    await load();
   }
 }
 
-final configProfilesProvider =
-    StateNotifierProvider<ConfigProfilesNotifier, AsyncValue<AppConfigStore>>(
-        (ref) {
+final configProfilesNotifierProvider = Provider<ConfigProfilesNotifier>((ref) {
   return ConfigProfilesNotifier(ref);
 });
