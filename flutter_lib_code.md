@@ -7179,6 +7179,7 @@ class ChatState with _$ChatState {
   const factory ChatState({
     Session? session,
     String? currentRoundId,
+    String? branchLeafRoundId,
     String? error,
     @Default(false) bool isLoading,
   }) = _ChatState;
@@ -7199,6 +7200,10 @@ extension ChatStateX on ChatState {
 
   ChatState copyWithCurrentRoundId(String roundId) {
     return copyWith(currentRoundId: roundId);
+  }
+
+  ChatState copyWithBranchLeafRoundId(String roundId) {
+    return copyWith(branchLeafRoundId: roundId);
   }
 
   ChatState copyWithError(String error) {
@@ -8030,13 +8035,13 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
   bool _isRouteVisible = false;
   ModalRoute<dynamic>? _route;
 
-    List<ChatRound> _buildVisibleRounds(ChatState state) {
+  List<ChatRound> _buildVisibleRounds(ChatState state) {
     final session = state.session;
-    final currentRoundId = state.currentRoundId;
-    if (session == null || currentRoundId == null) {
+    final branchLeafRoundId = state.branchLeafRoundId;
+    if (session == null || branchLeafRoundId == null) {
       return const <ChatRound>[];
     }
-    return BranchNavigator.getCurrentBranchPath(session, currentRoundId);
+    return BranchNavigator.getCurrentBranchPath(session, branchLeafRoundId);
   }
 
   int _resolveCurrentIndex(List<ChatRound> visibleRounds, String? currentRoundId) {
@@ -8099,12 +8104,6 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     Future.microtask(() async {
       final notifier = ref.read(chatProvider(widget.fileName).notifier);
       await notifier.loadSession(initialRoundId: widget.initialRoundId);
-
-      final state = ref.read(chatProvider(widget.fileName));
-      final currentRoundId = state.currentRoundId;
-      if (currentRoundId != null) {
-        await notifier.ensureRoundLoaded(currentRoundId);
-      }
     });
   }
 
@@ -8307,7 +8306,6 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
                                     notifier.changePage(index, round.id);
                                   }
 
-                                  await notifier.ensureRoundLoaded(round.id);
                                   await _syncSeenWithVisiblePage();
                                 },
                                 itemBuilder: (context, index) {
@@ -8688,7 +8686,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../core/models/session.dart';
 import '../../core/utils/time_format_utils.dart';
-import '../providers/global_streaming_provider.dart';
 import '../providers/home_session_list_provider.dart';
 import '../providers/session_list_notifier.dart';
 import '../widgets/common/app_page_scaffold.dart';
@@ -8945,7 +8942,7 @@ class _HomeErrorState extends StatelessWidget {
   }
 }
 
-class _SessionCard extends ConsumerStatefulWidget {
+class _SessionCard extends StatelessWidget {
   final HomeSessionItem item;
   final SessionListNotifier notifier;
   final Future<void> Function(Session session) onRename;
@@ -8958,50 +8955,6 @@ class _SessionCard extends ConsumerStatefulWidget {
     required this.onDelete,
   });
 
-  @override
-  ConsumerState<_SessionCard> createState() => _SessionCardState();
-}
-
-class _SessionCardState extends ConsumerState<_SessionCard> {
-  bool _requested = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _ensurePreviewLoaded();
-  }
-
-  @override
-  void didUpdateWidget(covariant _SessionCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    final oldItem = oldWidget.item;
-    final newItem = widget.item;
-    if (oldItem.previewRoundId != newItem.previewRoundId ||
-        oldItem.session.id != newItem.session.id) {
-      _requested = false;
-      _ensurePreviewLoaded();
-    }
-  }
-
-  void _ensurePreviewLoaded() {
-    final previewRoundId = widget.item.previewRoundId;
-    if (_requested || previewRoundId == null) return;
-
-    _requested = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-
-      final fileName = '${widget.item.session.id}.json';
-      final previewRound =
-          widget.item.session.rounds.firstWhere((r) => r.id == previewRoundId);
-
-      ref.read(globalStreamCacheProvider.notifier).ensureRoundLoaded(
-            fileName,
-            previewRound,
-          );
-    });
-  }
-
   Widget _buildMetaChip(String label, {IconData? icon}) {
     return Chip(
       avatar: icon == null ? null : Icon(icon, size: 16),
@@ -9012,24 +8965,18 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
 
   @override
   Widget build(BuildContext context) {
-    final session = widget.item.session;
+    final session = item.session;
     final fileName = '${session.id}.json';
-    final updatedAt = TimeFormatUtils.formatTimestamp(widget.item.updatedAt);
+    final updatedAt = TimeFormatUtils.formatTimestamp(item.updatedAt);
+    final previewRound = item.previewRound;
 
-    final previewRoundId = widget.item.previewRoundId;
-    final stream = previewRoundId == null
-        ? null
-        : ref.watch(
-            roundStreamProvider((fileName: fileName, roundId: previewRoundId)),
-          );
+    final aiPreview = previewRound == null
+        ? '（等待回复）'
+        : (previewRound.assistantContent?.trim().isNotEmpty ?? false)
+            ? previewRound.assistantContent!
+            : (previewRound.isIncomplete ? '正在生成...' : '（等待回复）');
 
-    final aiPreview = stream == null
-        ? '加载中...'
-        : stream.content.trim().isEmpty
-            ? (stream.isStreaming ? '正在生成...' : '（等待回复）')
-            : stream.content;
-
-    final isStreaming = stream?.isStreaming == true;
+    final isStreaming = previewRound?.isIncomplete == true;
 
     return Slidable(
       key: ValueKey(fileName),
@@ -9038,7 +8985,7 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
         extentRatio: 0.34,
         children: [
           CustomSlidableAction(
-            onPressed: (_) => widget.onRename(session),
+            onPressed: (_) => onRename(session),
             backgroundColor: Theme.of(context).colorScheme.secondary,
             child: const Icon(
               Icons.edit_outlined,
@@ -9046,7 +8993,7 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
             ),
           ),
           CustomSlidableAction(
-            onPressed: (_) => widget.onDelete(session),
+            onPressed: (_) => onDelete(session),
             backgroundColor: Theme.of(context).colorScheme.error,
             child: Icon(
               Icons.delete_outline,
@@ -9063,12 +9010,12 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
               MaterialPageRoute(
                 builder: (_) => ChatPage(
                   fileName: fileName,
-                  initialRoundId: widget.item.previewRoundId,
+                  initialRoundId: item.previewRound?.id,
                 ),
               ),
             );
             if (context.mounted) {
-              await widget.notifier.refresh();
+              await notifier.refresh();
             }
           },
           leading: const Icon(Icons.forum_outlined),
@@ -9085,7 +9032,7 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
                 const SizedBox(width: 8),
                 _buildMetaChip('生成中', icon: Icons.bolt_outlined),
               ],
-              if (widget.item.hasUnseen == true) ...[
+              if (item.hasUnseen == true) ...[
                 const SizedBox(width: 8),
                 _buildMetaChip('未查看', icon: Icons.mark_chat_unread_outlined),
               ],
@@ -9098,7 +9045,7 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
               children: [
                 _PreviewLine(
                   label: 'YOU',
-                  text: widget.item.userPreview,
+                  text: item.userPreview,
                 ),
                 const SizedBox(height: 4),
                 _PreviewLine(
@@ -9111,7 +9058,7 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
                   runSpacing: 8,
                   children: [
                     _buildMetaChip(
-                      '${widget.item.roundCount} 轮',
+                      '${item.roundCount} 轮',
                       icon: Icons.chat_bubble_outline,
                     ),
                     _buildMetaChip(
@@ -9693,7 +9640,6 @@ import '../../domain/services/chat_stream_accumulator.dart';
 import '../../domain/states/chat_state.dart';
 import '../models/pending_attachment.dart';
 import '../utils/page_utils.dart';
-import 'global_streaming_provider.dart';
 import '../../core/utils/id_generator.dart';
 import 'config_notifier.dart';
 
@@ -9721,10 +9667,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
     return session.rounds.any((r) => r.id == roundId);
   }
 
-  String? _resolveCurrentRoundId(Session session, String? preferredRoundId) {
-    if (preferredRoundId != null &&
-        _sessionContainsRound(session, preferredRoundId)) {
-      return preferredRoundId;
+  String? _resolveBranchLeafRoundId(Session session, String? preferredLeafRoundId) {
+    if (preferredLeafRoundId != null &&
+        _sessionContainsRound(session, preferredLeafRoundId)) {
+      return preferredLeafRoundId;
     }
 
     final leaves = BranchNavigator.getAllBranchLeaves(session);
@@ -9752,19 +9698,26 @@ class ChatNotifier extends StateNotifier<ChatState> {
         return;
       }
 
-      final resolvedRoundId = _resolveCurrentRoundId(
+      final resolvedBranchLeafRoundId = _resolveBranchLeafRoundId(
         session,
-        state.currentRoundId,
+        state.branchLeafRoundId,
       );
 
-            final visibleRounds = resolvedRoundId == null
+      final visibleRounds = resolvedBranchLeafRoundId == null
           ? <ChatRound>[]
-          : BranchNavigator.getCurrentBranchPath(session, resolvedRoundId);
+          : BranchNavigator.getCurrentBranchPath(session, resolvedBranchLeafRoundId);
+
+      String? resolvedCurrentRoundId = state.currentRoundId;
+      if (resolvedCurrentRoundId == null ||
+          !visibleRounds.any((round) => round.id == resolvedCurrentRoundId)) {
+        resolvedCurrentRoundId =
+            visibleRounds.isNotEmpty ? visibleRounds.last.id : null;
+      }
 
       int targetPageIndex = 0;
-      if (resolvedRoundId != null && visibleRounds.isNotEmpty) {
+      if (resolvedCurrentRoundId != null && visibleRounds.isNotEmpty) {
         final foundIndex =
-            visibleRounds.indexWhere((round) => round.id == resolvedRoundId);
+            visibleRounds.indexWhere((round) => round.id == resolvedCurrentRoundId);
         targetPageIndex = foundIndex >= 0 ? foundIndex : visibleRounds.length - 1;
       }
 
@@ -9772,36 +9725,20 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
       state = state.copyWith(
         session: session,
-        currentRoundId: resolvedRoundId,
+        currentRoundId: resolvedCurrentRoundId,
+        branchLeafRoundId: resolvedBranchLeafRoundId,
         error: null,
         isLoading: false,
       );
-
-      if (resolvedRoundId != null) {
-        final round =
-            _firstWhereOrNull(visibleRounds, (r) => r.id == resolvedRoundId);
-        if (round != null) {
-          _streamCache.ensureRoundLoaded(fileName, round);
-        }
-      }
     });
-  }
-
-  GlobalStreamCacheNotifier get _streamCache =>
-      ref.read(globalStreamCacheProvider.notifier);
-
-
-  Future<void> ensureRoundLoaded(String roundId) async {
-    final session = state.session;
-    if (session == null) return;
-    final round = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
-    if (round == null) return;
-    _streamCache.ensureRoundLoaded(fileName, round);
   }
 
   Future<void> loadSession({String? initialRoundId}) async {
     if (initialRoundId != null) {
-      state = state.copyWith(currentRoundId: initialRoundId);
+      state = state.copyWith(
+        currentRoundId: initialRoundId,
+        branchLeafRoundId: initialRoundId,
+      );
     }
   }
 
@@ -9883,12 +9820,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
       );
 
       await repository.appendRound(fileName, newRound);
-      state = state.copyWith(currentRoundId: newRound.id);
-
-      _streamCache.setRoundStream(
-        fileName,
-        newRound.id,
-        const StreamStatus(content: '', reasoning: '', isStreaming: true),
+      state = state.copyWith(
+        currentRoundId: newRound.id,
+        branchLeafRoundId: newRound.id,
       );
 
       _handleStreamTask(newRound, session, config);
@@ -9932,14 +9866,11 @@ class ChatNotifier extends StateNotifier<ChatState> {
         isIncomplete: true,
         hasUnseenUpdate: false,
       );
-
+      
       await repository.appendRound(fileName, newRound);
-      state = state.copyWith(currentRoundId: newRound.id);
-
-      _streamCache.setRoundStream(
-        fileName,
-        newRound.id,
-        const StreamStatus(content: '', reasoning: '', isStreaming: true),
+      state = state.copyWith(
+        currentRoundId: newRound.id,
+        branchLeafRoundId: newRound.id,
       );
 
       _handleStreamTask(newRound, session, config);
@@ -10003,12 +9934,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
       );
 
       await repository.appendRound(fileName, newRound);
-      state = state.copyWith(currentRoundId: newRound.id);
-
-      _streamCache.setRoundStream(
-        fileName,
-        newRound.id,
-        const StreamStatus(content: '', reasoning: '', isStreaming: true),
+      state = state.copyWith(
+        currentRoundId: newRound.id,
+        branchLeafRoundId: newRound.id,
       );
 
       _handleStreamTask(newRound, session, config);
@@ -10132,8 +10060,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
     );
 
     await repository.updateRound(fileName, roundId, updatedRound);
-
-    _streamCache.updateRoundStream(fileName, roundId, isStreaming: false);
   }
 
   void stopGeneration() {
@@ -10163,12 +10089,13 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
     final newRoundId = BranchNavigator.switchBranch(session, targetRoundId);
 
-    state = state.copyWithCurrentRoundId(newRoundId);
-
-    await ensureRoundLoaded(newRoundId);
+    state = state.copyWith(
+      currentRoundId: newRoundId,
+      branchLeafRoundId: newRoundId,
+    );
   }
 
-    void changePage(int pageIndex, String roundId) {
+  void changePage(int pageIndex, String roundId) {
     final session = state.session;
     if (session == null) return;
 
@@ -10180,8 +10107,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
     state = state.copyWith(
       currentRoundId: roundId,
     );
-
-    ensureRoundLoaded(roundId);
   }
 
   Future<void> markRoundSeen(String roundId) async {
@@ -10518,10 +10443,9 @@ final roundStreamProvider =
 
 ## File: presentation/providers/home_session_list_provider.dart
 ```dart
-// presentation/providers/home_session_list_provider.dart
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/session.dart';
+import '../../core/models/chat_round.dart';
 import 'session_list_notifier.dart';
 
 class HomeSessionItem {
@@ -10530,7 +10454,7 @@ class HomeSessionItem {
   final String userPreview;
   final int roundCount;
   final int updatedAt;
-  final String? previewRoundId;
+  final ChatRound? previewRound;
 
   const HomeSessionItem({
     required this.session,
@@ -10538,42 +10462,38 @@ class HomeSessionItem {
     required this.userPreview,
     required this.roundCount,
     required this.updatedAt,
-    required this.previewRoundId,
+    required this.previewRound,
   });
 }
 
-// 简化：直接监听 sessionListProvider，无需额外处理
 final homeSessionListProvider = Provider<AsyncValue<List<HomeSessionItem>>>((ref) {
   final sessionsAsync = ref.watch(sessionListProvider);
-  
+
   return sessionsAsync.whenData((sessions) {
     final items = sessions.map((session) {
       final hasUnseen = session.rounds.any((r) => r.hasUnseenUpdate);
       final roundCount = session.rounds.length;
-      
-      // 直接获取最后一个 round 作为预览
-      final previewRound = session.rounds.isEmpty 
-          ? null 
+
+      final previewRound = session.rounds.isEmpty
+          ? null
           : session.rounds.last;
-      
-      final previewRoundId = previewRound?.id;
-      
+
       final userPreview = previewRound == null
           ? '点击开始新的对话'
           : previewRound.userContent.trim().isEmpty
               ? '（空输入）'
               : previewRound.userContent.trim();
-      
+
       return HomeSessionItem(
         session: session,
         hasUnseen: hasUnseen,
         userPreview: userPreview,
         roundCount: roundCount,
         updatedAt: session.updatedAt,
-        previewRoundId: previewRoundId,
+        previewRound: previewRound,
       );
     }).toList();
-    
+
     items.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     return items;
   });

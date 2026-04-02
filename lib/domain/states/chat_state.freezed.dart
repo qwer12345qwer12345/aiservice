@@ -200,6 +200,7 @@ abstract class _StreamStatus implements StreamStatus {
 mixin _$ChatState {
   Session? get session => throw _privateConstructorUsedError;
   String? get currentRoundId => throw _privateConstructorUsedError;
+  String? get branchLeafRoundId => throw _privateConstructorUsedError;
   String? get error => throw _privateConstructorUsedError;
   bool get isLoading => throw _privateConstructorUsedError;
 
@@ -218,6 +219,7 @@ abstract class $ChatStateCopyWith<$Res> {
   $Res call({
     Session? session,
     String? currentRoundId,
+    String? branchLeafRoundId,
     String? error,
     bool isLoading,
   });
@@ -242,6 +244,7 @@ class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
   $Res call({
     Object? session = freezed,
     Object? currentRoundId = freezed,
+    Object? branchLeafRoundId = freezed,
     Object? error = freezed,
     Object? isLoading = null,
   }) {
@@ -254,6 +257,10 @@ class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
             currentRoundId: freezed == currentRoundId
                 ? _value.currentRoundId
                 : currentRoundId // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            branchLeafRoundId: freezed == branchLeafRoundId
+                ? _value.branchLeafRoundId
+                : branchLeafRoundId // ignore: cast_nullable_to_non_nullable
                       as String?,
             error: freezed == error
                 ? _value.error
@@ -295,6 +302,7 @@ abstract class _$$ChatStateImplCopyWith<$Res>
   $Res call({
     Session? session,
     String? currentRoundId,
+    String? branchLeafRoundId,
     String? error,
     bool isLoading,
   });
@@ -319,6 +327,7 @@ class __$$ChatStateImplCopyWithImpl<$Res>
   $Res call({
     Object? session = freezed,
     Object? currentRoundId = freezed,
+    Object? branchLeafRoundId = freezed,
     Object? error = freezed,
     Object? isLoading = null,
   }) {
@@ -331,6 +340,10 @@ class __$$ChatStateImplCopyWithImpl<$Res>
         currentRoundId: freezed == currentRoundId
             ? _value.currentRoundId
             : currentRoundId // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        branchLeafRoundId: freezed == branchLeafRoundId
+            ? _value.branchLeafRoundId
+            : branchLeafRoundId // ignore: cast_nullable_to_non_nullable
                   as String?,
         error: freezed == error
             ? _value.error
@@ -351,6 +364,7 @@ class _$ChatStateImpl implements _ChatState {
   const _$ChatStateImpl({
     this.session,
     this.currentRoundId,
+    this.branchLeafRoundId,
     this.error,
     this.isLoading = false,
   });
@@ -360,6 +374,8 @@ class _$ChatStateImpl implements _ChatState {
   @override
   final String? currentRoundId;
   @override
+  final String? branchLeafRoundId;
+  @override
   final String? error;
   @override
   @JsonKey()
@@ -367,7 +383,7 @@ class _$ChatStateImpl implements _ChatState {
 
   @override
   String toString() {
-    return 'ChatState(session: $session, currentRoundId: $currentRoundId, error: $error, isLoading: $isLoading)';
+    return 'ChatState(session: $session, currentRoundId: $currentRoundId, branchLeafRoundId: $branchLeafRoundId, error: $error, isLoading: $isLoading)';
   }
 
   @override
@@ -378,14 +394,22 @@ class _$ChatStateImpl implements _ChatState {
             (identical(other.session, session) || other.session == session) &&
             (identical(other.currentRoundId, currentRoundId) ||
                 other.currentRoundId == currentRoundId) &&
+            (identical(other.branchLeafRoundId, branchLeafRoundId) ||
+                other.branchLeafRoundId == branchLeafRoundId) &&
             (identical(other.error, error) || other.error == error) &&
             (identical(other.isLoading, isLoading) ||
                 other.isLoading == isLoading));
   }
 
   @override
-  int get hashCode =>
-      Object.hash(runtimeType, session, currentRoundId, error, isLoading);
+  int get hashCode => Object.hash(
+    runtimeType,
+    session,
+    currentRoundId,
+    branchLeafRoundId,
+    error,
+    isLoading,
+  );
 
   /// Create a copy of ChatState
   /// with the given fields replaced by the non-null parameter values.
@@ -400,6 +424,7 @@ abstract class _ChatState implements ChatState {
   const factory _ChatState({
     final Session? session,
     final String? currentRoundId,
+    final String? branchLeafRoundId,
     final String? error,
     final bool isLoading,
   }) = _$ChatStateImpl;
@@ -408,6 +433,8 @@ abstract class _ChatState implements ChatState {
   Session? get session;
   @override
   String? get currentRoundId;
+  @override
+  String? get branchLeafRoundId;
   @override
   String? get error;
   @override

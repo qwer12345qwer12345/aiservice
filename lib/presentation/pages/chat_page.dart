@@ -44,13 +44,13 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
   bool _isRouteVisible = false;
   ModalRoute<dynamic>? _route;
 
-    List<ChatRound> _buildVisibleRounds(ChatState state) {
+  List<ChatRound> _buildVisibleRounds(ChatState state) {
     final session = state.session;
-    final currentRoundId = state.currentRoundId;
-    if (session == null || currentRoundId == null) {
+    final branchLeafRoundId = state.branchLeafRoundId;
+    if (session == null || branchLeafRoundId == null) {
       return const <ChatRound>[];
     }
-    return BranchNavigator.getCurrentBranchPath(session, currentRoundId);
+    return BranchNavigator.getCurrentBranchPath(session, branchLeafRoundId);
   }
 
   int _resolveCurrentIndex(List<ChatRound> visibleRounds, String? currentRoundId) {
@@ -113,12 +113,6 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     Future.microtask(() async {
       final notifier = ref.read(chatProvider(widget.fileName).notifier);
       await notifier.loadSession(initialRoundId: widget.initialRoundId);
-
-      final state = ref.read(chatProvider(widget.fileName));
-      final currentRoundId = state.currentRoundId;
-      if (currentRoundId != null) {
-        await notifier.ensureRoundLoaded(currentRoundId);
-      }
     });
   }
 
@@ -321,7 +315,6 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
                                     notifier.changePage(index, round.id);
                                   }
 
-                                  await notifier.ensureRoundLoaded(round.id);
                                   await _syncSeenWithVisiblePage();
                                 },
                                 itemBuilder: (context, index) {

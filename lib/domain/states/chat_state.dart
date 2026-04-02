@@ -17,6 +17,7 @@ class ChatState with _$ChatState {
   const factory ChatState({
     Session? session,
     String? currentRoundId,
+    String? branchLeafRoundId,
     String? error,
     @Default(false) bool isLoading,
   }) = _ChatState;
@@ -37,6 +38,10 @@ extension ChatStateX on ChatState {
 
   ChatState copyWithCurrentRoundId(String roundId) {
     return copyWith(currentRoundId: roundId);
+  }
+
+  ChatState copyWithBranchLeafRoundId(String roundId) {
+    return copyWith(branchLeafRoundId: roundId);
   }
 
   ChatState copyWithError(String error) {

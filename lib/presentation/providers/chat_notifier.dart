@@ -15,7 +15,6 @@ import '../../domain/services/chat_stream_accumulator.dart';
 import '../../domain/states/chat_state.dart';
 import '../models/pending_attachment.dart';
 import '../utils/page_utils.dart';
-import 'global_streaming_provider.dart';
 import '../../core/utils/id_generator.dart';
 import 'config_notifier.dart';
 
@@ -43,10 +42,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
     return session.rounds.any((r) => r.id == roundId);
   }
 
-  String? _resolveCurrentRoundId(Session session, String? preferredRoundId) {
-    if (preferredRoundId != null &&
-        _sessionContainsRound(session, preferredRoundId)) {
-      return preferredRoundId;
+  String? _resolveBranchLeafRoundId(Session session, String? preferredLeafRoundId) {
+    if (preferredLeafRoundId != null &&
+        _sessionContainsRound(session, preferredLeafRoundId)) {
+      return preferredLeafRoundId;
     }
 
     final leaves = BranchNavigator.getAllBranchLeaves(session);
@@ -74,19 +73,26 @@ class ChatNotifier extends StateNotifier<ChatState> {
         return;
       }
 
-      final resolvedRoundId = _resolveCurrentRoundId(
+      final resolvedBranchLeafRoundId = _resolveBranchLeafRoundId(
         session,
-        state.currentRoundId,
+        state.branchLeafRoundId,
       );
 
-            final visibleRounds = resolvedRoundId == null
+      final visibleRounds = resolvedBranchLeafRoundId == null
           ? <ChatRound>[]
-          : BranchNavigator.getCurrentBranchPath(session, resolvedRoundId);
+          : BranchNavigator.getCurrentBranchPath(session, resolvedBranchLeafRoundId);
+
+      String? resolvedCurrentRoundId = state.currentRoundId;
+      if (resolvedCurrentRoundId == null ||
+          !visibleRounds.any((round) => round.id == resolvedCurrentRoundId)) {
+        resolvedCurrentRoundId =
+            visibleRounds.isNotEmpty ? visibleRounds.last.id : null;
+      }
 
       int targetPageIndex = 0;
-      if (resolvedRoundId != null && visibleRounds.isNotEmpty) {
+      if (resolvedCurrentRoundId != null && visibleRounds.isNotEmpty) {
         final foundIndex =
-            visibleRounds.indexWhere((round) => round.id == resolvedRoundId);
+            visibleRounds.indexWhere((round) => round.id == resolvedCurrentRoundId);
         targetPageIndex = foundIndex >= 0 ? foundIndex : visibleRounds.length - 1;
       }
 
@@ -94,36 +100,20 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
       state = state.copyWith(
         session: session,
-        currentRoundId: resolvedRoundId,
+        currentRoundId: resolvedCurrentRoundId,
+        branchLeafRoundId: resolvedBranchLeafRoundId,
         error: null,
         isLoading: false,
       );
-
-      if (resolvedRoundId != null) {
-        final round =
-            _firstWhereOrNull(visibleRounds, (r) => r.id == resolvedRoundId);
-        if (round != null) {
-          _streamCache.ensureRoundLoaded(fileName, round);
-        }
-      }
     });
-  }
-
-  GlobalStreamCacheNotifier get _streamCache =>
-      ref.read(globalStreamCacheProvider.notifier);
-
-
-  Future<void> ensureRoundLoaded(String roundId) async {
-    final session = state.session;
-    if (session == null) return;
-    final round = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
-    if (round == null) return;
-    _streamCache.ensureRoundLoaded(fileName, round);
   }
 
   Future<void> loadSession({String? initialRoundId}) async {
     if (initialRoundId != null) {
-      state = state.copyWith(currentRoundId: initialRoundId);
+      state = state.copyWith(
+        currentRoundId: initialRoundId,
+        branchLeafRoundId: initialRoundId,
+      );
     }
   }
 
@@ -205,12 +195,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
       );
 
       await repository.appendRound(fileName, newRound);
-      state = state.copyWith(currentRoundId: newRound.id);
-
-      _streamCache.setRoundStream(
-        fileName,
-        newRound.id,
-        const StreamStatus(content: '', reasoning: '', isStreaming: true),
+      state = state.copyWith(
+        currentRoundId: newRound.id,
+        branchLeafRoundId: newRound.id,
       );
 
       _handleStreamTask(newRound, session, config);
@@ -254,14 +241,11 @@ class ChatNotifier extends StateNotifier<ChatState> {
         isIncomplete: true,
         hasUnseenUpdate: false,
       );
-
+      
       await repository.appendRound(fileName, newRound);
-      state = state.copyWith(currentRoundId: newRound.id);
-
-      _streamCache.setRoundStream(
-        fileName,
-        newRound.id,
-        const StreamStatus(content: '', reasoning: '', isStreaming: true),
+      state = state.copyWith(
+        currentRoundId: newRound.id,
+        branchLeafRoundId: newRound.id,
       );
 
       _handleStreamTask(newRound, session, config);
@@ -325,12 +309,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
       );
 
       await repository.appendRound(fileName, newRound);
-      state = state.copyWith(currentRoundId: newRound.id);
-
-      _streamCache.setRoundStream(
-        fileName,
-        newRound.id,
-        const StreamStatus(content: '', reasoning: '', isStreaming: true),
+      state = state.copyWith(
+        currentRoundId: newRound.id,
+        branchLeafRoundId: newRound.id,
       );
 
       _handleStreamTask(newRound, session, config);
@@ -454,8 +435,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
     );
 
     await repository.updateRound(fileName, roundId, updatedRound);
-
-    _streamCache.updateRoundStream(fileName, roundId, isStreaming: false);
   }
 
   void stopGeneration() {
@@ -485,12 +464,13 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
     final newRoundId = BranchNavigator.switchBranch(session, targetRoundId);
 
-    state = state.copyWithCurrentRoundId(newRoundId);
-
-    await ensureRoundLoaded(newRoundId);
+    state = state.copyWith(
+      currentRoundId: newRoundId,
+      branchLeafRoundId: newRoundId,
+    );
   }
 
-    void changePage(int pageIndex, String roundId) {
+  void changePage(int pageIndex, String roundId) {
     final session = state.session;
     if (session == null) return;
 
@@ -502,8 +482,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
     state = state.copyWith(
       currentRoundId: roundId,
     );
-
-    ensureRoundLoaded(roundId);
   }
 
   Future<void> markRoundSeen(String roundId) async {

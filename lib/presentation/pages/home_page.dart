@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../core/models/session.dart';
 import '../../core/utils/time_format_utils.dart';
-import '../providers/global_streaming_provider.dart';
 import '../providers/home_session_list_provider.dart';
 import '../providers/session_list_notifier.dart';
 import '../widgets/common/app_page_scaffold.dart';
@@ -260,7 +259,7 @@ class _HomeErrorState extends StatelessWidget {
   }
 }
 
-class _SessionCard extends ConsumerStatefulWidget {
+class _SessionCard extends StatelessWidget {
   final HomeSessionItem item;
   final SessionListNotifier notifier;
   final Future<void> Function(Session session) onRename;
@@ -273,50 +272,6 @@ class _SessionCard extends ConsumerStatefulWidget {
     required this.onDelete,
   });
 
-  @override
-  ConsumerState<_SessionCard> createState() => _SessionCardState();
-}
-
-class _SessionCardState extends ConsumerState<_SessionCard> {
-  bool _requested = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _ensurePreviewLoaded();
-  }
-
-  @override
-  void didUpdateWidget(covariant _SessionCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    final oldItem = oldWidget.item;
-    final newItem = widget.item;
-    if (oldItem.previewRoundId != newItem.previewRoundId ||
-        oldItem.session.id != newItem.session.id) {
-      _requested = false;
-      _ensurePreviewLoaded();
-    }
-  }
-
-  void _ensurePreviewLoaded() {
-    final previewRoundId = widget.item.previewRoundId;
-    if (_requested || previewRoundId == null) return;
-
-    _requested = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-
-      final fileName = '${widget.item.session.id}.json';
-      final previewRound =
-          widget.item.session.rounds.firstWhere((r) => r.id == previewRoundId);
-
-      ref.read(globalStreamCacheProvider.notifier).ensureRoundLoaded(
-            fileName,
-            previewRound,
-          );
-    });
-  }
-
   Widget _buildMetaChip(String label, {IconData? icon}) {
     return Chip(
       avatar: icon == null ? null : Icon(icon, size: 16),
@@ -327,24 +282,18 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
 
   @override
   Widget build(BuildContext context) {
-    final session = widget.item.session;
+    final session = item.session;
     final fileName = '${session.id}.json';
-    final updatedAt = TimeFormatUtils.formatTimestamp(widget.item.updatedAt);
+    final updatedAt = TimeFormatUtils.formatTimestamp(item.updatedAt);
+    final previewRound = item.previewRound;
 
-    final previewRoundId = widget.item.previewRoundId;
-    final stream = previewRoundId == null
-        ? null
-        : ref.watch(
-            roundStreamProvider((fileName: fileName, roundId: previewRoundId)),
-          );
+    final aiPreview = previewRound == null
+        ? '（等待回复）'
+        : (previewRound.assistantContent?.trim().isNotEmpty ?? false)
+            ? previewRound.assistantContent!
+            : (previewRound.isIncomplete ? '正在生成...' : '（等待回复）');
 
-    final aiPreview = stream == null
-        ? '加载中...'
-        : stream.content.trim().isEmpty
-            ? (stream.isStreaming ? '正在生成...' : '（等待回复）')
-            : stream.content;
-
-    final isStreaming = stream?.isStreaming == true;
+    final isStreaming = previewRound?.isIncomplete == true;
 
     return Slidable(
       key: ValueKey(fileName),
@@ -353,7 +302,7 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
         extentRatio: 0.34,
         children: [
           CustomSlidableAction(
-            onPressed: (_) => widget.onRename(session),
+            onPressed: (_) => onRename(session),
             backgroundColor: Theme.of(context).colorScheme.secondary,
             child: const Icon(
               Icons.edit_outlined,
@@ -361,7 +310,7 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
             ),
           ),
           CustomSlidableAction(
-            onPressed: (_) => widget.onDelete(session),
+            onPressed: (_) => onDelete(session),
             backgroundColor: Theme.of(context).colorScheme.error,
             child: Icon(
               Icons.delete_outline,
@@ -378,12 +327,12 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
               MaterialPageRoute(
                 builder: (_) => ChatPage(
                   fileName: fileName,
-                  initialRoundId: widget.item.previewRoundId,
+                  initialRoundId: item.previewRound?.id,
                 ),
               ),
             );
             if (context.mounted) {
-              await widget.notifier.refresh();
+              await notifier.refresh();
             }
           },
           leading: const Icon(Icons.forum_outlined),
@@ -400,7 +349,7 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
                 const SizedBox(width: 8),
                 _buildMetaChip('生成中', icon: Icons.bolt_outlined),
               ],
-              if (widget.item.hasUnseen == true) ...[
+              if (item.hasUnseen == true) ...[
                 const SizedBox(width: 8),
                 _buildMetaChip('未查看', icon: Icons.mark_chat_unread_outlined),
               ],
@@ -413,7 +362,7 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
               children: [
                 _PreviewLine(
                   label: 'YOU',
-                  text: widget.item.userPreview,
+                  text: item.userPreview,
                 ),
                 const SizedBox(height: 4),
                 _PreviewLine(
@@ -426,7 +375,7 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
                   runSpacing: 8,
                   children: [
                     _buildMetaChip(
-                      '${widget.item.roundCount} 轮',
+                      '${item.roundCount} 轮',
                       icon: Icons.chat_bubble_outline,
                     ),
                     _buildMetaChip(
