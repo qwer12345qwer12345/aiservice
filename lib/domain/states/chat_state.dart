@@ -1,6 +1,5 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import '../../core/models/session.dart';
-import '../models/chat_page.dart';
 
 part 'chat_state.freezed.dart';
 
@@ -18,7 +17,6 @@ class ChatState with _$ChatState {
   const factory ChatState({
     Session? session,
     String? currentRoundId,
-    ChatPageList? pageList,
     String? error,
     @Default(false) bool isLoading,
   }) = _ChatState;

@@ -200,7 +200,6 @@ abstract class _StreamStatus implements StreamStatus {
 mixin _$ChatState {
   Session? get session => throw _privateConstructorUsedError;
   String? get currentRoundId => throw _privateConstructorUsedError;
-  ChatPageList? get pageList => throw _privateConstructorUsedError;
   String? get error => throw _privateConstructorUsedError;
   bool get isLoading => throw _privateConstructorUsedError;
 
@@ -219,13 +218,11 @@ abstract class $ChatStateCopyWith<$Res> {
   $Res call({
     Session? session,
     String? currentRoundId,
-    ChatPageList? pageList,
     String? error,
     bool isLoading,
   });
 
   $SessionCopyWith<$Res>? get session;
-  $ChatPageListCopyWith<$Res>? get pageList;
 }
 
 /// @nodoc
@@ -245,7 +242,6 @@ class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
   $Res call({
     Object? session = freezed,
     Object? currentRoundId = freezed,
-    Object? pageList = freezed,
     Object? error = freezed,
     Object? isLoading = null,
   }) {
@@ -259,10 +255,6 @@ class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
                 ? _value.currentRoundId
                 : currentRoundId // ignore: cast_nullable_to_non_nullable
                       as String?,
-            pageList: freezed == pageList
-                ? _value.pageList
-                : pageList // ignore: cast_nullable_to_non_nullable
-                      as ChatPageList?,
             error: freezed == error
                 ? _value.error
                 : error // ignore: cast_nullable_to_non_nullable
@@ -289,20 +281,6 @@ class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
       return _then(_value.copyWith(session: value) as $Val);
     });
   }
-
-  /// Create a copy of ChatState
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @pragma('vm:prefer-inline')
-  $ChatPageListCopyWith<$Res>? get pageList {
-    if (_value.pageList == null) {
-      return null;
-    }
-
-    return $ChatPageListCopyWith<$Res>(_value.pageList!, (value) {
-      return _then(_value.copyWith(pageList: value) as $Val);
-    });
-  }
 }
 
 /// @nodoc
@@ -317,15 +295,12 @@ abstract class _$$ChatStateImplCopyWith<$Res>
   $Res call({
     Session? session,
     String? currentRoundId,
-    ChatPageList? pageList,
     String? error,
     bool isLoading,
   });
 
   @override
   $SessionCopyWith<$Res>? get session;
-  @override
-  $ChatPageListCopyWith<$Res>? get pageList;
 }
 
 /// @nodoc
@@ -344,7 +319,6 @@ class __$$ChatStateImplCopyWithImpl<$Res>
   $Res call({
     Object? session = freezed,
     Object? currentRoundId = freezed,
-    Object? pageList = freezed,
     Object? error = freezed,
     Object? isLoading = null,
   }) {
@@ -358,10 +332,6 @@ class __$$ChatStateImplCopyWithImpl<$Res>
             ? _value.currentRoundId
             : currentRoundId // ignore: cast_nullable_to_non_nullable
                   as String?,
-        pageList: freezed == pageList
-            ? _value.pageList
-            : pageList // ignore: cast_nullable_to_non_nullable
-                  as ChatPageList?,
         error: freezed == error
             ? _value.error
             : error // ignore: cast_nullable_to_non_nullable
@@ -381,7 +351,6 @@ class _$ChatStateImpl implements _ChatState {
   const _$ChatStateImpl({
     this.session,
     this.currentRoundId,
-    this.pageList,
     this.error,
     this.isLoading = false,
   });
@@ -391,8 +360,6 @@ class _$ChatStateImpl implements _ChatState {
   @override
   final String? currentRoundId;
   @override
-  final ChatPageList? pageList;
-  @override
   final String? error;
   @override
   @JsonKey()
@@ -400,7 +367,7 @@ class _$ChatStateImpl implements _ChatState {
 
   @override
   String toString() {
-    return 'ChatState(session: $session, currentRoundId: $currentRoundId, pageList: $pageList, error: $error, isLoading: $isLoading)';
+    return 'ChatState(session: $session, currentRoundId: $currentRoundId, error: $error, isLoading: $isLoading)';
   }
 
   @override
@@ -411,22 +378,14 @@ class _$ChatStateImpl implements _ChatState {
             (identical(other.session, session) || other.session == session) &&
             (identical(other.currentRoundId, currentRoundId) ||
                 other.currentRoundId == currentRoundId) &&
-            (identical(other.pageList, pageList) ||
-                other.pageList == pageList) &&
             (identical(other.error, error) || other.error == error) &&
             (identical(other.isLoading, isLoading) ||
                 other.isLoading == isLoading));
   }
 
   @override
-  int get hashCode => Object.hash(
-    runtimeType,
-    session,
-    currentRoundId,
-    pageList,
-    error,
-    isLoading,
-  );
+  int get hashCode =>
+      Object.hash(runtimeType, session, currentRoundId, error, isLoading);
 
   /// Create a copy of ChatState
   /// with the given fields replaced by the non-null parameter values.
@@ -441,7 +400,6 @@ abstract class _ChatState implements ChatState {
   const factory _ChatState({
     final Session? session,
     final String? currentRoundId,
-    final ChatPageList? pageList,
     final String? error,
     final bool isLoading,
   }) = _$ChatStateImpl;
@@ -450,8 +408,6 @@ abstract class _ChatState implements ChatState {
   Session? get session;
   @override
   String? get currentRoundId;
-  @override
-  ChatPageList? get pageList;
   @override
   String? get error;
   @override

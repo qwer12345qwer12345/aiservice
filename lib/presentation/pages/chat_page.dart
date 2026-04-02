@@ -7,7 +7,6 @@ import '../../core/utils/time_format_utils.dart';
 import '../../domain/states/chat_state.dart';
 import '../models/pending_attachment.dart';
 import '../providers/chat_notifier.dart';
-import '../providers/global_streaming_provider.dart';
 import '../providers/input_draft_provider.dart';
 import '../widgets/attachment_list.dart';
 import '../widgets/input_bar.dart';
@@ -18,7 +17,7 @@ import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_toast.dart';
 import 'branch_tree_page.dart';
 import '../utils/page_utils.dart';
-import '../../domain/models/chat_page.dart';
+import '../../domain/services/branch_navigator.dart';
 class ChatPage extends ConsumerStatefulWidget {
   final String fileName;
   final String? initialRoundId;
@@ -45,6 +44,22 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
   bool _isRouteVisible = false;
   ModalRoute<dynamic>? _route;
 
+    List<ChatRound> _buildVisibleRounds(ChatState state) {
+    final session = state.session;
+    final currentRoundId = state.currentRoundId;
+    if (session == null || currentRoundId == null) {
+      return const <ChatRound>[];
+    }
+    return BranchNavigator.getCurrentBranchPath(session, currentRoundId);
+  }
+
+  int _resolveCurrentIndex(List<ChatRound> visibleRounds, String? currentRoundId) {
+    if (visibleRounds.isEmpty || currentRoundId == null) return 0;
+    final index = visibleRounds.indexWhere((round) => round.id == currentRoundId);
+    if (index < 0) return visibleRounds.length - 1;
+    return index;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -53,11 +68,13 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
       chatProvider(widget.fileName),
       (previous, next) {
         // 原有分页逻辑保持不变
-        final nextPageList = next.pageList;
-        if (nextPageList != null && nextPageList.pages.isNotEmpty) {
+        final nextVisibleRounds = _buildVisibleRounds(next);
+        final nextIndex =
+            _resolveCurrentIndex(nextVisibleRounds, next.currentRoundId);
+
+        if (nextVisibleRounds.isNotEmpty) {
           if (_pageController == null) {
-            final initialIndex = nextPageList.currentPageIndex;
-            _pageController = PageController(initialPage: initialIndex);
+            _pageController = PageController(initialPage: nextIndex);
             if (mounted) {
               setState(() {});
             }
@@ -66,13 +83,9 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
 
           final controller = _pageController!;
           if (controller.hasClients) {
-            final prevIndex = previous?.pageList?.currentPageIndex;
-            final nextIndex = nextPageList.currentPageIndex;
-            if (prevIndex != nextIndex) {
-              final currentPage = controller.page?.round() ?? controller.initialPage;
-              if (currentPage != nextIndex) {
-                controller.jumpToPage(nextIndex);
-              }
+            final currentPage = controller.page?.round() ?? controller.initialPage;
+            if (currentPage != nextIndex) {
+              controller.jumpToPage(nextIndex);
             }
           }
         }
@@ -190,15 +203,16 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     if (controller == null || !controller.hasClients) return;
 
     final state = ref.read(chatProvider(widget.fileName));
-    final pageList = state.pageList;
-    if (pageList == null || pageList.pages.isEmpty) return;
+        final visibleRounds = _buildVisibleRounds(state);
+    if (visibleRounds.isEmpty) return;
 
+    final currentIndex = _resolveCurrentIndex(visibleRounds, state.currentRoundId);
     final currentPage = controller.page;
-    final index = currentPage != null 
-        ? currentPage.round().clamp(0, pageList.pages.length - 1)
-        : pageList.currentPageIndex;
-        
-    final round = pageList.pages[index].round;
+    final index = currentPage != null
+        ? currentPage.round().clamp(0, visibleRounds.length - 1)
+        : currentIndex;
+
+    final round = visibleRounds[index];
     if (!round.hasUnseenUpdate) return;
 
     _isMarkingSeen = true;
@@ -217,9 +231,14 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     final notifier = ref.read(chatProvider(widget.fileName).notifier);
     final editSourceRoundId = ref.watch(globalEditSourceRoundIdProvider);
     final isEditMode = editSourceRoundId != null;
-    final hasPages = state.pageList != null && state.pageList!.pages.isNotEmpty;
+    final visibleRounds = _buildVisibleRounds(state);
+    final currentIndex = _resolveCurrentIndex(visibleRounds, state.currentRoundId);
+    final hasPages = visibleRounds.isNotEmpty;
     final textTheme = Theme.of(context).textTheme;
-    final currentRound = state.pageList?.currentPage?.round;
+    final currentRound =
+        hasPages && PageUtils.isValidIndex(currentIndex, visibleRounds.length)
+            ? visibleRounds[currentIndex]
+            : null;
     final currentIsStreaming = currentRound?.isIncomplete == true;
 
     return AppPageScaffold(
@@ -250,13 +269,13 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
       ),
       body: Column(
         children: [
-          if (state.pageList != null && state.pageList!.totalPages > 0)
+                    if (hasPages)
             _PaginationBar(
-              currentIndex: state.pageList!.currentPageIndex,  // ✅ 直接传递 0-based
-              totalPages: state.pageList!.totalPages,
+              currentIndex: currentIndex,
+              totalPages: visibleRounds.length,
               onPrev: isEditMode
                   ? null
-                  : state.pageList!.currentPageIndex > 0
+                  : currentIndex > 0
                       ? () => _pageController?.previousPage(
                             duration: const Duration(milliseconds: 260),
                             curve: Curves.easeOutCubic,
@@ -264,7 +283,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
                       : null,
               onNext: isEditMode
                   ? null
-                  : state.pageList!.currentPageIndex < state.pageList!.totalPages - 1
+                  : currentIndex < visibleRounds.length - 1
                       ? () => _pageController?.nextPage(
                             duration: const Duration(milliseconds: 260),
                             curve: Curves.easeOutCubic,
@@ -285,30 +304,29 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
                         ? _buildWelcomeEmpty(context)
                         : _pageController == null
                             ? const Center(child: CircularProgressIndicator())
-                            : PageView.builder(
+                        : PageView.builder(
                                 controller: _pageController,
                                 physics: isEditMode
                                     ? const NeverScrollableScrollPhysics()
                                     : const PageScrollPhysics(),
-                                itemCount: state.pageList?.pages.length ?? 0,
+                                itemCount: visibleRounds.length,
                                 onPageChanged: (index) async {
-                                  // ✅ index 已经是 0-based，无需转换
-                                  if (state.pageList == null) return;
-                                  if (index != state.pageList!.currentPageIndex) {
-                                    notifier.changePage(index);  // ✅ 直接传递 0-based
+                                  if (!PageUtils.isValidIndex(index, visibleRounds.length)) {
+                                    return;
                                   }
-                                  final round = state.pageList!.pages[index].round;
+
+                                  final round = visibleRounds[index];
+
+                                  if (index != currentIndex) {
+                                    notifier.changePage(index, round.id);
+                                  }
+
                                   await notifier.ensureRoundLoaded(round.id);
                                   await _syncSeenWithVisiblePage();
                                 },
                                 itemBuilder: (context, index) {
-                                  final round = state.pageList!.pages[index].round;
-                                  final stream = ref.watch(
-                                    roundStreamProvider(
-                                      (fileName: widget.fileName, roundId: round.id),
-                                    ),
-                                  );
-                                  final canEdit = stream?.isStreaming != true;                              
+                                  final round = visibleRounds[index];
+                                  final canEdit = !round.isIncomplete;
                                   return _ChatRoundPage(
                                     key: ValueKey(round.id),
                                     fileName: widget.fileName,

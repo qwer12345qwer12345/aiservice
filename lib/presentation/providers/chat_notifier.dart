@@ -8,7 +8,6 @@ import '../../core/models/model_info.dart';
 import '../../core/models/session.dart';
 import '../../core/models/attachment.dart';
 import '../../di/providers.dart';
-import '../../domain/models/chat_page.dart';
 import '../../domain/services/attachment_preparer.dart';
 import '../../domain/services/branch_navigator.dart';
 import '../../domain/services/chat_context_builder.dart';
@@ -80,31 +79,29 @@ class ChatNotifier extends StateNotifier<ChatState> {
         state.currentRoundId,
       );
 
-      final branchPath = resolvedRoundId == null
+            final visibleRounds = resolvedRoundId == null
           ? <ChatRound>[]
           : BranchNavigator.getCurrentBranchPath(session, resolvedRoundId);
 
       int targetPageIndex = 0;
-      if (resolvedRoundId != null && branchPath.isNotEmpty) {
+      if (resolvedRoundId != null && visibleRounds.isNotEmpty) {
         final foundIndex =
-            branchPath.indexWhere((round) => round.id == resolvedRoundId);
-        targetPageIndex = foundIndex >= 0 ? foundIndex : branchPath.length - 1;
+            visibleRounds.indexWhere((round) => round.id == resolvedRoundId);
+        targetPageIndex = foundIndex >= 0 ? foundIndex : visibleRounds.length - 1;
       }
 
       _currentPageIndex = targetPageIndex;
-      final chatPages = branchPath.map((round) => ChatPage(round: round)).toList();
 
       state = state.copyWith(
         session: session,
         currentRoundId: resolvedRoundId,
-        pageList: ChatPageList.fromPages(chatPages, _currentPageIndex),
         error: null,
         isLoading: false,
       );
 
       if (resolvedRoundId != null) {
         final round =
-            _firstWhereOrNull(branchPath, (r) => r.id == resolvedRoundId);
+            _firstWhereOrNull(visibleRounds, (r) => r.id == resolvedRoundId);
         if (round != null) {
           _streamCache.ensureRoundLoaded(fileName, round);
         }
@@ -462,14 +459,18 @@ class ChatNotifier extends StateNotifier<ChatState> {
   }
 
   void stopGeneration() {
-    final pageList = state.pageList;
-    if (pageList == null || pageList.pages.isEmpty) return;
+    final session = state.session;
+    final currentRoundId = state.currentRoundId;
+    if (session == null || currentRoundId == null) return;
 
-    if (!PageUtils.isValidIndex(_currentPageIndex, pageList.pages.length)) {
+    final visibleRounds =
+        BranchNavigator.getCurrentBranchPath(session, currentRoundId);
+
+    if (!PageUtils.isValidIndex(_currentPageIndex, visibleRounds.length)) {
       return;
     }
 
-    final viewingRound = pageList.pages[_currentPageIndex].round;
+    final viewingRound = visibleRounds[_currentPageIndex];
 
     if (!viewingRound.isIncomplete) return;
 
@@ -489,23 +490,20 @@ class ChatNotifier extends StateNotifier<ChatState> {
     await ensureRoundLoaded(newRoundId);
   }
 
-  void changePage(int pageIndex) {
-    if (state.pageList == null) return;
+    void changePage(int pageIndex, String roundId) {
+    final session = state.session;
+    if (session == null) return;
 
-    final pages = state.pageList!.pages;
-    if (!PageUtils.isValidIndex(pageIndex, pages.length)) return;
-
-    final targetPage = pages[pageIndex];
-    final newRoundId = targetPage.round.id;
+    final exists = session.rounds.any((round) => round.id == roundId);
+    if (!exists) return;
 
     _currentPageIndex = pageIndex;
 
     state = state.copyWith(
-      currentRoundId: newRoundId,
-      pageList: state.pageList!.copyWith(currentPageIndex: pageIndex),
+      currentRoundId: roundId,
     );
 
-    ensureRoundLoaded(newRoundId);
+    ensureRoundLoaded(roundId);
   }
 
   Future<void> markRoundSeen(String roundId) async {

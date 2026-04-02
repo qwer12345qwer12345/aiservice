@@ -246,7 +246,6 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
       final chatNotifier = ref.read(chatProvider(widget.fileName).notifier);
       chatNotifier.state = chatNotifier.state.copyWith(
         session: updatedSession,
-        pageList: deletedCurrentFocus ? null : chatNotifier.state.pageList,
       );
       // 如果删除了当前焦点节点，重新加载会话，让聊天页返回时定位到有效页
       if (deletedCurrentFocus) {
