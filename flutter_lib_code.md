@@ -96,7 +96,6 @@ presentation/pages/text_attachment_viewer_page.dart
 presentation/providers/attachment_bytes_provider.dart
 presentation/providers/chat_notifier.dart
 presentation/providers/config_notifier.dart
-presentation/providers/global_streaming_provider.dart
 presentation/providers/input_draft_provider.dart
 presentation/providers/session_card_provider.dart
 presentation/providers/session_list_notifier.dart
@@ -5416,7 +5415,9 @@ class ConversationRepository {
 
   // 检查附件是否被其他 Round 引用
   Future<bool> _isAttachmentUsedElsewhere(
-      String relativePath, List<String> excludeRoundIds) async {
+    String relativePath,
+    List<String> excludeRoundIds,
+  ) async {
     final query = _db.select(_db.dbAttachments).join([
       innerJoin(
         _db.dbChatRounds,
@@ -5425,13 +5426,14 @@ class ConversationRepository {
     ])
       ..where(_db.dbAttachments.relativePath.equals(relativePath))
       ..where(_db.dbChatRounds.id.isNotIn(excludeRoundIds));
+
     final result = await query.get();
     return result.isNotEmpty;
   }
 
   Stream<List<SessionListItem>> watchSessionListItems() {
     final query = (_db.select(_db.dbSessions)
-          ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]));
+      ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]));
 
     return query.watch().map((sessions) {
       return sessions.map((session) {
@@ -5446,8 +5448,8 @@ class ConversationRepository {
 
   Stream<SessionCardMeta> watchSessionCardMeta(String sessionId) {
     final query = (_db.select(_db.dbChatRounds)
-          ..where((t) => t.sessionId.equals(sessionId))
-          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]));
+      ..where((t) => t.sessionId.equals(sessionId))
+      ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]));
 
     return query.watch().map((rounds) {
       final previewRound = rounds.isEmpty ? null : rounds.last;
@@ -5477,93 +5479,68 @@ class ConversationRepository {
   }
 
   /// 监听单个会话的完整数据（包含所有轮次和附件）
+  /// 改为单条 join watch，避免“watch 主表 + 子表补查”
   Stream<Session?> watchSession(String fileName) {
     final sessionId = _getId(fileName);
 
-    // 监听会话元数据变更
-    final sessionQuery = _db.select(_db.dbSessions)
-      ..where((t) => t.id.equals(sessionId));
+    final query = _db.select(_db.dbSessions).join([
+      leftOuterJoin(
+        _db.dbChatRounds,
+        _db.dbChatRounds.sessionId.equalsExp(_db.dbSessions.id),
+      ),
+      leftOuterJoin(
+        _db.dbAttachments,
+        _db.dbAttachments.roundId.equalsExp(_db.dbChatRounds.id),
+      ),
+    ])
+      ..where(_db.dbSessions.id.equals(sessionId))
+      ..orderBy([
+        OrderingTerm.asc(_db.dbChatRounds.createdAt),
+      ]);
 
-    return sessionQuery.watchSingleOrNull().asyncMap((sessionRow) async {
-      if (sessionRow == null) return null;
-      return _buildSessionFromRow(sessionRow);
-    });
-  }
-
-  /// 监听会话的轮次列表
-  Stream<List<ChatRound>> watchRounds(String sessionId) {
-    final roundsQuery = _db.select(_db.dbChatRounds)
-      ..where((t) => t.sessionId.equals(sessionId))
-      ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]);
-
-    return roundsQuery.watch().asyncMap((roundRows) async {
-      final rounds = <ChatRound>[];
-      for (final round in roundRows) {
-        final attachments = await _getAttachmentsForRound(round.id);
-        rounds.add(_mapToChatRound(round, attachments));
-      }
-      return rounds;
-    });
-  }
-
-  /// 监听单个轮次的数据
-  Stream<ChatRound?> watchRound(String roundId) {
-    final query = _db.select(_db.dbChatRounds)
-      ..where((t) => t.id.equals(roundId));
-
-    return query.watchSingleOrNull().asyncMap((roundRow) async {
-      if (roundRow == null) return null;
-      final attachments = await _getAttachmentsForRound(roundId);
-      return _mapToChatRound(roundRow, attachments);
-    });
+    return query.watch().map(_mapSessionFromJoinedRows);
   }
 
   // ========== 私有辅助方法 ==========
 
-  Future<Session> _buildSessionFromRow(DbSession sessionRow) async {
-    final sessionId = sessionRow.id;
+  Session? _mapSessionFromJoinedRows(List<TypedResult> rows) {
+    if (rows.isEmpty) return null;
 
-    // 查询所有轮次
-    final roundsQuery = _db.select(_db.dbChatRounds)
-      ..where((t) => t.sessionId.equals(sessionId))
-      ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]);
-    final roundRows = await roundsQuery.get();
+    final sessionRow = rows.first.readTable(_db.dbSessions);
 
-    if (roundRows.isEmpty) {
-      return Session(
-        id: sessionRow.id,
-        title: sessionRow.title,
-        createdAt: sessionRow.createdAt,
-        updatedAt: sessionRow.updatedAt,
-        config: sessionRow.config,
-        hasUnseenUpdate: sessionRow.hasUnseenUpdate,
-        rounds: const [],
-      );
+    final roundMap = <String, DbChatRound>{};
+    final attachmentMap = <String, List<Attachment>>{};
+
+    for (final row in rows) {
+      final roundRow = row.readTableOrNull(_db.dbChatRounds);
+      if (roundRow == null) continue;
+
+      roundMap.putIfAbsent(roundRow.id, () => roundRow);
+
+      final attachmentRow = row.readTableOrNull(_db.dbAttachments);
+      if (attachmentRow != null) {
+        attachmentMap.putIfAbsent(roundRow.id, () => []).add(
+              Attachment(
+                id: attachmentRow.id,
+                name: attachmentRow.name,
+                relativePath: attachmentRow.relativePath,
+                isImage: attachmentRow.isImage,
+                mimeType: attachmentRow.mimeType,
+              ),
+            );
+      }
     }
 
-    // 查询所有相关附件
-    final roundIds = roundRows.map((r) => r.id).toList();
-    final attachmentsQuery = _db.select(_db.dbAttachments)
-      ..where((t) => t.roundId.isIn(roundIds));
-    final attachmentRows = await attachmentsQuery.get();
+    final sortedRoundRows = roundMap.values.toList()
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
-    // 组装 Attachments Map
-    final attachMap = <String, List<Attachment>>{};
-    for (final a in attachmentRows) {
-      attachMap.putIfAbsent(a.roundId, () => []).add(
-            Attachment(
-              id: a.id,
-              name: a.name,
-              relativePath: a.relativePath,
-              isImage: a.isImage,
-              mimeType: a.mimeType,
-            ),
-          );
-    }
-
-    // 组装 Rounds
-    final rounds = roundRows
-        .map((r) => _mapToChatRound(r, attachMap[r.id] ?? []))
+    final rounds = sortedRoundRows
+        .map(
+          (roundRow) => _mapToChatRound(
+            roundRow,
+            attachmentMap[roundRow.id] ?? const <Attachment>[],
+          ),
+        )
         .toList();
 
     return Session(
@@ -5575,21 +5552,6 @@ class ConversationRepository {
       hasUnseenUpdate: sessionRow.hasUnseenUpdate,
       rounds: rounds,
     );
-  }
-
-  Future<List<Attachment>> _getAttachmentsForRound(String roundId) async {
-    final query = _db.select(_db.dbAttachments)
-      ..where((t) => t.roundId.equals(roundId));
-    final rows = await query.get();
-    return rows
-        .map((a) => Attachment(
-              id: a.id,
-              name: a.name,
-              relativePath: a.relativePath,
-              isImage: a.isImage,
-              mimeType: a.mimeType,
-            ))
-        .toList();
   }
 
   ChatRound _mapToChatRound(DbChatRound row, List<Attachment> attachments) {
@@ -5617,21 +5579,40 @@ class ConversationRepository {
 
   Future<Session> getSession(String fileName) async {
     final sessionId = _getId(fileName);
-    final sessionRow = await (_db.select(_db.dbSessions)
-          ..where((t) => t.id.equals(sessionId)))
-        .getSingle();
-    return _buildSessionFromRow(sessionRow);
+
+    final query = _db.select(_db.dbSessions).join([
+      leftOuterJoin(
+        _db.dbChatRounds,
+        _db.dbChatRounds.sessionId.equalsExp(_db.dbSessions.id),
+      ),
+      leftOuterJoin(
+        _db.dbAttachments,
+        _db.dbAttachments.roundId.equalsExp(_db.dbChatRounds.id),
+      ),
+    ])
+      ..where(_db.dbSessions.id.equals(sessionId))
+      ..orderBy([
+        OrderingTerm.asc(_db.dbChatRounds.createdAt),
+      ]);
+
+    final session = _mapSessionFromJoinedRows(await query.get());
+
+    if (session == null) {
+      throw StateError('Session not found: $fileName');
+    }
+
+    return session;
   }
 
   Future<void> deleteRounds(String sessionId, List<String> roundIds) async {
     if (roundIds.isEmpty) return;
+
     await (_db.delete(_db.dbChatRounds)
           ..where((t) => t.sessionId.equals(sessionId) & t.id.isIn(roundIds)))
         .go();
   }
 
-  Future<void> saveSession(
-      String fileName, Session newSession) async {
+  Future<void> saveSession(String fileName, Session newSession) async {
     final sessionId = _getId(fileName);
 
     await _db.transaction(() async {
@@ -5652,15 +5633,18 @@ class ConversationRepository {
               ),
             );
 
-        allAttachments.addAll(round.userAttachments
-            .map((a) => DbAttachmentsCompanion.insert(
-                  id: a.id,
-                  roundId: round.id,
-                  name: a.name,
-                  relativePath: a.relativePath,
-                  isImage: Value(a.isImage),
-                  mimeType: Value(a.mimeType),
-                )));
+        allAttachments.addAll(
+          round.userAttachments.map(
+            (a) => DbAttachmentsCompanion.insert(
+              id: a.id,
+              roundId: round.id,
+              name: a.name,
+              relativePath: a.relativePath,
+              isImage: Value(a.isImage),
+              mimeType: Value(a.mimeType),
+            ),
+          ),
+        );
       }
 
       for (final attach in allAttachments) {
@@ -5681,7 +5665,9 @@ class ConversationRepository {
   }
 
   Future<void> saveSessionAndCleanupOrphanAttachments(
-    String fileName, Session oldSession, Session newSession,
+    String fileName,
+    Session oldSession,
+    Session newSession,
   ) async {
     final oldPaths = oldSession.rounds
         .expand((r) => r.userAttachments)
@@ -5708,9 +5694,53 @@ class ConversationRepository {
     }
   }
 
+  Future<void> deleteRoundsAndCleanupOrphanAttachments(
+    String fileName,
+    List<String> roundIds,
+  ) async {
+    if (roundIds.isEmpty) return;
+
+    final sessionId = _getId(fileName);
+
+    final attachmentsToCheck = await (_db.select(_db.dbAttachments).join([
+      innerJoin(
+        _db.dbChatRounds,
+        _db.dbChatRounds.id.equalsExp(_db.dbAttachments.roundId),
+      ),
+    ])
+          ..where(_db.dbChatRounds.sessionId.equals(sessionId))
+          ..where(_db.dbChatRounds.id.isIn(roundIds)))
+        .get();
+
+    final paths = attachmentsToCheck
+        .map((row) => row.readTable(_db.dbAttachments).relativePath)
+        .toSet();
+
+    await _db.transaction(() async {
+      await (_db.delete(_db.dbChatRounds)
+            ..where((t) => t.sessionId.equals(sessionId) & t.id.isIn(roundIds)))
+          .go();
+
+      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId))).write(
+        DbSessionsCompanion(
+          updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+        ),
+      );
+    });
+
+    for (final path in paths) {
+      if (!await _isAttachmentUsedElsewhere(path, roundIds)) {
+        try {
+          await _fileService.deleteAttachment(path);
+        } catch (_) {}
+      }
+    }
+  }
+
   Future<void> deleteSession(String fileName) async {
     final sessionId = _getId(fileName);
     Session? targetSession;
+
     try {
       targetSession = await getSession(fileName);
     } catch (_) {}
@@ -5721,6 +5751,7 @@ class ConversationRepository {
           .map((a) => a.relativePath)
           .toSet();
       final allRoundIds = targetSession.rounds.map((r) => r.id).toList();
+
       for (final path in paths) {
         if (!await _isAttachmentUsedElsewhere(path, allRoundIds)) {
           try {
@@ -5729,26 +5760,33 @@ class ConversationRepository {
         }
       }
     }
-    await (_db.delete(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-        .go();
+
+    await (_db.delete(_db.dbSessions)..where((t) => t.id.equals(sessionId))).go();
   }
 
   Future<String> saveAttachment(Uint8List data, String fileName) async =>
       await _fileService.saveAttachment(data, fileName);
+
   Future<Uint8List> getAttachment(String relativePath) async =>
       await _fileService.readAttachment(relativePath);
+
   Future<void> deleteAttachment(String relativePath) async =>
       await _fileService.deleteAttachment(relativePath);
 
-  Future<Session> createSession({required String fileName, required String title}) async {
+  Future<Session> createSession({
+    required String fileName,
+    required String title,
+  }) async {
     final sessionId = _getId(fileName);
     final now = DateTime.now().millisecondsSinceEpoch;
+
     final session = Session(
-        id: sessionId,
-        title: title,
-        createdAt: now,
-        updatedAt: now,
-        rounds: []);
+      id: sessionId,
+      title: title,
+      createdAt: now,
+      updatedAt: now,
+      rounds: [],
+    );
 
     await _db.into(_db.dbSessions).insert(
           DbSessionsCompanion.insert(
@@ -5758,6 +5796,7 @@ class ConversationRepository {
             updatedAt: session.updatedAt,
           ),
         );
+
     return session;
   }
 
@@ -5768,26 +5807,31 @@ class ConversationRepository {
 
   Future<void> updateSessionTitle(String fileName, String title) async {
     final sessionId = _getId(fileName);
-    await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-        .write(DbSessionsCompanion(
-          title: Value(title),
-          updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
-        ));
+
+    await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId))).write(
+      DbSessionsCompanion(
+        title: Value(title),
+        updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
   }
 
   Future<List<Session>> getAllSessions() async {
     final ids = await getAllSessionFileNames();
     final sessions = <Session>[];
+
     for (final id in ids) {
       try {
         sessions.add(await getSession(id));
       } catch (_) {}
     }
+
     return sessions;
   }
 
   Future<void> appendRound(String fileName, ChatRound round) async {
     final sessionId = _getId(fileName);
+
     await _db.transaction(() async {
       await _db.into(_db.dbChatRounds).insert(
             DbChatRoundsCompanion.insert(
@@ -5802,6 +5846,7 @@ class ConversationRepository {
               hasUnseenUpdate: Value(round.hasUnseenUpdate),
             ),
           );
+
       for (final attach in round.userAttachments) {
         await _db.into(_db.dbAttachments).insert(
               DbAttachmentsCompanion.insert(
@@ -5814,29 +5859,37 @@ class ConversationRepository {
               ),
             );
       }
-      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-          .write(DbSessionsCompanion(
-              updatedAt: Value(DateTime.now().millisecondsSinceEpoch)));
+
+      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId))).write(
+        DbSessionsCompanion(
+          updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+        ),
+      );
     });
   }
 
   Future<void> updateRound(
-      String fileName, String roundId, ChatRound updatedRound) async {
+    String fileName,
+    String roundId,
+    ChatRound updatedRound,
+  ) async {
     final sessionId = _getId(fileName);
+
     await _db.transaction(() async {
-      await (_db.update(_db.dbChatRounds)
-            ..where((t) => t.id.equals(roundId)))
-          .write(
-            DbChatRoundsCompanion(
-              assistantThinking: Value(updatedRound.assistantThinking),
-              assistantContent: Value(updatedRound.assistantContent),
-              isIncomplete: Value(updatedRound.isIncomplete),
-              hasUnseenUpdate: Value(updatedRound.hasUnseenUpdate),
-            ),
-          );
-      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-          .write(DbSessionsCompanion(
-              updatedAt: Value(DateTime.now().millisecondsSinceEpoch)));
+      await (_db.update(_db.dbChatRounds)..where((t) => t.id.equals(roundId))).write(
+        DbChatRoundsCompanion(
+          assistantThinking: Value(updatedRound.assistantThinking),
+          assistantContent: Value(updatedRound.assistantContent),
+          isIncomplete: Value(updatedRound.isIncomplete),
+          hasUnseenUpdate: Value(updatedRound.hasUnseenUpdate),
+        ),
+      );
+
+      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId))).write(
+        DbSessionsCompanion(
+          updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+        ),
+      );
     });
   }
 }
@@ -7354,7 +7407,7 @@ import '../../core/utils/time_format_utils.dart';
 import '../../di/providers.dart';
 import '../../domain/models/tree_node.dart';
 import '../../domain/services/tree_builder.dart';
-import '../providers/chat_notifier.dart';
+import '../providers/chat_notifier.dart' show chatSessionProvider;
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_toast.dart';
 
@@ -7409,10 +7462,6 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     _scheduleFocusToTarget();
   }
 
-  bool _treeContainsNodeId(List<TreeNode> roots, String nodeId) {
-    return _findTreeNodeById(roots, nodeId) != null;
-  }
-
   void _reloadTree(
     List<ChatRound> rounds, {
     bool resetViewport = false,
@@ -7428,13 +7477,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
       _transformationController.value = Matrix4.identity();
       _hasFocused = false;
       _focusRetryCount = 0;
-
-      if (_treeContainsNodeId(roots, widget.initialFocusRoundId)) {
-        _targetNodeKey = GlobalKey();
-      } else {
-        _targetNodeKey = null;
-        _hasFocused = true;
-      }
+      _targetNodeKey = GlobalKey();
     }
 
     setState(() {
@@ -7559,39 +7602,13 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
       throw Exception('未找到要删除的节点');
     }
 
-    final idsToDelete = _collectSubtreeIds(targetNode);
+    final idsToDelete = _collectSubtreeIds(targetNode).toList();
 
     try {
-      final sessionId = widget.fileName.replaceAll('.json', '');
-      await repository.deleteRounds(sessionId, idsToDelete.toList());
-
-      final updatedRounds = session.rounds
-          .where((round) => !idsToDelete.contains(round.id))
-          .toList();
-      final updatedSession = session.copyWith(
-        rounds: updatedRounds,
-        updatedAt: DateTime.now().millisecondsSinceEpoch,
-      );
-
-      await repository.saveSessionAndCleanupOrphanAttachments(
+      await repository.deleteRoundsAndCleanupOrphanAttachments(
         widget.fileName,
-        session,
-        updatedSession,
+        idsToDelete,
       );
-
-      final deletedCurrentFocus =
-          idsToDelete.contains(widget.initialFocusRoundId);
-
-      final chatNotifier = ref.read(chatProvider(widget.fileName).notifier);
-      if (deletedCurrentFocus) {
-        await chatNotifier.loadSession();
-      }
-
-      if (deletedCurrentFocus) {
-        _targetNodeKey = null;
-        _hasFocused = true;
-      }
-      _reloadTree(updatedRounds);
     } catch (e) {
       await AppToast.show('删除失败：$e');
       rethrow;
@@ -7649,9 +7666,9 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
             appBar: AppBar(
               title: const Text('分支树'),
             ),
-            body: Center(
+            body: const Center(
               child: Padding(
-                padding: const EdgeInsets.all(24),
+                padding: EdgeInsets.all(24),
                 child: Text('会话不存在'),
               ),
             ),
@@ -7666,17 +7683,9 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
         if (latestSignature != _lastSignature) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted) return;
-
-            if (!_treeContainsNodeId(latestRoots, widget.initialFocusRoundId)) {
-              _targetNodeKey = null;
-              _hasFocused = true;
-            }
-
             _reloadTree(session.rounds);
           });
         }
-
-        final chatNotifier = ref.read(chatProvider(widget.fileName).notifier);
 
         return AppPageScaffold(
           appBar: AppBar(
@@ -7728,9 +7737,8 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
                                   targetNodeId: widget.initialFocusRoundId,
                                   targetNodeKey: _targetNodeKey,
                                   onSwitch: (treeNode) async {
-                                    await chatNotifier.switchBranch(treeNode.id);
                                     if (context.mounted) {
-                                      Navigator.of(context).pop();
+                                      Navigator.of(context).pop(treeNode.id);
                                     }
                                   },
                                   onDelete: (treeNode) async {
@@ -8055,7 +8063,6 @@ import '../../core/models/chat_round.dart';
 import '../../core/models/session.dart';
 import '../../core/utils/app_route_observer.dart';
 import '../../core/utils/time_format_utils.dart';
-import '../../domain/states/chat_state.dart';
 import '../models/pending_attachment.dart';
 import '../providers/chat_notifier.dart';
 import '../providers/input_draft_provider.dart';
@@ -8090,81 +8097,62 @@ class ChatPage extends ConsumerStatefulWidget {
 
 class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
   PageController? _pageController;
-  late final ProviderSubscription<ChatState> _chatSubscription;
+  late final ProviderSubscription<AsyncValue<Session?>> _sessionSubscription;
+
   bool _initialMessageHandled = false;
   bool _isMarkingSeen = false;
   bool _isRouteVisible = false;
   ModalRoute<dynamic>? _route;
 
-  List<ChatRound> _buildVisibleRounds(
-    Session? session,
-    String? branchLeafRoundId,
-  ) {
-    if (session == null || branchLeafRoundId == null) {
-      return const <ChatRound>[];
-    }
-    return BranchNavigator.getCurrentBranchPath(session, branchLeafRoundId);
-  }
-
-  int _resolveCurrentIndex(List<ChatRound> visibleRounds, String? currentRoundId) {
-    if (visibleRounds.isEmpty || currentRoundId == null) return 0;
-    final index = visibleRounds.indexWhere((round) => round.id == currentRoundId);
-    if (index < 0) return visibleRounds.length - 1;
-    return index;
-  }
+  String? _branchRoundId;
+  String? _currentRoundId;
 
   @override
   void initState() {
     super.initState();
 
-    _chatSubscription = ref.listenManual<ChatState>(
-      chatProvider(widget.fileName),
-      (previous, next) {
-        final session = ref.read(chatSessionProvider(widget.fileName)).valueOrNull;
-        final nextVisibleRounds =
-            _buildVisibleRounds(session, next.branchLeafRoundId);
-        final nextIndex =
-            _resolveCurrentIndex(nextVisibleRounds, next.currentRoundId);
+    _branchRoundId = widget.initialRoundId;
+    _currentRoundId = widget.initialRoundId;
 
-        if (nextVisibleRounds.isNotEmpty) {
-          if (_pageController == null) {
-            _pageController = PageController(initialPage: nextIndex);
-            if (mounted) {
-              setState(() {});
-            }
+    _sessionSubscription = ref.listenManual<AsyncValue<Session?>>(
+      chatSessionProvider(widget.fileName),
+      (previous, next) {
+        next.whenData((session) async {
+          _reconcileSession(session);
+
+          if (_initialMessageHandled || session == null || !mounted) {
             return;
           }
 
-          final controller = _pageController!;
-          if (controller.hasClients) {
-            final currentPage = controller.page?.round() ?? controller.initialPage;
-            if (currentPage != nextIndex) {
-              controller.jumpToPage(nextIndex);
-            }
-          }
-        }
-
-        if (session != null && !_initialMessageHandled && mounted) {
           final message = widget.initialMessage?.trim() ?? '';
-          final attachments = widget.initialAttachments ?? const <PendingAttachment>[];
+          final attachments =
+              widget.initialAttachments ?? const <PendingAttachment>[];
           final hasContent = message.isNotEmpty || attachments.isNotEmpty;
 
-          if (hasContent) {
-            _initialMessageHandled = true;
-            ref.read(chatProvider(widget.fileName).notifier)
-                .sendMessage(message, attachments: attachments)
-                .catchError((e) {
-              if (mounted) AppToast.show('发送失败：${e.toString()}');
+          if (!hasContent) return;
+
+          _initialMessageHandled = true;
+          try {
+            final newRoundId =
+                await ref.read(chatControllerProvider(widget.fileName)).sendMessage(
+                      content: message,
+                      parentRoundId: _currentRoundId,
+                      attachments: attachments,
+                    );
+
+            if (!mounted) return;
+            setState(() {
+              _branchRoundId = newRoundId;
+              _currentRoundId = newRoundId;
             });
+          } catch (e) {
+            if (mounted) {
+              AppToast.show('发送失败：${e.toString()}');
+            }
           }
-        }
+        });
       },
     );
-
-    Future.microtask(() async {
-      final notifier = ref.read(chatProvider(widget.fileName).notifier);
-      await notifier.loadSession(initialRoundId: widget.initialRoundId);
-    });
   }
 
   @override
@@ -8182,10 +8170,106 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
 
   @override
   void dispose() {
-    _chatSubscription.close();
+    _sessionSubscription.close();
     appRouteObserver.unsubscribe(this);
     _pageController?.dispose();
     super.dispose();
+  }
+
+  List<ChatRound> _buildVisibleRounds(
+    Session? session,
+    String? branchRoundId,
+  ) {
+    if (session == null || branchRoundId == null) {
+      return const <ChatRound>[];
+    }
+    return BranchNavigator.getCurrentBranchPath(session, branchRoundId);
+  }
+
+  int _resolveCurrentIndex(List<ChatRound> visibleRounds, String? currentRoundId) {
+    if (visibleRounds.isEmpty || currentRoundId == null) return 0;
+    final index = visibleRounds.indexWhere((round) => round.id == currentRoundId);
+    if (index < 0) return visibleRounds.length - 1;
+    return index;
+  }
+
+  String? _resolveBranchRoundId(Session session, String? preferredRoundId) {
+    if (preferredRoundId != null &&
+        session.rounds.any((r) => r.id == preferredRoundId)) {
+      return preferredRoundId;
+    }
+
+    final leaves = BranchNavigator.getAllBranchLeaves(session);
+    if (leaves.isNotEmpty) {
+      return leaves.last.id;
+    }
+
+    if (session.rounds.isNotEmpty) {
+      return session.rounds.first.id;
+    }
+
+    return null;
+  }
+
+  String? _resolveCurrentRoundId(
+    List<ChatRound> visibleRounds,
+    String? preferredRoundId,
+  ) {
+    if (preferredRoundId != null &&
+        visibleRounds.any((r) => r.id == preferredRoundId)) {
+      return preferredRoundId;
+    }
+
+    return visibleRounds.isNotEmpty ? visibleRounds.last.id : null;
+  }
+
+  void _reconcileSession(Session? session) {
+    if (!mounted) return;
+
+    if (session == null) {
+      setState(() {
+        _branchRoundId = null;
+        _currentRoundId = null;
+      });
+      return;
+    }
+
+    final nextBranchRoundId = _resolveBranchRoundId(session, _branchRoundId);
+
+    final visibleRounds = nextBranchRoundId == null
+        ? const <ChatRound>[]
+        : BranchNavigator.getCurrentBranchPath(session, nextBranchRoundId);
+
+    final nextCurrentRoundId =
+        _resolveCurrentRoundId(visibleRounds, _currentRoundId);
+
+    final nextIndex = _resolveCurrentIndex(visibleRounds, nextCurrentRoundId);
+
+    final shouldUpdateState = nextBranchRoundId != _branchRoundId ||
+        nextCurrentRoundId != _currentRoundId;
+
+    if (shouldUpdateState) {
+      setState(() {
+        _branchRoundId = nextBranchRoundId;
+        _currentRoundId = nextCurrentRoundId;
+      });
+    }
+
+    if (visibleRounds.isNotEmpty && _pageController == null) {
+      _pageController = PageController(initialPage: nextIndex);
+      if (mounted) {
+        setState(() {});
+      }
+      return;
+    }
+
+    final controller = _pageController;
+    if (controller != null && controller.hasClients) {
+      final currentPage = controller.page?.round() ?? controller.initialPage;
+      if (currentPage != nextIndex) {
+        controller.jumpToPage(nextIndex);
+      }
+    }
   }
 
   @override
@@ -8247,14 +8331,11 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     final controller = _pageController;
     if (controller == null || !controller.hasClients) return;
 
-    final chatState = ref.read(chatProvider(widget.fileName));
     final session = ref.read(chatSessionProvider(widget.fileName)).valueOrNull;
-    final visibleRounds =
-        _buildVisibleRounds(session, chatState.branchLeafRoundId);
+    final visibleRounds = _buildVisibleRounds(session, _branchRoundId);
     if (visibleRounds.isEmpty) return;
 
-    final currentIndex =
-        _resolveCurrentIndex(visibleRounds, chatState.currentRoundId);
+    final currentIndex = _resolveCurrentIndex(visibleRounds, _currentRoundId);
     final currentPage = controller.page;
     final index = currentPage != null
         ? currentPage.round().clamp(0, visibleRounds.length - 1)
@@ -8266,18 +8347,36 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     _isMarkingSeen = true;
     try {
       await ref
-          .read(chatProvider(widget.fileName).notifier)
+          .read(chatControllerProvider(widget.fileName))
           .markRoundSeen(round.id);
     } finally {
       _isMarkingSeen = false;
     }
   }
 
+  Future<void> _retryFromRound(String roundId) async {
+    try {
+      final newRoundId =
+          await ref.read(chatControllerProvider(widget.fileName)).retryFromRound(
+                roundId,
+              );
+
+      if (!mounted) return;
+      setState(() {
+        _branchRoundId = newRoundId;
+        _currentRoundId = newRoundId;
+      });
+    } catch (e) {
+      if (mounted) {
+        await AppToast.show('重新生成失败：$e');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final chatState = ref.watch(chatProvider(widget.fileName));
     final sessionAsync = ref.watch(chatSessionProvider(widget.fileName));
-    final notifier = ref.read(chatProvider(widget.fileName).notifier);
+    final chatController = ref.read(chatControllerProvider(widget.fileName));
     final editSourceRoundId = ref.watch(globalEditSourceRoundIdProvider);
     final isEditMode = editSourceRoundId != null;
 
@@ -8295,10 +8394,9 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
         body: _buildErrorState('加载会话失败：$e'),
       ),
       data: (session) {
-        final visibleRounds =
-            _buildVisibleRounds(session, chatState.branchLeafRoundId);
+        final visibleRounds = _buildVisibleRounds(session, _branchRoundId);
         final currentIndex =
-            _resolveCurrentIndex(visibleRounds, chatState.currentRoundId);
+            _resolveCurrentIndex(visibleRounds, _currentRoundId);
         final hasPages = visibleRounds.isNotEmpty;
         final textTheme = Theme.of(context).textTheme;
         final currentRound =
@@ -8314,21 +8412,44 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
               style: textTheme.titleMedium,
             ),
             actions: [
-              if (session != null && chatState.currentRoundId != null)
+              if (session != null && _currentRoundId != null)
                 IconButton(
                   tooltip: isEditMode ? '编辑模式下不可切换页面' : '查看分支树',
                   icon: const Icon(Icons.account_tree_outlined),
                   onPressed: isEditMode
                       ? null
-                      : () {
-                          Navigator.of(context).push(
+                      : () async {
+                          final selectedRoundId =
+                              await Navigator.of(context).push<String?>(
                             MaterialPageRoute(
                               builder: (_) => BranchTreePage(
                                 fileName: widget.fileName,
-                                initialFocusRoundId: chatState.currentRoundId!,
+                                initialFocusRoundId: _currentRoundId!,
                               ),
                             ),
                           );
+
+                          if (!mounted ||
+                              selectedRoundId == null) {
+                            return;
+                          }
+
+                          setState(() {
+                            _branchRoundId = selectedRoundId;
+                            _currentRoundId = selectedRoundId;
+                          });
+
+                          final nextVisibleRounds =
+                              _buildVisibleRounds(session, _branchRoundId);
+                          final nextIndex = _resolveCurrentIndex(
+                            nextVisibleRounds,
+                            _currentRoundId,
+                          );
+
+                          if (_pageController != null &&
+                              _pageController!.hasClients) {
+                            _pageController!.jumpToPage(nextIndex);
+                          }
                         },
                 ),
             ],
@@ -8362,70 +8483,94 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
                   onCancel: _cancelEditMode,
                 ),
               Expanded(
-                child: chatState.isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : session == null
-                        ? _buildErrorState(chatState.error ?? '会话不存在')
-                        : !hasPages
-                            ? _buildWelcomeEmpty(context)
-                            : _pageController == null
-                                ? const Center(child: CircularProgressIndicator())
-                                : PageView.builder(
-                                    controller: _pageController,
-                                    physics: isEditMode
-                                        ? const NeverScrollableScrollPhysics()
-                                        : const PageScrollPhysics(),
-                                    itemCount: visibleRounds.length,
-                                    onPageChanged: (index) async {
-                                      if (!PageUtils.isValidIndex(
-                                          index, visibleRounds.length)) {
-                                        return;
-                                      }
+                child: session == null
+                    ? _buildErrorState('会话不存在')
+                    : !hasPages
+                        ? _buildWelcomeEmpty(context)
+                        : _pageController == null
+                            ? const Center(child: CircularProgressIndicator())
+                            : PageView.builder(
+                                controller: _pageController,
+                                physics: isEditMode
+                                    ? const NeverScrollableScrollPhysics()
+                                    : const PageScrollPhysics(),
+                                itemCount: visibleRounds.length,
+                                onPageChanged: (index) async {
+                                  if (!PageUtils.isValidIndex(
+                                    index,
+                                    visibleRounds.length,
+                                  )) {
+                                    return;
+                                  }
 
-                                      final round = visibleRounds[index];
+                                  final round = visibleRounds[index];
+                                  setState(() {
+                                    _currentRoundId = round.id;
+                                  });
 
-                                      if (index != currentIndex) {
-                                        notifier.changePage(index, round.id);
-                                      }
-
-                                      await _syncSeenWithVisiblePage();
-                                    },
-                                    itemBuilder: (context, index) {
-                                      final round = visibleRounds[index];
-                                      final canEdit = !round.isIncomplete;
-                                      return _ChatRoundPage(
-                                        key: ValueKey(round.id),
-                                        fileName: widget.fileName,
-                                        round: round,
-                                        canEdit: canEdit,
-                                        onRetryReply: () =>
-                                            notifier.retryFromRound(round.id),
-                                        onEdit: canEdit
-                                            ? () => _enterEditMode(
-                                                  round.id,
-                                                  round.userContent,
-                                                )
-                                            : null,
-                                        onCopyText: _copyText,
-                                      );
-                                    },
-                                  ),
+                                  await _syncSeenWithVisiblePage();
+                                },
+                                itemBuilder: (context, index) {
+                                  final round = visibleRounds[index];
+                                  final canEdit = !round.isIncomplete;
+                                  return _ChatRoundPage(
+                                    key: ValueKey(round.id),
+                                    fileName: widget.fileName,
+                                    round: round,
+                                    canEdit: canEdit,
+                                    onRetryReply: () => _retryFromRound(round.id),
+                                    onEdit: canEdit
+                                        ? () => _enterEditMode(
+                                              round.id,
+                                              round.userContent,
+                                            )
+                                        : null,
+                                    onCopyText: _copyText,
+                                  );
+                                },
+                              ),
               ),
               InputBar(
                 hintText: isEditMode ? '修改文本后发送' : '发送消息',
                 isStreaming: currentIsStreaming,
-                onStop: notifier.stopGeneration,
+                onStop: currentRound == null
+                    ? null
+                    : () => chatController.stopGeneration(currentRound.id),
                 onSend: (text, attachments) async {
-                  if (editSourceRoundId != null) {
-                    await notifier.editAndResendFromRound(
-                      editSourceRoundId,
-                      text,
+                  try {
+                    if (editSourceRoundId != null) {
+                      final newRoundId =
+                          await chatController.editAndResendFromRound(
+                        editSourceRoundId,
+                        text,
+                        attachments: attachments,
+                      );
+
+                      if (!mounted) return;
+                      setState(() {
+                        _branchRoundId = newRoundId;
+                        _currentRoundId = newRoundId;
+                      });
+                      _cancelEditMode();
+                      return;
+                    }
+
+                    final newRoundId = await chatController.sendMessage(
+                      content: text,
+                      parentRoundId: _currentRoundId,
                       attachments: attachments,
                     );
-                    _cancelEditMode();
-                    return;
+
+                    if (!mounted) return;
+                    setState(() {
+                      _branchRoundId = newRoundId;
+                      _currentRoundId = newRoundId;
+                    });
+                  } catch (e) {
+                    if (mounted) {
+                      await AppToast.show('发送失败：$e');
+                    }
                   }
-                  await notifier.sendMessage(text, attachments: attachments);
                 },
               ),
             ],
@@ -8783,16 +8928,16 @@ class HomePage extends ConsumerWidget {
 
   Future<void> _showRenameDialog(
     BuildContext context,
-    SessionListNotifier notifier,
+    SessionListController controller,
     SessionListItem item,
   ) async {
-    final controller = TextEditingController(text: item.title);
+    final controllerText = TextEditingController(text: item.title);
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('重命名会话'),
         content: TextField(
-          controller: controller,
+          controller: controllerText,
           autofocus: true,
           decoration: const InputDecoration(
             hintText: '输入新的会话名称',
@@ -8805,23 +8950,20 @@ class HomePage extends ConsumerWidget {
             child: const Text('取消'),
           ),
           FilledButton(
-            onPressed: () =>
-                Navigator.of(ctx).pop(controller.text.trim()),
+            onPressed: () => Navigator.of(ctx).pop(controllerText.text.trim()),
             child: const Text('保存'),
           ),
         ],
       ),
     );
-    if (result != null &&
-        result.isNotEmpty &&
-        result != item.title) {
-      await notifier.updateSessionTitle('${item.id}.json', result);
+    if (result != null && result.isNotEmpty && result != item.title) {
+      await controller.updateSessionTitle('${item.id}.json', result);
     }
   }
 
   Future<void> _showDeleteConfirmDialog(
     BuildContext context,
-    SessionListNotifier notifier,
+    SessionListController controller,
     SessionListItem item,
   ) async {
     final colorScheme = Theme.of(context).colorScheme;
@@ -8849,14 +8991,14 @@ class HomePage extends ConsumerWidget {
         false;
 
     if (confirmed == true) {
-      await notifier.deleteSession('${item.id}.json');
+      await controller.deleteSession('${item.id}.json');
     }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sessionsAsync = ref.watch(sessionListProvider);
-    final notifier = ref.read(sessionListNotifierProvider);
+    final controller = ref.read(sessionListControllerProvider);
 
     return AppPageScaffold(
       appBar: AppBar(
@@ -8886,7 +9028,7 @@ class HomePage extends ConsumerWidget {
               error: (e, st) => _HomeErrorState(
                 message: '加载会话失败：$e',
                 onRetry: () async {
-                  await notifier.refresh();
+                  ref.invalidate(sessionListProvider);
                 },
               ),
               data: (items) {
@@ -8901,11 +9043,11 @@ class HomePage extends ConsumerWidget {
                     final item = items[index];
                     return _SessionCard(
                       item: item,
-                      notifier: notifier,
+                      controller: controller,
                       onRename: (item) =>
-                          _showRenameDialog(context, notifier, item),
+                          _showRenameDialog(context, controller, item),
                       onDelete: (item) =>
-                          _showDeleteConfirmDialog(context, notifier, item),
+                          _showDeleteConfirmDialog(context, controller, item),
                     );
                   },
                 );
@@ -8915,7 +9057,7 @@ class HomePage extends ConsumerWidget {
           InputBar(
             hintText: '发送消息',
             onSend: (content, attachments) async {
-              final newFileName = await notifier.createSession('新对话');
+              final newFileName = await controller.createSession('新对话');
               if (context.mounted) {
                 await Navigator.push(
                   context,
@@ -8927,9 +9069,6 @@ class HomePage extends ConsumerWidget {
                     ),
                   ),
                 );
-                if (context.mounted) {
-                  await notifier.refresh();
-                }
               }
             },
           ),
@@ -9026,13 +9165,13 @@ class _HomeErrorState extends StatelessWidget {
 
 class _SessionCard extends ConsumerWidget {
   final SessionListItem item;
-  final SessionListNotifier notifier;
+  final SessionListController controller;
   final Future<void> Function(SessionListItem item) onRename;
   final Future<void> Function(SessionListItem item) onDelete;
 
   const _SessionCard({
     required this.item,
-    required this.notifier,
+    required this.controller,
     required this.onRename,
     required this.onDelete,
   });
@@ -9062,9 +9201,6 @@ class _SessionCard extends ConsumerWidget {
                   builder: (_) => ChatPage(fileName: fileName),
                 ),
               );
-              if (context.mounted) {
-                await notifier.refresh();
-              }
             },
             leading: const Icon(Icons.forum_outlined),
             title: Text(
@@ -9103,9 +9239,6 @@ class _SessionCard extends ConsumerWidget {
                   builder: (_) => ChatPage(fileName: fileName),
                 ),
               );
-              if (context.mounted) {
-                await notifier.refresh();
-              }
             },
             leading: const Icon(Icons.forum_outlined),
             title: Text(
@@ -9171,9 +9304,6 @@ class _SessionCard extends ConsumerWidget {
                     ),
                   ),
                 );
-                if (context.mounted) {
-                  await notifier.refresh();
-                }
               },
               leading: const Icon(Icons.forum_outlined),
               title: Row(
@@ -9311,7 +9441,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     super.dispose();
   }
 
-  /// 同步表单值到配置流，自动触发，无需手动保存
   void _syncControllersWithConfig(AppConfig config) {
     _isSyncing = true;
     setState(() {
@@ -9332,7 +9461,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final configAsync = ref.watch(configProvider);
     final profilesAsync = ref.watch(configProfilesProvider);
 
-    // 监听配置变化，自动同步到表单
     ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
       next.whenData((config) {
         _syncControllersWithConfig(config);
@@ -9363,7 +9491,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(child: Text('加载配置失败：$e')),
             data: (config) {
-              // 首次加载时同步 Controller
               if (_baseUrlController.text.isEmpty) {
                 _syncControllersWithConfig(config);
               }
@@ -9384,7 +9511,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // 配置存档
         AppSection(
           title: '配置存档',
           subtitle: '切换后自动同步到表单',
@@ -9399,7 +9525,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ? null
                   : (value) async {
                       if (value == null) return;
-                      await ref.read(configProfilesNotifierProvider).switchProfile(value);
+                      await ref
+                          .read(configProfilesControllerProvider)
+                          .switchProfile(value);
                     },
             ),
             const SizedBox(height: 12),
@@ -9414,15 +9542,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   onPressed: isBusy
                       ? null
                       : () => _showRenameProfileDialog(
-                          store.profiles.firstWhere((p) => p.id == store.activeProfileId)),
+                            store.profiles.firstWhere(
+                              (p) => p.id == store.activeProfileId,
+                            ),
+                          ),
                   child: const Text('重命名'),
                 ),
                 OutlinedButton(
                   onPressed: isBusy
                       ? null
                       : () => _deleteProfile(
-                          store.profiles.firstWhere((p) => p.id == store.activeProfileId),
-                          store.profiles.length),
+                            store.profiles.firstWhere(
+                              (p) => p.id == store.activeProfileId,
+                            ),
+                            store.profiles.length,
+                          ),
                   child: const Text('删除'),
                 ),
               ],
@@ -9430,7 +9564,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ],
         ),
 
-        // 连接配置
         AppSection(
           title: '连接配置',
           subtitle: '修改后自动保存到当前配置',
@@ -9438,10 +9571,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             TextField(
               controller: _baseUrlController,
               enabled: !isBusy,
-              decoration: const InputDecoration(labelText: 'Base URL', hintText: 'https://api.openai.com'),
+              decoration: const InputDecoration(
+                labelText: 'Base URL',
+                hintText: 'https://api.openai.com',
+              ),
               onChanged: (v) {
                 if (_isSyncing) return;
-                ref.read(configNotifierProvider).updateBaseUrl(v);
+                ref.read(configControllerProvider).updateBaseUrl(v);
               },
             ),
             const SizedBox(height: 12),
@@ -9452,27 +9588,37 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               decoration: const InputDecoration(labelText: 'API Key'),
               onChanged: (v) {
                 if (_isSyncing) return;
-                ref.read(configNotifierProvider).updateApiKey(v);
+                ref.read(configControllerProvider).updateApiKey(v);
               },
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _modelsPathController,
               enabled: !isBusy,
-              decoration: const InputDecoration(labelText: 'Models Path', hintText: _defaultModelsPath),
+              decoration: const InputDecoration(
+                labelText: 'Models Path',
+                hintText: _defaultModelsPath,
+              ),
               onChanged: (v) {
                 if (_isSyncing) return;
-                ref.read(configNotifierProvider).updateModelsPath(v.isEmpty ? _defaultModelsPath : v);
+                ref
+                    .read(configControllerProvider)
+                    .updateModelsPath(v.isEmpty ? _defaultModelsPath : v);
               },
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _chatPathController,
               enabled: !isBusy,
-              decoration: InputDecoration(labelText: 'Chat Path', hintText: _defaultChatPathForApiMode(config.apiMode)),
+              decoration: InputDecoration(
+                labelText: 'Chat Path',
+                hintText: _defaultChatPathForApiMode(config.apiMode),
+              ),
               onChanged: (v) {
                 if (_isSyncing) return;
-                ref.read(configNotifierProvider).updateChatPath(v.isEmpty ? _defaultChatPathForApiMode(config.apiMode) : v);
+                ref.read(configControllerProvider).updateChatPath(
+                      v.isEmpty ? _defaultChatPathForApiMode(config.apiMode) : v,
+                    );
               },
             ),
             const SizedBox(height: 12),
@@ -9480,24 +9626,32 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               value: config.apiMode,
               decoration: const InputDecoration(labelText: 'API Mode'),
               items: const [
-                DropdownMenuItem(value: 'chat_completions', child: Text('chat_completions')),
-                DropdownMenuItem(value: 'responses', child: Text('responses')),
+                DropdownMenuItem(
+                  value: 'chat_completions',
+                  child: Text('chat_completions'),
+                ),
+                DropdownMenuItem(
+                  value: 'responses',
+                  child: Text('responses'),
+                ),
               ],
               onChanged: isBusy
                   ? null
                   : (value) {
                       if (value == null || _isSyncing) return;
-                      ref.read(configNotifierProvider).updateApiMode(value);
+                      ref.read(configControllerProvider).updateApiMode(value);
                       if (_chatPathController.text.isEmpty) {
-                        _chatPathController.text = _defaultChatPathForApiMode(value);
-                        ref.read(configNotifierProvider).updateChatPath(_chatPathController.text);
+                        _chatPathController.text =
+                            _defaultChatPathForApiMode(value);
+                        ref
+                            .read(configControllerProvider)
+                            .updateChatPath(_chatPathController.text);
                       }
                     },
             ),
           ],
         ),
 
-        // 模型配置
         AppSection(
           title: '模型配置',
           subtitle: '选择后自动保存到当前配置',
@@ -9520,7 +9674,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
-  Widget _buildModelSelector(BuildContext context, AppConfig config, bool isBusy) {
+  Widget _buildModelSelector(
+    BuildContext context,
+    AppConfig config,
+    bool isBusy,
+  ) {
     final models = config.availableModels ?? const [];
     final selectedId = config.selectedModel;
 
@@ -9529,8 +9687,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         return GestureDetector(
           onTap: isBusy ? null : () => controller.openView(),
           child: InputDecorator(
-            decoration: const InputDecoration(labelText: '当前模型', suffixIcon: Icon(Icons.arrow_drop_down)),
-            child: Text(_getSelectedModelDisplayText(models, selectedId), overflow: TextOverflow.ellipsis),
+            decoration: const InputDecoration(
+              labelText: '当前模型',
+              suffixIcon: Icon(Icons.arrow_drop_down),
+            ),
+            child: Text(
+              _getSelectedModelDisplayText(models, selectedId),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         );
       },
@@ -9542,25 +9706,35 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           return query.isEmpty || id.contains(query) || name.contains(query);
         }).toList();
 
-        if (filtered.isEmpty) return const [ListTile(title: Text('没有匹配的模型'))];
+        if (filtered.isEmpty) {
+          return const [
+            ListTile(title: Text('没有匹配的模型')),
+          ];
+        }
 
         return [
-          ...filtered.map((model) => ListTile(
-                title: Text((model.name ?? '').trim().isNotEmpty ? model.name! : model.id),
-                trailing: model.id == selectedId ? const Icon(Icons.check) : null,
-                onTap: () {
-                  if (_isSyncing) return;
-                  ref.read(configNotifierProvider).updateSelectedModel(model.id);
-                  controller.closeView(model.id);
-                },
-              )),
+          ...filtered.map(
+            (model) => ListTile(
+              title: Text(
+                (model.name ?? '').trim().isNotEmpty ? model.name! : model.id,
+              ),
+              trailing: model.id == selectedId ? const Icon(Icons.check) : null,
+              onTap: () {
+                if (_isSyncing) return;
+                ref
+                    .read(configControllerProvider)
+                    .updateSelectedModel(model.id);
+                controller.closeView(model.id);
+              },
+            ),
+          ),
           ListTile(
             title: const Text('自定义模型 ID'),
             onTap: () {
               final text = controller.text;
               controller.closeView(null);
               if (text.isNotEmpty && !_isSyncing) {
-                ref.read(configNotifierProvider).updateSelectedModel(text);
+                ref.read(configControllerProvider).updateSelectedModel(text);
               }
             },
           ),
@@ -9571,30 +9745,59 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Widget _buildModelChips(AppConfig config) {
     final selectedId = config.selectedModel;
-    if (selectedId == null || selectedId.trim().isEmpty) return const SizedBox.shrink();
+    if (selectedId == null || selectedId.trim().isEmpty) {
+      return const SizedBox.shrink();
+    }
 
-    final model = (config.availableModels ?? const []).where((m) => m.id == selectedId).firstOrNull;
-    if (model == null) return const SizedBox.shrink();
+    final model = (config.availableModels ?? const [])
+        .where((m) => m.id == selectedId)
+        .firstOrNull;
+    if (model == null) {
+      return const SizedBox.shrink();
+    }
 
     final chips = <Widget>[];
     if (model.supportsVision == true) {
-      chips.add(const Chip(avatar: Icon(Icons.image_outlined, size: 16), label: Text('Vision'), visualDensity: VisualDensity.compact));
+      chips.add(
+        const Chip(
+          avatar: Icon(Icons.image_outlined, size: 16),
+          label: Text('Vision'),
+          visualDensity: VisualDensity.compact,
+        ),
+      );
     }
     if (model.supportsReasoning == true) {
-      chips.add(const Chip(avatar: Icon(Icons.psychology_alt_outlined, size: 16), label: Text('Reasoning'), visualDensity: VisualDensity.compact));
+      chips.add(
+        const Chip(
+          avatar: Icon(Icons.psychology_alt_outlined, size: 16),
+          label: Text('Reasoning'),
+          visualDensity: VisualDensity.compact,
+        ),
+      );
     }
-    if (chips.isEmpty) return const SizedBox.shrink();
+    if (chips.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     return Padding(
       padding: const EdgeInsets.only(top: 12),
-      child: Wrap(spacing: 8, runSpacing: 8, children: chips),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: chips,
+      ),
     );
   }
 
-  String _getSelectedModelDisplayText(List<ModelInfo> models, String? selectedId) {
+  String _getSelectedModelDisplayText(
+    List<ModelInfo> models,
+    String? selectedId,
+  ) {
     if (selectedId == null || selectedId.trim().isEmpty) return '请选择模型';
     for (final m in models) {
-      if (m.id == selectedId) return (m.name ?? '').trim().isNotEmpty ? m.name! : m.id;
+      if (m.id == selectedId) {
+        return (m.name ?? '').trim().isNotEmpty ? m.name! : m.id;
+      }
     }
     return selectedId;
   }
@@ -9605,7 +9808,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (config == null) return;
 
     try {
-      await ref.read(configNotifierProvider).saveAndRefreshModels(config);
+      await ref.read(configControllerProvider).saveAndRefreshModels(config);
       await AppToast.show('模型列表已同步');
     } catch (e) {
       await AppToast.show('同步模型失败：$e');
@@ -9620,10 +9823,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             title: const Text('恢复默认设置'),
             content: const Text('确定要将当前配置存档恢复为默认设置吗？'),
             actions: [
-              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('取消'),
+              ),
               FilledButton(
                 onPressed: () => Navigator.of(ctx).pop(true),
-                style: FilledButton.styleFrom(backgroundColor: colorScheme.error, foregroundColor: colorScheme.onError),
+                style: FilledButton.styleFrom(
+                  backgroundColor: colorScheme.error,
+                  foregroundColor: colorScheme.onError,
+                ),
                 child: const Text('恢复默认'),
               ),
             ],
@@ -9634,7 +9843,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (!confirmed) return;
 
     try {
-      await ref.read(configNotifierProvider).saveFullConfig(AppConfig.defaultConfig());
+      await ref
+          .read(configControllerProvider)
+          .saveFullConfig(AppConfig.defaultConfig());
     } catch (e) {
       await AppToast.show('恢复默认失败：$e');
     }
@@ -9646,16 +9857,26 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('新建配置存档'),
-        content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(hintText: '输入配置名称')),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: '输入配置名称'),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(controller.text.trim()), child: const Text('创建')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            child: const Text('创建'),
+          ),
         ],
       ),
     );
 
     if (result == null || result.isEmpty) return;
-    await ref.read(configProfilesNotifierProvider).createProfile(result);
+    await ref.read(configProfilesControllerProvider).createProfile(result);
   }
 
   Future<void> _showRenameProfileDialog(ConfigProfile profile) async {
@@ -9664,16 +9885,28 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('重命名配置存档'),
-        content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(hintText: '输入配置名称')),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: '输入配置名称'),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(controller.text.trim()), child: const Text('保存')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            child: const Text('保存'),
+          ),
         ],
       ),
     );
 
     if (result == null || result.isEmpty) return;
-    await ref.read(configProfilesNotifierProvider).renameProfile(profile.id, result);
+    await ref
+        .read(configProfilesControllerProvider)
+        .renameProfile(profile.id, result);
   }
 
   Future<void> _deleteProfile(ConfigProfile profile, int profileCount) async {
@@ -9688,15 +9921,23 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             title: const Text('删除配置存档'),
             content: Text('确定删除 "${profile.name}" 吗？'),
             actions: [
-              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
-              FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('删除')),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('删除'),
+              ),
             ],
           ),
         ) ??
         false;
 
     if (!confirmed) return;
-    await ref.read(configProfilesNotifierProvider).deleteProfile(profile.id);
+    await ref
+        .read(configProfilesControllerProvider)
+        .deleteProfile(profile.id);
   }
 }
 ```
@@ -9796,13 +10037,10 @@ import '../../domain/services/attachment_preparer.dart';
 import '../../domain/services/branch_navigator.dart';
 import '../../domain/services/chat_context_builder.dart';
 import '../../domain/services/chat_stream_accumulator.dart';
-import '../../domain/states/chat_state.dart';
 import '../models/pending_attachment.dart';
-import '../utils/page_utils.dart';
 import '../../core/utils/id_generator.dart';
 import 'config_notifier.dart';
 
-/// 辅助函数
 T? _firstWhereOrNull<T>(List<T> list, bool Function(T) test) {
   for (final element in list) {
     if (test(element)) return element;
@@ -9817,39 +10055,12 @@ final chatSessionProvider =
   return repository.watchSession(fileName);
 });
 
-class ChatNotifier extends StateNotifier<ChatState> {
+class ChatController {
   final Ref ref;
   final String fileName;
   final Set<String> _stoppingRoundIds = {};
 
-  int _currentPageIndex = 0;
-
-  ChatNotifier(this.ref, this.fileName) : super(ChatState.initial());
-
-  bool _sessionContainsRound(Session session, String roundId) {
-    return session.rounds.any((r) => r.id == roundId);
-  }
-
-  String? _resolveBranchLeafRoundId(
-    Session session,
-    String? preferredLeafRoundId,
-  ) {
-    if (preferredLeafRoundId != null &&
-        _sessionContainsRound(session, preferredLeafRoundId)) {
-      return preferredLeafRoundId;
-    }
-
-    final leaves = BranchNavigator.getAllBranchLeaves(session);
-    if (leaves.isNotEmpty) {
-      return leaves.last.id;
-    }
-
-    if (session.rounds.isNotEmpty) {
-      return session.rounds.first.id;
-    }
-
-    return null;
-  }
+  ChatController(this.ref, this.fileName);
 
   Future<Session?> _getLatestSession() async {
     final sessionFromStream = ref.read(chatSessionProvider(fileName)).valueOrNull;
@@ -9863,49 +10074,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
     }
   }
 
-  Future<void> loadSession({String? initialRoundId}) async {
-    final session = await _getLatestSession();
-    if (session == null) {
-      state = state.copyWith(
-        error: '会话不存在',
-        isLoading: false,
-      );
-      return;
-    }
-
-    final resolvedBranchLeafRoundId = _resolveBranchLeafRoundId(
-      session,
-      initialRoundId ?? state.branchLeafRoundId,
-    );
-
-    final visibleRounds = resolvedBranchLeafRoundId == null
-        ? <ChatRound>[]
-        : BranchNavigator.getCurrentBranchPath(session, resolvedBranchLeafRoundId);
-
-    String? resolvedCurrentRoundId = initialRoundId ?? state.currentRoundId;
-    if (resolvedCurrentRoundId == null ||
-        !visibleRounds.any((round) => round.id == resolvedCurrentRoundId)) {
-      resolvedCurrentRoundId =
-          visibleRounds.isNotEmpty ? visibleRounds.last.id : null;
-    }
-
-    if (resolvedCurrentRoundId != null && visibleRounds.isNotEmpty) {
-      final foundIndex =
-          visibleRounds.indexWhere((round) => round.id == resolvedCurrentRoundId);
-      _currentPageIndex = foundIndex >= 0 ? foundIndex : visibleRounds.length - 1;
-    } else {
-      _currentPageIndex = 0;
-    }
-
-    state = state.copyWith(
-      currentRoundId: resolvedCurrentRoundId,
-      branchLeafRoundId: resolvedBranchLeafRoundId,
-      error: null,
-      isLoading: false,
-    );
-  }
-
-  /// 从配置流获取最新的模型信息，避免缓存导致切换配置后用旧模型
   ModelInfo? _findSelectedModelInfo() {
     final configAsync = ref.read(configProvider);
     final config = configAsync.valueOrNull;
@@ -9918,7 +10086,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
     return _firstWhereOrNull(models, (m) => m.id == selectedId);
   }
 
-  /// 从配置流获取最新的配置，避免缓存导致切换配置后用旧配置请求
   Future<AppConfig> _getCurrentConfig() async {
     final configAsync = ref.read(configProvider);
     if (configAsync.hasValue) {
@@ -9945,162 +10112,140 @@ class ChatNotifier extends StateNotifier<ChatState> {
     }
   }
 
-  Future<void> sendMessage(
-    String content, {
+  Future<String> sendMessage({
+    required String content,
+    required String? parentRoundId,
     List<PendingAttachment>? attachments,
   }) async {
     final session = await _getLatestSession();
     if (session == null) {
-      state = state.copyWithError('会话未初始化');
-      return;
+      throw Exception('会话未初始化');
     }
 
-    try {
-      final pendingAttachments = attachments ?? const <PendingAttachment>[];
-      final repository = ref.read(conversationRepositoryProvider);
-      final config = await _getCurrentConfig();
-
-      _validateRequestCapability(config: config, attachments: pendingAttachments);
-
-      final savedAttachments = await AttachmentPreparer.savePendingAttachments(
-        repository,
-        pendingAttachments,
-      );
-
-      final newRound = ChatRound(
-        id: IdGenerator.generate(),
-        parentId: state.currentRoundId,
-        createdAt: DateTime.now().millisecondsSinceEpoch,
-        userContent: content,
-        userAttachments: savedAttachments,
-        isIncomplete: true,
-        hasUnseenUpdate: false,
-      );
-
-      await repository.appendRound(fileName, newRound);
-      state = state.copyWith(
-        currentRoundId: newRound.id,
-        branchLeafRoundId: newRound.id,
-      );
-
-      unawaited(_handleStreamTask(newRound, config));
-    } catch (e) {
-      state = state.copyWithError(e.toString());
+    if (parentRoundId != null &&
+        !session.rounds.any((r) => r.id == parentRoundId)) {
+      throw Exception('当前引用的轮次不存在');
     }
+
+    final pendingAttachments = attachments ?? const <PendingAttachment>[];
+    final repository = ref.read(conversationRepositoryProvider);
+    final config = await _getCurrentConfig();
+
+    _validateRequestCapability(config: config, attachments: pendingAttachments);
+
+    final savedAttachments = await AttachmentPreparer.savePendingAttachments(
+      repository,
+      pendingAttachments,
+    );
+
+    final newRound = ChatRound(
+      id: IdGenerator.generate(),
+      parentId: parentRoundId,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+      userContent: content,
+      userAttachments: savedAttachments,
+      isIncomplete: true,
+      hasUnseenUpdate: false,
+    );
+
+    await repository.appendRound(fileName, newRound);
+    unawaited(_handleStreamTask(newRound, config));
+
+    return newRound.id;
   }
 
-  Future<void> retryFromRound(String roundId) async {
+  Future<String> retryFromRound(String roundId) async {
     final session = await _getLatestSession();
     if (session == null) {
-      state = state.copyWithError('会话未初始化');
-      return;
+      throw Exception('会话未初始化');
     }
 
-    try {
-      final repository = ref.read(conversationRepositoryProvider);
-      final config = await _getCurrentConfig();
+    final repository = ref.read(conversationRepositoryProvider);
+    final config = await _getCurrentConfig();
 
-      final sourceRound = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
-      if (sourceRound == null) {
-        state = state.copyWithError('未找到要重新回复的对话');
-        return;
-      }
-
-      final selectedModel = _findSelectedModelInfo();
-      if (selectedModel != null) {
-        final hasImage = sourceRound.userAttachments.any((a) => a.isImage);
-        if (hasImage && selectedModel.supportsVision != true) {
-          state = state.copyWithError('当前模型未声明支持图片输入');
-          return;
-        }
-      }
-
-      final newRound = ChatRound(
-        id: IdGenerator.generate(),
-        parentId: sourceRound.parentId,
-        createdAt: DateTime.now().millisecondsSinceEpoch,
-        userContent: sourceRound.userContent,
-        userAttachments: sourceRound.userAttachments,
-        isIncomplete: true,
-        hasUnseenUpdate: false,
-      );
-
-      await repository.appendRound(fileName, newRound);
-      state = state.copyWith(
-        currentRoundId: newRound.id,
-        branchLeafRoundId: newRound.id,
-      );
-
-      unawaited(_handleStreamTask(newRound, config));
-    } catch (e) {
-      state = state.copyWithError(e.toString());
+    final sourceRound = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
+    if (sourceRound == null) {
+      throw Exception('未找到要重新回复的对话');
     }
+
+    final selectedModel = _findSelectedModelInfo();
+    if (selectedModel != null) {
+      final hasImage = sourceRound.userAttachments.any((a) => a.isImage);
+      if (hasImage && selectedModel.supportsVision != true) {
+        throw Exception('当前模型未声明支持图片输入');
+      }
+    }
+
+    final newRound = ChatRound(
+      id: IdGenerator.generate(),
+      parentId: sourceRound.parentId,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+      userContent: sourceRound.userContent,
+      userAttachments: sourceRound.userAttachments,
+      isIncomplete: true,
+      hasUnseenUpdate: false,
+    );
+
+    await repository.appendRound(fileName, newRound);
+    unawaited(_handleStreamTask(newRound, config));
+
+    return newRound.id;
   }
 
-  Future<void> editAndResendFromRound(
+  Future<String> editAndResendFromRound(
     String roundId,
     String newContent, {
     List<PendingAttachment>? attachments,
   }) async {
     final session = await _getLatestSession();
     if (session == null) {
-      state = state.copyWithError('会话未初始化');
-      return;
+      throw Exception('会话未初始化');
     }
 
-    try {
-      final repository = ref.read(conversationRepositoryProvider);
-      final config = await _getCurrentConfig();
-      final pendingAttachments = attachments ?? const <PendingAttachment>[];
+    final repository = ref.read(conversationRepositoryProvider);
+    final config = await _getCurrentConfig();
+    final pendingAttachments = attachments ?? const <PendingAttachment>[];
 
-      _validateRequestCapability(config: config, attachments: pendingAttachments);
+    _validateRequestCapability(config: config, attachments: pendingAttachments);
 
-      final sourceRound = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
-      if (sourceRound == null) {
-        state = state.copyWithError('未找到要编辑重试的对话');
-        return;
-      }
-
-      final selectedModel = _findSelectedModelInfo();
-      if (selectedModel != null) {
-        final hasImage = sourceRound.userAttachments.any((a) => a.isImage) ||
-            pendingAttachments.any((a) => a.isImage);
-        if (hasImage && selectedModel.supportsVision != true) {
-          state = state.copyWithError('当前模型未声明支持图片输入');
-          return;
-        }
-      }
-
-      final savedAttachments = await AttachmentPreparer.savePendingAttachments(
-        repository,
-        pendingAttachments,
-      );
-
-      final mergedAttachments = <Attachment>[
-        ...sourceRound.userAttachments,
-        ...savedAttachments,
-      ];
-
-      final newRound = ChatRound(
-        id: IdGenerator.generate(),
-        parentId: sourceRound.parentId,
-        createdAt: DateTime.now().millisecondsSinceEpoch,
-        userContent: newContent,
-        userAttachments: mergedAttachments,
-        isIncomplete: true,
-        hasUnseenUpdate: false,
-      );
-
-      await repository.appendRound(fileName, newRound);
-      state = state.copyWith(
-        currentRoundId: newRound.id,
-        branchLeafRoundId: newRound.id,
-      );
-
-      unawaited(_handleStreamTask(newRound, config));
-    } catch (e) {
-      state = state.copyWithError(e.toString());
+    final sourceRound = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
+    if (sourceRound == null) {
+      throw Exception('未找到要编辑重试的对话');
     }
+
+    final selectedModel = _findSelectedModelInfo();
+    if (selectedModel != null) {
+      final hasImage = sourceRound.userAttachments.any((a) => a.isImage) ||
+          pendingAttachments.any((a) => a.isImage);
+      if (hasImage && selectedModel.supportsVision != true) {
+        throw Exception('当前模型未声明支持图片输入');
+      }
+    }
+
+    final savedAttachments = await AttachmentPreparer.savePendingAttachments(
+      repository,
+      pendingAttachments,
+    );
+
+    final mergedAttachments = <Attachment>[
+      ...sourceRound.userAttachments,
+      ...savedAttachments,
+    ];
+
+    final newRound = ChatRound(
+      id: IdGenerator.generate(),
+      parentId: sourceRound.parentId,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+      userContent: newContent,
+      userAttachments: mergedAttachments,
+      isIncomplete: true,
+      hasUnseenUpdate: false,
+    );
+
+    await repository.appendRound(fileName, newRound);
+    unawaited(_handleStreamTask(newRound, config));
+
+    return newRound.id;
   }
 
   Future<void> _handleStreamTask(
@@ -10188,7 +10333,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
       }
 
       await _finalizeRoundPersistence(round.id, finalContent, finalReasoning);
-
       _stoppingRoundIds.remove(round.id);
     }
   }
@@ -10229,45 +10373,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
     await repository.updateRound(fileName, roundId, updatedRound);
   }
 
-  void stopGeneration() {
-    final session = ref.read(chatSessionProvider(fileName)).valueOrNull;
-    final currentRoundId = state.currentRoundId;
-    if (session == null || currentRoundId == null) return;
-
-    final visibleRounds =
-        BranchNavigator.getCurrentBranchPath(session, currentRoundId);
-
-    if (!PageUtils.isValidIndex(_currentPageIndex, visibleRounds.length)) {
-      return;
-    }
-
-    final viewingRound = visibleRounds[_currentPageIndex];
-
-    if (!viewingRound.isIncomplete) return;
-
-    _stoppingRoundIds.add(viewingRound.id);
+  void stopGeneration(String roundId) {
+    _stoppingRoundIds.add(roundId);
     final apiSource = ref.read(remoteApiSourceProvider);
-    apiSource.cancelRequest(viewingRound.id);
-  }
-
-  Future<void> switchBranch(String targetRoundId) async {
-    final session = await _getLatestSession();
-    if (session == null) return;
-
-    final newRoundId = BranchNavigator.switchBranch(session, targetRoundId);
-
-    state = state.copyWith(
-      currentRoundId: newRoundId,
-      branchLeafRoundId: newRoundId,
-    );
-  }
-
-  void changePage(int pageIndex, String roundId) {
-    _currentPageIndex = pageIndex;
-
-    state = state.copyWith(
-      currentRoundId: roundId,
-    );
+    apiSource.cancelRequest(roundId);
   }
 
   Future<void> markRoundSeen(String roundId) async {
@@ -10283,9 +10392,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
   }
 }
 
-final chatProvider = StateNotifierProvider.family<ChatNotifier, ChatState, String>(
+final chatControllerProvider = Provider.family<ChatController, String>(
   (ref, fileName) {
-    return ChatNotifier(ref, fileName);
+    return ChatController(ref, fileName);
   },
 );
 ```
@@ -10299,7 +10408,6 @@ import '../../core/models/app_config.dart';
 import '../../core/models/app_config_store.dart';
 import '../../di/providers.dart';
 
-/// 使用纯声明式 StreamProvider - 所有状态来自 Drift 数据库流
 final configProvider = StreamProvider<AppConfig>((ref) {
   final repository = ref.watch(configRepositoryProvider);
   return repository.watchConfig();
@@ -10310,22 +10418,14 @@ final configProfilesProvider = StreamProvider<AppConfigStore>((ref) {
   return repository.watchConfigStore();
 });
 
-/// 直接使用 StreamProvider，不额外维护本地状态
-/// 所有配置操作直接调用 Repository 方法，写入数据库后流自动更新
-class ConfigNotifier extends StateNotifier<AsyncValue<AppConfig>> {
+class ConfigController {
   final Ref ref;
 
-  ConfigNotifier(this.ref) : super(const AsyncValue.loading()) {
-    // 监听 StreamProvider，自动同步本地状态
-    ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
-      state = next;
-    });
-  }
+  ConfigController(this.ref);
 
   Future<void> updateBaseUrl(String baseUrl) async {
     final repository = ref.read(configRepositoryProvider);
     await repository.updateBaseUrl(baseUrl);
-    // 无需手动更新状态，流会自动推送
   }
 
   Future<void> updateApiKey(String apiKey) async {
@@ -10359,7 +10459,6 @@ class ConfigNotifier extends StateNotifier<AsyncValue<AppConfig>> {
   }
 
   Future<void> saveAndRefreshModels(AppConfig config) async {
-    state = const AsyncValue.loading();
     final repository = ref.read(configRepositoryProvider);
     await repository.saveConfig(config.copyWith(availableModels: []));
     await repository.refreshModels();
@@ -10371,22 +10470,14 @@ class ConfigNotifier extends StateNotifier<AsyncValue<AppConfig>> {
   }
 }
 
-final configNotifierProvider = Provider<ConfigNotifier>((ref) {
-  return ConfigNotifier(ref);
+final configControllerProvider = Provider<ConfigController>((ref) {
+  return ConfigController(ref);
 });
 
-class ConfigProfilesNotifier extends StateNotifier<AsyncValue<AppConfigStore>> {
+class ConfigProfilesController {
   final Ref ref;
 
-  ConfigProfilesNotifier(this.ref) : super(const AsyncValue.loading()) {
-    ref.listen<AsyncValue<AppConfigStore>>(configProfilesProvider, (previous, next) {
-      state = next;
-    });
-  }
-
-  Future<void> load() async {
-    // Stream 会自动同步，无需手动操作
-  }
+  ConfigProfilesController(this.ref);
 
   Future<void> switchProfile(String profileId) async {
     final repository = ref.read(configRepositoryProvider);
@@ -10409,191 +10500,10 @@ class ConfigProfilesNotifier extends StateNotifier<AsyncValue<AppConfigStore>> {
   }
 }
 
-final configProfilesNotifierProvider = Provider<ConfigProfilesNotifier>((ref) {
-  return ConfigProfilesNotifier(ref);
+final configProfilesControllerProvider =
+    Provider<ConfigProfilesController>((ref) {
+  return ConfigProfilesController(ref);
 });
-```
-
-## File: presentation/providers/global_streaming_provider.dart
-```dart
-// presentation/providers/global_streaming_provider.dart
-
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/chat_round.dart';
-import '../../domain/states/chat_state.dart';
-
-typedef SessionStreamMap = Map<String, StreamStatus>;
-typedef GlobalStreamMap = Map<String, SessionStreamMap>;
-
-// 这个 Provider 持有正在流式生成的数据
-// 当流式结束时，数据会写入数据库，UI 通过 watch 获取
-// 此 Provider 主要用于避免重复请求和实时显示
-class GlobalStreamCacheNotifier extends StateNotifier<GlobalStreamMap> {
-  GlobalStreamCacheNotifier() : super(const {});
-
-  StreamStatus? getRoundStream(String fileName, String roundId) {
-    return state[fileName]?[roundId];
-  }
-
-  bool hasRoundStream(String fileName, String roundId) {
-    return state[fileName]?.containsKey(roundId) ?? false;
-  }
-
-  void setRoundStream(
-    String fileName,
-    String roundId,
-    StreamStatus status,
-  ) {
-    final sessionMap = Map<String, StreamStatus>.from(state[fileName] ?? {});
-    sessionMap[roundId] = status;
-    state = {
-      ...state,
-      fileName: sessionMap,
-    };
-  }
-
-  void updateRoundStream(
-    String fileName,
-    String roundId, {
-    String? content,
-    String? reasoning,
-    bool? isStreaming,
-  }) {
-    final sessionMap = Map<String, StreamStatus>.from(state[fileName] ?? {});
-    final current = sessionMap[roundId] ?? const StreamStatus();
-    sessionMap[roundId] = current.copyWith(
-      content: content ?? current.content,
-      reasoning: reasoning ?? current.reasoning,
-      isStreaming: isStreaming ?? current.isStreaming,
-    );
-    state = {
-      ...state,
-      fileName: sessionMap,
-    };
-  }
-
-  void ensureRoundLoaded(String fileName, ChatRound round) {
-    if (hasRoundStream(fileName, round.id)) return;
-    final sessionMap = Map<String, StreamStatus>.from(state[fileName] ?? {});
-    sessionMap[round.id] = StreamStatus(
-      content: round.assistantContent ?? '',
-      reasoning: round.assistantThinking ?? '',
-      isStreaming: false,
-    );
-    state = {
-      ...state,
-      fileName: sessionMap,
-    };
-  }
-
-  void ensureRoundLoadedWithContent(
-    String fileName,
-    String roundId,
-    String content,
-    String reasoning,
-  ) {
-    final sessionMap = Map<String, StreamStatus>.from(state[fileName] ?? {});
-    if (!sessionMap.containsKey(roundId)) {
-      sessionMap[roundId] = StreamStatus(
-        content: content,
-        reasoning: reasoning,
-        isStreaming: false,
-      );
-    }
-    state = {
-      ...state,
-      fileName: sessionMap,
-    };
-  }
-
-  void ensureRoundsLoaded(String fileName, List<ChatRound> rounds) {
-    if (rounds.isEmpty) return;
-    final sessionMap = Map<String, StreamStatus>.from(state[fileName] ?? {});
-    var changed = false;
-
-    for (final round in rounds) {
-      if (sessionMap.containsKey(round.id)) continue;
-      sessionMap[round.id] = StreamStatus(
-        content: round.assistantContent ?? '',
-        reasoning: round.assistantThinking ?? '',
-        isStreaming: false,
-      );
-      changed = true;
-    }
-
-    if (!changed) return;
-
-    state = {
-      ...state,
-      fileName: sessionMap,
-    };
-  }
-
-  void clearRoundStream(String fileName, String roundId) {
-    final sessionMap = state[fileName];
-    if (sessionMap == null) return;
-
-    final next = Map<String, StreamStatus>.from(sessionMap);
-    next.remove(roundId);
-
-    if (next.isEmpty) {
-      final global = Map<String, SessionStreamMap>.from(state);
-      global.remove(fileName);
-      state = global;
-    } else {
-      state = {
-        ...state,
-        fileName: next,
-      };
-    }
-  }
-
-  void clearNonStreamingForSession(String fileName) {
-    final sessionMap = state[fileName];
-    if (sessionMap == null) return;
-
-    final retained = <String, StreamStatus>{};
-    for (final entry in sessionMap.entries) {
-      if (entry.value.isStreaming) {
-        retained[entry.key] = entry.value;
-      }
-    }
-
-    state = {
-      ...state,
-      fileName: retained,
-    };
-  }
-
-  void clearSession(String fileName) {
-    final next = Map<String, SessionStreamMap>.from(state);
-    next.remove(fileName);
-    state = next;
-  }
-}
-
-final globalStreamCacheProvider =
-    StateNotifierProvider<GlobalStreamCacheNotifier, GlobalStreamMap>((ref) {
-  // 当没有任何监听时可以自动清理
-  ref.onDispose(() {
-    // 可以在这里做一些清理工作
-  });
-  return GlobalStreamCacheNotifier();
-});
-
-final sessionStreamMapProvider =
-    Provider.family<SessionStreamMap, String>((ref, fileName) {
-  final globalMap = ref.watch(globalStreamCacheProvider);
-  return globalMap[fileName] ?? const {};
-});
-
-final roundStreamProvider =
-    Provider.family<StreamStatus?, ({String fileName, String roundId})>(
-  (ref, args) {
-    final sessionMap = ref.watch(sessionStreamMapProvider(args.fileName));
-    return sessionMap[args.roundId];
-  },
-);
 ```
 
 ## File: presentation/providers/input_draft_provider.dart
@@ -10657,41 +10567,21 @@ final sessionCardMetaProvider =
   return repository.watchSessionCardMeta(sessionId);
 });
 
-class SessionListNotifier
-    extends StateNotifier<AsyncValue<List<SessionListItem>>> {
+class SessionListController {
   final Ref ref;
 
-  SessionListNotifier(this.ref) : super(const AsyncValue.loading()) {
-    ref.listen<AsyncValue<List<SessionListItem>>>(
-      sessionListProvider,
-      (previous, next) {
-        state = next;
-      },
-    );
-  }
-
-  Future<void> refresh() async {
-    // Stream 会自动同步，保留兼容方法
-  }
+  SessionListController(this.ref);
 
   Future<void> deleteSession(String fileName) async {
-    try {
-      final repository = ref.read(conversationRepositoryProvider);
-      await repository.deleteSession(fileName);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+    final repository = ref.read(conversationRepositoryProvider);
+    await repository.deleteSession(fileName);
   }
 
   Future<void> updateSessionTitle(String fileName, String newTitle) async {
-    try {
-      final repository = ref.read(conversationRepositoryProvider);
-      final cleanTitle = newTitle.trim();
-      if (cleanTitle.isEmpty) return;
-      await repository.updateSessionTitle(fileName, cleanTitle);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+    final repository = ref.read(conversationRepositoryProvider);
+    final cleanTitle = newTitle.trim();
+    if (cleanTitle.isEmpty) return;
+    await repository.updateSessionTitle(fileName, cleanTitle);
   }
 
   Future<String> createSession(String title) async {
@@ -10707,8 +10597,8 @@ class SessionListNotifier
   }
 }
 
-final sessionListNotifierProvider = Provider<SessionListNotifier>((ref) {
-  return SessionListNotifier(ref);
+final sessionListControllerProvider = Provider<SessionListController>((ref) {
+  return SessionListController(ref);
 });
 ```
 

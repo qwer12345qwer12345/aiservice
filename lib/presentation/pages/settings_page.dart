@@ -36,7 +36,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     super.dispose();
   }
 
-  /// 同步表单值到配置流，自动触发，无需手动保存
   void _syncControllersWithConfig(AppConfig config) {
     _isSyncing = true;
     setState(() {
@@ -57,7 +56,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final configAsync = ref.watch(configProvider);
     final profilesAsync = ref.watch(configProfilesProvider);
 
-    // 监听配置变化，自动同步到表单
     ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
       next.whenData((config) {
         _syncControllersWithConfig(config);
@@ -88,7 +86,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(child: Text('加载配置失败：$e')),
             data: (config) {
-              // 首次加载时同步 Controller
               if (_baseUrlController.text.isEmpty) {
                 _syncControllersWithConfig(config);
               }
@@ -109,7 +106,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // 配置存档
         AppSection(
           title: '配置存档',
           subtitle: '切换后自动同步到表单',
@@ -124,7 +120,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ? null
                   : (value) async {
                       if (value == null) return;
-                      await ref.read(configProfilesNotifierProvider).switchProfile(value);
+                      await ref
+                          .read(configProfilesControllerProvider)
+                          .switchProfile(value);
                     },
             ),
             const SizedBox(height: 12),
@@ -139,15 +137,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   onPressed: isBusy
                       ? null
                       : () => _showRenameProfileDialog(
-                          store.profiles.firstWhere((p) => p.id == store.activeProfileId)),
+                            store.profiles.firstWhere(
+                              (p) => p.id == store.activeProfileId,
+                            ),
+                          ),
                   child: const Text('重命名'),
                 ),
                 OutlinedButton(
                   onPressed: isBusy
                       ? null
                       : () => _deleteProfile(
-                          store.profiles.firstWhere((p) => p.id == store.activeProfileId),
-                          store.profiles.length),
+                            store.profiles.firstWhere(
+                              (p) => p.id == store.activeProfileId,
+                            ),
+                            store.profiles.length,
+                          ),
                   child: const Text('删除'),
                 ),
               ],
@@ -155,7 +159,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ],
         ),
 
-        // 连接配置
         AppSection(
           title: '连接配置',
           subtitle: '修改后自动保存到当前配置',
@@ -163,10 +166,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             TextField(
               controller: _baseUrlController,
               enabled: !isBusy,
-              decoration: const InputDecoration(labelText: 'Base URL', hintText: 'https://api.openai.com'),
+              decoration: const InputDecoration(
+                labelText: 'Base URL',
+                hintText: 'https://api.openai.com',
+              ),
               onChanged: (v) {
                 if (_isSyncing) return;
-                ref.read(configNotifierProvider).updateBaseUrl(v);
+                ref.read(configControllerProvider).updateBaseUrl(v);
               },
             ),
             const SizedBox(height: 12),
@@ -177,27 +183,37 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               decoration: const InputDecoration(labelText: 'API Key'),
               onChanged: (v) {
                 if (_isSyncing) return;
-                ref.read(configNotifierProvider).updateApiKey(v);
+                ref.read(configControllerProvider).updateApiKey(v);
               },
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _modelsPathController,
               enabled: !isBusy,
-              decoration: const InputDecoration(labelText: 'Models Path', hintText: _defaultModelsPath),
+              decoration: const InputDecoration(
+                labelText: 'Models Path',
+                hintText: _defaultModelsPath,
+              ),
               onChanged: (v) {
                 if (_isSyncing) return;
-                ref.read(configNotifierProvider).updateModelsPath(v.isEmpty ? _defaultModelsPath : v);
+                ref
+                    .read(configControllerProvider)
+                    .updateModelsPath(v.isEmpty ? _defaultModelsPath : v);
               },
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _chatPathController,
               enabled: !isBusy,
-              decoration: InputDecoration(labelText: 'Chat Path', hintText: _defaultChatPathForApiMode(config.apiMode)),
+              decoration: InputDecoration(
+                labelText: 'Chat Path',
+                hintText: _defaultChatPathForApiMode(config.apiMode),
+              ),
               onChanged: (v) {
                 if (_isSyncing) return;
-                ref.read(configNotifierProvider).updateChatPath(v.isEmpty ? _defaultChatPathForApiMode(config.apiMode) : v);
+                ref.read(configControllerProvider).updateChatPath(
+                      v.isEmpty ? _defaultChatPathForApiMode(config.apiMode) : v,
+                    );
               },
             ),
             const SizedBox(height: 12),
@@ -205,24 +221,32 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               value: config.apiMode,
               decoration: const InputDecoration(labelText: 'API Mode'),
               items: const [
-                DropdownMenuItem(value: 'chat_completions', child: Text('chat_completions')),
-                DropdownMenuItem(value: 'responses', child: Text('responses')),
+                DropdownMenuItem(
+                  value: 'chat_completions',
+                  child: Text('chat_completions'),
+                ),
+                DropdownMenuItem(
+                  value: 'responses',
+                  child: Text('responses'),
+                ),
               ],
               onChanged: isBusy
                   ? null
                   : (value) {
                       if (value == null || _isSyncing) return;
-                      ref.read(configNotifierProvider).updateApiMode(value);
+                      ref.read(configControllerProvider).updateApiMode(value);
                       if (_chatPathController.text.isEmpty) {
-                        _chatPathController.text = _defaultChatPathForApiMode(value);
-                        ref.read(configNotifierProvider).updateChatPath(_chatPathController.text);
+                        _chatPathController.text =
+                            _defaultChatPathForApiMode(value);
+                        ref
+                            .read(configControllerProvider)
+                            .updateChatPath(_chatPathController.text);
                       }
                     },
             ),
           ],
         ),
 
-        // 模型配置
         AppSection(
           title: '模型配置',
           subtitle: '选择后自动保存到当前配置',
@@ -245,7 +269,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
-  Widget _buildModelSelector(BuildContext context, AppConfig config, bool isBusy) {
+  Widget _buildModelSelector(
+    BuildContext context,
+    AppConfig config,
+    bool isBusy,
+  ) {
     final models = config.availableModels ?? const [];
     final selectedId = config.selectedModel;
 
@@ -254,8 +282,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         return GestureDetector(
           onTap: isBusy ? null : () => controller.openView(),
           child: InputDecorator(
-            decoration: const InputDecoration(labelText: '当前模型', suffixIcon: Icon(Icons.arrow_drop_down)),
-            child: Text(_getSelectedModelDisplayText(models, selectedId), overflow: TextOverflow.ellipsis),
+            decoration: const InputDecoration(
+              labelText: '当前模型',
+              suffixIcon: Icon(Icons.arrow_drop_down),
+            ),
+            child: Text(
+              _getSelectedModelDisplayText(models, selectedId),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         );
       },
@@ -267,25 +301,35 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           return query.isEmpty || id.contains(query) || name.contains(query);
         }).toList();
 
-        if (filtered.isEmpty) return const [ListTile(title: Text('没有匹配的模型'))];
+        if (filtered.isEmpty) {
+          return const [
+            ListTile(title: Text('没有匹配的模型')),
+          ];
+        }
 
         return [
-          ...filtered.map((model) => ListTile(
-                title: Text((model.name ?? '').trim().isNotEmpty ? model.name! : model.id),
-                trailing: model.id == selectedId ? const Icon(Icons.check) : null,
-                onTap: () {
-                  if (_isSyncing) return;
-                  ref.read(configNotifierProvider).updateSelectedModel(model.id);
-                  controller.closeView(model.id);
-                },
-              )),
+          ...filtered.map(
+            (model) => ListTile(
+              title: Text(
+                (model.name ?? '').trim().isNotEmpty ? model.name! : model.id,
+              ),
+              trailing: model.id == selectedId ? const Icon(Icons.check) : null,
+              onTap: () {
+                if (_isSyncing) return;
+                ref
+                    .read(configControllerProvider)
+                    .updateSelectedModel(model.id);
+                controller.closeView(model.id);
+              },
+            ),
+          ),
           ListTile(
             title: const Text('自定义模型 ID'),
             onTap: () {
               final text = controller.text;
               controller.closeView(null);
               if (text.isNotEmpty && !_isSyncing) {
-                ref.read(configNotifierProvider).updateSelectedModel(text);
+                ref.read(configControllerProvider).updateSelectedModel(text);
               }
             },
           ),
@@ -296,30 +340,59 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Widget _buildModelChips(AppConfig config) {
     final selectedId = config.selectedModel;
-    if (selectedId == null || selectedId.trim().isEmpty) return const SizedBox.shrink();
+    if (selectedId == null || selectedId.trim().isEmpty) {
+      return const SizedBox.shrink();
+    }
 
-    final model = (config.availableModels ?? const []).where((m) => m.id == selectedId).firstOrNull;
-    if (model == null) return const SizedBox.shrink();
+    final model = (config.availableModels ?? const [])
+        .where((m) => m.id == selectedId)
+        .firstOrNull;
+    if (model == null) {
+      return const SizedBox.shrink();
+    }
 
     final chips = <Widget>[];
     if (model.supportsVision == true) {
-      chips.add(const Chip(avatar: Icon(Icons.image_outlined, size: 16), label: Text('Vision'), visualDensity: VisualDensity.compact));
+      chips.add(
+        const Chip(
+          avatar: Icon(Icons.image_outlined, size: 16),
+          label: Text('Vision'),
+          visualDensity: VisualDensity.compact,
+        ),
+      );
     }
     if (model.supportsReasoning == true) {
-      chips.add(const Chip(avatar: Icon(Icons.psychology_alt_outlined, size: 16), label: Text('Reasoning'), visualDensity: VisualDensity.compact));
+      chips.add(
+        const Chip(
+          avatar: Icon(Icons.psychology_alt_outlined, size: 16),
+          label: Text('Reasoning'),
+          visualDensity: VisualDensity.compact,
+        ),
+      );
     }
-    if (chips.isEmpty) return const SizedBox.shrink();
+    if (chips.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     return Padding(
       padding: const EdgeInsets.only(top: 12),
-      child: Wrap(spacing: 8, runSpacing: 8, children: chips),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: chips,
+      ),
     );
   }
 
-  String _getSelectedModelDisplayText(List<ModelInfo> models, String? selectedId) {
+  String _getSelectedModelDisplayText(
+    List<ModelInfo> models,
+    String? selectedId,
+  ) {
     if (selectedId == null || selectedId.trim().isEmpty) return '请选择模型';
     for (final m in models) {
-      if (m.id == selectedId) return (m.name ?? '').trim().isNotEmpty ? m.name! : m.id;
+      if (m.id == selectedId) {
+        return (m.name ?? '').trim().isNotEmpty ? m.name! : m.id;
+      }
     }
     return selectedId;
   }
@@ -330,7 +403,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (config == null) return;
 
     try {
-      await ref.read(configNotifierProvider).saveAndRefreshModels(config);
+      await ref.read(configControllerProvider).saveAndRefreshModels(config);
       await AppToast.show('模型列表已同步');
     } catch (e) {
       await AppToast.show('同步模型失败：$e');
@@ -345,10 +418,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             title: const Text('恢复默认设置'),
             content: const Text('确定要将当前配置存档恢复为默认设置吗？'),
             actions: [
-              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('取消'),
+              ),
               FilledButton(
                 onPressed: () => Navigator.of(ctx).pop(true),
-                style: FilledButton.styleFrom(backgroundColor: colorScheme.error, foregroundColor: colorScheme.onError),
+                style: FilledButton.styleFrom(
+                  backgroundColor: colorScheme.error,
+                  foregroundColor: colorScheme.onError,
+                ),
                 child: const Text('恢复默认'),
               ),
             ],
@@ -359,7 +438,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (!confirmed) return;
 
     try {
-      await ref.read(configNotifierProvider).saveFullConfig(AppConfig.defaultConfig());
+      await ref
+          .read(configControllerProvider)
+          .saveFullConfig(AppConfig.defaultConfig());
     } catch (e) {
       await AppToast.show('恢复默认失败：$e');
     }
@@ -371,16 +452,26 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('新建配置存档'),
-        content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(hintText: '输入配置名称')),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: '输入配置名称'),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(controller.text.trim()), child: const Text('创建')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            child: const Text('创建'),
+          ),
         ],
       ),
     );
 
     if (result == null || result.isEmpty) return;
-    await ref.read(configProfilesNotifierProvider).createProfile(result);
+    await ref.read(configProfilesControllerProvider).createProfile(result);
   }
 
   Future<void> _showRenameProfileDialog(ConfigProfile profile) async {
@@ -389,16 +480,28 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('重命名配置存档'),
-        content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(hintText: '输入配置名称')),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: '输入配置名称'),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(controller.text.trim()), child: const Text('保存')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            child: const Text('保存'),
+          ),
         ],
       ),
     );
 
     if (result == null || result.isEmpty) return;
-    await ref.read(configProfilesNotifierProvider).renameProfile(profile.id, result);
+    await ref
+        .read(configProfilesControllerProvider)
+        .renameProfile(profile.id, result);
   }
 
   Future<void> _deleteProfile(ConfigProfile profile, int profileCount) async {
@@ -413,14 +516,22 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             title: const Text('删除配置存档'),
             content: Text('确定删除 "${profile.name}" 吗？'),
             actions: [
-              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
-              FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('删除')),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('删除'),
+              ),
             ],
           ),
         ) ??
         false;
 
     if (!confirmed) return;
-    await ref.read(configProfilesNotifierProvider).deleteProfile(profile.id);
+    await ref
+        .read(configProfilesControllerProvider)
+        .deleteProfile(profile.id);
   }
 }

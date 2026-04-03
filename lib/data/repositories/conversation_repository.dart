@@ -22,7 +22,9 @@ class ConversationRepository {
 
   // 检查附件是否被其他 Round 引用
   Future<bool> _isAttachmentUsedElsewhere(
-      String relativePath, List<String> excludeRoundIds) async {
+    String relativePath,
+    List<String> excludeRoundIds,
+  ) async {
     final query = _db.select(_db.dbAttachments).join([
       innerJoin(
         _db.dbChatRounds,
@@ -31,13 +33,14 @@ class ConversationRepository {
     ])
       ..where(_db.dbAttachments.relativePath.equals(relativePath))
       ..where(_db.dbChatRounds.id.isNotIn(excludeRoundIds));
+
     final result = await query.get();
     return result.isNotEmpty;
   }
 
   Stream<List<SessionListItem>> watchSessionListItems() {
     final query = (_db.select(_db.dbSessions)
-          ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]));
+      ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]));
 
     return query.watch().map((sessions) {
       return sessions.map((session) {
@@ -52,8 +55,8 @@ class ConversationRepository {
 
   Stream<SessionCardMeta> watchSessionCardMeta(String sessionId) {
     final query = (_db.select(_db.dbChatRounds)
-          ..where((t) => t.sessionId.equals(sessionId))
-          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]));
+      ..where((t) => t.sessionId.equals(sessionId))
+      ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]));
 
     return query.watch().map((rounds) {
       final previewRound = rounds.isEmpty ? null : rounds.last;
@@ -83,93 +86,68 @@ class ConversationRepository {
   }
 
   /// 监听单个会话的完整数据（包含所有轮次和附件）
+  /// 改为单条 join watch，避免“watch 主表 + 子表补查”
   Stream<Session?> watchSession(String fileName) {
     final sessionId = _getId(fileName);
 
-    // 监听会话元数据变更
-    final sessionQuery = _db.select(_db.dbSessions)
-      ..where((t) => t.id.equals(sessionId));
+    final query = _db.select(_db.dbSessions).join([
+      leftOuterJoin(
+        _db.dbChatRounds,
+        _db.dbChatRounds.sessionId.equalsExp(_db.dbSessions.id),
+      ),
+      leftOuterJoin(
+        _db.dbAttachments,
+        _db.dbAttachments.roundId.equalsExp(_db.dbChatRounds.id),
+      ),
+    ])
+      ..where(_db.dbSessions.id.equals(sessionId))
+      ..orderBy([
+        OrderingTerm.asc(_db.dbChatRounds.createdAt),
+      ]);
 
-    return sessionQuery.watchSingleOrNull().asyncMap((sessionRow) async {
-      if (sessionRow == null) return null;
-      return _buildSessionFromRow(sessionRow);
-    });
-  }
-
-  /// 监听会话的轮次列表
-  Stream<List<ChatRound>> watchRounds(String sessionId) {
-    final roundsQuery = _db.select(_db.dbChatRounds)
-      ..where((t) => t.sessionId.equals(sessionId))
-      ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]);
-
-    return roundsQuery.watch().asyncMap((roundRows) async {
-      final rounds = <ChatRound>[];
-      for (final round in roundRows) {
-        final attachments = await _getAttachmentsForRound(round.id);
-        rounds.add(_mapToChatRound(round, attachments));
-      }
-      return rounds;
-    });
-  }
-
-  /// 监听单个轮次的数据
-  Stream<ChatRound?> watchRound(String roundId) {
-    final query = _db.select(_db.dbChatRounds)
-      ..where((t) => t.id.equals(roundId));
-
-    return query.watchSingleOrNull().asyncMap((roundRow) async {
-      if (roundRow == null) return null;
-      final attachments = await _getAttachmentsForRound(roundId);
-      return _mapToChatRound(roundRow, attachments);
-    });
+    return query.watch().map(_mapSessionFromJoinedRows);
   }
 
   // ========== 私有辅助方法 ==========
 
-  Future<Session> _buildSessionFromRow(DbSession sessionRow) async {
-    final sessionId = sessionRow.id;
+  Session? _mapSessionFromJoinedRows(List<TypedResult> rows) {
+    if (rows.isEmpty) return null;
 
-    // 查询所有轮次
-    final roundsQuery = _db.select(_db.dbChatRounds)
-      ..where((t) => t.sessionId.equals(sessionId))
-      ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]);
-    final roundRows = await roundsQuery.get();
+    final sessionRow = rows.first.readTable(_db.dbSessions);
 
-    if (roundRows.isEmpty) {
-      return Session(
-        id: sessionRow.id,
-        title: sessionRow.title,
-        createdAt: sessionRow.createdAt,
-        updatedAt: sessionRow.updatedAt,
-        config: sessionRow.config,
-        hasUnseenUpdate: sessionRow.hasUnseenUpdate,
-        rounds: const [],
-      );
+    final roundMap = <String, DbChatRound>{};
+    final attachmentMap = <String, List<Attachment>>{};
+
+    for (final row in rows) {
+      final roundRow = row.readTableOrNull(_db.dbChatRounds);
+      if (roundRow == null) continue;
+
+      roundMap.putIfAbsent(roundRow.id, () => roundRow);
+
+      final attachmentRow = row.readTableOrNull(_db.dbAttachments);
+      if (attachmentRow != null) {
+        attachmentMap.putIfAbsent(roundRow.id, () => []).add(
+              Attachment(
+                id: attachmentRow.id,
+                name: attachmentRow.name,
+                relativePath: attachmentRow.relativePath,
+                isImage: attachmentRow.isImage,
+                mimeType: attachmentRow.mimeType,
+              ),
+            );
+      }
     }
 
-    // 查询所有相关附件
-    final roundIds = roundRows.map((r) => r.id).toList();
-    final attachmentsQuery = _db.select(_db.dbAttachments)
-      ..where((t) => t.roundId.isIn(roundIds));
-    final attachmentRows = await attachmentsQuery.get();
+    final sortedRoundRows = roundMap.values.toList()
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
-    // 组装 Attachments Map
-    final attachMap = <String, List<Attachment>>{};
-    for (final a in attachmentRows) {
-      attachMap.putIfAbsent(a.roundId, () => []).add(
-            Attachment(
-              id: a.id,
-              name: a.name,
-              relativePath: a.relativePath,
-              isImage: a.isImage,
-              mimeType: a.mimeType,
-            ),
-          );
-    }
-
-    // 组装 Rounds
-    final rounds = roundRows
-        .map((r) => _mapToChatRound(r, attachMap[r.id] ?? []))
+    final rounds = sortedRoundRows
+        .map(
+          (roundRow) => _mapToChatRound(
+            roundRow,
+            attachmentMap[roundRow.id] ?? const <Attachment>[],
+          ),
+        )
         .toList();
 
     return Session(
@@ -181,21 +159,6 @@ class ConversationRepository {
       hasUnseenUpdate: sessionRow.hasUnseenUpdate,
       rounds: rounds,
     );
-  }
-
-  Future<List<Attachment>> _getAttachmentsForRound(String roundId) async {
-    final query = _db.select(_db.dbAttachments)
-      ..where((t) => t.roundId.equals(roundId));
-    final rows = await query.get();
-    return rows
-        .map((a) => Attachment(
-              id: a.id,
-              name: a.name,
-              relativePath: a.relativePath,
-              isImage: a.isImage,
-              mimeType: a.mimeType,
-            ))
-        .toList();
   }
 
   ChatRound _mapToChatRound(DbChatRound row, List<Attachment> attachments) {
@@ -223,21 +186,40 @@ class ConversationRepository {
 
   Future<Session> getSession(String fileName) async {
     final sessionId = _getId(fileName);
-    final sessionRow = await (_db.select(_db.dbSessions)
-          ..where((t) => t.id.equals(sessionId)))
-        .getSingle();
-    return _buildSessionFromRow(sessionRow);
+
+    final query = _db.select(_db.dbSessions).join([
+      leftOuterJoin(
+        _db.dbChatRounds,
+        _db.dbChatRounds.sessionId.equalsExp(_db.dbSessions.id),
+      ),
+      leftOuterJoin(
+        _db.dbAttachments,
+        _db.dbAttachments.roundId.equalsExp(_db.dbChatRounds.id),
+      ),
+    ])
+      ..where(_db.dbSessions.id.equals(sessionId))
+      ..orderBy([
+        OrderingTerm.asc(_db.dbChatRounds.createdAt),
+      ]);
+
+    final session = _mapSessionFromJoinedRows(await query.get());
+
+    if (session == null) {
+      throw StateError('Session not found: $fileName');
+    }
+
+    return session;
   }
 
   Future<void> deleteRounds(String sessionId, List<String> roundIds) async {
     if (roundIds.isEmpty) return;
+
     await (_db.delete(_db.dbChatRounds)
           ..where((t) => t.sessionId.equals(sessionId) & t.id.isIn(roundIds)))
         .go();
   }
 
-  Future<void> saveSession(
-      String fileName, Session newSession) async {
+  Future<void> saveSession(String fileName, Session newSession) async {
     final sessionId = _getId(fileName);
 
     await _db.transaction(() async {
@@ -258,15 +240,18 @@ class ConversationRepository {
               ),
             );
 
-        allAttachments.addAll(round.userAttachments
-            .map((a) => DbAttachmentsCompanion.insert(
-                  id: a.id,
-                  roundId: round.id,
-                  name: a.name,
-                  relativePath: a.relativePath,
-                  isImage: Value(a.isImage),
-                  mimeType: Value(a.mimeType),
-                )));
+        allAttachments.addAll(
+          round.userAttachments.map(
+            (a) => DbAttachmentsCompanion.insert(
+              id: a.id,
+              roundId: round.id,
+              name: a.name,
+              relativePath: a.relativePath,
+              isImage: Value(a.isImage),
+              mimeType: Value(a.mimeType),
+            ),
+          ),
+        );
       }
 
       for (final attach in allAttachments) {
@@ -287,7 +272,9 @@ class ConversationRepository {
   }
 
   Future<void> saveSessionAndCleanupOrphanAttachments(
-    String fileName, Session oldSession, Session newSession,
+    String fileName,
+    Session oldSession,
+    Session newSession,
   ) async {
     final oldPaths = oldSession.rounds
         .expand((r) => r.userAttachments)
@@ -314,9 +301,53 @@ class ConversationRepository {
     }
   }
 
+  Future<void> deleteRoundsAndCleanupOrphanAttachments(
+    String fileName,
+    List<String> roundIds,
+  ) async {
+    if (roundIds.isEmpty) return;
+
+    final sessionId = _getId(fileName);
+
+    final attachmentsToCheck = await (_db.select(_db.dbAttachments).join([
+      innerJoin(
+        _db.dbChatRounds,
+        _db.dbChatRounds.id.equalsExp(_db.dbAttachments.roundId),
+      ),
+    ])
+          ..where(_db.dbChatRounds.sessionId.equals(sessionId))
+          ..where(_db.dbChatRounds.id.isIn(roundIds)))
+        .get();
+
+    final paths = attachmentsToCheck
+        .map((row) => row.readTable(_db.dbAttachments).relativePath)
+        .toSet();
+
+    await _db.transaction(() async {
+      await (_db.delete(_db.dbChatRounds)
+            ..where((t) => t.sessionId.equals(sessionId) & t.id.isIn(roundIds)))
+          .go();
+
+      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId))).write(
+        DbSessionsCompanion(
+          updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+        ),
+      );
+    });
+
+    for (final path in paths) {
+      if (!await _isAttachmentUsedElsewhere(path, roundIds)) {
+        try {
+          await _fileService.deleteAttachment(path);
+        } catch (_) {}
+      }
+    }
+  }
+
   Future<void> deleteSession(String fileName) async {
     final sessionId = _getId(fileName);
     Session? targetSession;
+
     try {
       targetSession = await getSession(fileName);
     } catch (_) {}
@@ -327,6 +358,7 @@ class ConversationRepository {
           .map((a) => a.relativePath)
           .toSet();
       final allRoundIds = targetSession.rounds.map((r) => r.id).toList();
+
       for (final path in paths) {
         if (!await _isAttachmentUsedElsewhere(path, allRoundIds)) {
           try {
@@ -335,26 +367,33 @@ class ConversationRepository {
         }
       }
     }
-    await (_db.delete(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-        .go();
+
+    await (_db.delete(_db.dbSessions)..where((t) => t.id.equals(sessionId))).go();
   }
 
   Future<String> saveAttachment(Uint8List data, String fileName) async =>
       await _fileService.saveAttachment(data, fileName);
+
   Future<Uint8List> getAttachment(String relativePath) async =>
       await _fileService.readAttachment(relativePath);
+
   Future<void> deleteAttachment(String relativePath) async =>
       await _fileService.deleteAttachment(relativePath);
 
-  Future<Session> createSession({required String fileName, required String title}) async {
+  Future<Session> createSession({
+    required String fileName,
+    required String title,
+  }) async {
     final sessionId = _getId(fileName);
     final now = DateTime.now().millisecondsSinceEpoch;
+
     final session = Session(
-        id: sessionId,
-        title: title,
-        createdAt: now,
-        updatedAt: now,
-        rounds: []);
+      id: sessionId,
+      title: title,
+      createdAt: now,
+      updatedAt: now,
+      rounds: [],
+    );
 
     await _db.into(_db.dbSessions).insert(
           DbSessionsCompanion.insert(
@@ -364,6 +403,7 @@ class ConversationRepository {
             updatedAt: session.updatedAt,
           ),
         );
+
     return session;
   }
 
@@ -374,26 +414,31 @@ class ConversationRepository {
 
   Future<void> updateSessionTitle(String fileName, String title) async {
     final sessionId = _getId(fileName);
-    await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-        .write(DbSessionsCompanion(
-          title: Value(title),
-          updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
-        ));
+
+    await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId))).write(
+      DbSessionsCompanion(
+        title: Value(title),
+        updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
   }
 
   Future<List<Session>> getAllSessions() async {
     final ids = await getAllSessionFileNames();
     final sessions = <Session>[];
+
     for (final id in ids) {
       try {
         sessions.add(await getSession(id));
       } catch (_) {}
     }
+
     return sessions;
   }
 
   Future<void> appendRound(String fileName, ChatRound round) async {
     final sessionId = _getId(fileName);
+
     await _db.transaction(() async {
       await _db.into(_db.dbChatRounds).insert(
             DbChatRoundsCompanion.insert(
@@ -408,6 +453,7 @@ class ConversationRepository {
               hasUnseenUpdate: Value(round.hasUnseenUpdate),
             ),
           );
+
       for (final attach in round.userAttachments) {
         await _db.into(_db.dbAttachments).insert(
               DbAttachmentsCompanion.insert(
@@ -420,29 +466,37 @@ class ConversationRepository {
               ),
             );
       }
-      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-          .write(DbSessionsCompanion(
-              updatedAt: Value(DateTime.now().millisecondsSinceEpoch)));
+
+      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId))).write(
+        DbSessionsCompanion(
+          updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+        ),
+      );
     });
   }
 
   Future<void> updateRound(
-      String fileName, String roundId, ChatRound updatedRound) async {
+    String fileName,
+    String roundId,
+    ChatRound updatedRound,
+  ) async {
     final sessionId = _getId(fileName);
+
     await _db.transaction(() async {
-      await (_db.update(_db.dbChatRounds)
-            ..where((t) => t.id.equals(roundId)))
-          .write(
-            DbChatRoundsCompanion(
-              assistantThinking: Value(updatedRound.assistantThinking),
-              assistantContent: Value(updatedRound.assistantContent),
-              isIncomplete: Value(updatedRound.isIncomplete),
-              hasUnseenUpdate: Value(updatedRound.hasUnseenUpdate),
-            ),
-          );
-      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-          .write(DbSessionsCompanion(
-              updatedAt: Value(DateTime.now().millisecondsSinceEpoch)));
+      await (_db.update(_db.dbChatRounds)..where((t) => t.id.equals(roundId))).write(
+        DbChatRoundsCompanion(
+          assistantThinking: Value(updatedRound.assistantThinking),
+          assistantContent: Value(updatedRound.assistantContent),
+          isIncomplete: Value(updatedRound.isIncomplete),
+          hasUnseenUpdate: Value(updatedRound.hasUnseenUpdate),
+        ),
+      );
+
+      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId))).write(
+        DbSessionsCompanion(
+          updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+        ),
+      );
     });
   }
 }

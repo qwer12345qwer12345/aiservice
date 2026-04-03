@@ -14,16 +14,16 @@ class HomePage extends ConsumerWidget {
 
   Future<void> _showRenameDialog(
     BuildContext context,
-    SessionListNotifier notifier,
+    SessionListController controller,
     SessionListItem item,
   ) async {
-    final controller = TextEditingController(text: item.title);
+    final controllerText = TextEditingController(text: item.title);
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('重命名会话'),
         content: TextField(
-          controller: controller,
+          controller: controllerText,
           autofocus: true,
           decoration: const InputDecoration(
             hintText: '输入新的会话名称',
@@ -36,23 +36,20 @@ class HomePage extends ConsumerWidget {
             child: const Text('取消'),
           ),
           FilledButton(
-            onPressed: () =>
-                Navigator.of(ctx).pop(controller.text.trim()),
+            onPressed: () => Navigator.of(ctx).pop(controllerText.text.trim()),
             child: const Text('保存'),
           ),
         ],
       ),
     );
-    if (result != null &&
-        result.isNotEmpty &&
-        result != item.title) {
-      await notifier.updateSessionTitle('${item.id}.json', result);
+    if (result != null && result.isNotEmpty && result != item.title) {
+      await controller.updateSessionTitle('${item.id}.json', result);
     }
   }
 
   Future<void> _showDeleteConfirmDialog(
     BuildContext context,
-    SessionListNotifier notifier,
+    SessionListController controller,
     SessionListItem item,
   ) async {
     final colorScheme = Theme.of(context).colorScheme;
@@ -80,14 +77,14 @@ class HomePage extends ConsumerWidget {
         false;
 
     if (confirmed == true) {
-      await notifier.deleteSession('${item.id}.json');
+      await controller.deleteSession('${item.id}.json');
     }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sessionsAsync = ref.watch(sessionListProvider);
-    final notifier = ref.read(sessionListNotifierProvider);
+    final controller = ref.read(sessionListControllerProvider);
 
     return AppPageScaffold(
       appBar: AppBar(
@@ -117,7 +114,7 @@ class HomePage extends ConsumerWidget {
               error: (e, st) => _HomeErrorState(
                 message: '加载会话失败：$e',
                 onRetry: () async {
-                  await notifier.refresh();
+                  ref.invalidate(sessionListProvider);
                 },
               ),
               data: (items) {
@@ -132,11 +129,11 @@ class HomePage extends ConsumerWidget {
                     final item = items[index];
                     return _SessionCard(
                       item: item,
-                      notifier: notifier,
+                      controller: controller,
                       onRename: (item) =>
-                          _showRenameDialog(context, notifier, item),
+                          _showRenameDialog(context, controller, item),
                       onDelete: (item) =>
-                          _showDeleteConfirmDialog(context, notifier, item),
+                          _showDeleteConfirmDialog(context, controller, item),
                     );
                   },
                 );
@@ -146,7 +143,7 @@ class HomePage extends ConsumerWidget {
           InputBar(
             hintText: '发送消息',
             onSend: (content, attachments) async {
-              final newFileName = await notifier.createSession('新对话');
+              final newFileName = await controller.createSession('新对话');
               if (context.mounted) {
                 await Navigator.push(
                   context,
@@ -158,9 +155,6 @@ class HomePage extends ConsumerWidget {
                     ),
                   ),
                 );
-                if (context.mounted) {
-                  await notifier.refresh();
-                }
               }
             },
           ),
@@ -257,13 +251,13 @@ class _HomeErrorState extends StatelessWidget {
 
 class _SessionCard extends ConsumerWidget {
   final SessionListItem item;
-  final SessionListNotifier notifier;
+  final SessionListController controller;
   final Future<void> Function(SessionListItem item) onRename;
   final Future<void> Function(SessionListItem item) onDelete;
 
   const _SessionCard({
     required this.item,
-    required this.notifier,
+    required this.controller,
     required this.onRename,
     required this.onDelete,
   });
@@ -293,9 +287,6 @@ class _SessionCard extends ConsumerWidget {
                   builder: (_) => ChatPage(fileName: fileName),
                 ),
               );
-              if (context.mounted) {
-                await notifier.refresh();
-              }
             },
             leading: const Icon(Icons.forum_outlined),
             title: Text(
@@ -334,9 +325,6 @@ class _SessionCard extends ConsumerWidget {
                   builder: (_) => ChatPage(fileName: fileName),
                 ),
               );
-              if (context.mounted) {
-                await notifier.refresh();
-              }
             },
             leading: const Icon(Icons.forum_outlined),
             title: Text(
@@ -402,9 +390,6 @@ class _SessionCard extends ConsumerWidget {
                     ),
                   ),
                 );
-                if (context.mounted) {
-                  await notifier.refresh();
-                }
               },
               leading: const Icon(Icons.forum_outlined),
               title: Row(

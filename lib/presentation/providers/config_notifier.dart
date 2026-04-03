@@ -5,7 +5,6 @@ import '../../core/models/app_config.dart';
 import '../../core/models/app_config_store.dart';
 import '../../di/providers.dart';
 
-/// 使用纯声明式 StreamProvider - 所有状态来自 Drift 数据库流
 final configProvider = StreamProvider<AppConfig>((ref) {
   final repository = ref.watch(configRepositoryProvider);
   return repository.watchConfig();
@@ -16,22 +15,14 @@ final configProfilesProvider = StreamProvider<AppConfigStore>((ref) {
   return repository.watchConfigStore();
 });
 
-/// 直接使用 StreamProvider，不额外维护本地状态
-/// 所有配置操作直接调用 Repository 方法，写入数据库后流自动更新
-class ConfigNotifier extends StateNotifier<AsyncValue<AppConfig>> {
+class ConfigController {
   final Ref ref;
 
-  ConfigNotifier(this.ref) : super(const AsyncValue.loading()) {
-    // 监听 StreamProvider，自动同步本地状态
-    ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
-      state = next;
-    });
-  }
+  ConfigController(this.ref);
 
   Future<void> updateBaseUrl(String baseUrl) async {
     final repository = ref.read(configRepositoryProvider);
     await repository.updateBaseUrl(baseUrl);
-    // 无需手动更新状态，流会自动推送
   }
 
   Future<void> updateApiKey(String apiKey) async {
@@ -65,7 +56,6 @@ class ConfigNotifier extends StateNotifier<AsyncValue<AppConfig>> {
   }
 
   Future<void> saveAndRefreshModels(AppConfig config) async {
-    state = const AsyncValue.loading();
     final repository = ref.read(configRepositoryProvider);
     await repository.saveConfig(config.copyWith(availableModels: []));
     await repository.refreshModels();
@@ -77,22 +67,14 @@ class ConfigNotifier extends StateNotifier<AsyncValue<AppConfig>> {
   }
 }
 
-final configNotifierProvider = Provider<ConfigNotifier>((ref) {
-  return ConfigNotifier(ref);
+final configControllerProvider = Provider<ConfigController>((ref) {
+  return ConfigController(ref);
 });
 
-class ConfigProfilesNotifier extends StateNotifier<AsyncValue<AppConfigStore>> {
+class ConfigProfilesController {
   final Ref ref;
 
-  ConfigProfilesNotifier(this.ref) : super(const AsyncValue.loading()) {
-    ref.listen<AsyncValue<AppConfigStore>>(configProfilesProvider, (previous, next) {
-      state = next;
-    });
-  }
-
-  Future<void> load() async {
-    // Stream 会自动同步，无需手动操作
-  }
+  ConfigProfilesController(this.ref);
 
   Future<void> switchProfile(String profileId) async {
     final repository = ref.read(configRepositoryProvider);
@@ -115,6 +97,7 @@ class ConfigProfilesNotifier extends StateNotifier<AsyncValue<AppConfigStore>> {
   }
 }
 
-final configProfilesNotifierProvider = Provider<ConfigProfilesNotifier>((ref) {
-  return ConfigProfilesNotifier(ref);
+final configProfilesControllerProvider =
+    Provider<ConfigProfilesController>((ref) {
+  return ConfigProfilesController(ref);
 });

@@ -14,41 +14,21 @@ final sessionCardMetaProvider =
   return repository.watchSessionCardMeta(sessionId);
 });
 
-class SessionListNotifier
-    extends StateNotifier<AsyncValue<List<SessionListItem>>> {
+class SessionListController {
   final Ref ref;
 
-  SessionListNotifier(this.ref) : super(const AsyncValue.loading()) {
-    ref.listen<AsyncValue<List<SessionListItem>>>(
-      sessionListProvider,
-      (previous, next) {
-        state = next;
-      },
-    );
-  }
-
-  Future<void> refresh() async {
-    // Stream 会自动同步，保留兼容方法
-  }
+  SessionListController(this.ref);
 
   Future<void> deleteSession(String fileName) async {
-    try {
-      final repository = ref.read(conversationRepositoryProvider);
-      await repository.deleteSession(fileName);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+    final repository = ref.read(conversationRepositoryProvider);
+    await repository.deleteSession(fileName);
   }
 
   Future<void> updateSessionTitle(String fileName, String newTitle) async {
-    try {
-      final repository = ref.read(conversationRepositoryProvider);
-      final cleanTitle = newTitle.trim();
-      if (cleanTitle.isEmpty) return;
-      await repository.updateSessionTitle(fileName, cleanTitle);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+    final repository = ref.read(conversationRepositoryProvider);
+    final cleanTitle = newTitle.trim();
+    if (cleanTitle.isEmpty) return;
+    await repository.updateSessionTitle(fileName, cleanTitle);
   }
 
   Future<String> createSession(String title) async {
@@ -64,6 +44,6 @@ class SessionListNotifier
   }
 }
 
-final sessionListNotifierProvider = Provider<SessionListNotifier>((ref) {
-  return SessionListNotifier(ref);
+final sessionListControllerProvider = Provider<SessionListController>((ref) {
+  return SessionListController(ref);
 });

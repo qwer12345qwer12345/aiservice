@@ -5,7 +5,6 @@ import '../../core/models/chat_round.dart';
 import '../../core/models/session.dart';
 import '../../core/utils/app_route_observer.dart';
 import '../../core/utils/time_format_utils.dart';
-import '../../domain/states/chat_state.dart';
 import '../models/pending_attachment.dart';
 import '../providers/chat_notifier.dart';
 import '../providers/input_draft_provider.dart';
@@ -40,81 +39,62 @@ class ChatPage extends ConsumerStatefulWidget {
 
 class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
   PageController? _pageController;
-  late final ProviderSubscription<ChatState> _chatSubscription;
+  late final ProviderSubscription<AsyncValue<Session?>> _sessionSubscription;
+
   bool _initialMessageHandled = false;
   bool _isMarkingSeen = false;
   bool _isRouteVisible = false;
   ModalRoute<dynamic>? _route;
 
-  List<ChatRound> _buildVisibleRounds(
-    Session? session,
-    String? branchLeafRoundId,
-  ) {
-    if (session == null || branchLeafRoundId == null) {
-      return const <ChatRound>[];
-    }
-    return BranchNavigator.getCurrentBranchPath(session, branchLeafRoundId);
-  }
-
-  int _resolveCurrentIndex(List<ChatRound> visibleRounds, String? currentRoundId) {
-    if (visibleRounds.isEmpty || currentRoundId == null) return 0;
-    final index = visibleRounds.indexWhere((round) => round.id == currentRoundId);
-    if (index < 0) return visibleRounds.length - 1;
-    return index;
-  }
+  String? _branchRoundId;
+  String? _currentRoundId;
 
   @override
   void initState() {
     super.initState();
 
-    _chatSubscription = ref.listenManual<ChatState>(
-      chatProvider(widget.fileName),
-      (previous, next) {
-        final session = ref.read(chatSessionProvider(widget.fileName)).valueOrNull;
-        final nextVisibleRounds =
-            _buildVisibleRounds(session, next.branchLeafRoundId);
-        final nextIndex =
-            _resolveCurrentIndex(nextVisibleRounds, next.currentRoundId);
+    _branchRoundId = widget.initialRoundId;
+    _currentRoundId = widget.initialRoundId;
 
-        if (nextVisibleRounds.isNotEmpty) {
-          if (_pageController == null) {
-            _pageController = PageController(initialPage: nextIndex);
-            if (mounted) {
-              setState(() {});
-            }
+    _sessionSubscription = ref.listenManual<AsyncValue<Session?>>(
+      chatSessionProvider(widget.fileName),
+      (previous, next) {
+        next.whenData((session) async {
+          _reconcileSession(session);
+
+          if (_initialMessageHandled || session == null || !mounted) {
             return;
           }
 
-          final controller = _pageController!;
-          if (controller.hasClients) {
-            final currentPage = controller.page?.round() ?? controller.initialPage;
-            if (currentPage != nextIndex) {
-              controller.jumpToPage(nextIndex);
-            }
-          }
-        }
-
-        if (session != null && !_initialMessageHandled && mounted) {
           final message = widget.initialMessage?.trim() ?? '';
-          final attachments = widget.initialAttachments ?? const <PendingAttachment>[];
+          final attachments =
+              widget.initialAttachments ?? const <PendingAttachment>[];
           final hasContent = message.isNotEmpty || attachments.isNotEmpty;
 
-          if (hasContent) {
-            _initialMessageHandled = true;
-            ref.read(chatProvider(widget.fileName).notifier)
-                .sendMessage(message, attachments: attachments)
-                .catchError((e) {
-              if (mounted) AppToast.show('发送失败：${e.toString()}');
+          if (!hasContent) return;
+
+          _initialMessageHandled = true;
+          try {
+            final newRoundId =
+                await ref.read(chatControllerProvider(widget.fileName)).sendMessage(
+                      content: message,
+                      parentRoundId: _currentRoundId,
+                      attachments: attachments,
+                    );
+
+            if (!mounted) return;
+            setState(() {
+              _branchRoundId = newRoundId;
+              _currentRoundId = newRoundId;
             });
+          } catch (e) {
+            if (mounted) {
+              AppToast.show('发送失败：${e.toString()}');
+            }
           }
-        }
+        });
       },
     );
-
-    Future.microtask(() async {
-      final notifier = ref.read(chatProvider(widget.fileName).notifier);
-      await notifier.loadSession(initialRoundId: widget.initialRoundId);
-    });
   }
 
   @override
@@ -132,10 +112,106 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
 
   @override
   void dispose() {
-    _chatSubscription.close();
+    _sessionSubscription.close();
     appRouteObserver.unsubscribe(this);
     _pageController?.dispose();
     super.dispose();
+  }
+
+  List<ChatRound> _buildVisibleRounds(
+    Session? session,
+    String? branchRoundId,
+  ) {
+    if (session == null || branchRoundId == null) {
+      return const <ChatRound>[];
+    }
+    return BranchNavigator.getCurrentBranchPath(session, branchRoundId);
+  }
+
+  int _resolveCurrentIndex(List<ChatRound> visibleRounds, String? currentRoundId) {
+    if (visibleRounds.isEmpty || currentRoundId == null) return 0;
+    final index = visibleRounds.indexWhere((round) => round.id == currentRoundId);
+    if (index < 0) return visibleRounds.length - 1;
+    return index;
+  }
+
+  String? _resolveBranchRoundId(Session session, String? preferredRoundId) {
+    if (preferredRoundId != null &&
+        session.rounds.any((r) => r.id == preferredRoundId)) {
+      return preferredRoundId;
+    }
+
+    final leaves = BranchNavigator.getAllBranchLeaves(session);
+    if (leaves.isNotEmpty) {
+      return leaves.last.id;
+    }
+
+    if (session.rounds.isNotEmpty) {
+      return session.rounds.first.id;
+    }
+
+    return null;
+  }
+
+  String? _resolveCurrentRoundId(
+    List<ChatRound> visibleRounds,
+    String? preferredRoundId,
+  ) {
+    if (preferredRoundId != null &&
+        visibleRounds.any((r) => r.id == preferredRoundId)) {
+      return preferredRoundId;
+    }
+
+    return visibleRounds.isNotEmpty ? visibleRounds.last.id : null;
+  }
+
+  void _reconcileSession(Session? session) {
+    if (!mounted) return;
+
+    if (session == null) {
+      setState(() {
+        _branchRoundId = null;
+        _currentRoundId = null;
+      });
+      return;
+    }
+
+    final nextBranchRoundId = _resolveBranchRoundId(session, _branchRoundId);
+
+    final visibleRounds = nextBranchRoundId == null
+        ? const <ChatRound>[]
+        : BranchNavigator.getCurrentBranchPath(session, nextBranchRoundId);
+
+    final nextCurrentRoundId =
+        _resolveCurrentRoundId(visibleRounds, _currentRoundId);
+
+    final nextIndex = _resolveCurrentIndex(visibleRounds, nextCurrentRoundId);
+
+    final shouldUpdateState = nextBranchRoundId != _branchRoundId ||
+        nextCurrentRoundId != _currentRoundId;
+
+    if (shouldUpdateState) {
+      setState(() {
+        _branchRoundId = nextBranchRoundId;
+        _currentRoundId = nextCurrentRoundId;
+      });
+    }
+
+    if (visibleRounds.isNotEmpty && _pageController == null) {
+      _pageController = PageController(initialPage: nextIndex);
+      if (mounted) {
+        setState(() {});
+      }
+      return;
+    }
+
+    final controller = _pageController;
+    if (controller != null && controller.hasClients) {
+      final currentPage = controller.page?.round() ?? controller.initialPage;
+      if (currentPage != nextIndex) {
+        controller.jumpToPage(nextIndex);
+      }
+    }
   }
 
   @override
@@ -197,14 +273,11 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     final controller = _pageController;
     if (controller == null || !controller.hasClients) return;
 
-    final chatState = ref.read(chatProvider(widget.fileName));
     final session = ref.read(chatSessionProvider(widget.fileName)).valueOrNull;
-    final visibleRounds =
-        _buildVisibleRounds(session, chatState.branchLeafRoundId);
+    final visibleRounds = _buildVisibleRounds(session, _branchRoundId);
     if (visibleRounds.isEmpty) return;
 
-    final currentIndex =
-        _resolveCurrentIndex(visibleRounds, chatState.currentRoundId);
+    final currentIndex = _resolveCurrentIndex(visibleRounds, _currentRoundId);
     final currentPage = controller.page;
     final index = currentPage != null
         ? currentPage.round().clamp(0, visibleRounds.length - 1)
@@ -216,18 +289,36 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     _isMarkingSeen = true;
     try {
       await ref
-          .read(chatProvider(widget.fileName).notifier)
+          .read(chatControllerProvider(widget.fileName))
           .markRoundSeen(round.id);
     } finally {
       _isMarkingSeen = false;
     }
   }
 
+  Future<void> _retryFromRound(String roundId) async {
+    try {
+      final newRoundId =
+          await ref.read(chatControllerProvider(widget.fileName)).retryFromRound(
+                roundId,
+              );
+
+      if (!mounted) return;
+      setState(() {
+        _branchRoundId = newRoundId;
+        _currentRoundId = newRoundId;
+      });
+    } catch (e) {
+      if (mounted) {
+        await AppToast.show('重新生成失败：$e');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final chatState = ref.watch(chatProvider(widget.fileName));
     final sessionAsync = ref.watch(chatSessionProvider(widget.fileName));
-    final notifier = ref.read(chatProvider(widget.fileName).notifier);
+    final chatController = ref.read(chatControllerProvider(widget.fileName));
     final editSourceRoundId = ref.watch(globalEditSourceRoundIdProvider);
     final isEditMode = editSourceRoundId != null;
 
@@ -245,10 +336,9 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
         body: _buildErrorState('加载会话失败：$e'),
       ),
       data: (session) {
-        final visibleRounds =
-            _buildVisibleRounds(session, chatState.branchLeafRoundId);
+        final visibleRounds = _buildVisibleRounds(session, _branchRoundId);
         final currentIndex =
-            _resolveCurrentIndex(visibleRounds, chatState.currentRoundId);
+            _resolveCurrentIndex(visibleRounds, _currentRoundId);
         final hasPages = visibleRounds.isNotEmpty;
         final textTheme = Theme.of(context).textTheme;
         final currentRound =
@@ -264,21 +354,44 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
               style: textTheme.titleMedium,
             ),
             actions: [
-              if (session != null && chatState.currentRoundId != null)
+              if (session != null && _currentRoundId != null)
                 IconButton(
                   tooltip: isEditMode ? '编辑模式下不可切换页面' : '查看分支树',
                   icon: const Icon(Icons.account_tree_outlined),
                   onPressed: isEditMode
                       ? null
-                      : () {
-                          Navigator.of(context).push(
+                      : () async {
+                          final selectedRoundId =
+                              await Navigator.of(context).push<String?>(
                             MaterialPageRoute(
                               builder: (_) => BranchTreePage(
                                 fileName: widget.fileName,
-                                initialFocusRoundId: chatState.currentRoundId!,
+                                initialFocusRoundId: _currentRoundId!,
                               ),
                             ),
                           );
+
+                          if (!mounted ||
+                              selectedRoundId == null) {
+                            return;
+                          }
+
+                          setState(() {
+                            _branchRoundId = selectedRoundId;
+                            _currentRoundId = selectedRoundId;
+                          });
+
+                          final nextVisibleRounds =
+                              _buildVisibleRounds(session, _branchRoundId);
+                          final nextIndex = _resolveCurrentIndex(
+                            nextVisibleRounds,
+                            _currentRoundId,
+                          );
+
+                          if (_pageController != null &&
+                              _pageController!.hasClients) {
+                            _pageController!.jumpToPage(nextIndex);
+                          }
                         },
                 ),
             ],
@@ -312,70 +425,94 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
                   onCancel: _cancelEditMode,
                 ),
               Expanded(
-                child: chatState.isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : session == null
-                        ? _buildErrorState(chatState.error ?? '会话不存在')
-                        : !hasPages
-                            ? _buildWelcomeEmpty(context)
-                            : _pageController == null
-                                ? const Center(child: CircularProgressIndicator())
-                                : PageView.builder(
-                                    controller: _pageController,
-                                    physics: isEditMode
-                                        ? const NeverScrollableScrollPhysics()
-                                        : const PageScrollPhysics(),
-                                    itemCount: visibleRounds.length,
-                                    onPageChanged: (index) async {
-                                      if (!PageUtils.isValidIndex(
-                                          index, visibleRounds.length)) {
-                                        return;
-                                      }
+                child: session == null
+                    ? _buildErrorState('会话不存在')
+                    : !hasPages
+                        ? _buildWelcomeEmpty(context)
+                        : _pageController == null
+                            ? const Center(child: CircularProgressIndicator())
+                            : PageView.builder(
+                                controller: _pageController,
+                                physics: isEditMode
+                                    ? const NeverScrollableScrollPhysics()
+                                    : const PageScrollPhysics(),
+                                itemCount: visibleRounds.length,
+                                onPageChanged: (index) async {
+                                  if (!PageUtils.isValidIndex(
+                                    index,
+                                    visibleRounds.length,
+                                  )) {
+                                    return;
+                                  }
 
-                                      final round = visibleRounds[index];
+                                  final round = visibleRounds[index];
+                                  setState(() {
+                                    _currentRoundId = round.id;
+                                  });
 
-                                      if (index != currentIndex) {
-                                        notifier.changePage(index, round.id);
-                                      }
-
-                                      await _syncSeenWithVisiblePage();
-                                    },
-                                    itemBuilder: (context, index) {
-                                      final round = visibleRounds[index];
-                                      final canEdit = !round.isIncomplete;
-                                      return _ChatRoundPage(
-                                        key: ValueKey(round.id),
-                                        fileName: widget.fileName,
-                                        round: round,
-                                        canEdit: canEdit,
-                                        onRetryReply: () =>
-                                            notifier.retryFromRound(round.id),
-                                        onEdit: canEdit
-                                            ? () => _enterEditMode(
-                                                  round.id,
-                                                  round.userContent,
-                                                )
-                                            : null,
-                                        onCopyText: _copyText,
-                                      );
-                                    },
-                                  ),
+                                  await _syncSeenWithVisiblePage();
+                                },
+                                itemBuilder: (context, index) {
+                                  final round = visibleRounds[index];
+                                  final canEdit = !round.isIncomplete;
+                                  return _ChatRoundPage(
+                                    key: ValueKey(round.id),
+                                    fileName: widget.fileName,
+                                    round: round,
+                                    canEdit: canEdit,
+                                    onRetryReply: () => _retryFromRound(round.id),
+                                    onEdit: canEdit
+                                        ? () => _enterEditMode(
+                                              round.id,
+                                              round.userContent,
+                                            )
+                                        : null,
+                                    onCopyText: _copyText,
+                                  );
+                                },
+                              ),
               ),
               InputBar(
                 hintText: isEditMode ? '修改文本后发送' : '发送消息',
                 isStreaming: currentIsStreaming,
-                onStop: notifier.stopGeneration,
+                onStop: currentRound == null
+                    ? null
+                    : () => chatController.stopGeneration(currentRound.id),
                 onSend: (text, attachments) async {
-                  if (editSourceRoundId != null) {
-                    await notifier.editAndResendFromRound(
-                      editSourceRoundId,
-                      text,
+                  try {
+                    if (editSourceRoundId != null) {
+                      final newRoundId =
+                          await chatController.editAndResendFromRound(
+                        editSourceRoundId,
+                        text,
+                        attachments: attachments,
+                      );
+
+                      if (!mounted) return;
+                      setState(() {
+                        _branchRoundId = newRoundId;
+                        _currentRoundId = newRoundId;
+                      });
+                      _cancelEditMode();
+                      return;
+                    }
+
+                    final newRoundId = await chatController.sendMessage(
+                      content: text,
+                      parentRoundId: _currentRoundId,
                       attachments: attachments,
                     );
-                    _cancelEditMode();
-                    return;
+
+                    if (!mounted) return;
+                    setState(() {
+                      _branchRoundId = newRoundId;
+                      _currentRoundId = newRoundId;
+                    });
+                  } catch (e) {
+                    if (mounted) {
+                      await AppToast.show('发送失败：$e');
+                    }
                   }
-                  await notifier.sendMessage(text, attachments: attachments);
                 },
               ),
             ],

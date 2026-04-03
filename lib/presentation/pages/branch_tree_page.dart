@@ -8,7 +8,7 @@ import '../../core/utils/time_format_utils.dart';
 import '../../di/providers.dart';
 import '../../domain/models/tree_node.dart';
 import '../../domain/services/tree_builder.dart';
-import '../providers/chat_notifier.dart';
+import '../providers/chat_notifier.dart' show chatSessionProvider;
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_toast.dart';
 
@@ -63,10 +63,6 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     _scheduleFocusToTarget();
   }
 
-  bool _treeContainsNodeId(List<TreeNode> roots, String nodeId) {
-    return _findTreeNodeById(roots, nodeId) != null;
-  }
-
   void _reloadTree(
     List<ChatRound> rounds, {
     bool resetViewport = false,
@@ -82,13 +78,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
       _transformationController.value = Matrix4.identity();
       _hasFocused = false;
       _focusRetryCount = 0;
-
-      if (_treeContainsNodeId(roots, widget.initialFocusRoundId)) {
-        _targetNodeKey = GlobalKey();
-      } else {
-        _targetNodeKey = null;
-        _hasFocused = true;
-      }
+      _targetNodeKey = GlobalKey();
     }
 
     setState(() {
@@ -213,39 +203,13 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
       throw Exception('未找到要删除的节点');
     }
 
-    final idsToDelete = _collectSubtreeIds(targetNode);
+    final idsToDelete = _collectSubtreeIds(targetNode).toList();
 
     try {
-      final sessionId = widget.fileName.replaceAll('.json', '');
-      await repository.deleteRounds(sessionId, idsToDelete.toList());
-
-      final updatedRounds = session.rounds
-          .where((round) => !idsToDelete.contains(round.id))
-          .toList();
-      final updatedSession = session.copyWith(
-        rounds: updatedRounds,
-        updatedAt: DateTime.now().millisecondsSinceEpoch,
-      );
-
-      await repository.saveSessionAndCleanupOrphanAttachments(
+      await repository.deleteRoundsAndCleanupOrphanAttachments(
         widget.fileName,
-        session,
-        updatedSession,
+        idsToDelete,
       );
-
-      final deletedCurrentFocus =
-          idsToDelete.contains(widget.initialFocusRoundId);
-
-      final chatNotifier = ref.read(chatProvider(widget.fileName).notifier);
-      if (deletedCurrentFocus) {
-        await chatNotifier.loadSession();
-      }
-
-      if (deletedCurrentFocus) {
-        _targetNodeKey = null;
-        _hasFocused = true;
-      }
-      _reloadTree(updatedRounds);
     } catch (e) {
       await AppToast.show('删除失败：$e');
       rethrow;
@@ -303,9 +267,9 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
             appBar: AppBar(
               title: const Text('分支树'),
             ),
-            body: Center(
+            body: const Center(
               child: Padding(
-                padding: const EdgeInsets.all(24),
+                padding: EdgeInsets.all(24),
                 child: Text('会话不存在'),
               ),
             ),
@@ -320,17 +284,9 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
         if (latestSignature != _lastSignature) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted) return;
-
-            if (!_treeContainsNodeId(latestRoots, widget.initialFocusRoundId)) {
-              _targetNodeKey = null;
-              _hasFocused = true;
-            }
-
             _reloadTree(session.rounds);
           });
         }
-
-        final chatNotifier = ref.read(chatProvider(widget.fileName).notifier);
 
         return AppPageScaffold(
           appBar: AppBar(
@@ -382,9 +338,8 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
                                   targetNodeId: widget.initialFocusRoundId,
                                   targetNodeKey: _targetNodeKey,
                                   onSwitch: (treeNode) async {
-                                    await chatNotifier.switchBranch(treeNode.id);
                                     if (context.mounted) {
-                                      Navigator.of(context).pop();
+                                      Navigator.of(context).pop(treeNode.id);
                                     }
                                   },
                                   onDelete: (treeNode) async {
