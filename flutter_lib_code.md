@@ -72,6 +72,7 @@ data/services/config_service.dart
 data/services/file_service.dart
 di/providers.dart
 domain/models/chat_page.dart
+domain/models/session_list_item.dart
 domain/models/tree_node.dart
 domain/models/tree_node.g.dart
 domain/services/attachment_preparer.dart
@@ -95,7 +96,6 @@ presentation/providers/attachment_bytes_provider.dart
 presentation/providers/chat_notifier.dart
 presentation/providers/config_notifier.dart
 presentation/providers/global_streaming_provider.dart
-presentation/providers/home_session_list_provider.dart
 presentation/providers/input_draft_provider.dart
 presentation/providers/session_card_provider.dart
 presentation/providers/session_list_notifier.dart
@@ -5400,6 +5400,7 @@ import '../../core/interfaces/file_service.dart';
 import '../../core/models/attachment.dart';
 import '../../core/models/chat_round.dart';
 import '../../core/models/session.dart';
+import '../../domain/models/session_list_item.dart';
 import '../database/database.dart';
 import '../../core/utils/id_generator.dart';
 
@@ -5426,20 +5427,83 @@ class ConversationRepository {
     return result.isNotEmpty;
   }
 
-  // ========== 核心改造：添加 watch 方法 ==========
+  // ========== 首页轻量列表 watch ==========
 
-  /// 监听所有会话列表，返回按更新时间倒序的会话 Stream
-  Stream<List<Session>> watchAllSessions() {
-    final query = _db.select(_db.dbSessions)
-      ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]);
+  /// 监听首页所需的会话摘要列表，不构建完整 Session
+  Stream<List<SessionListItem>> watchSessionListItems() {
+    final sessionsStream = (_db.select(_db.dbSessions)
+          ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]))
+        .watch();
 
-    return query.watch().asyncMap((sessionRows) async {
-      final sessions = <Session>[];
-      for (final sessionRow in sessionRows) {
-        final session = await _buildSessionFromRow(sessionRow);
-        sessions.add(session);
+    final roundsStream = (_db.select(_db.dbChatRounds)
+          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
+        .watch();
+
+    return Stream.multi((controller) {
+      List<DbSession> latestSessions = const [];
+      List<DbChatRound> latestRounds = const [];
+
+      void emit() {
+        final roundsBySession = <String, List<DbChatRound>>{};
+        for (final round in latestRounds) {
+          roundsBySession.putIfAbsent(round.sessionId, () => []).add(round);
+        }
+
+        final items = latestSessions.map((session) {
+          final rounds = roundsBySession[session.id] ?? const <DbChatRound>[];
+          final previewRound = rounds.isEmpty ? null : rounds.last;
+
+          final hasUnseen = rounds.any((r) => r.hasUnseenUpdate);
+
+          final userPreview = previewRound == null
+              ? '点击开始新的对话'
+              : previewRound.userContent.trim().isEmpty
+                  ? '（空输入）'
+                  : previewRound.userContent.trim();
+
+          final aiPreview = previewRound == null
+              ? '（等待回复）'
+              : (previewRound.assistantContent?.trim().isNotEmpty ?? false)
+                  ? previewRound.assistantContent!
+                  : (previewRound.isIncomplete ? '正在生成...' : '（等待回复）');
+
+          return SessionListItem(
+            id: session.id,
+            title: session.title,
+            updatedAt: session.updatedAt,
+            hasUnseen: hasUnseen,
+            roundCount: rounds.length,
+            previewRoundId: previewRound?.id,
+            userPreview: userPreview,
+            aiPreview: aiPreview,
+            isStreaming: previewRound?.isIncomplete == true,
+          );
+        }).toList();
+
+        items.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+        controller.add(items);
       }
-      return sessions;
+
+      final sessionSub = sessionsStream.listen(
+        (sessions) {
+          latestSessions = sessions;
+          emit();
+        },
+        onError: controller.addError,
+      );
+
+      final roundSub = roundsStream.listen(
+        (rounds) {
+          latestRounds = rounds;
+          emit();
+        },
+        onError: controller.addError,
+      );
+
+      controller.onCancel = () async {
+        await sessionSub.cancel();
+        await roundSub.cancel();
+      };
     });
   }
 
@@ -6287,6 +6351,33 @@ extension ChatPageListX on ChatPageList {
     if (currentPageIndex >= pages.length - 1) return null;
     return currentPageIndex + 1;
   }
+}
+```
+
+## File: domain/models/session_list_item.dart
+```dart
+class SessionListItem {
+  final String id;
+  final String title;
+  final int updatedAt;
+  final bool hasUnseen;
+  final int roundCount;
+  final String? previewRoundId;
+  final String userPreview;
+  final String aiPreview;
+  final bool isStreaming;
+
+  const SessionListItem({
+    required this.id,
+    required this.title,
+    required this.updatedAt,
+    required this.hasUnseen,
+    required this.roundCount,
+    required this.previewRoundId,
+    required this.userPreview,
+    required this.aiPreview,
+    required this.isStreaming,
+  });
 }
 ```
 
@@ -8701,9 +8792,8 @@ class _PaginationBar extends StatelessWidget {
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
-import '../../core/models/session.dart';
 import '../../core/utils/time_format_utils.dart';
-import '../providers/home_session_list_provider.dart';
+import '../../domain/models/session_list_item.dart';
 import '../providers/session_list_notifier.dart';
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/input_bar.dart';
@@ -8716,9 +8806,9 @@ class HomePage extends ConsumerWidget {
   Future<void> _showRenameDialog(
     BuildContext context,
     SessionListNotifier notifier,
-    Session session,
+    SessionListItem item,
   ) async {
-    final controller = TextEditingController(text: session.title);
+    final controller = TextEditingController(text: item.title);
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -8746,22 +8836,22 @@ class HomePage extends ConsumerWidget {
     );
     if (result != null &&
         result.isNotEmpty &&
-        result != session.title) {
-      await notifier.updateSessionTitle('${session.id}.json', result);
+        result != item.title) {
+      await notifier.updateSessionTitle('${item.id}.json', result);
     }
   }
 
   Future<void> _showDeleteConfirmDialog(
     BuildContext context,
     SessionListNotifier notifier,
-    Session session,
+    SessionListItem item,
   ) async {
     final colorScheme = Theme.of(context).colorScheme;
     final confirmed = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('删除会话'),
-            content: Text('确定要删除 “${session.title}” 吗？\n此操作无法撤销。'),
+            content: Text('确定要删除 “${item.title}” 吗？\n此操作无法撤销。'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(false),
@@ -8781,16 +8871,13 @@ class HomePage extends ConsumerWidget {
         false;
 
     if (confirmed == true) {
-      await notifier.deleteSession('${session.id}.json');
+      await notifier.deleteSession('${item.id}.json');
     }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 关键修复：必须监听 homeSessionListProvider
-    final sessionsAsync = ref.watch(homeSessionListProvider);
-
-    // 操作类 notifier：仍用 sessionListProvider.notifier
+    final sessionsAsync = ref.watch(sessionListProvider);
     final notifier = ref.read(sessionListNotifierProvider);
 
     return AppPageScaffold(
@@ -8837,10 +8924,10 @@ class HomePage extends ConsumerWidget {
                     return _SessionCard(
                       item: item,
                       notifier: notifier,
-                      onRename: (session) =>
-                          _showRenameDialog(context, notifier, session),
-                      onDelete: (session) =>
-                          _showDeleteConfirmDialog(context, notifier, session),
+                      onRename: (item) =>
+                          _showRenameDialog(context, notifier, item),
+                      onDelete: (item) =>
+                          _showDeleteConfirmDialog(context, notifier, item),
                     );
                   },
                 );
@@ -8960,10 +9047,10 @@ class _HomeErrorState extends StatelessWidget {
 }
 
 class _SessionCard extends StatelessWidget {
-  final HomeSessionItem item;
+  final SessionListItem item;
   final SessionListNotifier notifier;
-  final Future<void> Function(Session session) onRename;
-  final Future<void> Function(Session session) onDelete;
+  final Future<void> Function(SessionListItem item) onRename;
+  final Future<void> Function(SessionListItem item) onDelete;
 
   const _SessionCard({
     required this.item,
@@ -8982,18 +9069,8 @@ class _SessionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final session = item.session;
-    final fileName = '${session.id}.json';
+    final fileName = '${item.id}.json';
     final updatedAt = TimeFormatUtils.formatTimestamp(item.updatedAt);
-    final previewRound = item.previewRound;
-
-    final aiPreview = previewRound == null
-        ? '（等待回复）'
-        : (previewRound.assistantContent?.trim().isNotEmpty ?? false)
-            ? previewRound.assistantContent!
-            : (previewRound.isIncomplete ? '正在生成...' : '（等待回复）');
-
-    final isStreaming = previewRound?.isIncomplete == true;
 
     return Slidable(
       key: ValueKey(fileName),
@@ -9002,7 +9079,7 @@ class _SessionCard extends StatelessWidget {
         extentRatio: 0.34,
         children: [
           CustomSlidableAction(
-            onPressed: (_) => onRename(session),
+            onPressed: (_) => onRename(item),
             backgroundColor: Theme.of(context).colorScheme.secondary,
             child: const Icon(
               Icons.edit_outlined,
@@ -9010,7 +9087,7 @@ class _SessionCard extends StatelessWidget {
             ),
           ),
           CustomSlidableAction(
-            onPressed: (_) => onDelete(session),
+            onPressed: (_) => onDelete(item),
             backgroundColor: Theme.of(context).colorScheme.error,
             child: Icon(
               Icons.delete_outline,
@@ -9027,7 +9104,7 @@ class _SessionCard extends StatelessWidget {
               MaterialPageRoute(
                 builder: (_) => ChatPage(
                   fileName: fileName,
-                  initialRoundId: item.previewRound?.id,
+                  initialRoundId: item.previewRoundId,
                 ),
               ),
             );
@@ -9040,16 +9117,16 @@ class _SessionCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  session.title,
+                  item.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (isStreaming) ...[
+              if (item.isStreaming) ...[
                 const SizedBox(width: 8),
                 _buildMetaChip('生成中', icon: Icons.bolt_outlined),
               ],
-              if (item.hasUnseen == true) ...[
+              if (item.hasUnseen) ...[
                 const SizedBox(width: 8),
                 _buildMetaChip('未查看', icon: Icons.mark_chat_unread_outlined),
               ],
@@ -9067,7 +9144,7 @@ class _SessionCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 _PreviewLine(
                   label: 'AI',
-                  text: aiPreview,
+                  text: item.aiPreview,
                 ),
                 const SizedBox(height: 8),
                 Wrap(
@@ -10454,65 +10531,6 @@ final roundStreamProvider =
 );
 ```
 
-## File: presentation/providers/home_session_list_provider.dart
-```dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/session.dart';
-import '../../core/models/chat_round.dart';
-import 'session_list_notifier.dart';
-
-class HomeSessionItem {
-  final Session session;
-  final bool hasUnseen;
-  final String userPreview;
-  final int roundCount;
-  final int updatedAt;
-  final ChatRound? previewRound;
-
-  const HomeSessionItem({
-    required this.session,
-    required this.hasUnseen,
-    required this.userPreview,
-    required this.roundCount,
-    required this.updatedAt,
-    required this.previewRound,
-  });
-}
-
-final homeSessionListProvider = Provider<AsyncValue<List<HomeSessionItem>>>((ref) {
-  final sessionsAsync = ref.watch(sessionListProvider);
-
-  return sessionsAsync.whenData((sessions) {
-    final items = sessions.map((session) {
-      final hasUnseen = session.rounds.any((r) => r.hasUnseenUpdate);
-      final roundCount = session.rounds.length;
-
-      final previewRound = session.rounds.isEmpty
-          ? null
-          : session.rounds.last;
-
-      final userPreview = previewRound == null
-          ? '点击开始新的对话'
-          : previewRound.userContent.trim().isEmpty
-              ? '（空输入）'
-              : previewRound.userContent.trim();
-
-      return HomeSessionItem(
-        session: session,
-        hasUnseen: hasUnseen,
-        userPreview: userPreview,
-        roundCount: roundCount,
-        updatedAt: session.updatedAt,
-        previewRound: previewRound,
-      );
-    }).toList();
-
-    items.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-    return items;
-  });
-});
-```
-
 ## File: presentation/providers/input_draft_provider.dart
 ```dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10561,22 +10579,21 @@ final sessionCardProvider =
 // presentation/providers/session_list_notifier.dart
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/session.dart';
 import '../../di/providers.dart';
+import '../../domain/models/session_list_item.dart';
 
-// ✅ 使用纯声明式 StreamProvider
-final sessionListProvider = StreamProvider<List<Session>>((ref) {
+// 使用纯声明式 StreamProvider，首页消费轻量列表模型
+final sessionListProvider = StreamProvider<List<SessionListItem>>((ref) {
   final repository = ref.watch(conversationRepositoryProvider);
-  return repository.watchAllSessions();
+  return repository.watchSessionListItems();
 });
 
-// ✅ 保留命令式 notifier 用于需要直接调用方法的场景
-class SessionListNotifier extends StateNotifier<AsyncValue<List<Session>>> {
+// 保留命令式 notifier，用于删除/重命名/创建等操作
+class SessionListNotifier extends StateNotifier<AsyncValue<List<SessionListItem>>> {
   final Ref ref;
 
   SessionListNotifier(this.ref) : super(const AsyncValue.loading()) {
-    // 监听上面的 StreamProvider
-    ref.listen<AsyncValue<List<Session>>>(sessionListProvider, (previous, next) {
+    ref.listen<AsyncValue<List<SessionListItem>>>(sessionListProvider, (previous, next) {
       state = next;
     });
   }
@@ -10589,7 +10606,6 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<Session>>> {
     try {
       final repository = ref.read(conversationRepositoryProvider);
       await repository.deleteSession(fileName);
-      // Stream 会自动同步
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
@@ -10601,7 +10617,6 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<Session>>> {
       final cleanTitle = newTitle.trim();
       if (cleanTitle.isEmpty) return;
       await repository.updateSessionTitle(fileName, cleanTitle);
-      // Stream 会自动同步
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
@@ -10610,19 +10625,17 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<Session>>> {
   Future<String> createSession(String title) async {
     final repository = ref.read(conversationRepositoryProvider);
     final cleanTitle = title.trim().isEmpty ? '新对话' : title.trim();
-    
-    // 使用时间戳生成临时 ID
+
     final now = DateTime.now().millisecondsSinceEpoch;
     final sessionId = now.toString();
     final fileName = '$sessionId.json';
-    
+
     await repository.createSession(fileName: fileName, title: cleanTitle);
-    
+
     return fileName;
   }
 }
 
-// ✅ 使用 Provider 而非 StateNotifierProvider
 final sessionListNotifierProvider = Provider<SessionListNotifier>((ref) {
   return SessionListNotifier(ref);
 });

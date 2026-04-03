@@ -255,7 +255,7 @@ class _HomeErrorState extends StatelessWidget {
   }
 }
 
-class _SessionCard extends StatelessWidget {
+class _SessionCard extends ConsumerWidget {
   final SessionListItem item;
   final SessionListNotifier notifier;
   final Future<void> Function(SessionListItem item) onRename;
@@ -277,105 +277,192 @@ class _SessionCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final fileName = '${item.id}.json';
     final updatedAt = TimeFormatUtils.formatTimestamp(item.updatedAt);
+    final metaAsync = ref.watch(sessionCardMetaProvider(item.id));
 
-    return Slidable(
-      key: ValueKey(fileName),
-      endActionPane: ActionPane(
-        motion: const DrawerMotion(),
-        extentRatio: 0.34,
-        children: [
-          CustomSlidableAction(
-            onPressed: (_) => onRename(item),
-            backgroundColor: Theme.of(context).colorScheme.secondary,
-            child: const Icon(
-              Icons.edit_outlined,
-              color: Colors.white,
-            ),
-          ),
-          CustomSlidableAction(
-            onPressed: (_) => onDelete(item),
-            backgroundColor: Theme.of(context).colorScheme.error,
-            child: Icon(
-              Icons.delete_outline,
-              color: Theme.of(context).colorScheme.onError,
-            ),
-          ),
-        ],
-      ),
-      child: Card(
-        child: ListTile(
-          onTap: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ChatPage(
-                  fileName: fileName,
-                  initialRoundId: item.previewRoundId,
+    return metaAsync.when(
+      loading: () {
+        return Card(
+          child: ListTile(
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ChatPage(fileName: fileName),
                 ),
+              );
+              if (context.mounted) {
+                await notifier.refresh();
+              }
+            },
+            leading: const Icon(Icons.forum_outlined),
+            title: Text(
+              item.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('加载中...'),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildMetaChip(updatedAt, icon: Icons.schedule_outlined),
+                    ],
+                  ),
+                ],
               ),
-            );
-            if (context.mounted) {
-              await notifier.refresh();
-            }
-          },
-          leading: const Icon(Icons.forum_outlined),
-          title: Row(
+            ),
+            trailing: const Icon(Icons.chevron_right_rounded),
+          ),
+        );
+      },
+      error: (e, st) {
+        return Card(
+          child: ListTile(
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ChatPage(fileName: fileName),
+                ),
+              );
+              if (context.mounted) {
+                await notifier.refresh();
+              }
+            },
+            leading: const Icon(Icons.forum_outlined),
+            title: Text(
+              item.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('加载摘要失败'),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildMetaChip(updatedAt, icon: Icons.schedule_outlined),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            trailing: const Icon(Icons.chevron_right_rounded),
+          ),
+        );
+      },
+      data: (meta) {
+        return Slidable(
+          key: ValueKey(fileName),
+          endActionPane: ActionPane(
+            motion: const DrawerMotion(),
+            extentRatio: 0.34,
             children: [
-              Expanded(
-                child: Text(
-                  item.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+              CustomSlidableAction(
+                onPressed: (_) => onRename(item),
+                backgroundColor: Theme.of(context).colorScheme.secondary,
+                child: const Icon(
+                  Icons.edit_outlined,
+                  color: Colors.white,
                 ),
               ),
-              if (item.isStreaming) ...[
-                const SizedBox(width: 8),
-                _buildMetaChip('生成中', icon: Icons.bolt_outlined),
-              ],
-              if (item.hasUnseen) ...[
-                const SizedBox(width: 8),
-                _buildMetaChip('未查看', icon: Icons.mark_chat_unread_outlined),
-              ],
+              CustomSlidableAction(
+                onPressed: (_) => onDelete(item),
+                backgroundColor: Theme.of(context).colorScheme.error,
+                child: Icon(
+                  Icons.delete_outline,
+                  color: Theme.of(context).colorScheme.onError,
+                ),
+              ),
             ],
           ),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _PreviewLine(
-                  label: 'YOU',
-                  text: item.userPreview,
-                ),
-                const SizedBox(height: 4),
-                _PreviewLine(
-                  label: 'AI',
-                  text: item.aiPreview,
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _buildMetaChip(
-                      '${item.roundCount} 轮',
-                      icon: Icons.chat_bubble_outline,
+          child: Card(
+            child: ListTile(
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ChatPage(
+                      fileName: fileName,
+                      initialRoundId: meta.previewRoundId,
                     ),
-                    _buildMetaChip(
-                      updatedAt,
-                      icon: Icons.schedule_outlined,
+                  ),
+                );
+                if (context.mounted) {
+                  await notifier.refresh();
+                }
+              },
+              leading: const Icon(Icons.forum_outlined),
+              title: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (meta.isStreaming) ...[
+                    const SizedBox(width: 8),
+                    _buildMetaChip('生成中', icon: Icons.bolt_outlined),
+                  ],
+                  if (meta.hasUnseen) ...[
+                    const SizedBox(width: 8),
+                    _buildMetaChip('未查看', icon: Icons.mark_chat_unread_outlined),
+                  ],
+                ],
+              ),
+              subtitle: Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _PreviewLine(
+                      label: 'YOU',
+                      text: meta.userPreview,
+                    ),
+                    const SizedBox(height: 4),
+                    _PreviewLine(
+                      label: 'AI',
+                      text: meta.aiPreview,
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _buildMetaChip(
+                          '${meta.roundCount} 轮',
+                          icon: Icons.chat_bubble_outline,
+                        ),
+                        _buildMetaChip(
+                          updatedAt,
+                          icon: Icons.schedule_outlined,
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
             ),
           ),
-          trailing: const Icon(Icons.chevron_right_rounded),
-        ),
-      ),
+        );
+      },
     );
   }
 }

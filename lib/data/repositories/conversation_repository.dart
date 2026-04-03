@@ -10,6 +10,7 @@ import '../../core/models/session.dart';
 import '../../domain/models/session_list_item.dart';
 import '../database/database.dart';
 import '../../core/utils/id_generator.dart';
+import '../../domain/models/session_card_meta.dart';
 
 class ConversationRepository {
   final AppDatabase _db;
@@ -34,83 +35,50 @@ class ConversationRepository {
     return result.isNotEmpty;
   }
 
-  // ========== 首页轻量列表 watch ==========
-
-  /// 监听首页所需的会话摘要列表，不构建完整 Session
   Stream<List<SessionListItem>> watchSessionListItems() {
-    final sessionsStream = (_db.select(_db.dbSessions)
-          ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]))
-        .watch();
+    final query = (_db.select(_db.dbSessions)
+          ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]));
 
-    final roundsStream = (_db.select(_db.dbChatRounds)
-          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
-        .watch();
+    return query.watch().map((sessions) {
+      return sessions.map((session) {
+        return SessionListItem(
+          id: session.id,
+          title: session.title,
+          updatedAt: session.updatedAt,
+        );
+      }).toList();
+    });
+  }
 
-    return Stream.multi((controller) {
-      List<DbSession> latestSessions = const [];
-      List<DbChatRound> latestRounds = const [];
+  Stream<SessionCardMeta> watchSessionCardMeta(String sessionId) {
+    final query = (_db.select(_db.dbChatRounds)
+          ..where((t) => t.sessionId.equals(sessionId))
+          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]));
 
-      void emit() {
-        final roundsBySession = <String, List<DbChatRound>>{};
-        for (final round in latestRounds) {
-          roundsBySession.putIfAbsent(round.sessionId, () => []).add(round);
-        }
+    return query.watch().map((rounds) {
+      final previewRound = rounds.isEmpty ? null : rounds.last;
+      final hasUnseen = rounds.any((r) => r.hasUnseenUpdate);
 
-        final items = latestSessions.map((session) {
-          final rounds = roundsBySession[session.id] ?? const <DbChatRound>[];
-          final previewRound = rounds.isEmpty ? null : rounds.last;
+      final userPreview = previewRound == null
+          ? '点击开始新的对话'
+          : previewRound.userContent.trim().isEmpty
+              ? '（空输入）'
+              : previewRound.userContent.trim();
 
-          final hasUnseen = rounds.any((r) => r.hasUnseenUpdate);
+      final aiPreview = previewRound == null
+          ? '（等待回复）'
+          : (previewRound.assistantContent?.trim().isNotEmpty ?? false)
+              ? previewRound.assistantContent!
+              : (previewRound.isIncomplete ? '正在生成...' : '（等待回复）');
 
-          final userPreview = previewRound == null
-              ? '点击开始新的对话'
-              : previewRound.userContent.trim().isEmpty
-                  ? '（空输入）'
-                  : previewRound.userContent.trim();
-
-          final aiPreview = previewRound == null
-              ? '（等待回复）'
-              : (previewRound.assistantContent?.trim().isNotEmpty ?? false)
-                  ? previewRound.assistantContent!
-                  : (previewRound.isIncomplete ? '正在生成...' : '（等待回复）');
-
-          return SessionListItem(
-            id: session.id,
-            title: session.title,
-            updatedAt: session.updatedAt,
-            hasUnseen: hasUnseen,
-            roundCount: rounds.length,
-            previewRoundId: previewRound?.id,
-            userPreview: userPreview,
-            aiPreview: aiPreview,
-            isStreaming: previewRound?.isIncomplete == true,
-          );
-        }).toList();
-
-        items.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-        controller.add(items);
-      }
-
-      final sessionSub = sessionsStream.listen(
-        (sessions) {
-          latestSessions = sessions;
-          emit();
-        },
-        onError: controller.addError,
+      return SessionCardMeta(
+        roundCount: rounds.length,
+        previewRoundId: previewRound?.id,
+        userPreview: userPreview,
+        aiPreview: aiPreview,
+        hasUnseen: hasUnseen,
+        isStreaming: previewRound?.isIncomplete == true,
       );
-
-      final roundSub = roundsStream.listen(
-        (rounds) {
-          latestRounds = rounds;
-          emit();
-        },
-        onError: controller.addError,
-      );
-
-      controller.onCancel = () async {
-        await sessionSub.cancel();
-        await roundSub.cancel();
-      };
     });
   }
 

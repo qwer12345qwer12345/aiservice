@@ -1,27 +1,34 @@
-// presentation/providers/session_list_notifier.dart
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../di/providers.dart';
 import '../../domain/models/session_list_item.dart';
+import '../../domain/models/session_card_meta.dart';
 
-// 使用纯声明式 StreamProvider，首页消费轻量列表模型
 final sessionListProvider = StreamProvider<List<SessionListItem>>((ref) {
   final repository = ref.watch(conversationRepositoryProvider);
   return repository.watchSessionListItems();
 });
 
-// 保留命令式 notifier，用于删除/重命名/创建等操作
-class SessionListNotifier extends StateNotifier<AsyncValue<List<SessionListItem>>> {
+final sessionCardMetaProvider =
+    StreamProvider.family<SessionCardMeta, String>((ref, sessionId) {
+  final repository = ref.watch(conversationRepositoryProvider);
+  return repository.watchSessionCardMeta(sessionId);
+});
+
+class SessionListNotifier
+    extends StateNotifier<AsyncValue<List<SessionListItem>>> {
   final Ref ref;
 
   SessionListNotifier(this.ref) : super(const AsyncValue.loading()) {
-    ref.listen<AsyncValue<List<SessionListItem>>>(sessionListProvider, (previous, next) {
-      state = next;
-    });
+    ref.listen<AsyncValue<List<SessionListItem>>>(
+      sessionListProvider,
+      (previous, next) {
+        state = next;
+      },
+    );
   }
 
   Future<void> refresh() async {
-    // Stream 会自动同步，保留此方法用于兼容性
+    // Stream 会自动同步，保留兼容方法
   }
 
   Future<void> deleteSession(String fileName) async {
@@ -53,7 +60,6 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<SessionListItem>
     final fileName = '$sessionId.json';
 
     await repository.createSession(fileName: fileName, title: cleanTitle);
-
     return fileName;
   }
 }
