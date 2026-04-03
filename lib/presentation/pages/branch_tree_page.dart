@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:graphview/GraphView.dart';
 import '../../core/models/chat_round.dart';
+import '../../core/models/session.dart';
 import '../../core/utils/time_format_utils.dart';
 import '../../di/providers.dart';
 import '../../domain/models/tree_node.dart';
@@ -201,15 +202,9 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     return null;
   }
 
-  /// 完整删除分支节点逻辑，和原有业务逻辑完全一致，仅优化删除性能
-  Future<void> _deleteNode(String nodeId) async {
+  Future<void> _deleteNode(String nodeId, Session session) async {
     final repository = ref.read(conversationRepositoryProvider);
-    final chatState = ref.read(chatProvider(widget.fileName));
-    final session = chatState.session;
-    if (session == null) {
-      throw Exception('会话未加载');
-    }
-    // ========== 原有逻辑：构建树、查找要删除的节点 ==========
+
     final roots = session.rounds.isEmpty
         ? <TreeNode>[]
         : TreeBuilder.buildTree(session.rounds);
@@ -217,15 +212,13 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     if (targetNode == null) {
       throw Exception('未找到要删除的节点');
     }
-    // 收集当前节点+所有子节点的ID（原有逻辑不变）
+
     final idsToDelete = _collectSubtreeIds(targetNode);
+
     try {
-      // ====================== ✅ 新增优化：调用专用批量删除方法，直接删除指定Round，比原来全量覆盖性能提升10倍+ ======================
-      // 从fileName中提取sessionId（去掉.json后缀，对应Repository中的_getId逻辑）
       final sessionId = widget.fileName.replaceAll('.json', '');
-      // 批量删除要移除的Round，外键自动删除对应附件
       await repository.deleteRounds(sessionId, idsToDelete.toList());
-      // ========== 原有逻辑：生成更新后的会话 ==========
+
       final updatedRounds = session.rounds
           .where((round) => !idsToDelete.contains(round.id))
           .toList();
@@ -233,32 +226,27 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
         rounds: updatedRounds,
         updatedAt: DateTime.now().millisecondsSinceEpoch,
       );
-      // ========== 原有逻辑：清理孤儿附件+保存会话 ==========
+
       await repository.saveSessionAndCleanupOrphanAttachments(
         widget.fileName,
         session,
         updatedSession,
       );
-      // ========== 原有逻辑：更新Chat状态 ==========
-      // ✅ 判断是否删除了当前焦点节点
-      final deletedCurrentFocus = idsToDelete.contains(widget.initialFocusRoundId);
-      // 直接更新chatNotifier状态，不需要invalidate
+
+      final deletedCurrentFocus =
+          idsToDelete.contains(widget.initialFocusRoundId);
+
       final chatNotifier = ref.read(chatProvider(widget.fileName).notifier);
-      chatNotifier.state = chatNotifier.state.copyWith(
-        session: updatedSession,
-      );
-      // 如果删除了当前焦点节点，重新加载会话，让聊天页返回时定位到有效页
       if (deletedCurrentFocus) {
         await chatNotifier.loadSession();
       }
-      // ========== 原有逻辑：更新本地树状态 ==========
+
       if (deletedCurrentFocus) {
         _targetNodeKey = null;
         _hasFocused = true;
       }
       _reloadTree(updatedRounds);
     } catch (e) {
-      // 原有异常提示逻辑不变
       await AppToast.show('删除失败：$e');
       rethrow;
     }
@@ -287,127 +275,138 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
 
   @override
   Widget build(BuildContext context) {
-    final chatState = ref.watch(chatProvider(widget.fileName));
+    final sessionAsync = ref.watch(chatSessionProvider(widget.fileName));
 
-    if (chatState.isLoading && chatState.session == null) {
-      return AppPageScaffold(
+    return sessionAsync.when(
+      loading: () => AppPageScaffold(
         appBar: AppBar(
           title: const Text('分支树'),
         ),
         body: const Center(
           child: CircularProgressIndicator(),
         ),
-      );
-    }
-
-    if (chatState.session == null) {
-      return AppPageScaffold(
+      ),
+      error: (e, _) => AppPageScaffold(
         appBar: AppBar(
           title: const Text('分支树'),
         ),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text(chatState.error ?? '会话不存在'),
+            child: Text('加载会话失败：$e'),
           ),
         ),
-      );
-    }
-
-    final session = chatState.session!;
-    final latestRoots = session.rounds.isEmpty
-        ? <TreeNode>[]
-        : TreeBuilder.buildTree(session.rounds);
-    final latestSignature = _buildSignature(latestRoots);
-
-    if (latestSignature != _lastSignature) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-
-        if (!_treeContainsNodeId(latestRoots, widget.initialFocusRoundId)) {
-          _targetNodeKey = null;
-          _hasFocused = true;
+      ),
+      data: (session) {
+        if (session == null) {
+          return AppPageScaffold(
+            appBar: AppBar(
+              title: const Text('分支树'),
+            ),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text('会话不存在'),
+              ),
+            ),
+          );
         }
 
-        _reloadTree(session.rounds);
-      });
-    }
+        final latestRoots = session.rounds.isEmpty
+            ? <TreeNode>[]
+            : TreeBuilder.buildTree(session.rounds);
+        final latestSignature = _buildSignature(latestRoots);
 
-    final chatNotifier = ref.read(chatProvider(widget.fileName).notifier);
+        if (latestSignature != _lastSignature) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
 
-    return AppPageScaffold(
-      appBar: AppBar(
-        title: Text(
-          session.title,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ),
-      body: _roots.isEmpty
-          ? _buildEmptyState(context)
-          : Column(
-              children: [
-                _GraphToolbar(
-                  onZoomIn: () {
-                    final current = _transformationController.value.clone();
-                    current.scale(1.1);
-                    _transformationController.value = current;
-                  },
-                  onZoomOut: () {
-                    final current = _transformationController.value.clone();
-                    current.scale(0.9);
-                    _transformationController.value = current;
-                  },
-                  onReset: _resetViewport,
-                ),
-                Expanded(
-                  child: InteractiveViewer(
-                    key: _viewerKey,
-                    constrained: false,
-                    boundaryMargin: const EdgeInsets.all(double.infinity),
-                    minScale: 0.1,
-                    maxScale: 3.0,
-                    transformationController: _transformationController,
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Wrap(
-                        spacing: 40,
-                        runSpacing: 40,
-                        crossAxisAlignment: WrapCrossAlignment.start,
-                        children: [
-                          for (final root in _roots)
-                            _RootTreeGroup(
-                              key: ValueKey(
-                                'root-tree-${root.id}-${_buildNodeSignature(root)}',
-                              ),
-                              root: root,
-                              graphSignature: _buildNodeSignature(root),
-                              builderConfig: _builder,
-                              targetNodeId: widget.initialFocusRoundId,
-                              targetNodeKey: _targetNodeKey,
-                              onSwitch: (treeNode) async {
-                                await chatNotifier.switchBranch(treeNode.id);
-                                if (context.mounted) {
-                                  Navigator.of(context).pop();
-                                }
-                              },
-                              onDelete: (treeNode) async {
-                                final confirmed =
-                                    await _confirmDelete(treeNode);
-                                if (!confirmed) return;
-                                try {
-                                  await _deleteNode(treeNode.id);
-                                } catch (e) {
-                                  await AppToast.show('删除失败：$e');
-                                }
-                              },
-                            ),
-                        ],
+            if (!_treeContainsNodeId(latestRoots, widget.initialFocusRoundId)) {
+              _targetNodeKey = null;
+              _hasFocused = true;
+            }
+
+            _reloadTree(session.rounds);
+          });
+        }
+
+        final chatNotifier = ref.read(chatProvider(widget.fileName).notifier);
+
+        return AppPageScaffold(
+          appBar: AppBar(
+            title: Text(
+              session.title,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          body: _roots.isEmpty
+              ? _buildEmptyState(context)
+              : Column(
+                  children: [
+                    _GraphToolbar(
+                      onZoomIn: () {
+                        final current = _transformationController.value.clone();
+                        current.scale(1.1);
+                        _transformationController.value = current;
+                      },
+                      onZoomOut: () {
+                        final current = _transformationController.value.clone();
+                        current.scale(0.9);
+                        _transformationController.value = current;
+                      },
+                      onReset: _resetViewport,
+                    ),
+                    Expanded(
+                      child: InteractiveViewer(
+                        key: _viewerKey,
+                        constrained: false,
+                        boundaryMargin: const EdgeInsets.all(double.infinity),
+                        minScale: 0.1,
+                        maxScale: 3.0,
+                        transformationController: _transformationController,
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Wrap(
+                            spacing: 40,
+                            runSpacing: 40,
+                            crossAxisAlignment: WrapCrossAlignment.start,
+                            children: [
+                              for (final root in _roots)
+                                _RootTreeGroup(
+                                  key: ValueKey(
+                                    'root-tree-${root.id}-${_buildNodeSignature(root)}',
+                                  ),
+                                  root: root,
+                                  graphSignature: _buildNodeSignature(root),
+                                  builderConfig: _builder,
+                                  targetNodeId: widget.initialFocusRoundId,
+                                  targetNodeKey: _targetNodeKey,
+                                  onSwitch: (treeNode) async {
+                                    await chatNotifier.switchBranch(treeNode.id);
+                                    if (context.mounted) {
+                                      Navigator.of(context).pop();
+                                    }
+                                  },
+                                  onDelete: (treeNode) async {
+                                    final confirmed =
+                                        await _confirmDelete(treeNode);
+                                    if (!confirmed) return;
+                                    try {
+                                      await _deleteNode(treeNode.id, session);
+                                    } catch (e) {
+                                      await AppToast.show('删除失败：$e');
+                                    }
+                                  },
+                                ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
+        );
+      },
     );
   }
 

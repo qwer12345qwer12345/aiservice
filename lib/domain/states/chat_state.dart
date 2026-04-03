@@ -1,5 +1,4 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
-import '../../core/models/session.dart';
 
 part 'chat_state.freezed.dart';
 
@@ -15,7 +14,6 @@ class StreamStatus with _$StreamStatus {
 @freezed
 class ChatState with _$ChatState {
   const factory ChatState({
-    Session? session,
     String? currentRoundId,
     String? branchLeafRoundId,
     String? error,
@@ -29,13 +27,6 @@ class ChatState with _$ChatState {
 }
 
 extension ChatStateX on ChatState {
-  ChatState copyWithSession(Session session) {
-    return copyWith(
-      session: session,
-      isLoading: false,
-    );
-  }
-
   ChatState copyWithCurrentRoundId(String roundId) {
     return copyWith(currentRoundId: roundId);
   }

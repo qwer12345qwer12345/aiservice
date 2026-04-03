@@ -198,7 +198,6 @@ abstract class _StreamStatus implements StreamStatus {
 
 /// @nodoc
 mixin _$ChatState {
-  Session? get session => throw _privateConstructorUsedError;
   String? get currentRoundId => throw _privateConstructorUsedError;
   String? get branchLeafRoundId => throw _privateConstructorUsedError;
   String? get error => throw _privateConstructorUsedError;
@@ -217,14 +216,11 @@ abstract class $ChatStateCopyWith<$Res> {
       _$ChatStateCopyWithImpl<$Res, ChatState>;
   @useResult
   $Res call({
-    Session? session,
     String? currentRoundId,
     String? branchLeafRoundId,
     String? error,
     bool isLoading,
   });
-
-  $SessionCopyWith<$Res>? get session;
 }
 
 /// @nodoc
@@ -242,7 +238,6 @@ class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
   @pragma('vm:prefer-inline')
   @override
   $Res call({
-    Object? session = freezed,
     Object? currentRoundId = freezed,
     Object? branchLeafRoundId = freezed,
     Object? error = freezed,
@@ -250,10 +245,6 @@ class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
   }) {
     return _then(
       _value.copyWith(
-            session: freezed == session
-                ? _value.session
-                : session // ignore: cast_nullable_to_non_nullable
-                      as Session?,
             currentRoundId: freezed == currentRoundId
                 ? _value.currentRoundId
                 : currentRoundId // ignore: cast_nullable_to_non_nullable
@@ -274,20 +265,6 @@ class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
           as $Val,
     );
   }
-
-  /// Create a copy of ChatState
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @pragma('vm:prefer-inline')
-  $SessionCopyWith<$Res>? get session {
-    if (_value.session == null) {
-      return null;
-    }
-
-    return $SessionCopyWith<$Res>(_value.session!, (value) {
-      return _then(_value.copyWith(session: value) as $Val);
-    });
-  }
 }
 
 /// @nodoc
@@ -300,15 +277,11 @@ abstract class _$$ChatStateImplCopyWith<$Res>
   @override
   @useResult
   $Res call({
-    Session? session,
     String? currentRoundId,
     String? branchLeafRoundId,
     String? error,
     bool isLoading,
   });
-
-  @override
-  $SessionCopyWith<$Res>? get session;
 }
 
 /// @nodoc
@@ -325,7 +298,6 @@ class __$$ChatStateImplCopyWithImpl<$Res>
   @pragma('vm:prefer-inline')
   @override
   $Res call({
-    Object? session = freezed,
     Object? currentRoundId = freezed,
     Object? branchLeafRoundId = freezed,
     Object? error = freezed,
@@ -333,10 +305,6 @@ class __$$ChatStateImplCopyWithImpl<$Res>
   }) {
     return _then(
       _$ChatStateImpl(
-        session: freezed == session
-            ? _value.session
-            : session // ignore: cast_nullable_to_non_nullable
-                  as Session?,
         currentRoundId: freezed == currentRoundId
             ? _value.currentRoundId
             : currentRoundId // ignore: cast_nullable_to_non_nullable
@@ -362,15 +330,12 @@ class __$$ChatStateImplCopyWithImpl<$Res>
 
 class _$ChatStateImpl implements _ChatState {
   const _$ChatStateImpl({
-    this.session,
     this.currentRoundId,
     this.branchLeafRoundId,
     this.error,
     this.isLoading = false,
   });
 
-  @override
-  final Session? session;
   @override
   final String? currentRoundId;
   @override
@@ -383,7 +348,7 @@ class _$ChatStateImpl implements _ChatState {
 
   @override
   String toString() {
-    return 'ChatState(session: $session, currentRoundId: $currentRoundId, branchLeafRoundId: $branchLeafRoundId, error: $error, isLoading: $isLoading)';
+    return 'ChatState(currentRoundId: $currentRoundId, branchLeafRoundId: $branchLeafRoundId, error: $error, isLoading: $isLoading)';
   }
 
   @override
@@ -391,7 +356,6 @@ class _$ChatStateImpl implements _ChatState {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
             other is _$ChatStateImpl &&
-            (identical(other.session, session) || other.session == session) &&
             (identical(other.currentRoundId, currentRoundId) ||
                 other.currentRoundId == currentRoundId) &&
             (identical(other.branchLeafRoundId, branchLeafRoundId) ||
@@ -404,7 +368,6 @@ class _$ChatStateImpl implements _ChatState {
   @override
   int get hashCode => Object.hash(
     runtimeType,
-    session,
     currentRoundId,
     branchLeafRoundId,
     error,
@@ -422,15 +385,12 @@ class _$ChatStateImpl implements _ChatState {
 
 abstract class _ChatState implements ChatState {
   const factory _ChatState({
-    final Session? session,
     final String? currentRoundId,
     final String? branchLeafRoundId,
     final String? error,
     final bool isLoading,
   }) = _$ChatStateImpl;
 
-  @override
-  Session? get session;
   @override
   String? get currentRoundId;
   @override

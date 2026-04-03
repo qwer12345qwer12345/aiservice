@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/chat_round.dart';
+import '../../core/models/session.dart';
 import '../../core/utils/app_route_observer.dart';
 import '../../core/utils/time_format_utils.dart';
 import '../../domain/states/chat_state.dart';
@@ -18,6 +19,7 @@ import '../widgets/common/app_toast.dart';
 import 'branch_tree_page.dart';
 import '../utils/page_utils.dart';
 import '../../domain/services/branch_navigator.dart';
+
 class ChatPage extends ConsumerStatefulWidget {
   final String fileName;
   final String? initialRoundId;
@@ -44,9 +46,10 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
   bool _isRouteVisible = false;
   ModalRoute<dynamic>? _route;
 
-  List<ChatRound> _buildVisibleRounds(ChatState state) {
-    final session = state.session;
-    final branchLeafRoundId = state.branchLeafRoundId;
+  List<ChatRound> _buildVisibleRounds(
+    Session? session,
+    String? branchLeafRoundId,
+  ) {
     if (session == null || branchLeafRoundId == null) {
       return const <ChatRound>[];
     }
@@ -67,8 +70,9 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     _chatSubscription = ref.listenManual<ChatState>(
       chatProvider(widget.fileName),
       (previous, next) {
-        // 原有分页逻辑保持不变
-        final nextVisibleRounds = _buildVisibleRounds(next);
+        final session = ref.read(chatSessionProvider(widget.fileName)).valueOrNull;
+        final nextVisibleRounds =
+            _buildVisibleRounds(session, next.branchLeafRoundId);
         final nextIndex =
             _resolveCurrentIndex(nextVisibleRounds, next.currentRoundId);
 
@@ -90,26 +94,23 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
           }
         }
 
-        // ========== 新增：会话加载完成后处理初始消息 ==========
-        if (next.session != null && !_initialMessageHandled && mounted) {
+        if (session != null && !_initialMessageHandled && mounted) {
           final message = widget.initialMessage?.trim() ?? '';
           final attachments = widget.initialAttachments ?? const <PendingAttachment>[];
           final hasContent = message.isNotEmpty || attachments.isNotEmpty;
 
           if (hasContent) {
             _initialMessageHandled = true;
-            // 异步发送不阻塞UI，添加错误捕获
             ref.read(chatProvider(widget.fileName).notifier)
                 .sendMessage(message, attachments: attachments)
                 .catchError((e) {
-                  if (mounted) AppToast.show('发送失败：${e.toString()}');
-                });
+              if (mounted) AppToast.show('发送失败：${e.toString()}');
+            });
           }
         }
       },
     );
 
-    // 原有微任务逻辑删除初始消息处理部分
     Future.microtask(() async {
       final notifier = ref.read(chatProvider(widget.fileName).notifier);
       await notifier.loadSession(initialRoundId: widget.initialRoundId);
@@ -192,15 +193,18 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
   Future<void> _syncSeenWithVisiblePage() async {
     if (!_isRouteVisible) return;
     if (_isMarkingSeen) return;
-    
+
     final controller = _pageController;
     if (controller == null || !controller.hasClients) return;
 
-    final state = ref.read(chatProvider(widget.fileName));
-        final visibleRounds = _buildVisibleRounds(state);
+    final chatState = ref.read(chatProvider(widget.fileName));
+    final session = ref.read(chatSessionProvider(widget.fileName)).valueOrNull;
+    final visibleRounds =
+        _buildVisibleRounds(session, chatState.branchLeafRoundId);
     if (visibleRounds.isEmpty) return;
 
-    final currentIndex = _resolveCurrentIndex(visibleRounds, state.currentRoundId);
+    final currentIndex =
+        _resolveCurrentIndex(visibleRounds, chatState.currentRoundId);
     final currentPage = controller.page;
     final index = currentPage != null
         ? currentPage.round().clamp(0, visibleRounds.length - 1)
@@ -221,138 +225,163 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(chatProvider(widget.fileName));
+    final chatState = ref.watch(chatProvider(widget.fileName));
+    final sessionAsync = ref.watch(chatSessionProvider(widget.fileName));
     final notifier = ref.read(chatProvider(widget.fileName).notifier);
     final editSourceRoundId = ref.watch(globalEditSourceRoundIdProvider);
     final isEditMode = editSourceRoundId != null;
-    final visibleRounds = _buildVisibleRounds(state);
-    final currentIndex = _resolveCurrentIndex(visibleRounds, state.currentRoundId);
-    final hasPages = visibleRounds.isNotEmpty;
-    final textTheme = Theme.of(context).textTheme;
-    final currentRound =
-        hasPages && PageUtils.isValidIndex(currentIndex, visibleRounds.length)
-            ? visibleRounds[currentIndex]
-            : null;
-    final currentIsStreaming = currentRound?.isIncomplete == true;
 
-    return AppPageScaffold(
-      appBar: AppBar(
-        title: Text(
-          state.session?.title ?? '对话',
-          style: textTheme.titleMedium,
+    return sessionAsync.when(
+      loading: () => AppPageScaffold(
+        appBar: AppBar(
+          title: const Text('对话'),
         ),
-        actions: [
-          if (state.session != null)
-            IconButton(
-              tooltip: isEditMode ? '编辑模式下不可切换页面' : '查看分支树',
-              icon: const Icon(Icons.account_tree_outlined),
-              onPressed: isEditMode
-                  ? null
-                  : () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => BranchTreePage(
-                            fileName: widget.fileName,
-                            initialFocusRoundId: state.currentRoundId!,
-                          ),
-                        ),
-                      );
-                    },
-            ),
-        ],
+        body: const Center(child: CircularProgressIndicator()),
       ),
-      body: Column(
-        children: [
-                    if (hasPages)
-            _PaginationBar(
-              currentIndex: currentIndex,
-              totalPages: visibleRounds.length,
-              onPrev: isEditMode
-                  ? null
-                  : currentIndex > 0
-                      ? () => _pageController?.previousPage(
-                            duration: const Duration(milliseconds: 260),
-                            curve: Curves.easeOutCubic,
-                          )
-                      : null,
-              onNext: isEditMode
-                  ? null
-                  : currentIndex < visibleRounds.length - 1
-                      ? () => _pageController?.nextPage(
-                            duration: const Duration(milliseconds: 260),
-                            curve: Curves.easeOutCubic,
-                          )
-                      : null,
-              isEditMode: isEditMode,
+      error: (e, _) => AppPageScaffold(
+        appBar: AppBar(
+          title: const Text('对话'),
+        ),
+        body: _buildErrorState('加载会话失败：$e'),
+      ),
+      data: (session) {
+        final visibleRounds =
+            _buildVisibleRounds(session, chatState.branchLeafRoundId);
+        final currentIndex =
+            _resolveCurrentIndex(visibleRounds, chatState.currentRoundId);
+        final hasPages = visibleRounds.isNotEmpty;
+        final textTheme = Theme.of(context).textTheme;
+        final currentRound =
+            hasPages && PageUtils.isValidIndex(currentIndex, visibleRounds.length)
+                ? visibleRounds[currentIndex]
+                : null;
+        final currentIsStreaming = currentRound?.isIncomplete == true;
+
+        return AppPageScaffold(
+          appBar: AppBar(
+            title: Text(
+              session?.title ?? '对话',
+              style: textTheme.titleMedium,
             ),
-          if (isEditMode)
-            _EditModeBanner(
-              onCancel: _cancelEditMode,
-            ),
-          Expanded(
-            child: state.isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : state.session == null
-                    ? _buildErrorState(state.error ?? '会话不存在')
-                    : !hasPages
-                        ? _buildWelcomeEmpty(context)
-                        : _pageController == null
-                            ? const Center(child: CircularProgressIndicator())
-                        : PageView.builder(
-                                controller: _pageController,
-                                physics: isEditMode
-                                    ? const NeverScrollableScrollPhysics()
-                                    : const PageScrollPhysics(),
-                                itemCount: visibleRounds.length,
-                                onPageChanged: (index) async {
-                                  if (!PageUtils.isValidIndex(index, visibleRounds.length)) {
-                                    return;
-                                  }
-
-                                  final round = visibleRounds[index];
-
-                                  if (index != currentIndex) {
-                                    notifier.changePage(index, round.id);
-                                  }
-
-                                  await _syncSeenWithVisiblePage();
-                                },
-                                itemBuilder: (context, index) {
-                                  final round = visibleRounds[index];
-                                  final canEdit = !round.isIncomplete;
-                                  return _ChatRoundPage(
-                                    key: ValueKey(round.id),
-                                    fileName: widget.fileName,
-                                    round: round,
-                                    canEdit: canEdit,
-                                    onRetryReply: () => notifier.retryFromRound(round.id),
-                                    onEdit: canEdit 
-                                        ? () => _enterEditMode(round.id, round.userContent) 
-                                        : null,
-                                    onCopyText: _copyText,
-                                  );
-                                },
+            actions: [
+              if (session != null && chatState.currentRoundId != null)
+                IconButton(
+                  tooltip: isEditMode ? '编辑模式下不可切换页面' : '查看分支树',
+                  icon: const Icon(Icons.account_tree_outlined),
+                  onPressed: isEditMode
+                      ? null
+                      : () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => BranchTreePage(
+                                fileName: widget.fileName,
+                                initialFocusRoundId: chatState.currentRoundId!,
                               ),
+                            ),
+                          );
+                        },
+                ),
+            ],
           ),
-          InputBar(
-            hintText: isEditMode ? '修改文本后发送' : '发送消息',
-            isStreaming: currentIsStreaming,
-            onStop: notifier.stopGeneration,
-            onSend: (text, attachments) async {
-              if (editSourceRoundId != null) {
-                await notifier.editAndResendFromRound(
-                  editSourceRoundId,
-                  text,
-                  attachments: attachments,
-                );
-                _cancelEditMode();
-                return;
-              }
-              await notifier.sendMessage(text, attachments: attachments);
-            },
+          body: Column(
+            children: [
+              if (hasPages)
+                _PaginationBar(
+                  currentIndex: currentIndex,
+                  totalPages: visibleRounds.length,
+                  onPrev: isEditMode
+                      ? null
+                      : currentIndex > 0
+                          ? () => _pageController?.previousPage(
+                                duration: const Duration(milliseconds: 260),
+                                curve: Curves.easeOutCubic,
+                              )
+                          : null,
+                  onNext: isEditMode
+                      ? null
+                      : currentIndex < visibleRounds.length - 1
+                          ? () => _pageController?.nextPage(
+                                duration: const Duration(milliseconds: 260),
+                                curve: Curves.easeOutCubic,
+                              )
+                          : null,
+                  isEditMode: isEditMode,
+                ),
+              if (isEditMode)
+                _EditModeBanner(
+                  onCancel: _cancelEditMode,
+                ),
+              Expanded(
+                child: chatState.isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : session == null
+                        ? _buildErrorState(chatState.error ?? '会话不存在')
+                        : !hasPages
+                            ? _buildWelcomeEmpty(context)
+                            : _pageController == null
+                                ? const Center(child: CircularProgressIndicator())
+                                : PageView.builder(
+                                    controller: _pageController,
+                                    physics: isEditMode
+                                        ? const NeverScrollableScrollPhysics()
+                                        : const PageScrollPhysics(),
+                                    itemCount: visibleRounds.length,
+                                    onPageChanged: (index) async {
+                                      if (!PageUtils.isValidIndex(
+                                          index, visibleRounds.length)) {
+                                        return;
+                                      }
+
+                                      final round = visibleRounds[index];
+
+                                      if (index != currentIndex) {
+                                        notifier.changePage(index, round.id);
+                                      }
+
+                                      await _syncSeenWithVisiblePage();
+                                    },
+                                    itemBuilder: (context, index) {
+                                      final round = visibleRounds[index];
+                                      final canEdit = !round.isIncomplete;
+                                      return _ChatRoundPage(
+                                        key: ValueKey(round.id),
+                                        fileName: widget.fileName,
+                                        round: round,
+                                        canEdit: canEdit,
+                                        onRetryReply: () =>
+                                            notifier.retryFromRound(round.id),
+                                        onEdit: canEdit
+                                            ? () => _enterEditMode(
+                                                  round.id,
+                                                  round.userContent,
+                                                )
+                                            : null,
+                                        onCopyText: _copyText,
+                                      );
+                                    },
+                                  ),
+              ),
+              InputBar(
+                hintText: isEditMode ? '修改文本后发送' : '发送消息',
+                isStreaming: currentIsStreaming,
+                onStop: notifier.stopGeneration,
+                onSend: (text, attachments) async {
+                  if (editSourceRoundId != null) {
+                    await notifier.editAndResendFromRound(
+                      editSourceRoundId,
+                      text,
+                      attachments: attachments,
+                    );
+                    _cancelEditMode();
+                    return;
+                  }
+                  await notifier.sendMessage(text, attachments: attachments);
+                },
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -628,7 +657,7 @@ class _SectionLabel extends StatelessWidget {
 }
 
 class _PaginationBar extends StatelessWidget {
-  final int currentIndex;    // ✅ 0-based 索引
+  final int currentIndex;
   final int totalPages;
   final VoidCallback? onPrev;
   final VoidCallback? onNext;
@@ -644,7 +673,6 @@ class _PaginationBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ✅ 使用统一工具类计算进度
     final progress = PageUtils.calculateProgress(currentIndex, totalPages);
     final textTheme = Theme.of(context).textTheme;
 
@@ -664,7 +692,6 @@ class _PaginationBar extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    // ✅ 使用统一工具类格式化
                     isEditMode
                         ? '编辑中｜${PageUtils.format(currentIndex, totalPages)}'
                         : PageUtils.format(currentIndex, totalPages),

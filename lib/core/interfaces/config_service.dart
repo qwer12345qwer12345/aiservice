@@ -25,4 +25,4 @@ abstract class IConfigService {
   
   /// 监听当前配置
   Stream<AppConfig> watchConfig();
-}
+} 
