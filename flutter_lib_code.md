@@ -72,6 +72,7 @@ data/services/config_service.dart
 data/services/file_service.dart
 di/providers.dart
 domain/models/chat_page.dart
+domain/models/session_card_meta.dart
 domain/models/session_list_item.dart
 domain/models/tree_node.dart
 domain/models/tree_node.g.dart
@@ -5403,6 +5404,7 @@ import '../../core/models/session.dart';
 import '../../domain/models/session_list_item.dart';
 import '../database/database.dart';
 import '../../core/utils/id_generator.dart';
+import '../../domain/models/session_card_meta.dart';
 
 class ConversationRepository {
   final AppDatabase _db;
@@ -5427,83 +5429,50 @@ class ConversationRepository {
     return result.isNotEmpty;
   }
 
-  // ========== 首页轻量列表 watch ==========
-
-  /// 监听首页所需的会话摘要列表，不构建完整 Session
   Stream<List<SessionListItem>> watchSessionListItems() {
-    final sessionsStream = (_db.select(_db.dbSessions)
-          ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]))
-        .watch();
+    final query = (_db.select(_db.dbSessions)
+          ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]));
 
-    final roundsStream = (_db.select(_db.dbChatRounds)
-          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
-        .watch();
+    return query.watch().map((sessions) {
+      return sessions.map((session) {
+        return SessionListItem(
+          id: session.id,
+          title: session.title,
+          updatedAt: session.updatedAt,
+        );
+      }).toList();
+    });
+  }
 
-    return Stream.multi((controller) {
-      List<DbSession> latestSessions = const [];
-      List<DbChatRound> latestRounds = const [];
+  Stream<SessionCardMeta> watchSessionCardMeta(String sessionId) {
+    final query = (_db.select(_db.dbChatRounds)
+          ..where((t) => t.sessionId.equals(sessionId))
+          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]));
 
-      void emit() {
-        final roundsBySession = <String, List<DbChatRound>>{};
-        for (final round in latestRounds) {
-          roundsBySession.putIfAbsent(round.sessionId, () => []).add(round);
-        }
+    return query.watch().map((rounds) {
+      final previewRound = rounds.isEmpty ? null : rounds.last;
+      final hasUnseen = rounds.any((r) => r.hasUnseenUpdate);
 
-        final items = latestSessions.map((session) {
-          final rounds = roundsBySession[session.id] ?? const <DbChatRound>[];
-          final previewRound = rounds.isEmpty ? null : rounds.last;
+      final userPreview = previewRound == null
+          ? '点击开始新的对话'
+          : previewRound.userContent.trim().isEmpty
+              ? '（空输入）'
+              : previewRound.userContent.trim();
 
-          final hasUnseen = rounds.any((r) => r.hasUnseenUpdate);
+      final aiPreview = previewRound == null
+          ? '（等待回复）'
+          : (previewRound.assistantContent?.trim().isNotEmpty ?? false)
+              ? previewRound.assistantContent!
+              : (previewRound.isIncomplete ? '正在生成...' : '（等待回复）');
 
-          final userPreview = previewRound == null
-              ? '点击开始新的对话'
-              : previewRound.userContent.trim().isEmpty
-                  ? '（空输入）'
-                  : previewRound.userContent.trim();
-
-          final aiPreview = previewRound == null
-              ? '（等待回复）'
-              : (previewRound.assistantContent?.trim().isNotEmpty ?? false)
-                  ? previewRound.assistantContent!
-                  : (previewRound.isIncomplete ? '正在生成...' : '（等待回复）');
-
-          return SessionListItem(
-            id: session.id,
-            title: session.title,
-            updatedAt: session.updatedAt,
-            hasUnseen: hasUnseen,
-            roundCount: rounds.length,
-            previewRoundId: previewRound?.id,
-            userPreview: userPreview,
-            aiPreview: aiPreview,
-            isStreaming: previewRound?.isIncomplete == true,
-          );
-        }).toList();
-
-        items.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-        controller.add(items);
-      }
-
-      final sessionSub = sessionsStream.listen(
-        (sessions) {
-          latestSessions = sessions;
-          emit();
-        },
-        onError: controller.addError,
+      return SessionCardMeta(
+        roundCount: rounds.length,
+        previewRoundId: previewRound?.id,
+        userPreview: userPreview,
+        aiPreview: aiPreview,
+        hasUnseen: hasUnseen,
+        isStreaming: previewRound?.isIncomplete == true,
       );
-
-      final roundSub = roundsStream.listen(
-        (rounds) {
-          latestRounds = rounds;
-          emit();
-        },
-        onError: controller.addError,
-      );
-
-      controller.onCancel = () async {
-        await sessionSub.cancel();
-        await roundSub.cancel();
-      };
     });
   }
 
@@ -6354,29 +6323,38 @@ extension ChatPageListX on ChatPageList {
 }
 ```
 
+## File: domain/models/session_card_meta.dart
+```dart
+class SessionCardMeta {
+  final int roundCount;
+  final String? previewRoundId;
+  final String userPreview;
+  final String aiPreview;
+  final bool hasUnseen;
+  final bool isStreaming;
+
+  const SessionCardMeta({
+    required this.roundCount,
+    required this.previewRoundId,
+    required this.userPreview,
+    required this.aiPreview,
+    required this.hasUnseen,
+    required this.isStreaming,
+  });
+}
+```
+
 ## File: domain/models/session_list_item.dart
 ```dart
 class SessionListItem {
   final String id;
   final String title;
   final int updatedAt;
-  final bool hasUnseen;
-  final int roundCount;
-  final String? previewRoundId;
-  final String userPreview;
-  final String aiPreview;
-  final bool isStreaming;
 
   const SessionListItem({
     required this.id,
     required this.title,
     required this.updatedAt,
-    required this.hasUnseen,
-    required this.roundCount,
-    required this.previewRoundId,
-    required this.userPreview,
-    required this.aiPreview,
-    required this.isStreaming,
   });
 }
 ```
@@ -9046,7 +9024,7 @@ class _HomeErrorState extends StatelessWidget {
   }
 }
 
-class _SessionCard extends StatelessWidget {
+class _SessionCard extends ConsumerWidget {
   final SessionListItem item;
   final SessionListNotifier notifier;
   final Future<void> Function(SessionListItem item) onRename;
@@ -9068,105 +9046,192 @@ class _SessionCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final fileName = '${item.id}.json';
     final updatedAt = TimeFormatUtils.formatTimestamp(item.updatedAt);
+    final metaAsync = ref.watch(sessionCardMetaProvider(item.id));
 
-    return Slidable(
-      key: ValueKey(fileName),
-      endActionPane: ActionPane(
-        motion: const DrawerMotion(),
-        extentRatio: 0.34,
-        children: [
-          CustomSlidableAction(
-            onPressed: (_) => onRename(item),
-            backgroundColor: Theme.of(context).colorScheme.secondary,
-            child: const Icon(
-              Icons.edit_outlined,
-              color: Colors.white,
-            ),
-          ),
-          CustomSlidableAction(
-            onPressed: (_) => onDelete(item),
-            backgroundColor: Theme.of(context).colorScheme.error,
-            child: Icon(
-              Icons.delete_outline,
-              color: Theme.of(context).colorScheme.onError,
-            ),
-          ),
-        ],
-      ),
-      child: Card(
-        child: ListTile(
-          onTap: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ChatPage(
-                  fileName: fileName,
-                  initialRoundId: item.previewRoundId,
+    return metaAsync.when(
+      loading: () {
+        return Card(
+          child: ListTile(
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ChatPage(fileName: fileName),
                 ),
+              );
+              if (context.mounted) {
+                await notifier.refresh();
+              }
+            },
+            leading: const Icon(Icons.forum_outlined),
+            title: Text(
+              item.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('加载中...'),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildMetaChip(updatedAt, icon: Icons.schedule_outlined),
+                    ],
+                  ),
+                ],
               ),
-            );
-            if (context.mounted) {
-              await notifier.refresh();
-            }
-          },
-          leading: const Icon(Icons.forum_outlined),
-          title: Row(
+            ),
+            trailing: const Icon(Icons.chevron_right_rounded),
+          ),
+        );
+      },
+      error: (e, st) {
+        return Card(
+          child: ListTile(
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ChatPage(fileName: fileName),
+                ),
+              );
+              if (context.mounted) {
+                await notifier.refresh();
+              }
+            },
+            leading: const Icon(Icons.forum_outlined),
+            title: Text(
+              item.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('加载摘要失败'),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildMetaChip(updatedAt, icon: Icons.schedule_outlined),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            trailing: const Icon(Icons.chevron_right_rounded),
+          ),
+        );
+      },
+      data: (meta) {
+        return Slidable(
+          key: ValueKey(fileName),
+          endActionPane: ActionPane(
+            motion: const DrawerMotion(),
+            extentRatio: 0.34,
             children: [
-              Expanded(
-                child: Text(
-                  item.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+              CustomSlidableAction(
+                onPressed: (_) => onRename(item),
+                backgroundColor: Theme.of(context).colorScheme.secondary,
+                child: const Icon(
+                  Icons.edit_outlined,
+                  color: Colors.white,
                 ),
               ),
-              if (item.isStreaming) ...[
-                const SizedBox(width: 8),
-                _buildMetaChip('生成中', icon: Icons.bolt_outlined),
-              ],
-              if (item.hasUnseen) ...[
-                const SizedBox(width: 8),
-                _buildMetaChip('未查看', icon: Icons.mark_chat_unread_outlined),
-              ],
+              CustomSlidableAction(
+                onPressed: (_) => onDelete(item),
+                backgroundColor: Theme.of(context).colorScheme.error,
+                child: Icon(
+                  Icons.delete_outline,
+                  color: Theme.of(context).colorScheme.onError,
+                ),
+              ),
             ],
           ),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _PreviewLine(
-                  label: 'YOU',
-                  text: item.userPreview,
-                ),
-                const SizedBox(height: 4),
-                _PreviewLine(
-                  label: 'AI',
-                  text: item.aiPreview,
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _buildMetaChip(
-                      '${item.roundCount} 轮',
-                      icon: Icons.chat_bubble_outline,
+          child: Card(
+            child: ListTile(
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ChatPage(
+                      fileName: fileName,
+                      initialRoundId: meta.previewRoundId,
                     ),
-                    _buildMetaChip(
-                      updatedAt,
-                      icon: Icons.schedule_outlined,
+                  ),
+                );
+                if (context.mounted) {
+                  await notifier.refresh();
+                }
+              },
+              leading: const Icon(Icons.forum_outlined),
+              title: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (meta.isStreaming) ...[
+                    const SizedBox(width: 8),
+                    _buildMetaChip('生成中', icon: Icons.bolt_outlined),
+                  ],
+                  if (meta.hasUnseen) ...[
+                    const SizedBox(width: 8),
+                    _buildMetaChip('未查看', icon: Icons.mark_chat_unread_outlined),
+                  ],
+                ],
+              ),
+              subtitle: Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _PreviewLine(
+                      label: 'YOU',
+                      text: meta.userPreview,
+                    ),
+                    const SizedBox(height: 4),
+                    _PreviewLine(
+                      label: 'AI',
+                      text: meta.aiPreview,
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _buildMetaChip(
+                          '${meta.roundCount} 轮',
+                          icon: Icons.chat_bubble_outline,
+                        ),
+                        _buildMetaChip(
+                          updatedAt,
+                          icon: Icons.schedule_outlined,
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
             ),
           ),
-          trailing: const Icon(Icons.chevron_right_rounded),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -10576,30 +10641,37 @@ final sessionCardProvider =
 
 ## File: presentation/providers/session_list_notifier.dart
 ```dart
-// presentation/providers/session_list_notifier.dart
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../di/providers.dart';
 import '../../domain/models/session_list_item.dart';
+import '../../domain/models/session_card_meta.dart';
 
-// 使用纯声明式 StreamProvider，首页消费轻量列表模型
 final sessionListProvider = StreamProvider<List<SessionListItem>>((ref) {
   final repository = ref.watch(conversationRepositoryProvider);
   return repository.watchSessionListItems();
 });
 
-// 保留命令式 notifier，用于删除/重命名/创建等操作
-class SessionListNotifier extends StateNotifier<AsyncValue<List<SessionListItem>>> {
+final sessionCardMetaProvider =
+    StreamProvider.family<SessionCardMeta, String>((ref, sessionId) {
+  final repository = ref.watch(conversationRepositoryProvider);
+  return repository.watchSessionCardMeta(sessionId);
+});
+
+class SessionListNotifier
+    extends StateNotifier<AsyncValue<List<SessionListItem>>> {
   final Ref ref;
 
   SessionListNotifier(this.ref) : super(const AsyncValue.loading()) {
-    ref.listen<AsyncValue<List<SessionListItem>>>(sessionListProvider, (previous, next) {
-      state = next;
-    });
+    ref.listen<AsyncValue<List<SessionListItem>>>(
+      sessionListProvider,
+      (previous, next) {
+        state = next;
+      },
+    );
   }
 
   Future<void> refresh() async {
-    // Stream 会自动同步，保留此方法用于兼容性
+    // Stream 会自动同步，保留兼容方法
   }
 
   Future<void> deleteSession(String fileName) async {
@@ -10631,7 +10703,6 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<SessionListItem>
     final fileName = '$sessionId.json';
 
     await repository.createSession(fileName: fileName, title: cleanTitle);
-
     return fileName;
   }
 }
