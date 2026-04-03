@@ -7,6 +7,7 @@ import '../../core/interfaces/file_service.dart';
 import '../../core/models/attachment.dart';
 import '../../core/models/chat_round.dart';
 import '../../core/models/session.dart';
+import '../../domain/models/session_list_item.dart';
 import '../database/database.dart';
 import '../../core/utils/id_generator.dart';
 
@@ -33,20 +34,83 @@ class ConversationRepository {
     return result.isNotEmpty;
   }
 
-  // ========== 核心改造：添加 watch 方法 ==========
+  // ========== 首页轻量列表 watch ==========
 
-  /// 监听所有会话列表，返回按更新时间倒序的会话 Stream
-  Stream<List<Session>> watchAllSessions() {
-    final query = _db.select(_db.dbSessions)
-      ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]);
+  /// 监听首页所需的会话摘要列表，不构建完整 Session
+  Stream<List<SessionListItem>> watchSessionListItems() {
+    final sessionsStream = (_db.select(_db.dbSessions)
+          ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]))
+        .watch();
 
-    return query.watch().asyncMap((sessionRows) async {
-      final sessions = <Session>[];
-      for (final sessionRow in sessionRows) {
-        final session = await _buildSessionFromRow(sessionRow);
-        sessions.add(session);
+    final roundsStream = (_db.select(_db.dbChatRounds)
+          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
+        .watch();
+
+    return Stream.multi((controller) {
+      List<DbSession> latestSessions = const [];
+      List<DbChatRound> latestRounds = const [];
+
+      void emit() {
+        final roundsBySession = <String, List<DbChatRound>>{};
+        for (final round in latestRounds) {
+          roundsBySession.putIfAbsent(round.sessionId, () => []).add(round);
+        }
+
+        final items = latestSessions.map((session) {
+          final rounds = roundsBySession[session.id] ?? const <DbChatRound>[];
+          final previewRound = rounds.isEmpty ? null : rounds.last;
+
+          final hasUnseen = rounds.any((r) => r.hasUnseenUpdate);
+
+          final userPreview = previewRound == null
+              ? '点击开始新的对话'
+              : previewRound.userContent.trim().isEmpty
+                  ? '（空输入）'
+                  : previewRound.userContent.trim();
+
+          final aiPreview = previewRound == null
+              ? '（等待回复）'
+              : (previewRound.assistantContent?.trim().isNotEmpty ?? false)
+                  ? previewRound.assistantContent!
+                  : (previewRound.isIncomplete ? '正在生成...' : '（等待回复）');
+
+          return SessionListItem(
+            id: session.id,
+            title: session.title,
+            updatedAt: session.updatedAt,
+            hasUnseen: hasUnseen,
+            roundCount: rounds.length,
+            previewRoundId: previewRound?.id,
+            userPreview: userPreview,
+            aiPreview: aiPreview,
+            isStreaming: previewRound?.isIncomplete == true,
+          );
+        }).toList();
+
+        items.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+        controller.add(items);
       }
-      return sessions;
+
+      final sessionSub = sessionsStream.listen(
+        (sessions) {
+          latestSessions = sessions;
+          emit();
+        },
+        onError: controller.addError,
+      );
+
+      final roundSub = roundsStream.listen(
+        (rounds) {
+          latestRounds = rounds;
+          emit();
+        },
+        onError: controller.addError,
+      );
+
+      controller.onCancel = () async {
+        await sessionSub.cancel();
+        await roundSub.cancel();
+      };
     });
   }
 
