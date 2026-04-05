@@ -1,33 +1,59 @@
-// presentation/providers/chat_notifier.dart
-
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/app_config.dart';
 import '../../core/models/chat_round.dart';
-import '../../core/models/model_info.dart';
 import '../../core/models/session.dart';
-import '../../core/models/attachment.dart';
+import '../../core/utils/id_generator.dart';
 import '../../di/providers.dart';
 import '../../domain/services/attachment_preparer.dart';
-import '../../domain/services/branch_navigator.dart';
 import '../../domain/services/chat_context_builder.dart';
 import '../../domain/services/chat_stream_accumulator.dart';
-import '../models/pending_attachment.dart';
-import '../../core/utils/id_generator.dart';
-import 'config_notifier.dart';
 
-T? _firstWhereOrNull<T>(List<T> list, bool Function(T) test) {
-  for (final element in list) {
-    if (test(element)) return element;
+// 数据源
+final chatSessionProvider = StreamProvider.family<Session?, String>((ref, fileName) {
+  return ref.watch(conversationRepositoryProvider).watchSession(fileName);
+});
+
+// 新增：拓扑结构监听（仅 ID 和父 ID）
+final chatTopologyProvider = StreamProvider.family<List<({String id, String? parentId})>, String>((ref, fileName) {
+  return ref.watch(conversationRepositoryProvider).watchSessionTopology(fileName);
+});
+
+// 新增：单条详情监听
+final roundDetailProvider = StreamProvider.family<ChatRound?, String>((ref, roundId) {
+  return ref.watch(conversationRepositoryProvider).watchSingleRound(roundId);
+});
+
+// 新增：ID 列表计算路径。AI 说话时，ID 列表不变，由此 Provider 驱动的 Widget 不会重绘
+final visibleRoundIdsProvider = Provider.family<List<String>, ({String fileName, String? roundId})>((ref, args) {
+  final topology = ref.watch(chatTopologyProvider(args.fileName)).valueOrNull ?? [];
+  if (args.roundId == null) return const [];
+  
+  final idToParent = {for (var t in topology) t.id: t.parentId};
+  final path = <String>[];
+  String? currentId = args.roundId;
+
+  while (currentId != null && idToParent.containsKey(currentId)) {
+    path.add(currentId);
+    currentId = idToParent[currentId];
   }
-  return null;
-}
+  return path.reversed.toList();
+});
 
-/// 会话事实数据完全来自数据库 watch
-final chatSessionProvider =
-    StreamProvider.family<Session?, String>((ref, fileName) {
-  final repository = ref.watch(conversationRepositoryProvider);
-  return repository.watchSession(fileName);
+// 保持计算路径：仅供其他需要全量对象的场景使用
+final visibleRoundsProvider = Provider.family<List<ChatRound>, ({String fileName, String? roundId})>((ref, args) {
+  final session = ref.watch(chatSessionProvider(args.fileName)).valueOrNull;
+  if (session == null || args.roundId == null) return const [];
+  
+  final roundMap = {for (final r in session.rounds) r.id: r};
+  final path = <ChatRound>[];
+  String? currentId = args.roundId;
+
+  while (currentId != null && roundMap.containsKey(currentId)) {
+    final r = roundMap[currentId]!;
+    path.add(r);
+    currentId = r.parentId;
+  }
+  return path.reversed.toList();
 });
 
 class ChatController {
@@ -37,69 +63,16 @@ class ChatController {
 
   ChatController(this.ref, this.fileName);
 
-  ModelInfo? _findSelectedModelInfo() {
-    final configAsync = ref.read(configProvider);
-    final config = configAsync.valueOrNull;
-    if (config == null) return null;
-
-    final selectedId = config.selectedModel;
-    if (selectedId == null || selectedId.trim().isEmpty) return null;
-
-    final models = config.availableModels ?? const <ModelInfo>[];
-    return _firstWhereOrNull(models, (m) => m.id == selectedId);
-  }
-
-  Future<AppConfig> _getCurrentConfig() async {
-    final configAsync = ref.read(configProvider);
-    if (configAsync.hasValue) {
-      return configAsync.valueOrNull!;
-    }
-    return await ref.read(configRepositoryProvider).getConfig();
-  }
-
-  bool _shouldEnableReasoning(AppConfig config) {
-    final selectedModel = _findSelectedModelInfo();
-    return selectedModel?.supportsReasoning == true;
-  }
-
-  void _validateRequestCapability({
-    required AppConfig config,
-    required List<PendingAttachment> attachments,
-  }) {
-    final selectedModel = _findSelectedModelInfo();
-    if (selectedModel == null) return;
-
-    final hasImage = attachments.any((a) => a.isImage);
-    if (hasImage && selectedModel.supportsVision != true) {
-      throw Exception('当前模型未声明支持图片输入');
-    }
-  }
-
   Future<String> sendMessage({
     required String content,
     required String? parentRoundId,
-    List<PendingAttachment>? attachments,
+    List<dynamic>? attachments,
   }) async {
-    final session = ref.read(chatSessionProvider(fileName)).valueOrNull ??
-        await ref.read(chatSessionProvider(fileName).future);
-    if (session == null) {
-      throw Exception('会话未初始化');
-    }
-
-    if (parentRoundId != null &&
-        !session.rounds.any((r) => r.id == parentRoundId)) {
-      throw Exception('当前引用的轮次不存在');
-    }
-
-    final pendingAttachments = attachments ?? const <PendingAttachment>[];
+    // ========== 阶段1: 准备并持久化用户消息 ==========
     final repository = ref.read(conversationRepositoryProvider);
-    final config = await _getCurrentConfig();
-
-    _validateRequestCapability(config: config, attachments: pendingAttachments);
-
-    final savedAttachments = await AttachmentPreparer.savePendingAttachments(
-      repository,
-      pendingAttachments,
+    final saved = await AttachmentPreparer.savePendingAttachments(
+      repository, 
+      attachments?.cast() ?? []
     );
 
     final newRound = ChatRound(
@@ -107,268 +80,106 @@ class ChatController {
       parentId: parentRoundId,
       createdAt: DateTime.now().millisecondsSinceEpoch,
       userContent: content,
-      userAttachments: savedAttachments,
+      userAttachments: saved,
       isIncomplete: true,
-      hasUnseenUpdate: false,
-    );
-
-    final contextRounds = BranchNavigator.getCurrentBranchPath(
-      session.copyWith(rounds: [...session.rounds, newRound]),
-      newRound.id,
     );
 
     await repository.appendRound(fileName, newRound);
-    unawaited(_handleStreamTask(newRound, config, contextRounds));
+    
+    // ========== 阶段2: 内联流式任务（真正 inline，fire-and-forget）==========
+    () async {
+      // 1. 原子快照读取
+      final apiSource = ref.read(remoteApiSourceProvider);
+      final sessionRounds = ref.read(chatSessionProvider(fileName)).valueOrNull?.rounds ?? [];
 
+      final config = await ref.read(configServiceProvider).loadConfig();
+      final accumulator = ChatStreamAccumulator();
+      String? error;
+
+      try {
+        // 2. 构建上下文路径
+        final contextPath = _buildContextPathFromSnapshot(newRound.id, sessionRounds);
+        final apiContext = await ChatContextBuilder.buildFromRounds(contextPath, repository);
+
+        // 3. 发起流式请求
+        final stream = apiSource.chatStream(
+          taskId: newRound.id,
+          baseUrl: config.baseUrl,
+          apiKey: config.apiKey,
+          chatPath: config.chatPath,
+          apiMode: config.apiMode,
+          model: config.selectedModel ?? '',
+          context: apiContext,
+          enableReasoning: true,
+        );
+
+        // 4. 流式消费 + 增量更新
+        await for (final chunk in stream) {
+          if (chunk.error != null) { error = chunk.error; break; }
+          if (chunk.isDone) break;
+          accumulator.add(chunk);
+          await repository.updateRound(fileName, newRound.id, newRound.copyWith(
+            assistantContent: accumulator.content,
+            assistantThinking: accumulator.reasoning,
+          ));
+        }
+      } catch (e) {
+        error = e.toString();
+      } finally {
+        // 5. 最终状态持久化
+        String finalContent = accumulator.content;
+        if (error != null) {
+          finalContent += "\n\n[错误]\n$error ";
+        } else if (_stoppingRoundIds.contains(newRound.id)) {
+          finalContent += "\n\n[已停止] ";
+        }
+
+        await repository.updateRound(fileName, newRound.id, newRound.copyWith(
+          assistantContent: finalContent.trim().isEmpty ? null : finalContent,
+          assistantThinking: accumulator.reasoning.trim().isEmpty ? null : accumulator.reasoning,
+          isIncomplete: false,
+          hasUnseenUpdate: true,
+        ));
+        _stoppingRoundIds.remove(newRound.id);
+      }
+    }(); // ← 立即执行 async 闭包，不 await，实现 fire-and-forget
+    
     return newRound.id;
   }
 
   Future<String> retryFromRound(String roundId) async {
-    final session = ref.read(chatSessionProvider(fileName)).valueOrNull ??
-        await ref.read(chatSessionProvider(fileName).future);
-    if (session == null) {
-      throw Exception('会话未初始化');
-    }
-
-    final repository = ref.read(conversationRepositoryProvider);
-    final config = await _getCurrentConfig();
-
-    final sourceRound = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
-    if (sourceRound == null) {
-      throw Exception('未找到要重新回复的对话');
-    }
-
-    final selectedModel = _findSelectedModelInfo();
-    if (selectedModel != null) {
-      final hasImage = sourceRound.userAttachments.any((a) => a.isImage);
-      if (hasImage && selectedModel.supportsVision != true) {
-        throw Exception('当前模型未声明支持图片输入');
-      }
-    }
-
-    final newRound = ChatRound(
-      id: IdGenerator.generate(),
-      parentId: sourceRound.parentId,
-      createdAt: DateTime.now().millisecondsSinceEpoch,
-      userContent: sourceRound.userContent,
-      userAttachments: sourceRound.userAttachments,
-      isIncomplete: true,
-      hasUnseenUpdate: false,
-    );
-
-    final contextRounds = BranchNavigator.getCurrentBranchPath(
-      session.copyWith(rounds: [...session.rounds, newRound]),
-      newRound.id,
-    );
-
-    await repository.appendRound(fileName, newRound);
-    unawaited(_handleStreamTask(newRound, config, contextRounds));
-
-    return newRound.id;
+    final rounds = ref.read(chatSessionProvider(fileName)).valueOrNull?.rounds ?? [];
+    final source = rounds.firstWhere((r) => r.id == roundId);
+    return sendMessage(content: source.userContent, parentRoundId: source.parentId);
   }
 
-  Future<String> editAndResendFromRound(
-    String roundId,
-    String newContent, {
-    List<PendingAttachment>? attachments,
-  }) async {
-    final session = ref.read(chatSessionProvider(fileName)).valueOrNull ??
-        await ref.read(chatSessionProvider(fileName).future);
-    if (session == null) {
-      throw Exception('会话未初始化');
-    }
-
-    final repository = ref.read(conversationRepositoryProvider);
-    final config = await _getCurrentConfig();
-    final pendingAttachments = attachments ?? const <PendingAttachment>[];
-
-    _validateRequestCapability(config: config, attachments: pendingAttachments);
-
-    final sourceRound = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
-    if (sourceRound == null) {
-      throw Exception('未找到要编辑重试的对话');
-    }
-
-    final selectedModel = _findSelectedModelInfo();
-    if (selectedModel != null) {
-      final hasImage = sourceRound.userAttachments.any((a) => a.isImage) ||
-          pendingAttachments.any((a) => a.isImage);
-      if (hasImage && selectedModel.supportsVision != true) {
-        throw Exception('当前模型未声明支持图片输入');
-      }
-    }
-
-    final savedAttachments = await AttachmentPreparer.savePendingAttachments(
-      repository,
-      pendingAttachments,
-    );
-
-    final mergedAttachments = <Attachment>[
-      ...sourceRound.userAttachments,
-      ...savedAttachments,
-    ];
-
-    final newRound = ChatRound(
-      id: IdGenerator.generate(),
-      parentId: sourceRound.parentId,
-      createdAt: DateTime.now().millisecondsSinceEpoch,
-      userContent: newContent,
-      userAttachments: mergedAttachments,
-      isIncomplete: true,
-      hasUnseenUpdate: false,
-    );
-
-    final contextRounds = BranchNavigator.getCurrentBranchPath(
-      session.copyWith(rounds: [...session.rounds, newRound]),
-      newRound.id,
-    );
-
-    await repository.appendRound(fileName, newRound);
-    unawaited(_handleStreamTask(newRound, config, contextRounds));
-
-    return newRound.id;
+  Future<String> editAndResendFromRound(String roundId, String content, {List<dynamic>? attachments}) async {
+    final rounds = ref.read(chatSessionProvider(fileName)).valueOrNull?.rounds ?? [];
+    final source = rounds.firstWhere((r) => r.id == roundId);
+    return sendMessage(content: content, parentRoundId: source.parentId, attachments: attachments);
   }
 
-  Future<void> _handleStreamTask(
-    ChatRound round,
-    AppConfig config,
-    List<ChatRound> contextRounds,
-  ) async {
-    final apiSource = ref.read(remoteApiSourceProvider);
-    final repository = ref.read(conversationRepositoryProvider);
-    final accumulator = ChatStreamAccumulator();
-    var hasError = false;
-    String? errorMessage;
-    var wasStopped = false;
+  /// 基于原子快照构建消息路径（替代原内部循环）
+  List<ChatRound> _buildContextPathFromSnapshot(String roundId, List<ChatRound> allRounds) {
+    final roundMap = {for (final r in allRounds) r.id: r};
+    final path = <ChatRound>[];
+    String? currentId = roundId;
 
-    int lastUpdateTimestamp = 0;
-    const throttleMs = 1000;
-
-    Future<void> _flushProgress(bool isIncomplete) async {
-      final updatedRound = round.copyWith(
-        assistantThinking:
-            accumulator.reasoning.isEmpty ? null : accumulator.reasoning,
-        assistantContent:
-            accumulator.content.isEmpty ? null : accumulator.content,
-        isIncomplete: isIncomplete,
-        hasUnseenUpdate: false,
-      );
-      await repository.updateRound(fileName, round.id, updatedRound);
+    while (currentId != null && roundMap.containsKey(currentId)) {
+      path.add(roundMap[currentId]!);
+      currentId = roundMap[currentId]!.parentId;
     }
-
-    try {
-      final apiContext = await ChatContextBuilder.buildFromRounds(
-        contextRounds,
-        repository,
-      );
-
-      final stream = apiSource.chatStream(
-        taskId: round.id,
-        baseUrl: config.baseUrl,
-        apiKey: config.apiKey,
-        chatPath: config.chatPath,
-        apiMode: config.apiMode,
-        model: config.selectedModel ?? 'unknown-model',
-        context: apiContext,
-        enableReasoning: _shouldEnableReasoning(config),
-      );
-
-      await for (final chunk in stream) {
-        if (chunk.error != null) {
-          hasError = true;
-          errorMessage = chunk.error;
-          break;
-        }
-
-        if (!chunk.isDone) {
-          accumulator.add(chunk);
-
-          final now = DateTime.now().millisecondsSinceEpoch;
-          if (now - lastUpdateTimestamp >= throttleMs) {
-            await _flushProgress(true);
-            lastUpdateTimestamp = now;
-          }
-          continue;
-        }
-
-        if (_stoppingRoundIds.contains(round.id)) {
-          wasStopped = true;
-        }
-        break;
-      }
-    } catch (e) {
-      if (_stoppingRoundIds.contains(round.id)) {
-        wasStopped = true;
-      } else {
-        hasError = true;
-        errorMessage = e.toString();
-      }
-    } finally {
-      var finalContent = accumulator.content;
-      final finalReasoning = accumulator.reasoning;
-
-      if (hasError) {
-        finalContent = _appendErrorSuffix(finalContent, errorMessage);
-      } else if (wasStopped) {
-        finalContent = _appendStoppedSuffix(finalContent);
-      }
-
-      await _finalizeRoundPersistence(round, finalContent, finalReasoning);
-      _stoppingRoundIds.remove(round.id);
-    }
-  }
-
-  String _appendStoppedSuffix(String content) {
-    final trimmed = content.trim();
-    if (trimmed.isEmpty) return '[已停止]';
-    return '$trimmed\n\n[已停止]';
-  }
-
-  String _appendErrorSuffix(String content, String? message) {
-    final trimmed = content.trim();
-    final cleanMessage = (message ?? '').trim();
-    final errorText = cleanMessage.isEmpty ? '[错误]' : '[错误]\n$cleanMessage';
-    if (trimmed.isEmpty) return errorText;
-    return '$trimmed\n\n$errorText';
-  }
-
-  Future<void> _finalizeRoundPersistence(
-    ChatRound round,
-    String content,
-    String reasoning,
-  ) async {
-    final repository = ref.read(conversationRepositoryProvider);
-
-    final updatedRound = round.copyWith(
-      assistantContent: content.trim().isEmpty ? null : content,
-      assistantThinking: reasoning.trim().isEmpty ? null : reasoning,
-      isIncomplete: false,
-      hasUnseenUpdate: true,
-    );
-
-    await repository.updateRound(fileName, round.id, updatedRound);
+    return path.reversed.toList();
   }
 
   void stopGeneration(String roundId) {
     _stoppingRoundIds.add(roundId);
-    final apiSource = ref.read(remoteApiSourceProvider);
-    apiSource.cancelRequest(roundId);
+    ref.read(remoteApiSourceProvider).cancelRequest(roundId);
   }
 
   Future<void> markRoundSeen(ChatRound round) async {
-    if (!round.hasUnseenUpdate) return;
-
-    final repository = ref.read(conversationRepositoryProvider);
-    await repository.updateRound(
-      fileName,
-      round.id,
-      round.copyWith(hasUnseenUpdate: false),
-    );
+    await ref.read(conversationRepositoryProvider).updateRound(fileName, round.id, round.copyWith(hasUnseenUpdate: false));
   }
 }
 
-final chatControllerProvider = Provider.family<ChatController, String>(
-  (ref, fileName) {
-    return ChatController(ref, fileName);
-  },
-);
+final chatControllerProvider = Provider.family<ChatController, String>((ref, fileName) => ChatController(ref, fileName));

@@ -2,7 +2,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:drift/drift.dart';
-import '../../core/interfaces/file_service.dart';
+import '../data_sources/local_file_source.dart';
 import '../../core/models/attachment.dart';
 import '../../core/models/chat_round.dart';
 import '../../core/models/session.dart';
@@ -12,7 +12,7 @@ import '../../domain/models/session_card_meta.dart';
 
 class ConversationRepository {
   final AppDatabase _db;
-  final IFileService _fileService;
+  final ILocalFileSource _fileService;
   ConversationRepository(this._db, this._fileService);
 
   String _getId(String fileName) => fileName.replaceAll('.json', '');
@@ -78,6 +78,51 @@ class ConversationRepository {
     return query.watch().map(_mapSessionFromJoinedRows);
   }
 
+  // ========== 细粒度监听（新增） ==========
+
+  /// 仅监听会话的拓扑结构（ID 与父子关系）
+  /// 只有在增删消息时触发，AI 说话时不触发
+  Stream<List<({String id, String? parentId})>> watchSessionTopology(String fileName) {
+    final sessionId = _getId(fileName);
+    final query = _db.selectOnly(_db.dbChatRounds)
+      ..addColumns([_db.dbChatRounds.id, _db.dbChatRounds.parentId])
+      ..where(_db.dbChatRounds.sessionId.equals(sessionId))
+      ..orderBy([OrderingTerm.asc(_db.dbChatRounds.createdAt)]);
+      
+    return query.watch().map((rows) => rows.map((r) => (
+      id: r.read(_db.dbChatRounds.id)!,
+      parentId: r.read(_db.dbChatRounds.parentId)
+    )).toList());
+  }
+
+  /// 仅监听单条消息的完整详情（含附件）
+  Stream<ChatRound?> watchSingleRound(String roundId) {
+    final query = _db.select(_db.dbChatRounds).join([
+      leftOuterJoin(
+        _db.dbAttachments,
+        _db.dbAttachments.roundId.equalsExp(_db.dbChatRounds.id),
+      ),
+    ])..where(_db.dbChatRounds.id.equals(roundId));
+
+    return query.watch().map((rows) {
+      if (rows.isEmpty) return null;
+      final roundRow = rows.first.readTable(_db.dbChatRounds);
+      final attachments = rows
+          .where((row) => row.readTableOrNull(_db.dbAttachments) != null)
+          .map((row) {
+            final a = row.readTable(_db.dbAttachments);
+            return Attachment(
+              id: a.id,
+              name: a.name,
+              relativePath: a.relativePath,
+              isImage: a.isImage,
+              mimeType: a.mimeType,
+            );
+          }).toList();
+      return _mapToChatRound(roundRow, attachments);
+    });
+  }
+
   // ========== 私有辅助方法 ==========
 
   Session? _mapSessionFromJoinedRows(List<TypedResult> rows) {
@@ -104,10 +149,7 @@ class ConversationRepository {
       }
     }
 
-    final sortedRoundRows = roundMap.values.toList()
-      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
-
-    final rounds = sortedRoundRows
+    final rounds = roundMap.values
         .map((roundRow) => _mapToChatRound(
               roundRow,
               attachmentMap[roundRow.id] ?? const <Attachment>[],

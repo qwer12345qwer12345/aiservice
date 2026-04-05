@@ -10,7 +10,7 @@ abstract class ILocalFileSource {
   Future<void> initDirectories();
   Future<String> readTextFile(String relativePath);
   Future<void> writeTextFile(String relativePath, String content);
-  Future<void> deleteFile(String relativePath);
+  Future<void> deleteAttachment(String relativePath);
   Future<List<String>> listFiles(String directory);
   Future<String> saveAttachment(Uint8List data, String fileName);
   Future<Uint8List> readAttachment(String relativePath);
@@ -62,7 +62,7 @@ class LocalFileSource implements ILocalFileSource {
   }
 
   @override
-  Future<void> deleteFile(String relativePath) async {
+  Future<void> deleteAttachment(String relativePath) async {
     try {
       final file = File(path.join(_baseDir, relativePath));
       if (await file.exists()) {

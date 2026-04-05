@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/chat_round.dart';
-import '../../core/models/session.dart';
 import '../../core/utils/app_route_observer.dart';
 import '../../core/utils/time_format_utils.dart';
-import '../models/pending_attachment.dart';
 import '../providers/chat_notifier.dart';
 import '../providers/input_draft_provider.dart';
 import '../widgets/attachment_list.dart';
@@ -16,13 +13,12 @@ import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_toast.dart';
 import 'branch_tree_page.dart';
 import '../utils/page_utils.dart';
-import '../../domain/services/branch_navigator.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   final String fileName;
-  final String? initialRoundId;
+  final String? initialRoundId; 
   final String? initialMessage;
-  final List<PendingAttachment>? initialAttachments;
+  final List<dynamic>? initialAttachments;
 
   const ChatPage({
     super.key,
@@ -38,454 +34,164 @@ class ChatPage extends ConsumerStatefulWidget {
 
 class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
   PageController? _pageController;
-  late final ProviderSubscription<AsyncValue<Session?>> _sessionSubscription;
-
   bool _initialMessageHandled = false;
-  bool _isMarkingSeen = false;
   bool _isRouteVisible = false;
   ModalRoute<dynamic>? _route;
 
-  String? _branchRoundId;
+  String? _branchLeafId;
   String? _currentRoundId;
 
   @override
   void initState() {
     super.initState();
-
-    _branchRoundId = widget.initialRoundId;
+    _branchLeafId = widget.initialRoundId;
     _currentRoundId = widget.initialRoundId;
-
-    _sessionSubscription = ref.listenManual<AsyncValue<Session?>>(
-      chatSessionProvider(widget.fileName),
-      (previous, next) async {
-        final session = next.valueOrNull;
-        _reconcileSession(session);
-
-        if (_initialMessageHandled || session == null || !mounted) {
-          return;
-        }
-
-        final message = widget.initialMessage?.trim() ?? '';
-        final attachments =
-            widget.initialAttachments ?? const <PendingAttachment>[];
-        final hasContent = message.isNotEmpty || attachments.isNotEmpty;
-
-        if (!hasContent) return;
-
-        _initialMessageHandled = true;
-        try {
-          final newRoundId =
-              await ref.read(chatControllerProvider(widget.fileName)).sendMessage(
-                    content: message,
-                    parentRoundId: _currentRoundId,
-                    attachments: attachments,
-                  );
-
-          if (!mounted) return;
-          setState(() {
-            _branchRoundId = newRoundId;
-            _currentRoundId = newRoundId;
-          });
-        } catch (e) {
-          if (mounted) {
-            AppToast.show('发送失败：${e.toString()}');
-          }
-        }
-      },
-    );
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _subscribeRoute();
+    _handleInitialMessage();
+  }
+
+  void _handleInitialMessage() async {
+    if (_initialMessageHandled || widget.initialMessage == null) return;
+    _initialMessageHandled = true;
+
+    try {
+      final newId = await ref.read(chatControllerProvider(widget.fileName)).sendMessage(
+        content: widget.initialMessage!,
+        parentRoundId: _currentRoundId,
+        attachments: widget.initialAttachments?.cast() ?? [],
+      );
+      _updateBranch(newId);
+    } catch (e) {
+      AppToast.show('发送失败：$e');
+    }
+  }
+
+  void _subscribeRoute() {
     final route = ModalRoute.of(context);
-    if (route != null && route != _route) {
-      if (_route != null) {
-        appRouteObserver.unsubscribe(this);
-      }
+    if (route != _route && route is PageRoute) {
+      if (_route != null) appRouteObserver.unsubscribe(this);
       _route = route;
-      appRouteObserver.subscribe(this, route as PageRoute);
+      appRouteObserver.subscribe(this, route);
     }
   }
 
   @override
   void dispose() {
-    _sessionSubscription.close();
     appRouteObserver.unsubscribe(this);
     _pageController?.dispose();
     super.dispose();
   }
 
-  List<ChatRound> _buildVisibleRounds(
-    Session? session,
-    String? branchRoundId,
-  ) {
-    if (session == null || branchRoundId == null) {
-      return const <ChatRound>[];
-    }
-    return BranchNavigator.getCurrentBranchPath(session, branchRoundId);
-  }
-
-  int _resolveCurrentIndex(List<ChatRound> visibleRounds, String? currentRoundId) {
-    if (visibleRounds.isEmpty || currentRoundId == null) return 0;
-    final index = visibleRounds.indexWhere((round) => round.id == currentRoundId);
-    if (index < 0) return visibleRounds.length - 1;
-    return index;
-  }
-
-  String? _resolveBranchRoundId(Session session, String? preferredRoundId) {
-    if (preferredRoundId != null &&
-        session.rounds.any((r) => r.id == preferredRoundId)) {
-      return preferredRoundId;
-    }
-
-    final leaves = BranchNavigator.getAllBranchLeaves(session);
-    if (leaves.isNotEmpty) {
-      return leaves.last.id;
-    }
-
-    if (session.rounds.isNotEmpty) {
-      return session.rounds.first.id;
-    }
-
-    return null;
-  }
-
-  String? _resolveCurrentRoundId(
-    List<ChatRound> visibleRounds,
-    String? preferredRoundId,
-  ) {
-    if (preferredRoundId != null &&
-        visibleRounds.any((r) => r.id == preferredRoundId)) {
-      return preferredRoundId;
-    }
-
-    return visibleRounds.isNotEmpty ? visibleRounds.last.id : null;
-  }
-
-  void _reconcileSession(Session? session) {
+  void _updateBranch(String leafId) {
     if (!mounted) return;
-
-    if (session == null) {
-      setState(() {
-        _branchRoundId = null;
-        _currentRoundId = null;
-      });
-      return;
-    }
-
-    final nextBranchRoundId = _resolveBranchRoundId(session, _branchRoundId);
-
-    final visibleRounds = nextBranchRoundId == null
-        ? const <ChatRound>[]
-        : BranchNavigator.getCurrentBranchPath(session, nextBranchRoundId);
-
-    final nextCurrentRoundId =
-        _resolveCurrentRoundId(visibleRounds, _currentRoundId);
-
-    final nextIndex = _resolveCurrentIndex(visibleRounds, nextCurrentRoundId);
-
-    final shouldUpdateState = nextBranchRoundId != _branchRoundId ||
-        nextCurrentRoundId != _currentRoundId;
-
-    if (shouldUpdateState) {
-      setState(() {
-        _branchRoundId = nextBranchRoundId;
-        _currentRoundId = nextCurrentRoundId;
-      });
-    }
-
-    final controller = _pageController;
-    if (controller != null && controller.hasClients) {
-      final currentPage = controller.page?.round() ?? controller.initialPage;
-      if (currentPage != nextIndex) {
-        controller.jumpToPage(nextIndex);
-      }
-    }
-  }
-
-  @override
-  void didPush() {
-    _isRouteVisible = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
-      await _syncSeenWithVisiblePage();
+    setState(() {
+      _branchLeafId = leafId;
+      _currentRoundId = leafId;
     });
-  }
-
-  @override
-  void didPopNext() {
-    _isRouteVisible = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
-      await _syncSeenWithVisiblePage();
-    });
-  }
-
-  @override
-  void didPushNext() {
-    _isRouteVisible = false;
-  }
-
-  @override
-  void didPop() {
-    _isRouteVisible = false;
-    if (_isInEditMode()) {
-      _cancelEditMode();
-    }
-  }
-
-  Future<void> _copyText(String text) async {
-    await Clipboard.setData(ClipboardData(text: text));
-    await AppToast.show('已复制到剪贴板');
-  }
-
-  void _enterEditMode(String roundId, String text) {
-    ref.read(globalInputDraftProvider.notifier).state = text;
-    ref.read(globalEditSourceRoundIdProvider.notifier).state = roundId;
-    FocusScope.of(context).unfocus();
-  }
-
-  void _cancelEditMode() {
-    ref.read(globalEditSourceRoundIdProvider.notifier).state = null;
-    ref.read(globalInputDraftProvider.notifier).state = '';
-    ref.read(globalAttachmentDraftProvider.notifier).state = [];
-  }
-
-  bool _isInEditMode() {
-    return ref.read(globalEditSourceRoundIdProvider) != null;
-  }
-
-  Future<void> _syncSeenWithVisiblePage() async {
-    if (!_isRouteVisible) return;
-    if (_isMarkingSeen) return;
-
-    final controller = _pageController;
-    if (controller == null || !controller.hasClients) return;
-
-    final session = ref.read(chatSessionProvider(widget.fileName)).valueOrNull;
-    final visibleRounds = _buildVisibleRounds(session, _branchRoundId);
-    if (visibleRounds.isEmpty) return;
-
-    final currentIndex = _resolveCurrentIndex(visibleRounds, _currentRoundId);
-    final currentPage = controller.page;
-    final index = currentPage != null
-        ? currentPage.round().clamp(0, visibleRounds.length - 1)
-        : currentIndex;
-
-    final round = visibleRounds[index];
-    if (!round.hasUnseenUpdate) return;
-
-    _isMarkingSeen = true;
-    try {
-      await ref
-          .read(chatControllerProvider(widget.fileName))
-          .markRoundSeen(round);
-    } finally {
-      _isMarkingSeen = false;
-    }
-  }
-
-  Future<void> _retryFromRound(String roundId) async {
-    try {
-      final newRoundId =
-          await ref.read(chatControllerProvider(widget.fileName)).retryFromRound(
-                roundId,
-              );
-
-      if (!mounted) return;
-      setState(() {
-        _branchRoundId = newRoundId;
-        _currentRoundId = newRoundId;
-      });
-    } catch (e) {
-      if (mounted) {
-        await AppToast.show('重新生成失败：$e');
-      }
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     final sessionAsync = ref.watch(chatSessionProvider(widget.fileName));
-    final session = sessionAsync.valueOrNull;
-    final chatController = ref.read(chatControllerProvider(widget.fileName));
     final editSourceRoundId = ref.watch(globalEditSourceRoundIdProvider);
     final isEditMode = editSourceRoundId != null;
 
-    final visibleRounds = _buildVisibleRounds(session, _branchRoundId);
-    final currentIndex = _resolveCurrentIndex(visibleRounds, _currentRoundId);
-    final hasPages = visibleRounds.isNotEmpty;
-    final pageController = hasPages
-        ? (_pageController ??= PageController(initialPage: currentIndex))
-        : null;
-    final textTheme = Theme.of(context).textTheme;
-    final currentRound =
-        hasPages && PageUtils.isValidIndex(currentIndex, visibleRounds.length)
-            ? visibleRounds[currentIndex]
-            : null;
-    final currentIsStreaming = currentRound?.isIncomplete == true;
+    if (_branchLeafId == null && sessionAsync.hasValue) {
+      final rounds = sessionAsync.value!.rounds;
+      if (rounds.isNotEmpty) {
+        _branchLeafId = rounds.last.id;
+        _currentRoundId = _branchLeafId;
+      }
+    }
+
+    // ⚡️ 核心优化：仅观察 ID 列表。内容变化不触发 PageView 构建
+    final visibleRoundIds = ref.watch(visibleRoundIdsProvider((
+      fileName: widget.fileName,
+      roundId: _branchLeafId,
+    )));
+
+    int currentIndex = visibleRoundIds.indexOf(_currentRoundId ?? '');
+    if (currentIndex == -1 && visibleRoundIds.isNotEmpty) {
+      currentIndex = visibleRoundIds.length - 1;
+    }
+
+    if (visibleRoundIds.isNotEmpty) {
+      _pageController ??= PageController(initialPage: currentIndex);
+      if (_pageController!.hasClients && _pageController!.page?.round() != currentIndex) {
+        _pageController!.jumpToPage(currentIndex);
+      }
+    }
 
     return AppPageScaffold(
       appBar: AppBar(
-        title: Text(
-          session?.title ?? '对话',
-          style: textTheme.titleMedium,
-        ),
+        title: Text(sessionAsync.valueOrNull?.title ?? '对话'),
         actions: [
-          if (session != null && _currentRoundId != null)
-            IconButton(
-              tooltip: isEditMode ? '编辑模式下不可切换页面' : '查看分支树',
-              icon: const Icon(Icons.account_tree_outlined),
-              onPressed: isEditMode
-                  ? null
-                  : () async {
-                      final selectedRoundId =
-                          await Navigator.of(context).push<String?>(
-                        MaterialPageRoute(
-                          builder: (_) => BranchTreePage(
-                            fileName: widget.fileName,
-                            initialFocusRoundId: _currentRoundId!,
-                          ),
-                        ),
-                      );
-
-                      if (!mounted || selectedRoundId == null) {
-                        return;
-                      }
-
-                      setState(() {
-                        _branchRoundId = selectedRoundId;
-                        _currentRoundId = selectedRoundId;
-                      });
-
-                      final nextVisibleRounds =
-                          _buildVisibleRounds(session, _branchRoundId);
-                      final nextIndex = _resolveCurrentIndex(
-                        nextVisibleRounds,
-                        _currentRoundId,
-                      );
-
-                      if (_pageController != null && _pageController!.hasClients) {
-                        _pageController!.jumpToPage(nextIndex);
-                      }
-                    },
-            ),
+          IconButton(
+            icon: const Icon(Icons.account_tree_outlined),
+            onPressed: (isEditMode || _currentRoundId == null) ? null : () async {
+              final selectedId = await Navigator.of(context).push<String>(
+                MaterialPageRoute(builder: (_) => BranchTreePage(
+                  fileName: widget.fileName, 
+                  initialFocusRoundId: _currentRoundId!
+                )),
+              );
+              if (selectedId != null) _updateBranch(selectedId);
+            },
+          ),
         ],
       ),
       body: Column(
         children: [
-          if (hasPages)
+          if (visibleRoundIds.isNotEmpty)
             _PaginationBar(
               currentIndex: currentIndex,
-              totalPages: visibleRounds.length,
-              onPrev: isEditMode
-                  ? null
-                  : currentIndex > 0
-                      ? () => pageController?.previousPage(
-                            duration: const Duration(milliseconds: 260),
-                            curve: Curves.easeOutCubic,
-                          )
-                      : null,
-              onNext: isEditMode
-                  ? null
-                  : currentIndex < visibleRounds.length - 1
-                      ? () => pageController?.nextPage(
-                            duration: const Duration(milliseconds: 260),
-                            curve: Curves.easeOutCubic,
-                          )
-                      : null,
+              totalPages: visibleRoundIds.length,
+              onPrev: (currentIndex > 0 && !isEditMode) ? () => _pageController?.previousPage(duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic) : null,
+              onNext: (currentIndex < visibleRoundIds.length - 1 && !isEditMode) ? () => _pageController?.nextPage(duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic) : null,
               isEditMode: isEditMode,
             ),
-          if (isEditMode)
-            _EditModeBanner(
-              onCancel: _cancelEditMode,
+          if (isEditMode) 
+            MaterialBanner(
+              content: const Text('正在编辑，发送前不可切换页面'),
+              actions: [TextButton(onPressed: () => _setEditMode(null, ''), child: const Text('取消'))],
             ),
           Expanded(
-            child: !hasPages
-                ? _buildWelcomeEmpty(context)
+            child: visibleRoundIds.isEmpty
+                ? const Center(child: Text('新对话'))
                 : PageView.builder(
-                    controller: pageController,
-                    physics: isEditMode
-                        ? const NeverScrollableScrollPhysics()
-                        : const PageScrollPhysics(),
-                    itemCount: visibleRounds.length,
-                    onPageChanged: (index) async {
-                      if (!PageUtils.isValidIndex(
-                        index,
-                        visibleRounds.length,
-                      )) {
-                        return;
-                      }
-
-                      final round = visibleRounds[index];
-                      setState(() {
-                        _currentRoundId = round.id;
-                      });
-
-                      await _syncSeenWithVisiblePage();
+                    controller: _pageController,
+                    physics: isEditMode ? const NeverScrollableScrollPhysics() : const PageScrollPhysics(),
+                    itemCount: visibleRoundIds.length,
+                    onPageChanged: (index) {
+                      final targetId = visibleRoundIds[index];
+                      setState(() => _currentRoundId = targetId);
+                      _markAsSeen(targetId);
                     },
-                    itemBuilder: (context, index) {
-                      final round = visibleRounds[index];
-                      final canEdit = !round.isIncomplete;
-                      return _ChatRoundPage(
-                        key: ValueKey(round.id),
-                        fileName: widget.fileName,
-                        round: round,
-                        canEdit: canEdit,
-                        onRetryReply: () => _retryFromRound(round.id),
-                        onEdit: canEdit
-                            ? () => _enterEditMode(
-                                  round.id,
-                                  round.userContent,
-                                )
-                            : null,
-                        onCopyText: _copyText,
-                      );
-                    },
+                    itemBuilder: (_, index) => _ChatRoundPage(
+                      key: ValueKey(visibleRoundIds[index]),
+                      fileName: widget.fileName,
+                      roundId: visibleRoundIds[index],
+                      onRetryReply: () => _retry(visibleRoundIds[index]),
+                      onEdit: (text) => _setEditMode(visibleRoundIds[index], text),
+                    ),
                   ),
           ),
           InputBar(
-            hintText: isEditMode ? '修改文本后发送' : '发送消息',
-            isStreaming: currentIsStreaming,
-            onStop: currentRound == null
-                ? null
-                : () => chatController.stopGeneration(currentRound.id),
+            hintText: isEditMode ? '编辑并重试' : '发送消息',
+            isStreaming: sessionAsync.valueOrNull?.rounds.any((r) => r.id == _currentRoundId && r.isIncomplete) ?? false,
+            onStop: () => ref.read(chatControllerProvider(widget.fileName)).stopGeneration(_currentRoundId!),
             onSend: (text, attachments) async {
-              try {
-                if (editSourceRoundId != null) {
-                  final newRoundId =
-                      await chatController.editAndResendFromRound(
-                    editSourceRoundId,
-                    text,
-                    attachments: attachments,
-                  );
-
-                  if (!mounted) return;
-                  setState(() {
-                    _branchRoundId = newRoundId;
-                    _currentRoundId = newRoundId;
-                  });
-                  _cancelEditMode();
-                  return;
-                }
-
-                final newRoundId = await chatController.sendMessage(
-                  content: text,
-                  parentRoundId: _currentRoundId,
-                  attachments: attachments,
-                );
-
-                if (!mounted) return;
-                setState(() {
-                  _branchRoundId = newRoundId;
-                  _currentRoundId = newRoundId;
-                });
-              } catch (e) {
-                if (mounted) {
-                  await AppToast.show('发送失败：$e');
-                }
-              }
+              final controller = ref.read(chatControllerProvider(widget.fileName));
+              final newId = isEditMode
+                  ? await controller.editAndResendFromRound(editSourceRoundId, text, attachments: attachments)
+                  : await controller.sendMessage(content: text, parentRoundId: _currentRoundId, attachments: attachments);
+              _updateBranch(newId);
+              _setEditMode(null, '');
             },
           ),
         ],
@@ -493,67 +199,48 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     );
   }
 
-  Widget _buildWelcomeEmpty(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Card(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.auto_awesome_outlined,
-                  size: 36,
-                  color: colorScheme.primary,
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  '开始一段新的对话',
-                  style: textTheme.titleLarge,
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  '你可以输入问题、上传图片或文件，并在不同分支中回看每一轮回复。',
-                  textAlign: TextAlign.center,
-                  style: textTheme.bodyMedium,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+  void _markAsSeen(String roundId) {
+    if (!_isRouteVisible) return;
+    final rounds = ref.read(chatSessionProvider(widget.fileName)).valueOrNull?.rounds ?? [];
+    final round = rounds.where((r) => r.id == roundId).firstOrNull;
+    if (round?.hasUnseenUpdate == true) {
+      ref.read(chatControllerProvider(widget.fileName)).markRoundSeen(round!);
+    }
   }
+
+  void _retry(String roundId) async {
+    final newId = await ref.read(chatControllerProvider(widget.fileName)).retryFromRound(roundId);
+    _updateBranch(newId);
+  }
+
+  void _setEditMode(String? roundId, String text) {
+    ref.read(globalEditSourceRoundIdProvider.notifier).state = roundId;
+    ref.read(globalInputDraftProvider.notifier).state = text;
+  }
+
+  @override
+  void didPush() => _isRouteVisible = true;
+  @override
+  void didPopNext() {
+    _isRouteVisible = true;
+    if (_currentRoundId != null) _markAsSeen(_currentRoundId!);
+  }
+  @override
+  void didPushNext() => _isRouteVisible = false;
 }
 
 class _ChatRoundPage extends StatelessWidget {
   final String fileName;
-  final ChatRound round;
-  final bool canEdit;
+  final String roundId;
   final VoidCallback onRetryReply;
-  final VoidCallback? onEdit;
-  final Future<void> Function(String text) onCopyText;
+  final Function(String) onEdit;
 
-  const _ChatRoundPage({
-    super.key,
-    required this.fileName,
-    required this.round,
-    required this.canEdit,
-    required this.onRetryReply,
-    required this.onEdit,
-    required this.onCopyText,
-  });
+  const _ChatRoundPage({super.key, required this.fileName, required this.roundId, required this.onRetryReply, required this.onEdit});
 
   @override
   Widget build(BuildContext context) {
-    final hasUser = round.userContent.trim().isNotEmpty;
-    final hasAttachments = round.userAttachments.isNotEmpty;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      padding: const EdgeInsets.all(16),
       children: [
         Card(
           child: Padding(
@@ -561,33 +248,9 @@ class _ChatRoundPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _RoundHeader(createdAt: round.createdAt),
-                const SizedBox(height: 16),
-                const _SectionLabel(
-                  icon: Icons.person_outline,
-                  text: '你的输入',
-                ),
-                const SizedBox(height: 10),
-                if (hasUser)
-                  MessageBubble(
-                    content: round.userContent,
-                    isUser: true,
-                    onCopy: () => onCopyText(round.userContent),
-                    onRetryReply: onRetryReply,
-                    onEdit: onEdit,
-                  ),
-                if (hasAttachments) ...[
-                  if (hasUser) const SizedBox(height: 8),
-                  AttachmentList(
-                    attachments: round.userAttachments,
-                    rightAligned: true,
-                  ),
-                ],
-                _RoundAnswerSection(
-                  round: round,
-                  onRetryReply: onRetryReply,
-                  onCopyText: onCopyText,
-                ),
+                _UserSection(roundId: roundId, onEdit: onEdit, onRetryReply: onRetryReply),
+                _ThinkingSection(roundId: roundId),
+                _AiReplySection(roundId: roundId, onRetryReply: onRetryReply),
               ],
             ),
           ),
@@ -597,198 +260,92 @@ class _ChatRoundPage extends StatelessWidget {
   }
 }
 
-class _RoundAnswerSection extends StatelessWidget {
-  final ChatRound round;
+class _UserSection extends ConsumerWidget {
+  final String roundId;
+  final Function(String) onEdit;
   final VoidCallback onRetryReply;
-  final Future<void> Function(String text) onCopyText;
-
-  const _RoundAnswerSection({
-    required this.round,
-    required this.onRetryReply,
-    required this.onCopyText,
-  });
+  const _UserSection({required this.roundId, required this.onEdit, required this.onRetryReply});
 
   @override
-  Widget build(BuildContext context) {
-    final thinking = round.assistantThinking ?? '';
-    final assistantContent = round.assistantContent ?? '';
-    final hasThinking = thinking.trim().isNotEmpty;
-    final hasAssistant = assistantContent.trim().isNotEmpty;
-    final isStreaming = round.isIncomplete;
+  Widget build(BuildContext context, WidgetRef ref) {
+    // ⚡️ 仅当该 Round 的用户部分发生变动时刷新
+    final round = ref.watch(roundDetailProvider(roundId).select((s) {
+      final r = s.valueOrNull;
+      return r == null ? null : (content: r.userContent, time: r.createdAt, attach: r.userAttachments, inc: r.isIncomplete);
+    }));
 
-    if (!hasThinking && !hasAssistant && !isStreaming) {
-      return const SizedBox.shrink();
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (hasThinking) ...[
-          const SizedBox(height: 20),
-          const Divider(),
-          const SizedBox(height: 16),
-          const _SectionLabel(
-            icon: Icons.psychology_alt_outlined,
-            text: '推理过程',
-          ),
-          const SizedBox(height: 10),
-          ThoughtBubble(content: thinking),
-        ],
-        if (hasAssistant || isStreaming) ...[
-          const SizedBox(height: 20),
-          const Divider(),
-          const SizedBox(height: 16),
-          const _SectionLabel(
-            icon: Icons.smart_toy_outlined,
-            text: '回答',
-          ),
-          const SizedBox(height: 10),
-          if (hasAssistant)
-            MessageBubble(
-              content: assistantContent,
-              isUser: false,
-              onCopy: () => onCopyText(assistantContent),
-              onRetryReply: isStreaming ? null : onRetryReply,
-            )
-          else
-            const Card(
-              margin: EdgeInsets.zero,
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                    SizedBox(width: 12),
-                    Text('正在生成回答...'),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ],
-    );
+    if (round == null) return const SizedBox.shrink();
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Chip(label: Text(TimeFormatUtils.formatTimestamp(round.time))),
+      const SizedBox(height: 12),
+      MessageBubble(
+        content: round.content, 
+        isUser: true, 
+        onEdit: round.inc ? null : () => onEdit(round.content),
+        onCopy: () => Clipboard.setData(ClipboardData(text: round.content)),
+      ),
+      if (round.attach.isNotEmpty) ...[const SizedBox(height: 8), AttachmentList(attachments: round.attach)],
+    ]);
   }
 }
 
-class _EditModeBanner extends StatelessWidget {
-  final VoidCallback onCancel;
-
-  const _EditModeBanner({
-    required this.onCancel,
-  });
+class _ThinkingSection extends ConsumerWidget {
+  final String roundId;
+  const _ThinkingSection({required this.roundId});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialBanner(
-      content: const Text('正在编辑重试，发送前不可切换页面，发送时将保留原附件'),
-      actions: [
-        TextButton(
-          onPressed: onCancel,
-          child: const Text('取消编辑'),
-        ),
-      ],
-    );
+  Widget build(BuildContext context, WidgetRef ref) {
+    // ⚡️ 仅当该 Round 的推理内容变动时刷新
+    final thinking = ref.watch(roundDetailProvider(roundId).select((s) => 
+      s.valueOrNull?.assistantThinking
+    ));
+    if (thinking == null || thinking.trim().isEmpty) return const SizedBox.shrink();
+    return Column(children: [const Divider(height: 32), ThoughtBubble(content: thinking)]);
   }
 }
 
-class _RoundHeader extends StatelessWidget {
-  final int createdAt;
-
-  const _RoundHeader({
-    required this.createdAt,
-  });
+class _AiReplySection extends ConsumerWidget {
+  final String roundId;
+  final VoidCallback onRetryReply;
+  const _AiReplySection({required this.roundId, required this.onRetryReply});
 
   @override
-  Widget build(BuildContext context) {
-    return Chip(
-      label: Text(TimeFormatUtils.formatTimestamp(createdAt)),
-      visualDensity: VisualDensity.compact,
-    );
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const _SectionLabel({
-    required this.icon,
-    required this.text,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 18),
-        const SizedBox(width: 6),
-        Text(
-          text,
-          style: Theme.of(context).textTheme.titleSmall,
-        ),
-      ],
-    );
+  Widget build(BuildContext context, WidgetRef ref) {
+    // ⚡️ 仅当该 Round 的 AI 内容或完成状态变动时刷新
+    final ai = ref.watch(roundDetailProvider(roundId).select((s) {
+      final r = s.valueOrNull;
+      return r == null ? null : (content: r.assistantContent, isIncomplete: r.isIncomplete);
+    }));
+    
+    if (ai == null || (ai.content == null && !ai.isIncomplete)) return const SizedBox.shrink();
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Divider(height: 32),
+      if (ai.content != null) MessageBubble(content: ai.content!, isUser: false, onRetryReply: ai.isIncomplete ? null : onRetryReply, onCopy: () => Clipboard.setData(ClipboardData(text: ai.content!)))
+      else const Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator(strokeWidth: 2)),
+    ]);
   }
 }
 
 class _PaginationBar extends StatelessWidget {
-  final int currentIndex;
-  final int totalPages;
-  final VoidCallback? onPrev;
-  final VoidCallback? onNext;
+  final int currentIndex, totalPages;
+  final VoidCallback? onPrev, onNext;
   final bool isEditMode;
-
-  const _PaginationBar({
-    required this.currentIndex,
-    required this.totalPages,
-    required this.onPrev,
-    required this.onNext,
-    required this.isEditMode,
-  });
+  const _PaginationBar({required this.currentIndex, required this.totalPages, this.onPrev, this.onNext, required this.isEditMode});
 
   @override
   Widget build(BuildContext context) {
-    final progress = PageUtils.calculateProgress(currentIndex, totalPages);
-    final textTheme = Theme.of(context).textTheme;
-
-    return Material(
-      elevation: 1,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-        child: Row(
-          children: [
-            IconButton(
-              onPressed: onPrev,
-              icon: const Icon(Icons.chevron_left_rounded),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    isEditMode
-                        ? '编辑中｜${PageUtils.format(currentIndex, totalPages)}'
-                        : PageUtils.format(currentIndex, totalPages),
-                    style: textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 8),
-                  LinearProgressIndicator(value: progress),
-                ],
-              ),
-            ),
-            const SizedBox(width: 10),
-            IconButton(
-              onPressed: onNext,
-              icon: const Icon(Icons.chevron_right_rounded),
-            ),
-          ],
-        ),
-      ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(color: Theme.of(context).cardColor, border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor))),
+      child: Row(children: [
+        IconButton(onPressed: onPrev, icon: const Icon(Icons.chevron_left)),
+        Expanded(child: Column(children: [
+          Text(PageUtils.formatSimple(currentIndex, totalPages), style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(height: 4),
+          LinearProgressIndicator(value: PageUtils.calculateProgress(currentIndex, totalPages)),
+        ])),
+        IconButton(onPressed: onNext, icon: const Icon(Icons.chevron_right)),
+      ]),
     );
   }
 }

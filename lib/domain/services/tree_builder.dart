@@ -5,21 +5,15 @@ class TreeBuilder {
   static List<TreeNode> buildTree(List<ChatRound> rounds) {
     if (rounds.isEmpty) return [];
 
-    final sortedRounds = [...rounds]
-      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
-
     final nodeMap = <String, TreeNode>{
-      for (final round in sortedRounds)
-        round.id: TreeNode.fromRound(
-          round: round,
-          depth: 0,
-        ),
+      for (final round in rounds) 
+        round.id: TreeNode.fromRound(round: round, depth: 0),
     };
 
     final childrenMap = <String, List<String>>{};
     final rootIds = <String>[];
 
-    for (final round in sortedRounds) {
+    for (final round in rounds) {
       final parentId = round.parentId;
       if (parentId == null) {
         rootIds.add(round.id);
@@ -36,7 +30,6 @@ class TreeBuilder {
       }
     }
 
-    roots.sort((a, b) => a.round.createdAt.compareTo(b.round.createdAt));
     return roots;
   }
 
@@ -56,22 +49,18 @@ class TreeBuilder {
       }
     }
 
-    children.sort((a, b) => a.round.createdAt.compareTo(b.round.createdAt));
-
-    return node.copyWith(
-      depth: depth,
-      children: children,
-    );
+    // 🗑️ 删除原排序：children.sort(...)
+    // ✅ 子节点 ID 按创建时间顺序追加至 childrenMap，天然有序
+    return node.copyWith(depth: depth, children: children);
   }
+
+  // ================= 以下方法保持原样不动 =================
 
   static TreePath? findPath(List<TreeNode> roots, String targetId) {
     for (final root in roots) {
       final path = _findPathRecursive(root, targetId, []);
       if (path != null) {
-        return TreePath(
-          nodes: path,
-          targetNode: path.last,
-        );
+        return TreePath(nodes: path, targetNode: path.last);
       }
     }
     return null;
@@ -83,32 +72,22 @@ class TreeBuilder {
     List<TreeNode> currentPath,
   ) {
     final newPath = [...currentPath, node];
-
-    if (node.id == targetId) {
-      return newPath;
-    }
+    if (node.id == targetId) return newPath;
 
     for (final child in node.children) {
       final result = _findPathRecursive(child, targetId, newPath);
-      if (result != null) {
-        return result;
-      }
+      if (result != null) return result;
     }
-
     return null;
   }
 
   static List<TreeNode> findLeafNodes(List<TreeNode> roots) {
     final leaves = <TreeNode>[];
     _findLeavesRecursive(roots, leaves);
-    leaves.sort((a, b) => a.round.createdAt.compareTo(b.round.createdAt));
     return leaves;
   }
 
-  static void _findLeavesRecursive(
-    List<TreeNode> nodes,
-    List<TreeNode> leaves,
-  ) {
+  static void _findLeavesRecursive(List<TreeNode> nodes, List<TreeNode> leaves) {
     for (final node in nodes) {
       if (node.children.isEmpty) {
         leaves.add(node);
@@ -119,14 +98,10 @@ class TreeBuilder {
   }
 
   static TreeNode? findLatestLeaf(TreeNode node) {
-    if (node.children.isEmpty) {
-      return node;
-    }
-
+    if (node.children.isEmpty) return node;
     final latestChild = node.children.reduce((a, b) {
       return a.round.createdAt >= b.round.createdAt ? a : b;
     });
-
     return findLatestLeaf(latestChild);
   }
 }

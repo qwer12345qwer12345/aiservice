@@ -80,13 +80,7 @@ class _InputBarState extends ConsumerState<InputBar> {
     }
   }
 
-  void _clearDraft() {
-    ref.read(globalInputDraftProvider.notifier).state = '';
-  }
 
-  void _clearAttachmentDraft() {
-    ref.read(globalAttachmentDraftProvider.notifier).state = [];
-  }
 
   bool _isImageFile(String name) {
     final lower = name.toLowerCase();
@@ -208,8 +202,8 @@ class _InputBarState extends ConsumerState<InputBar> {
     if (content.isEmpty && attachments.isEmpty) return;
 
     widget.onSend(content, attachments);
-    _clearDraft();
-    _clearAttachmentDraft();
+    ref.invalidate(globalInputDraftProvider);
+    ref.invalidate(globalAttachmentDraftProvider);
   }
 
   @override

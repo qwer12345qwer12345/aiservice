@@ -4,11 +4,8 @@ import 'package:path_provider/path_provider.dart';
 import '../data/data_sources/local_file_source.dart';
 import '../data/data_sources/remote_api_source.dart';
 import '../data/database/database.dart';
-import '../data/services/file_service.dart';
 import '../data/services/config_service.dart';
 import '../data/repositories/conversation_repository.dart';
-import '../data/repositories/config_repository.dart';
-import '../core/interfaces/file_service.dart';
 import '../core/interfaces/config_service.dart';
 
 enum InitStatus { idle, loading, success, error }
@@ -18,22 +15,18 @@ class InitState {
   final String? errorMessage;
   final AppDatabase? appDatabase;
   final ILocalFileSource? fileSource;
-  final IFileService? fileService;
   final IRemoteApiSource? remoteApiSource;
   final IConfigService? configService;
   final ConversationRepository? conversationRepository;
-  final ConfigRepository? configRepository;
 
   InitState({
     this.status = InitStatus.idle,
     this.errorMessage,
     this.appDatabase,
     this.fileSource,
-    this.fileService,
     this.remoteApiSource,
     this.configService,
     this.conversationRepository,
-    this.configRepository,
   });
 
   InitState copyWith({
@@ -41,22 +34,18 @@ class InitState {
     String? errorMessage,
     AppDatabase? appDatabase,
     ILocalFileSource? fileSource,
-    IFileService? fileService,
     IRemoteApiSource? remoteApiSource,
     IConfigService? configService,
     ConversationRepository? conversationRepository,
-    ConfigRepository? configRepository,
   }) {
     return InitState(
       status: status ?? this.status,
       errorMessage: errorMessage ?? this.errorMessage,
       appDatabase: appDatabase ?? this.appDatabase,
       fileSource: fileSource ?? this.fileSource,
-      fileService: fileService ?? this.fileService,
       remoteApiSource: remoteApiSource ?? this.remoteApiSource,
       configService: configService ?? this.configService,
       conversationRepository: conversationRepository ?? this.conversationRepository,
-      configRepository: configRepository ?? this.configRepository,
     );
   }
 }
@@ -77,21 +66,17 @@ class InitNotifier extends StateNotifier<InitState> {
       final appDatabase = AppDatabase();
 
       // 3. 构建服务与 Repositories
-      final fileService = FileService(fileSource);
       final remoteApiSource = RemoteApiSource();
       final configService = ConfigService(appDatabase, remoteApiSource);
-      final conversationRepository = ConversationRepository(appDatabase, fileService);
-      final configRepository = ConfigRepository(configService);
+      final conversationRepository = ConversationRepository(appDatabase, fileSource);
 
       state = state.copyWith(
         status: InitStatus.success,
         appDatabase: appDatabase,
         fileSource: fileSource,
-        fileService: fileService,
         remoteApiSource: remoteApiSource,
         configService: configService,
         conversationRepository: conversationRepository,
-        configRepository: configRepository,
       );
     } catch (e) {
       state = state.copyWith(
@@ -110,10 +95,10 @@ final conversationRepositoryProvider = Provider<ConversationRepository>((ref) {
   return initState.conversationRepository!;
 });
 
-final configRepositoryProvider = Provider<ConfigRepository>((ref) {
+final configServiceProvider = Provider<IConfigService>((ref) {
   final initState = ref.watch(initProvider);
-  if (initState.configRepository == null) throw StateError('应用未初始化');
-  return initState.configRepository!;
+  if (initState.configService == null) throw StateError('应用未初始化');
+  return initState.configService!;
 });
 
 final remoteApiSourceProvider = Provider<IRemoteApiSource>((ref) {
