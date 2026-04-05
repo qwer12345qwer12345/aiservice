@@ -56,7 +56,6 @@ core/models/session.dart
 core/models/session.g.dart
 core/models/sse_event.dart
 core/utils/app_route_observer.dart
-core/utils/file_name_utils.dart
 core/utils/id_generator.dart
 core/utils/json_utils.dart
 core/utils/sse_parser.dart
@@ -97,7 +96,6 @@ presentation/providers/attachment_bytes_provider.dart
 presentation/providers/chat_notifier.dart
 presentation/providers/config_notifier.dart
 presentation/providers/input_draft_provider.dart
-presentation/providers/session_card_provider.dart
 presentation/providers/session_list_notifier.dart
 presentation/themes/app_theme.dart
 presentation/themes/app_tokens.dart
@@ -817,41 +815,6 @@ import 'package:flutter/material.dart';
 
 final RouteObserver<ModalRoute<void>> appRouteObserver =
     RouteObserver<ModalRoute<void>>();
-```
-
-## File: core/utils/file_name_utils.dart
-```dart
-abstract class FileNameUtils {
-  // Windows/Android/iOS 通用非法字符
-  static final _illegalChars = RegExp(r'[<>:"/\\|?*]');
-
-  // 清理非法字符
-  static String sanitize(String name) {
-    return name.replaceAll(_illegalChars, '_').trim();
-  }
-
-  // 生成唯一文件名 (如果存在冲突，自动加数字)
-  // 注意：这里只处理字符串逻辑，实际文件存在性检查应在 Service 层
-  static String makeUnique(String baseName, List<String> existingNames) {
-    final cleanName = sanitize(baseName);
-    if (!existingNames.contains('$cleanName.json')) {
-      return '$cleanName.json';
-    }
-
-    int counter = 1;
-    while (existingNames.contains('$cleanName$counter.json')) {
-      counter++;
-    }
-    return '$cleanName$counter.json';
-  }
-
-  // 从文件名提取标题 (去掉 .json)
-  static String extractTitle(String fileName) {
-    return fileName.endsWith('.json') 
-        ? fileName.substring(0, fileName.length - 5) 
-        : fileName;
-  }
-}
 ```
 
 ## File: core/utils/id_generator.dart
@@ -5392,7 +5355,6 @@ class ConfigRepository {
 ## File: data/repositories/conversation_repository.dart
 ```dart
 // data/repositories/conversation_repository.dart
-
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:drift/drift.dart';
@@ -5402,39 +5364,20 @@ import '../../core/models/chat_round.dart';
 import '../../core/models/session.dart';
 import '../../domain/models/session_list_item.dart';
 import '../database/database.dart';
-import '../../core/utils/id_generator.dart';
 import '../../domain/models/session_card_meta.dart';
 
 class ConversationRepository {
   final AppDatabase _db;
   final IFileService _fileService;
-
   ConversationRepository(this._db, this._fileService);
 
   String _getId(String fileName) => fileName.replaceAll('.json', '');
 
-  // 检查附件是否被其他 Round 引用
-  Future<bool> _isAttachmentUsedElsewhere(
-    String relativePath,
-    List<String> excludeRoundIds,
-  ) async {
-    final query = _db.select(_db.dbAttachments).join([
-      innerJoin(
-        _db.dbChatRounds,
-        _db.dbChatRounds.id.equalsExp(_db.dbAttachments.roundId),
-      )
-    ])
-      ..where(_db.dbAttachments.relativePath.equals(relativePath))
-      ..where(_db.dbChatRounds.id.isNotIn(excludeRoundIds));
-
-    final result = await query.get();
-    return result.isNotEmpty;
-  }
+  // ========== 响应式查询 ==========
 
   Stream<List<SessionListItem>> watchSessionListItems() {
     final query = (_db.select(_db.dbSessions)
       ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]));
-
     return query.watch().map((sessions) {
       return sessions.map((session) {
         return SessionListItem(
@@ -5450,23 +5393,19 @@ class ConversationRepository {
     final query = (_db.select(_db.dbChatRounds)
       ..where((t) => t.sessionId.equals(sessionId))
       ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]));
-
     return query.watch().map((rounds) {
       final previewRound = rounds.isEmpty ? null : rounds.last;
       final hasUnseen = rounds.any((r) => r.hasUnseenUpdate);
-
       final userPreview = previewRound == null
           ? '点击开始新的对话'
           : previewRound.userContent.trim().isEmpty
               ? '（空输入）'
               : previewRound.userContent.trim();
-
       final aiPreview = previewRound == null
           ? '（等待回复）'
           : (previewRound.assistantContent?.trim().isNotEmpty ?? false)
               ? previewRound.assistantContent!
               : (previewRound.isIncomplete ? '正在生成...' : '（等待回复）');
-
       return SessionCardMeta(
         roundCount: rounds.length,
         previewRoundId: previewRound?.id,
@@ -5478,11 +5417,8 @@ class ConversationRepository {
     });
   }
 
-  /// 监听单个会话的完整数据（包含所有轮次和附件）
-  /// 改为单条 join watch，避免“watch 主表 + 子表补查”
   Stream<Session?> watchSession(String fileName) {
     final sessionId = _getId(fileName);
-
     final query = _db.select(_db.dbSessions).join([
       leftOuterJoin(
         _db.dbChatRounds,
@@ -5494,10 +5430,7 @@ class ConversationRepository {
       ),
     ])
       ..where(_db.dbSessions.id.equals(sessionId))
-      ..orderBy([
-        OrderingTerm.asc(_db.dbChatRounds.createdAt),
-      ]);
-
+      ..orderBy([OrderingTerm.asc(_db.dbChatRounds.createdAt)]);
     return query.watch().map(_mapSessionFromJoinedRows);
   }
 
@@ -5505,29 +5438,25 @@ class ConversationRepository {
 
   Session? _mapSessionFromJoinedRows(List<TypedResult> rows) {
     if (rows.isEmpty) return null;
-
     final sessionRow = rows.first.readTable(_db.dbSessions);
-
     final roundMap = <String, DbChatRound>{};
     final attachmentMap = <String, List<Attachment>>{};
 
     for (final row in rows) {
       final roundRow = row.readTableOrNull(_db.dbChatRounds);
       if (roundRow == null) continue;
-
       roundMap.putIfAbsent(roundRow.id, () => roundRow);
-
       final attachmentRow = row.readTableOrNull(_db.dbAttachments);
       if (attachmentRow != null) {
         attachmentMap.putIfAbsent(roundRow.id, () => []).add(
-              Attachment(
-                id: attachmentRow.id,
-                name: attachmentRow.name,
-                relativePath: attachmentRow.relativePath,
-                isImage: attachmentRow.isImage,
-                mimeType: attachmentRow.mimeType,
-              ),
-            );
+          Attachment(
+            id: attachmentRow.id,
+            name: attachmentRow.name,
+            relativePath: attachmentRow.relativePath,
+            isImage: attachmentRow.isImage,
+            mimeType: attachmentRow.mimeType,
+          ),
+        );
       }
     }
 
@@ -5535,12 +5464,10 @@ class ConversationRepository {
       ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
     final rounds = sortedRoundRows
-        .map(
-          (roundRow) => _mapToChatRound(
-            roundRow,
-            attachmentMap[roundRow.id] ?? const <Attachment>[],
-          ),
-        )
+        .map((roundRow) => _mapToChatRound(
+              roundRow,
+              attachmentMap[roundRow.id] ?? const <Attachment>[],
+            ))
         .toList();
 
     return Session(
@@ -5568,141 +5495,41 @@ class ConversationRepository {
     );
   }
 
-  // ========== 现有的同步方法保留，用于初始化和一次性读取 ==========
+  // ========== 附件清理逻辑 (简化版) ==========
 
-  Future<List<String>> getAllSessionFileNames() async {
-    final sessions = await (_db.select(_db.dbSessions)
-          ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]))
-        .get();
-    return sessions.map((s) => '${s.id}.json').toList();
+  /// 检查数据库中是否仍存在该附件的引用
+  Future<bool> _hasAttachmentReference(String relativePath) async {
+    final row = await (_db.select(_db.dbAttachments)
+          ..where((t) => t.relativePath.equals(relativePath))
+          ..limit(1))
+        .getSingleOrNull();
+    return row != null;
   }
 
-  Future<Session> getSession(String fileName) async {
-    final sessionId = _getId(fileName);
-
-    final query = _db.select(_db.dbSessions).join([
-      leftOuterJoin(
-        _db.dbChatRounds,
-        _db.dbChatRounds.sessionId.equalsExp(_db.dbSessions.id),
-      ),
-      leftOuterJoin(
-        _db.dbAttachments,
-        _db.dbAttachments.roundId.equalsExp(_db.dbChatRounds.id),
-      ),
-    ])
-      ..where(_db.dbSessions.id.equals(sessionId))
-      ..orderBy([
-        OrderingTerm.asc(_db.dbChatRounds.createdAt),
-      ]);
-
-    final session = _mapSessionFromJoinedRows(await query.get());
-
-    if (session == null) {
-      throw StateError('Session not found: $fileName');
-    }
-
-    return session;
-  }
-
-  Future<void> deleteRounds(String sessionId, List<String> roundIds) async {
-    if (roundIds.isEmpty) return;
-
-    await (_db.delete(_db.dbChatRounds)
-          ..where((t) => t.sessionId.equals(sessionId) & t.id.isIn(roundIds)))
-        .go();
-  }
-
-  Future<void> saveSession(String fileName, Session newSession) async {
-    final sessionId = _getId(fileName);
-
-    await _db.transaction(() async {
-      final allAttachments = <DbAttachmentsCompanion>[];
-
-      for (final round in newSession.rounds) {
-        await _db.into(_db.dbChatRounds).insertOnConflictUpdate(
-              DbChatRoundsCompanion.insert(
-                id: round.id,
-                sessionId: sessionId,
-                parentId: Value(round.parentId),
-                createdAt: round.createdAt,
-                userContent: round.userContent,
-                assistantThinking: Value(round.assistantThinking),
-                assistantContent: Value(round.assistantContent),
-                isIncomplete: Value(round.isIncomplete),
-                hasUnseenUpdate: Value(round.hasUnseenUpdate),
-              ),
-            );
-
-        allAttachments.addAll(
-          round.userAttachments.map(
-            (a) => DbAttachmentsCompanion.insert(
-              id: a.id,
-              roundId: round.id,
-              name: a.name,
-              relativePath: a.relativePath,
-              isImage: Value(a.isImage),
-              mimeType: Value(a.mimeType),
-            ),
-          ),
-        );
-      }
-
-      for (final attach in allAttachments) {
-        await _db.into(_db.dbAttachments).insertOnConflictUpdate(attach);
-      }
-
-      await _db.into(_db.dbSessions).insertOnConflictUpdate(
-            DbSessionsCompanion(
-              id: Value(sessionId),
-              title: Value(newSession.title),
-              createdAt: Value(newSession.createdAt),
-              updatedAt: Value(newSession.updatedAt),
-              config: Value(newSession.config),
-              hasUnseenUpdate: Value(newSession.hasUnseenUpdate),
-            ),
-          );
-    });
-  }
-
-  Future<void> saveSessionAndCleanupOrphanAttachments(
-    String fileName,
-    Session oldSession,
-    Session newSession,
-  ) async {
-    final oldPaths = oldSession.rounds
-        .expand((r) => r.userAttachments)
-        .map((a) => a.relativePath)
-        .toSet();
-    final newPaths = newSession.rounds
-        .expand((r) => r.userAttachments)
-        .map((a) => a.relativePath)
-        .toSet();
-    final removedPaths = oldPaths.difference(newPaths);
-    final deletedRoundIds = oldSession.rounds
-        .where((oldR) => !newSession.rounds.any((newR) => newR.id == oldR.id))
-        .map((r) => r.id)
-        .toList();
-
-    await saveSession(fileName, newSession);
-
-    for (final path in removedPaths) {
-      if (!await _isAttachmentUsedElsewhere(path, deletedRoundIds)) {
+  /// 统一清理孤儿附件：检查引用，无引用则删除物理文件
+  Future<void> _cleanupOrphanAttachments(Iterable<String> relativePaths) async {
+    for (final path in relativePaths.toSet()) {
+      if (!await _hasAttachmentReference(path)) {
         try {
           await _fileService.deleteAttachment(path);
-        } catch (_) {}
+        } catch (_) {
+          // 忽略删除失败，避免阻塞流程
+        }
       }
     }
   }
+
+  // ========== 写操作 ==========
 
   Future<void> deleteRoundsAndCleanupOrphanAttachments(
     String fileName,
     List<String> roundIds,
   ) async {
     if (roundIds.isEmpty) return;
-
     final sessionId = _getId(fileName);
 
-    final attachmentsToCheck = await (_db.select(_db.dbAttachments).join([
+    // 1. 收集候选附件路径
+    final candidatePaths = (await (_db.select(_db.dbAttachments).join([
       innerJoin(
         _db.dbChatRounds,
         _db.dbChatRounds.id.equalsExp(_db.dbAttachments.roundId),
@@ -5710,68 +5537,49 @@ class ConversationRepository {
     ])
           ..where(_db.dbChatRounds.sessionId.equals(sessionId))
           ..where(_db.dbChatRounds.id.isIn(roundIds)))
-        .get();
-
-    final paths = attachmentsToCheck
+        .get())
         .map((row) => row.readTable(_db.dbAttachments).relativePath)
         .toSet();
 
+    // 2. 提交数据库变更 (级联删除会自动清理 dbAttachments)
     await _db.transaction(() async {
       await (_db.delete(_db.dbChatRounds)
             ..where((t) => t.sessionId.equals(sessionId) & t.id.isIn(roundIds)))
           .go();
-
-      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId))).write(
+      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
+          .write(
         DbSessionsCompanion(
           updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
         ),
       );
     });
 
-    for (final path in paths) {
-      if (!await _isAttachmentUsedElsewhere(path, roundIds)) {
-        try {
-          await _fileService.deleteAttachment(path);
-        } catch (_) {}
-      }
-    }
+    // 3. 基于最终态清理物理文件
+    await _cleanupOrphanAttachments(candidatePaths);
   }
 
   Future<void> deleteSession(String fileName) async {
     final sessionId = _getId(fileName);
-    Session? targetSession;
 
-    try {
-      targetSession = await getSession(fileName);
-    } catch (_) {}
+    // 1. 收集候选附件路径
+    final candidatePaths = (await (_db.select(_db.dbAttachments).join([
+      innerJoin(
+        _db.dbChatRounds,
+        _db.dbChatRounds.id.equalsExp(_db.dbAttachments.roundId),
+      ),
+    ])
+          ..where(_db.dbChatRounds.sessionId.equals(sessionId)))
+        .get())
+        .map((row) => row.readTable(_db.dbAttachments).relativePath)
+        .toSet();
 
-    if (targetSession != null) {
-      final paths = targetSession.rounds
-          .expand((r) => r.userAttachments)
-          .map((a) => a.relativePath)
-          .toSet();
-      final allRoundIds = targetSession.rounds.map((r) => r.id).toList();
+    // 2. 提交数据库变更
+    await (_db.delete(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
+        .go();
 
-      for (final path in paths) {
-        if (!await _isAttachmentUsedElsewhere(path, allRoundIds)) {
-          try {
-            await _fileService.deleteAttachment(path);
-          } catch (_) {}
-        }
-      }
-    }
-
-    await (_db.delete(_db.dbSessions)..where((t) => t.id.equals(sessionId))).go();
+    // 3. 基于最终态清理物理文件
+    await _cleanupOrphanAttachments(candidatePaths);
   }
-
-  Future<String> saveAttachment(Uint8List data, String fileName) async =>
-      await _fileService.saveAttachment(data, fileName);
-
-  Future<Uint8List> getAttachment(String relativePath) async =>
-      await _fileService.readAttachment(relativePath);
-
-  Future<void> deleteAttachment(String relativePath) async =>
-      await _fileService.deleteAttachment(relativePath);
 
   Future<Session> createSession({
     required String fileName,
@@ -5779,7 +5587,6 @@ class ConversationRepository {
   }) async {
     final sessionId = _getId(fileName);
     final now = DateTime.now().millisecondsSinceEpoch;
-
     final session = Session(
       id: sessionId,
       title: title,
@@ -5787,7 +5594,6 @@ class ConversationRepository {
       updatedAt: now,
       rounds: [],
     );
-
     await _db.into(_db.dbSessions).insert(
           DbSessionsCompanion.insert(
             id: session.id,
@@ -5796,19 +5602,13 @@ class ConversationRepository {
             updatedAt: session.updatedAt,
           ),
         );
-
     return session;
-  }
-
-  Future<Session> createSessionWithGeneratedId({required String title}) async {
-    final sessionId = IdGenerator.generate();
-    return createSession(fileName: '$sessionId.json', title: title);
   }
 
   Future<void> updateSessionTitle(String fileName, String title) async {
     final sessionId = _getId(fileName);
-
-    await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId))).write(
+    await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
+        .write(
       DbSessionsCompanion(
         title: Value(title),
         updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
@@ -5816,22 +5616,8 @@ class ConversationRepository {
     );
   }
 
-  Future<List<Session>> getAllSessions() async {
-    final ids = await getAllSessionFileNames();
-    final sessions = <Session>[];
-
-    for (final id in ids) {
-      try {
-        sessions.add(await getSession(id));
-      } catch (_) {}
-    }
-
-    return sessions;
-  }
-
   Future<void> appendRound(String fileName, ChatRound round) async {
     final sessionId = _getId(fileName);
-
     await _db.transaction(() async {
       await _db.into(_db.dbChatRounds).insert(
             DbChatRoundsCompanion.insert(
@@ -5846,7 +5632,6 @@ class ConversationRepository {
               hasUnseenUpdate: Value(round.hasUnseenUpdate),
             ),
           );
-
       for (final attach in round.userAttachments) {
         await _db.into(_db.dbAttachments).insert(
               DbAttachmentsCompanion.insert(
@@ -5859,8 +5644,8 @@ class ConversationRepository {
               ),
             );
       }
-
-      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId))).write(
+      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
+          .write(
         DbSessionsCompanion(
           updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
         ),
@@ -5874,9 +5659,9 @@ class ConversationRepository {
     ChatRound updatedRound,
   ) async {
     final sessionId = _getId(fileName);
-
     await _db.transaction(() async {
-      await (_db.update(_db.dbChatRounds)..where((t) => t.id.equals(roundId))).write(
+      await (_db.update(_db.dbChatRounds)..where((t) => t.id.equals(roundId)))
+          .write(
         DbChatRoundsCompanion(
           assistantThinking: Value(updatedRound.assistantThinking),
           assistantContent: Value(updatedRound.assistantContent),
@@ -5884,14 +5669,24 @@ class ConversationRepository {
           hasUnseenUpdate: Value(updatedRound.hasUnseenUpdate),
         ),
       );
-
-      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId))).write(
+      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
+          .write(
         DbSessionsCompanion(
           updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
         ),
       );
     });
   }
+
+  // ========== 附件读写接口保留 ==========
+  Future<String> saveAttachment(Uint8List data, String fileName) async =>
+      await _fileService.saveAttachment(data, fileName);
+
+  Future<Uint8List> getAttachment(String relativePath) async =>
+      await _fileService.readAttachment(relativePath);
+
+  Future<void> deleteAttachment(String relativePath) async =>
+      await _fileService.deleteAttachment(relativePath);
 }
 ```
 
@@ -6799,18 +6594,18 @@ class ChatRoundFactory {
 import '../../core/models/chat_chunk.dart';
 
 class ChatStreamAccumulator {
-  String _content = '';
-  String _reasoning = '';
+  final StringBuffer _content = StringBuffer();
+  final StringBuffer _reasoning = StringBuffer();
 
-  String get content => _content;
-  String get reasoning => _reasoning;
+  String get content => _content.toString();
+  String get reasoning => _reasoning.toString();
 
   void add(ChatChunk chunk) {
     if (chunk.content != null) {
-      _content += chunk.content!;
+      _content.write(chunk.content);
     }
     if (chunk.reasoningContent != null) {
-      _reasoning += chunk.reasoningContent!;
+      _reasoning.write(chunk.reasoningContent);
     }
   }
 }
@@ -7402,7 +7197,6 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:graphview/GraphView.dart';
 import '../../core/models/chat_round.dart';
-import '../../core/models/session.dart';
 import '../../core/utils/time_format_utils.dart';
 import '../../di/providers.dart';
 import '../../domain/models/tree_node.dart';
@@ -7410,6 +7204,39 @@ import '../../domain/services/tree_builder.dart';
 import '../providers/chat_notifier.dart' show chatSessionProvider;
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_toast.dart';
+
+// ==========================================
+// 🟢 第一层：结构层 Provider
+// ==========================================
+
+/// 1. 拓扑数据提取器：
+/// 将无关内容的字段剔除，使得 AI 回复文本时，该 Provider 产出的 List 完全一样（利用 Freezed 相等性）。
+/// 从而切断流式更新向下游的传递。
+final _sessionTopologyProvider = Provider.family<List<ChatRound>, String>((ref, fileName) {
+  return ref.watch(chatSessionProvider(fileName).select((sessionAsync) {
+    final rounds = sessionAsync.valueOrNull?.rounds ?? const [];
+    return rounds.map((r) => r.copyWith(
+      userContent: '',
+      assistantContent: null,
+      assistantThinking: null,
+      userAttachments: const [],
+      isIncomplete: false,
+      hasUnseenUpdate: false,
+    )).toList();
+  }));
+});
+
+/// 2. 结构树 Provider：
+/// 仅依赖干净的拓扑数据。只要新增、删除分支，才会重建整棵树。
+final branchTreeStructureProvider = Provider.family<List<TreeNode>, String>((ref, fileName) {
+  final topologyRounds = ref.watch(_sessionTopologyProvider(fileName));
+  if (topologyRounds.isEmpty) return const [];
+  return TreeBuilder.buildTree(topologyRounds);
+});
+
+// ==========================================
+// 📄 页面主结构
+// ==========================================
 
 class BranchTreePage extends ConsumerStatefulWidget {
   final String fileName;
@@ -7427,13 +7254,9 @@ class BranchTreePage extends ConsumerStatefulWidget {
 
 class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   final GlobalKey _viewerKey = GlobalKey();
-  final TransformationController _transformationController =
-      TransformationController();
-  final BuchheimWalkerConfiguration _builder =
-      BuchheimWalkerConfiguration();
+  final TransformationController _transformationController = TransformationController();
+  final BuchheimWalkerConfiguration _builder = BuchheimWalkerConfiguration();
 
-  List<TreeNode> _roots = [];
-  String _lastSignature = '';
   GlobalKey? _targetNodeKey;
   bool _hasFocused = false;
   int _focusRetryCount = 0;
@@ -7462,37 +7285,8 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     _scheduleFocusToTarget();
   }
 
-  void _reloadTree(
-    List<ChatRound> rounds, {
-    bool resetViewport = false,
-  }) {
-    final roots = rounds.isEmpty ? <TreeNode>[] : TreeBuilder.buildTree(rounds);
-    final signature = _buildSignature(roots);
-
-    if (!resetViewport && signature == _lastSignature) {
-      return;
-    }
-
-    if (resetViewport) {
-      _transformationController.value = Matrix4.identity();
-      _hasFocused = false;
-      _focusRetryCount = 0;
-      _targetNodeKey = GlobalKey();
-    }
-
-    setState(() {
-      _roots = roots;
-      _lastSignature = signature;
-    });
-
-    _scheduleFocusToTarget();
-  }
-
   void _scheduleFocusToTarget() {
-    if (_hasFocused || _targetNodeKey == null) {
-      return;
-    }
-
+    if (_hasFocused || _targetNodeKey == null) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _focusOnTargetNode();
@@ -7500,11 +7294,10 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   }
 
   void _focusOnTargetNode() {
-    if (_hasFocused) return;
-    if (_targetNodeKey == null) return;
-
+    if (_hasFocused || _targetNodeKey == null) return;
     final targetContext = _targetNodeKey!.currentContext;
     final viewerContext = _viewerKey.currentContext;
+    
     if (targetContext == null || viewerContext == null) {
       _retryFocus();
       return;
@@ -7512,19 +7305,13 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
 
     final targetBox = targetContext.findRenderObject() as RenderBox?;
     final viewerBox = viewerContext.findRenderObject() as RenderBox?;
-    if (targetBox == null || viewerBox == null) {
-      _retryFocus();
-      return;
-    }
-    if (!targetBox.hasSize || !viewerBox.hasSize) {
+    
+    if (targetBox == null || viewerBox == null || !targetBox.hasSize || !viewerBox.hasSize) {
       _retryFocus();
       return;
     }
 
-    final targetTopLeft = targetBox.localToGlobal(
-      Offset.zero,
-      ancestor: viewerBox,
-    );
+    final targetTopLeft = targetBox.localToGlobal(Offset.zero, ancestor: viewerBox);
     final targetSize = targetBox.size;
     final viewerSize = viewerBox.size;
 
@@ -7548,22 +7335,11 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   }
 
   void _retryFocus() {
-    if (_hasFocused) return;
-    if (_focusRetryCount >= 8) return;
-
+    if (_hasFocused || _focusRetryCount >= 8) return;
     _focusRetryCount++;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _focusOnTargetNode();
+      if (mounted) _focusOnTargetNode();
     });
-  }
-
-  String _buildSignature(List<TreeNode> roots) {
-    return roots.map((e) => e.toJson().toString()).join('|');
-  }
-
-  String _buildNodeSignature(TreeNode node) {
-    return node.toJson().toString();
   }
 
   Set<String> _collectSubtreeIds(TreeNode node) {
@@ -7591,19 +7367,14 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     return null;
   }
 
-  Future<void> _deleteNode(String nodeId, Session session) async {
-    final repository = ref.read(conversationRepositoryProvider);
-
-    final roots = session.rounds.isEmpty
-        ? <TreeNode>[]
-        : TreeBuilder.buildTree(session.rounds);
+  Future<void> _deleteNode(String nodeId) async {
+    final roots = ref.read(branchTreeStructureProvider(widget.fileName));
     final targetNode = _findTreeNodeById(roots, nodeId);
-    if (targetNode == null) {
-      throw Exception('未找到要删除的节点');
-    }
+    if (targetNode == null) throw Exception('未找到要删除的节点');
 
     final idsToDelete = _collectSubtreeIds(targetNode).toList();
-
+    final repository = ref.read(conversationRepositoryProvider);
+    
     try {
       await repository.deleteRoundsAndCleanupOrphanAttachments(
         widget.fileName,
@@ -7615,152 +7386,111 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     }
   }
 
-  Future<bool> _confirmDelete(TreeNode node) async {
+  Future<bool> _confirmDelete() async {
     return await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('删除节点'),
             content: const Text('确定删除这一轮及其后续全部分支吗？'),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                child: const Text('删除'),
-              ),
+              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
+              FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('删除')),
             ],
           ),
-        ) ??
-        false;
+        ) ?? false;
   }
 
   @override
   Widget build(BuildContext context) {
-    final sessionAsync = ref.watch(chatSessionProvider(widget.fileName));
+    // 基础状态监听：标题、加载状态（这些几乎不会频繁改变）
+    final sessionTitle = ref.watch(chatSessionProvider(widget.fileName).select((s) => s.valueOrNull?.title ?? '分支树'));
+    final isLoading = ref.watch(chatSessionProvider(widget.fileName).select((s) => s.isLoading && !s.hasValue));
+    final hasError = ref.watch(chatSessionProvider(widget.fileName).select((s) => s.hasError));
 
-    return sessionAsync.when(
-      loading: () => AppPageScaffold(
-        appBar: AppBar(
-          title: const Text('分支树'),
-        ),
-        body: const Center(
-          child: CircularProgressIndicator(),
-        ),
+    if (isLoading) {
+      return AppPageScaffold(appBar: AppBar(title: Text(sessionTitle)), body: const Center(child: CircularProgressIndicator()));
+    }
+    if (hasError) {
+      return AppPageScaffold(appBar: AppBar(title: Text(sessionTitle)), body: const Center(child: Text('加载失败')));
+    }
+
+    // 🟢 拿到第一层（结构树）数据，不会因为文本流式生成而频繁重构！
+    final roots = ref.watch(branchTreeStructureProvider(widget.fileName));
+    
+    // 生成轻量结构签名，用于在真正结构变更时给 GraphView 换 Key
+    final structKey = roots.map((r) => r.id).join('_');
+
+    // 监听树结构变更：如果拓扑变了，自动重置视角
+    ref.listen(branchTreeStructureProvider(widget.fileName), (prev, next) {
+      if (prev != null && prev != next) {
+        _resetViewport();
+      }
+    });
+
+    if (!_hasFocused && roots.isNotEmpty) {
+      _scheduleFocusToTarget();
+    }
+
+    return AppPageScaffold(
+      appBar: AppBar(
+        title: Text(sessionTitle, overflow: TextOverflow.ellipsis),
       ),
-      error: (e, _) => AppPageScaffold(
-        appBar: AppBar(
-          title: const Text('分支树'),
-        ),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text('加载会话失败：$e'),
-          ),
-        ),
-      ),
-      data: (session) {
-        if (session == null) {
-          return AppPageScaffold(
-            appBar: AppBar(
-              title: const Text('分支树'),
-            ),
-            body: const Center(
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: Text('会话不存在'),
-              ),
-            ),
-          );
-        }
-
-        final latestRoots = session.rounds.isEmpty
-            ? <TreeNode>[]
-            : TreeBuilder.buildTree(session.rounds);
-        final latestSignature = _buildSignature(latestRoots);
-
-        if (latestSignature != _lastSignature) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted) return;
-            _reloadTree(session.rounds);
-          });
-        }
-
-        return AppPageScaffold(
-          appBar: AppBar(
-            title: Text(
-              session.title,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          body: _roots.isEmpty
-              ? _buildEmptyState(context)
-              : Column(
-                  children: [
-                    _GraphToolbar(
-                      onZoomIn: () {
-                        final current = _transformationController.value.clone();
-                        current.scale(1.1);
-                        _transformationController.value = current;
-                      },
-                      onZoomOut: () {
-                        final current = _transformationController.value.clone();
-                        current.scale(0.9);
-                        _transformationController.value = current;
-                      },
-                      onReset: _resetViewport,
-                    ),
-                    Expanded(
-                      child: InteractiveViewer(
-                        key: _viewerKey,
-                        constrained: false,
-                        boundaryMargin: const EdgeInsets.all(double.infinity),
-                        minScale: 0.1,
-                        maxScale: 3.0,
-                        transformationController: _transformationController,
-                        child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Wrap(
-                            spacing: 40,
-                            runSpacing: 40,
-                            crossAxisAlignment: WrapCrossAlignment.start,
-                            children: [
-                              for (final root in _roots)
-                                _RootTreeGroup(
-                                  key: ValueKey(
-                                    'root-tree-${root.id}-${_buildNodeSignature(root)}',
-                                  ),
-                                  root: root,
-                                  graphSignature: _buildNodeSignature(root),
-                                  builderConfig: _builder,
-                                  targetNodeId: widget.initialFocusRoundId,
-                                  targetNodeKey: _targetNodeKey,
-                                  onSwitch: (treeNode) async {
-                                    if (context.mounted) {
-                                      Navigator.of(context).pop(treeNode.id);
-                                    }
-                                  },
-                                  onDelete: (treeNode) async {
-                                    final confirmed =
-                                        await _confirmDelete(treeNode);
-                                    if (!confirmed) return;
-                                    try {
-                                      await _deleteNode(treeNode.id, session);
-                                    } catch (e) {
-                                      await AppToast.show('删除失败：$e');
-                                    }
-                                  },
-                                ),
-                            ],
-                          ),
-                        ),
+      body: roots.isEmpty
+          ? _buildEmptyState(context)
+          : Column(
+              children: [
+                _GraphToolbar(
+                  onZoomIn: () {
+                    final current = _transformationController.value.clone();
+                    current.scale(1.1);
+                    _transformationController.value = current;
+                  },
+                  onZoomOut: () {
+                    final current = _transformationController.value.clone();
+                    current.scale(0.9);
+                    _transformationController.value = current;
+                  },
+                  onReset: _resetViewport,
+                ),
+                Expanded(
+                  child: InteractiveViewer(
+                    key: _viewerKey,
+                    constrained: false,
+                    boundaryMargin: const EdgeInsets.all(double.infinity),
+                    minScale: 0.1,
+                    maxScale: 3.0,
+                    transformationController: _transformationController,
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Wrap(
+                        spacing: 40,
+                        runSpacing: 40,
+                        crossAxisAlignment: WrapCrossAlignment.start,
+                        children: roots.map((root) => _RootTreeGroup(
+                          key: ValueKey('root-tree-${root.id}-$structKey'), // 锁定算法
+                          root: root,
+                          fileName: widget.fileName,
+                          graphSignature: structKey,
+                          builderConfig: _builder,
+                          targetNodeId: widget.initialFocusRoundId,
+                          targetNodeKey: _targetNodeKey,
+                          onSwitch: (roundId) => Navigator.of(context).pop(roundId),
+                          onDelete: (roundId) async {
+                            if (await _confirmDelete()) {
+                              try {
+                                await _deleteNode(roundId);
+                              } catch (e) {
+                                await AppToast.show('删除失败：$e');
+                              }
+                            }
+                          },
+                        )).toList(),
                       ),
                     ),
-                  ],
+                  ),
                 ),
-        );
-      },
+              ],
+            ),
     );
   }
 
@@ -7771,20 +7501,14 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 360),
-            child: Column(
+            child: const Column(
               mainAxisSize: MainAxisSize.min,
-              children: const [
+              children: [
                 Icon(Icons.account_tree_outlined, size: 40),
                 SizedBox(height: 16),
-                Text(
-                  '暂无分支结构',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-                ),
+                Text('暂无分支结构', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
                 SizedBox(height: 8),
-                Text(
-                  '当你对历史轮次重新生成回复时，这里会显示完整的分支关系。',
-                  textAlign: TextAlign.center,
-                ),
+                Text('当你对历史轮次重新生成回复时，这里会显示完整的分支关系。', textAlign: TextAlign.center),
               ],
             ),
           ),
@@ -7794,18 +7518,24 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   }
 }
 
+// ==========================================
+// 🎨 Graph 布局层
+// ==========================================
+
 class _RootTreeGroup extends StatelessWidget {
   final TreeNode root;
+  final String fileName;
   final String graphSignature;
   final BuchheimWalkerConfiguration builderConfig;
-  final Future<void> Function(TreeNode treeNode) onSwitch;
-  final Future<void> Function(TreeNode treeNode) onDelete;
+  final Function(String roundId) onSwitch;
+  final Function(String roundId) onDelete;
   final String? targetNodeId;
   final GlobalKey? targetNodeKey;
 
   const _RootTreeGroup({
     super.key,
     required this.root,
+    required this.fileName,
     required this.graphSignature,
     required this.builderConfig,
     required this.onSwitch,
@@ -7841,13 +7571,10 @@ class _RootTreeGroup extends StatelessWidget {
     addTree(root, null);
 
     return GraphView(
-      key: ValueKey('graph-${root.id}-$graphSignature'),
+      key: ValueKey('graph-${root.id}-$graphSignature'), // 图布局器不再因节点文本变化而销毁重建
       graph: graph,
       animated: false,
-      algorithm: BuchheimWalkerAlgorithm(
-        builderConfig,
-        TreeEdgeRenderer(builderConfig),
-      ),
+      algorithm: BuchheimWalkerAlgorithm(builderConfig, TreeEdgeRenderer(builderConfig)),
       paint: Paint()
         ..color = Theme.of(context).dividerColor
         ..strokeWidth = 1.6
@@ -7858,73 +7585,36 @@ class _RootTreeGroup extends StatelessWidget {
 
         final isTarget = targetNodeId != null && treeNode.id == targetNodeId;
 
+        // 向下传递必需的关键参数，不再传递可能变化的完整 TreeNode
         return _GraphNodeCard(
-          key: isTarget
-              ? targetNodeKey
-              : ValueKey('${treeNode.id}-$graphSignature'),
-          treeNode: treeNode,
-          onSwitch: () => onSwitch(treeNode),
-          onDelete: () => onDelete(treeNode),
+          key: isTarget ? targetNodeKey : ValueKey('${treeNode.id}-$graphSignature'),
+          fileName: fileName,
+          roundId: treeNode.id,
+          depth: treeNode.depth,
+          onSwitch: () => onSwitch(treeNode.id),
+          onDelete: () => onDelete(treeNode.id),
         );
       },
     );
   }
 }
 
-class _GraphToolbar extends StatelessWidget {
-  final VoidCallback onZoomIn;
-  final VoidCallback onZoomOut;
-  final VoidCallback onReset;
+// ==========================================
+// 🔵 第二层：卡片内容层（精细化监听重绘点）
+// ==========================================
 
-  const _GraphToolbar({
-    required this.onZoomIn,
-    required this.onZoomOut,
-    required this.onReset,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          children: [
-            const Icon(Icons.tune_outlined, size: 18),
-            const SizedBox(width: 8),
-            const Expanded(
-              child: Text('缩放、拖拽查看对话分支结构'),
-            ),
-            IconButton(
-              tooltip: '缩小',
-              onPressed: onZoomOut,
-              icon: const Icon(Icons.remove_rounded),
-            ),
-            IconButton(
-              tooltip: '放大',
-              onPressed: onZoomIn,
-              icon: const Icon(Icons.add_rounded),
-            ),
-            TextButton.icon(
-              onPressed: onReset,
-              icon: const Icon(Icons.center_focus_strong_outlined, size: 18),
-              label: const Text('重置'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _GraphNodeCard extends StatelessWidget {
-  final TreeNode treeNode;
+class _GraphNodeCard extends ConsumerWidget {
+  final String fileName;
+  final String roundId;
+  final int depth;
   final VoidCallback onSwitch;
   final VoidCallback onDelete;
 
   const _GraphNodeCard({
     super.key,
-    required this.treeNode,
+    required this.fileName,
+    required this.roundId,
+    required this.depth,
     required this.onSwitch,
     required this.onDelete,
   });
@@ -7938,12 +7628,24 @@ class _GraphNodeCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final isIncomplete = treeNode.round.isIncomplete;
-    final hasUnseenUpdate = treeNode.round.hasUnseenUpdate;
-    final aiContent = (treeNode.round.assistantContent ?? '').trim().isEmpty
+  Widget build(BuildContext context, WidgetRef ref) {
+    // ⚡ 重点：这里独立监听数据库流出的实时数据，仅更新本卡片
+    final round = ref.watch(chatSessionProvider(fileName).select((s) {
+      final rounds = s.valueOrNull?.rounds ?? const [];
+      return rounds.firstWhere(
+        (r) => r.id == roundId,
+        // 防止在被删除那帧报错，提供一个空 Fallback
+        orElse: () => ChatRound(id: roundId, createdAt: 0, userContent: '', isIncomplete: false),
+      );
+    }));
+
+    if (round.createdAt == 0) return const SizedBox.shrink();
+
+    final isIncomplete = round.isIncomplete;
+    final hasUnseenUpdate = round.hasUnseenUpdate;
+    final aiContent = (round.assistantContent ?? '').trim().isEmpty
         ? '（等待回复）'
-        : treeNode.round.assistantContent!;
+        : round.assistantContent!;
 
     return Card(
       child: SizedBox(
@@ -7957,33 +7659,20 @@ class _GraphNodeCard extends StatelessWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  _buildChip(
-                    '深度 ${treeNode.depth + 1}',
-                    icon: Icons.layers_outlined,
-                  ),
-                  if (isIncomplete)
-                    _buildChip(
-                      '未完成',
-                      icon: Icons.hourglass_empty_outlined,
-                    ),
-                  if (hasUnseenUpdate)
-                    _buildChip(
-                      '未查看',
-                      icon: Icons.mark_chat_unread_outlined,
-                    ),
+                  _buildChip('深度 ${depth + 1}', icon: Icons.layers_outlined),
+                  if (isIncomplete) _buildChip('未完成', icon: Icons.hourglass_empty_outlined),
+                  if (hasUnseenUpdate) _buildChip('未查看', icon: Icons.mark_chat_unread_outlined),
                 ],
               ),
               const SizedBox(height: 10),
               Text(
-                TimeFormatUtils.formatTimestamp(treeNode.round.createdAt),
+                TimeFormatUtils.formatTimestamp(round.createdAt),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 12),
               _PreviewBlock(
                 label: 'YOU',
-                content: treeNode.round.userContent.trim().isEmpty
-                    ? '（空输入）'
-                    : treeNode.round.userContent,
+                content: round.userContent.trim().isEmpty ? '（空输入）' : round.userContent,
               ),
               const SizedBox(height: 8),
               _PreviewBlock(
@@ -8014,14 +7703,12 @@ class _GraphNodeCard extends StatelessWidget {
   }
 }
 
+// 预览文本块、顶部工具栏保持不变
 class _PreviewBlock extends StatelessWidget {
   final String label;
   final String content;
 
-  const _PreviewBlock({
-    required this.label,
-    required this.content,
-  });
+  const _PreviewBlock({required this.label, required this.content});
 
   @override
   Widget build(BuildContext context) {
@@ -8032,12 +7719,7 @@ class _PreviewBlock extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '$label  ',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
+            Text('$label  ', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700)),
             Expanded(
               child: Text(
                 content,
@@ -8046,6 +7728,38 @@ class _PreviewBlock extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GraphToolbar extends StatelessWidget {
+  final VoidCallback onZoomIn;
+  final VoidCallback onZoomOut;
+  final VoidCallback onReset;
+
+  const _GraphToolbar({
+    required this.onZoomIn,
+    required this.onZoomOut,
+    required this.onReset,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            const Icon(Icons.tune_outlined, size: 18),
+            const SizedBox(width: 8),
+            const Expanded(child: Text('缩放、拖拽查看对话分支结构')),
+            IconButton(tooltip: '缩小', onPressed: onZoomOut, icon: const Icon(Icons.remove_rounded)),
+            IconButton(tooltip: '放大', onPressed: onZoomIn, icon: const Icon(Icons.add_rounded)),
+            TextButton.icon(onPressed: onReset, icon: const Icon(Icons.center_focus_strong_outlined, size: 18), label: const Text('重置')),
           ],
         ),
       ),
@@ -8070,7 +7784,6 @@ import '../widgets/attachment_list.dart';
 import '../widgets/input_bar.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/thought_bubble.dart';
-import '../widgets/common/app_card.dart';
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_toast.dart';
 import 'branch_tree_page.dart';
@@ -8116,41 +7829,40 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
 
     _sessionSubscription = ref.listenManual<AsyncValue<Session?>>(
       chatSessionProvider(widget.fileName),
-      (previous, next) {
-        next.whenData((session) async {
-          _reconcileSession(session);
+      (previous, next) async {
+        final session = next.valueOrNull;
+        _reconcileSession(session);
 
-          if (_initialMessageHandled || session == null || !mounted) {
-            return;
+        if (_initialMessageHandled || session == null || !mounted) {
+          return;
+        }
+
+        final message = widget.initialMessage?.trim() ?? '';
+        final attachments =
+            widget.initialAttachments ?? const <PendingAttachment>[];
+        final hasContent = message.isNotEmpty || attachments.isNotEmpty;
+
+        if (!hasContent) return;
+
+        _initialMessageHandled = true;
+        try {
+          final newRoundId =
+              await ref.read(chatControllerProvider(widget.fileName)).sendMessage(
+                    content: message,
+                    parentRoundId: _currentRoundId,
+                    attachments: attachments,
+                  );
+
+          if (!mounted) return;
+          setState(() {
+            _branchRoundId = newRoundId;
+            _currentRoundId = newRoundId;
+          });
+        } catch (e) {
+          if (mounted) {
+            AppToast.show('发送失败：${e.toString()}');
           }
-
-          final message = widget.initialMessage?.trim() ?? '';
-          final attachments =
-              widget.initialAttachments ?? const <PendingAttachment>[];
-          final hasContent = message.isNotEmpty || attachments.isNotEmpty;
-
-          if (!hasContent) return;
-
-          _initialMessageHandled = true;
-          try {
-            final newRoundId =
-                await ref.read(chatControllerProvider(widget.fileName)).sendMessage(
-                      content: message,
-                      parentRoundId: _currentRoundId,
-                      attachments: attachments,
-                    );
-
-            if (!mounted) return;
-            setState(() {
-              _branchRoundId = newRoundId;
-              _currentRoundId = newRoundId;
-            });
-          } catch (e) {
-            if (mounted) {
-              AppToast.show('发送失败：${e.toString()}');
-            }
-          }
-        });
+        }
       },
     );
   }
@@ -8255,14 +7967,6 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
       });
     }
 
-    if (visibleRounds.isNotEmpty && _pageController == null) {
-      _pageController = PageController(initialPage: nextIndex);
-      if (mounted) {
-        setState(() {});
-      }
-      return;
-    }
-
     final controller = _pageController;
     if (controller != null && controller.hasClients) {
       final currentPage = controller.page?.round() ?? controller.initialPage;
@@ -8348,7 +8052,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     try {
       await ref
           .read(chatControllerProvider(widget.fileName))
-          .markRoundSeen(round.id);
+          .markRoundSeen(round);
     } finally {
       _isMarkingSeen = false;
     }
@@ -8376,239 +8080,187 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
   @override
   Widget build(BuildContext context) {
     final sessionAsync = ref.watch(chatSessionProvider(widget.fileName));
+    final session = sessionAsync.valueOrNull;
     final chatController = ref.read(chatControllerProvider(widget.fileName));
     final editSourceRoundId = ref.watch(globalEditSourceRoundIdProvider);
     final isEditMode = editSourceRoundId != null;
 
-    return sessionAsync.when(
-      loading: () => AppPageScaffold(
-        appBar: AppBar(
-          title: const Text('对话'),
+    final visibleRounds = _buildVisibleRounds(session, _branchRoundId);
+    final currentIndex = _resolveCurrentIndex(visibleRounds, _currentRoundId);
+    final hasPages = visibleRounds.isNotEmpty;
+    final pageController = hasPages
+        ? (_pageController ??= PageController(initialPage: currentIndex))
+        : null;
+    final textTheme = Theme.of(context).textTheme;
+    final currentRound =
+        hasPages && PageUtils.isValidIndex(currentIndex, visibleRounds.length)
+            ? visibleRounds[currentIndex]
+            : null;
+    final currentIsStreaming = currentRound?.isIncomplete == true;
+
+    return AppPageScaffold(
+      appBar: AppBar(
+        title: Text(
+          session?.title ?? '对话',
+          style: textTheme.titleMedium,
         ),
-        body: const Center(child: CircularProgressIndicator()),
-      ),
-      error: (e, _) => AppPageScaffold(
-        appBar: AppBar(
-          title: const Text('对话'),
-        ),
-        body: _buildErrorState('加载会话失败：$e'),
-      ),
-      data: (session) {
-        final visibleRounds = _buildVisibleRounds(session, _branchRoundId);
-        final currentIndex =
-            _resolveCurrentIndex(visibleRounds, _currentRoundId);
-        final hasPages = visibleRounds.isNotEmpty;
-        final textTheme = Theme.of(context).textTheme;
-        final currentRound =
-            hasPages && PageUtils.isValidIndex(currentIndex, visibleRounds.length)
-                ? visibleRounds[currentIndex]
-                : null;
-        final currentIsStreaming = currentRound?.isIncomplete == true;
-
-        return AppPageScaffold(
-          appBar: AppBar(
-            title: Text(
-              session?.title ?? '对话',
-              style: textTheme.titleMedium,
-            ),
-            actions: [
-              if (session != null && _currentRoundId != null)
-                IconButton(
-                  tooltip: isEditMode ? '编辑模式下不可切换页面' : '查看分支树',
-                  icon: const Icon(Icons.account_tree_outlined),
-                  onPressed: isEditMode
-                      ? null
-                      : () async {
-                          final selectedRoundId =
-                              await Navigator.of(context).push<String?>(
-                            MaterialPageRoute(
-                              builder: (_) => BranchTreePage(
-                                fileName: widget.fileName,
-                                initialFocusRoundId: _currentRoundId!,
-                              ),
-                            ),
-                          );
-
-                          if (!mounted ||
-                              selectedRoundId == null) {
-                            return;
-                          }
-
-                          setState(() {
-                            _branchRoundId = selectedRoundId;
-                            _currentRoundId = selectedRoundId;
-                          });
-
-                          final nextVisibleRounds =
-                              _buildVisibleRounds(session, _branchRoundId);
-                          final nextIndex = _resolveCurrentIndex(
-                            nextVisibleRounds,
-                            _currentRoundId,
-                          );
-
-                          if (_pageController != null &&
-                              _pageController!.hasClients) {
-                            _pageController!.jumpToPage(nextIndex);
-                          }
-                        },
-                ),
-            ],
-          ),
-          body: Column(
-            children: [
-              if (hasPages)
-                _PaginationBar(
-                  currentIndex: currentIndex,
-                  totalPages: visibleRounds.length,
-                  onPrev: isEditMode
-                      ? null
-                      : currentIndex > 0
-                          ? () => _pageController?.previousPage(
-                                duration: const Duration(milliseconds: 260),
-                                curve: Curves.easeOutCubic,
-                              )
-                          : null,
-                  onNext: isEditMode
-                      ? null
-                      : currentIndex < visibleRounds.length - 1
-                          ? () => _pageController?.nextPage(
-                                duration: const Duration(milliseconds: 260),
-                                curve: Curves.easeOutCubic,
-                              )
-                          : null,
-                  isEditMode: isEditMode,
-                ),
-              if (isEditMode)
-                _EditModeBanner(
-                  onCancel: _cancelEditMode,
-                ),
-              Expanded(
-                child: session == null
-                    ? _buildErrorState('会话不存在')
-                    : !hasPages
-                        ? _buildWelcomeEmpty(context)
-                        : _pageController == null
-                            ? const Center(child: CircularProgressIndicator())
-                            : PageView.builder(
-                                controller: _pageController,
-                                physics: isEditMode
-                                    ? const NeverScrollableScrollPhysics()
-                                    : const PageScrollPhysics(),
-                                itemCount: visibleRounds.length,
-                                onPageChanged: (index) async {
-                                  if (!PageUtils.isValidIndex(
-                                    index,
-                                    visibleRounds.length,
-                                  )) {
-                                    return;
-                                  }
-
-                                  final round = visibleRounds[index];
-                                  setState(() {
-                                    _currentRoundId = round.id;
-                                  });
-
-                                  await _syncSeenWithVisiblePage();
-                                },
-                                itemBuilder: (context, index) {
-                                  final round = visibleRounds[index];
-                                  final canEdit = !round.isIncomplete;
-                                  return _ChatRoundPage(
-                                    key: ValueKey(round.id),
-                                    fileName: widget.fileName,
-                                    round: round,
-                                    canEdit: canEdit,
-                                    onRetryReply: () => _retryFromRound(round.id),
-                                    onEdit: canEdit
-                                        ? () => _enterEditMode(
-                                              round.id,
-                                              round.userContent,
-                                            )
-                                        : null,
-                                    onCopyText: _copyText,
-                                  );
-                                },
-                              ),
-              ),
-              InputBar(
-                hintText: isEditMode ? '修改文本后发送' : '发送消息',
-                isStreaming: currentIsStreaming,
-                onStop: currentRound == null
-                    ? null
-                    : () => chatController.stopGeneration(currentRound.id),
-                onSend: (text, attachments) async {
-                  try {
-                    if (editSourceRoundId != null) {
-                      final newRoundId =
-                          await chatController.editAndResendFromRound(
-                        editSourceRoundId,
-                        text,
-                        attachments: attachments,
+        actions: [
+          if (session != null && _currentRoundId != null)
+            IconButton(
+              tooltip: isEditMode ? '编辑模式下不可切换页面' : '查看分支树',
+              icon: const Icon(Icons.account_tree_outlined),
+              onPressed: isEditMode
+                  ? null
+                  : () async {
+                      final selectedRoundId =
+                          await Navigator.of(context).push<String?>(
+                        MaterialPageRoute(
+                          builder: (_) => BranchTreePage(
+                            fileName: widget.fileName,
+                            initialFocusRoundId: _currentRoundId!,
+                          ),
+                        ),
                       );
 
-                      if (!mounted) return;
+                      if (!mounted || selectedRoundId == null) {
+                        return;
+                      }
+
                       setState(() {
-                        _branchRoundId = newRoundId;
-                        _currentRoundId = newRoundId;
+                        _branchRoundId = selectedRoundId;
+                        _currentRoundId = selectedRoundId;
                       });
-                      _cancelEditMode();
-                      return;
-                    }
 
-                    final newRoundId = await chatController.sendMessage(
-                      content: text,
-                      parentRoundId: _currentRoundId,
-                      attachments: attachments,
-                    );
+                      final nextVisibleRounds =
+                          _buildVisibleRounds(session, _branchRoundId);
+                      final nextIndex = _resolveCurrentIndex(
+                        nextVisibleRounds,
+                        _currentRoundId,
+                      );
 
-                    if (!mounted) return;
-                    setState(() {
-                      _branchRoundId = newRoundId;
-                      _currentRoundId = newRoundId;
-                    });
-                  } catch (e) {
-                    if (mounted) {
-                      await AppToast.show('发送失败：$e');
-                    }
-                  }
-                },
-              ),
-            ],
+                      if (_pageController != null && _pageController!.hasClients) {
+                        _pageController!.jumpToPage(nextIndex);
+                      }
+                    },
+            ),
+        ],
+      ),
+      body: Column(
+        children: [
+          if (hasPages)
+            _PaginationBar(
+              currentIndex: currentIndex,
+              totalPages: visibleRounds.length,
+              onPrev: isEditMode
+                  ? null
+                  : currentIndex > 0
+                      ? () => pageController?.previousPage(
+                            duration: const Duration(milliseconds: 260),
+                            curve: Curves.easeOutCubic,
+                          )
+                      : null,
+              onNext: isEditMode
+                  ? null
+                  : currentIndex < visibleRounds.length - 1
+                      ? () => pageController?.nextPage(
+                            duration: const Duration(milliseconds: 260),
+                            curve: Curves.easeOutCubic,
+                          )
+                      : null,
+              isEditMode: isEditMode,
+            ),
+          if (isEditMode)
+            _EditModeBanner(
+              onCancel: _cancelEditMode,
+            ),
+          Expanded(
+            child: !hasPages
+                ? _buildWelcomeEmpty(context)
+                : PageView.builder(
+                    controller: pageController,
+                    physics: isEditMode
+                        ? const NeverScrollableScrollPhysics()
+                        : const PageScrollPhysics(),
+                    itemCount: visibleRounds.length,
+                    onPageChanged: (index) async {
+                      if (!PageUtils.isValidIndex(
+                        index,
+                        visibleRounds.length,
+                      )) {
+                        return;
+                      }
+
+                      final round = visibleRounds[index];
+                      setState(() {
+                        _currentRoundId = round.id;
+                      });
+
+                      await _syncSeenWithVisiblePage();
+                    },
+                    itemBuilder: (context, index) {
+                      final round = visibleRounds[index];
+                      final canEdit = !round.isIncomplete;
+                      return _ChatRoundPage(
+                        key: ValueKey(round.id),
+                        fileName: widget.fileName,
+                        round: round,
+                        canEdit: canEdit,
+                        onRetryReply: () => _retryFromRound(round.id),
+                        onEdit: canEdit
+                            ? () => _enterEditMode(
+                                  round.id,
+                                  round.userContent,
+                                )
+                            : null,
+                        onCopyText: _copyText,
+                      );
+                    },
+                  ),
           ),
-        );
-      },
-    );
-  }
+          InputBar(
+            hintText: isEditMode ? '修改文本后发送' : '发送消息',
+            isStreaming: currentIsStreaming,
+            onStop: currentRound == null
+                ? null
+                : () => chatController.stopGeneration(currentRound.id),
+            onSend: (text, attachments) async {
+              try {
+                if (editSourceRoundId != null) {
+                  final newRoundId =
+                      await chatController.editAndResendFromRound(
+                    editSourceRoundId,
+                    text,
+                    attachments: attachments,
+                  );
 
-  Widget _buildErrorState(String message) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: AppCard(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.error_outline,
-                size: 40,
-                color: colorScheme.error,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '无法加载会话',
-                style: textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: textTheme.bodySmall,
-              ),
-            ],
+                  if (!mounted) return;
+                  setState(() {
+                    _branchRoundId = newRoundId;
+                    _currentRoundId = newRoundId;
+                  });
+                  _cancelEditMode();
+                  return;
+                }
+
+                final newRoundId = await chatController.sendMessage(
+                  content: text,
+                  parentRoundId: _currentRoundId,
+                  attachments: attachments,
+                );
+
+                if (!mounted) return;
+                setState(() {
+                  _branchRoundId = newRoundId;
+                  _currentRoundId = newRoundId;
+                });
+              } catch (e) {
+                if (mounted) {
+                  await AppToast.show('发送失败：$e');
+                }
+              }
+            },
           ),
-        ),
+        ],
       ),
     );
   }
@@ -8619,28 +8271,30 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: AppCard(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.auto_awesome_outlined,
-                size: 36,
-                color: colorScheme.primary,
-              ),
-              const SizedBox(height: 18),
-              Text(
-                '开始一段新的对话',
-                style: textTheme.titleLarge,
-              ),
-              const SizedBox(height: 10),
-              Text(
-                '你可以输入问题、上传图片或文件，并在不同分支中回看每一轮回复。',
-                textAlign: TextAlign.center,
-                style: textTheme.bodyMedium,
-              ),
-            ],
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.auto_awesome_outlined,
+                  size: 36,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  '开始一段新的对话',
+                  style: textTheme.titleLarge,
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  '你可以输入问题、上传图片或文件，并在不同分支中回看每一轮回复。',
+                  textAlign: TextAlign.center,
+                  style: textTheme.bodyMedium,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -8673,39 +8327,41 @@ class _ChatRoundPage extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       children: [
-        AppCard(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _RoundHeader(createdAt: round.createdAt),
-              const SizedBox(height: 16),
-              const _SectionLabel(
-                icon: Icons.person_outline,
-                text: '你的输入',
-              ),
-              const SizedBox(height: 10),
-              if (hasUser)
-                MessageBubble(
-                  content: round.userContent,
-                  isUser: true,
-                  onCopy: () => onCopyText(round.userContent),
-                  onRetryReply: onRetryReply,
-                  onEdit: onEdit,
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _RoundHeader(createdAt: round.createdAt),
+                const SizedBox(height: 16),
+                const _SectionLabel(
+                  icon: Icons.person_outline,
+                  text: '你的输入',
                 ),
-              if (hasAttachments) ...[
-                if (hasUser) const SizedBox(height: 8),
-                AttachmentList(
-                  attachments: round.userAttachments,
-                  rightAligned: true,
+                const SizedBox(height: 10),
+                if (hasUser)
+                  MessageBubble(
+                    content: round.userContent,
+                    isUser: true,
+                    onCopy: () => onCopyText(round.userContent),
+                    onRetryReply: onRetryReply,
+                    onEdit: onEdit,
+                  ),
+                if (hasAttachments) ...[
+                  if (hasUser) const SizedBox(height: 8),
+                  AttachmentList(
+                    attachments: round.userAttachments,
+                    rightAligned: true,
+                  ),
+                ],
+                _RoundAnswerSection(
+                  round: round,
+                  onRetryReply: onRetryReply,
+                  onCopyText: onCopyText,
                 ),
               ],
-              _RoundAnswerSection(
-                round: round,
-                onRetryReply: onRetryReply,
-                onCopyText: onCopyText,
-              ),
-            ],
+            ),
           ),
         ),
       ],
@@ -10062,18 +9718,6 @@ class ChatController {
 
   ChatController(this.ref, this.fileName);
 
-  Future<Session?> _getLatestSession() async {
-    final sessionFromStream = ref.read(chatSessionProvider(fileName)).valueOrNull;
-    if (sessionFromStream != null) return sessionFromStream;
-
-    final repository = ref.read(conversationRepositoryProvider);
-    try {
-      return await repository.getSession(fileName);
-    } catch (_) {
-      return null;
-    }
-  }
-
   ModelInfo? _findSelectedModelInfo() {
     final configAsync = ref.read(configProvider);
     final config = configAsync.valueOrNull;
@@ -10117,7 +9761,8 @@ class ChatController {
     required String? parentRoundId,
     List<PendingAttachment>? attachments,
   }) async {
-    final session = await _getLatestSession();
+    final session = ref.read(chatSessionProvider(fileName)).valueOrNull ??
+        await ref.read(chatSessionProvider(fileName).future);
     if (session == null) {
       throw Exception('会话未初始化');
     }
@@ -10148,14 +9793,20 @@ class ChatController {
       hasUnseenUpdate: false,
     );
 
+    final contextRounds = BranchNavigator.getCurrentBranchPath(
+      session.copyWith(rounds: [...session.rounds, newRound]),
+      newRound.id,
+    );
+
     await repository.appendRound(fileName, newRound);
-    unawaited(_handleStreamTask(newRound, config));
+    unawaited(_handleStreamTask(newRound, config, contextRounds));
 
     return newRound.id;
   }
 
   Future<String> retryFromRound(String roundId) async {
-    final session = await _getLatestSession();
+    final session = ref.read(chatSessionProvider(fileName)).valueOrNull ??
+        await ref.read(chatSessionProvider(fileName).future);
     if (session == null) {
       throw Exception('会话未初始化');
     }
@@ -10186,8 +9837,13 @@ class ChatController {
       hasUnseenUpdate: false,
     );
 
+    final contextRounds = BranchNavigator.getCurrentBranchPath(
+      session.copyWith(rounds: [...session.rounds, newRound]),
+      newRound.id,
+    );
+
     await repository.appendRound(fileName, newRound);
-    unawaited(_handleStreamTask(newRound, config));
+    unawaited(_handleStreamTask(newRound, config, contextRounds));
 
     return newRound.id;
   }
@@ -10197,7 +9853,8 @@ class ChatController {
     String newContent, {
     List<PendingAttachment>? attachments,
   }) async {
-    final session = await _getLatestSession();
+    final session = ref.read(chatSessionProvider(fileName)).valueOrNull ??
+        await ref.read(chatSessionProvider(fileName).future);
     if (session == null) {
       throw Exception('会话未初始化');
     }
@@ -10242,8 +9899,13 @@ class ChatController {
       hasUnseenUpdate: false,
     );
 
+    final contextRounds = BranchNavigator.getCurrentBranchPath(
+      session.copyWith(rounds: [...session.rounds, newRound]),
+      newRound.id,
+    );
+
     await repository.appendRound(fileName, newRound);
-    unawaited(_handleStreamTask(newRound, config));
+    unawaited(_handleStreamTask(newRound, config, contextRounds));
 
     return newRound.id;
   }
@@ -10251,6 +9913,7 @@ class ChatController {
   Future<void> _handleStreamTask(
     ChatRound round,
     AppConfig config,
+    List<ChatRound> contextRounds,
   ) async {
     final apiSource = ref.read(remoteApiSourceProvider);
     final repository = ref.read(conversationRepositoryProvider);
@@ -10259,18 +9922,22 @@ class ChatController {
     String? errorMessage;
     var wasStopped = false;
 
-    try {
-      final latestSession = await repository.getSession(fileName);
+    int lastUpdateTimestamp = 0;
+    const throttleMs = 1000;
 
-      if (!latestSession.rounds.any((r) => r.id == round.id)) {
-        throw Exception('最新会话中未找到当前轮次，无法构建上下文');
-      }
-
-      final contextRounds = BranchNavigator.getCurrentBranchPath(
-        latestSession,
-        round.id,
+    Future<void> _flushProgress(bool isIncomplete) async {
+      final updatedRound = round.copyWith(
+        assistantThinking:
+            accumulator.reasoning.isEmpty ? null : accumulator.reasoning,
+        assistantContent:
+            accumulator.content.isEmpty ? null : accumulator.content,
+        isIncomplete: isIncomplete,
+        hasUnseenUpdate: false,
       );
+      await repository.updateRound(fileName, round.id, updatedRound);
+    }
 
+    try {
       final apiContext = await ChatContextBuilder.buildFromRounds(
         contextRounds,
         repository,
@@ -10297,16 +9964,11 @@ class ChatController {
         if (!chunk.isDone) {
           accumulator.add(chunk);
 
-          final updatedRound = round.copyWith(
-            assistantThinking:
-                accumulator.reasoning.isEmpty ? null : accumulator.reasoning,
-            assistantContent:
-                accumulator.content.isEmpty ? null : accumulator.content,
-            isIncomplete: true,
-            hasUnseenUpdate: false,
-          );
-
-          await repository.updateRound(fileName, round.id, updatedRound);
+          final now = DateTime.now().millisecondsSinceEpoch;
+          if (now - lastUpdateTimestamp >= throttleMs) {
+            await _flushProgress(true);
+            lastUpdateTimestamp = now;
+          }
           continue;
         }
 
@@ -10332,7 +9994,7 @@ class ChatController {
         finalContent = _appendStoppedSuffix(finalContent);
       }
 
-      await _finalizeRoundPersistence(round.id, finalContent, finalReasoning);
+      await _finalizeRoundPersistence(round, finalContent, finalReasoning);
       _stoppingRoundIds.remove(round.id);
     }
   }
@@ -10352,25 +10014,20 @@ class ChatController {
   }
 
   Future<void> _finalizeRoundPersistence(
-    String roundId,
+    ChatRound round,
     String content,
     String reasoning,
   ) async {
     final repository = ref.read(conversationRepositoryProvider);
-    final session = await _getLatestSession();
-    if (session == null) return;
 
-    final originalRound = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
-    if (originalRound == null) return;
-
-    final updatedRound = originalRound.copyWith(
+    final updatedRound = round.copyWith(
       assistantContent: content.trim().isEmpty ? null : content,
       assistantThinking: reasoning.trim().isEmpty ? null : reasoning,
       isIncomplete: false,
       hasUnseenUpdate: true,
     );
 
-    await repository.updateRound(fileName, roundId, updatedRound);
+    await repository.updateRound(fileName, round.id, updatedRound);
   }
 
   void stopGeneration(String roundId) {
@@ -10379,16 +10036,15 @@ class ChatController {
     apiSource.cancelRequest(roundId);
   }
 
-  Future<void> markRoundSeen(String roundId) async {
-    final session = await _getLatestSession();
-    if (session == null) return;
-
-    final target = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
-    if (target == null || !target.hasUnseenUpdate) return;
+  Future<void> markRoundSeen(ChatRound round) async {
+    if (!round.hasUnseenUpdate) return;
 
     final repository = ref.read(conversationRepositoryProvider);
-    final updatedRound = target.copyWith(hasUnseenUpdate: false);
-    await repository.updateRound(fileName, roundId, updatedRound);
+    await repository.updateRound(
+      fileName,
+      round.id,
+      round.copyWith(hasUnseenUpdate: false),
+    );
   }
 }
 
@@ -10520,37 +10176,9 @@ final globalEditSourceRoundIdProvider =
     StateProvider<String?>((ref) => null);
 ```
 
-## File: presentation/providers/session_card_provider.dart
-```dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/session.dart';
-import '../../di/providers.dart';
-
-final sessionFileNamesProvider = FutureProvider<List<String>>((ref) async {
-  final repository = ref.read(conversationRepositoryProvider);
-  final fileNames = await repository.getAllSessionFileNames();
-  final sessions = <Session>[];
-
-  for (final fileName in fileNames) {
-    try {
-      final session = await repository.getSession(fileName);
-      sessions.add(session);
-    } catch (_) {}
-  }
-
-  sessions.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-  return sessions.map((e) => '${e.id}.json').toList();
-});
-
-final sessionCardProvider =
-    FutureProvider.family<Session, String>((ref, fileName) async {
-  final repository = ref.read(conversationRepositoryProvider);
-  return repository.getSession(fileName);
-});
-```
-
 ## File: presentation/providers/session_list_notifier.dart
 ```dart
+import 'package:aiservice/core/utils/id_generator.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../di/providers.dart';
 import '../../domain/models/session_list_item.dart';
@@ -10586,13 +10214,10 @@ class SessionListController {
 
   Future<String> createSession(String title) async {
     final repository = ref.read(conversationRepositoryProvider);
-    final cleanTitle = title.trim().isEmpty ? '新对话' : title.trim();
 
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final sessionId = now.toString();
-    final fileName = '$sessionId.json';
+    final fileName = '${IdGenerator.generate()}.json';
 
-    await repository.createSession(fileName: fileName, title: cleanTitle);
+    await repository.createSession(fileName: fileName, title: '新对话');
     return fileName;
   }
 }

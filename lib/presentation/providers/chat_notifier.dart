@@ -37,18 +37,6 @@ class ChatController {
 
   ChatController(this.ref, this.fileName);
 
-  Future<Session?> _getLatestSession() async {
-    final sessionFromStream = ref.read(chatSessionProvider(fileName)).valueOrNull;
-    if (sessionFromStream != null) return sessionFromStream;
-
-    final repository = ref.read(conversationRepositoryProvider);
-    try {
-      return await repository.getSession(fileName);
-    } catch (_) {
-      return null;
-    }
-  }
-
   ModelInfo? _findSelectedModelInfo() {
     final configAsync = ref.read(configProvider);
     final config = configAsync.valueOrNull;
@@ -92,7 +80,8 @@ class ChatController {
     required String? parentRoundId,
     List<PendingAttachment>? attachments,
   }) async {
-    final session = await _getLatestSession();
+    final session = ref.read(chatSessionProvider(fileName)).valueOrNull ??
+        await ref.read(chatSessionProvider(fileName).future);
     if (session == null) {
       throw Exception('会话未初始化');
     }
@@ -123,14 +112,20 @@ class ChatController {
       hasUnseenUpdate: false,
     );
 
+    final contextRounds = BranchNavigator.getCurrentBranchPath(
+      session.copyWith(rounds: [...session.rounds, newRound]),
+      newRound.id,
+    );
+
     await repository.appendRound(fileName, newRound);
-    unawaited(_handleStreamTask(newRound, config));
+    unawaited(_handleStreamTask(newRound, config, contextRounds));
 
     return newRound.id;
   }
 
   Future<String> retryFromRound(String roundId) async {
-    final session = await _getLatestSession();
+    final session = ref.read(chatSessionProvider(fileName)).valueOrNull ??
+        await ref.read(chatSessionProvider(fileName).future);
     if (session == null) {
       throw Exception('会话未初始化');
     }
@@ -161,8 +156,13 @@ class ChatController {
       hasUnseenUpdate: false,
     );
 
+    final contextRounds = BranchNavigator.getCurrentBranchPath(
+      session.copyWith(rounds: [...session.rounds, newRound]),
+      newRound.id,
+    );
+
     await repository.appendRound(fileName, newRound);
-    unawaited(_handleStreamTask(newRound, config));
+    unawaited(_handleStreamTask(newRound, config, contextRounds));
 
     return newRound.id;
   }
@@ -172,7 +172,8 @@ class ChatController {
     String newContent, {
     List<PendingAttachment>? attachments,
   }) async {
-    final session = await _getLatestSession();
+    final session = ref.read(chatSessionProvider(fileName)).valueOrNull ??
+        await ref.read(chatSessionProvider(fileName).future);
     if (session == null) {
       throw Exception('会话未初始化');
     }
@@ -217,8 +218,13 @@ class ChatController {
       hasUnseenUpdate: false,
     );
 
+    final contextRounds = BranchNavigator.getCurrentBranchPath(
+      session.copyWith(rounds: [...session.rounds, newRound]),
+      newRound.id,
+    );
+
     await repository.appendRound(fileName, newRound);
-    unawaited(_handleStreamTask(newRound, config));
+    unawaited(_handleStreamTask(newRound, config, contextRounds));
 
     return newRound.id;
   }
@@ -226,6 +232,7 @@ class ChatController {
   Future<void> _handleStreamTask(
     ChatRound round,
     AppConfig config,
+    List<ChatRound> contextRounds,
   ) async {
     final apiSource = ref.read(remoteApiSourceProvider);
     final repository = ref.read(conversationRepositoryProvider);
@@ -234,18 +241,22 @@ class ChatController {
     String? errorMessage;
     var wasStopped = false;
 
-    try {
-      final latestSession = await repository.getSession(fileName);
+    int lastUpdateTimestamp = 0;
+    const throttleMs = 1000;
 
-      if (!latestSession.rounds.any((r) => r.id == round.id)) {
-        throw Exception('最新会话中未找到当前轮次，无法构建上下文');
-      }
-
-      final contextRounds = BranchNavigator.getCurrentBranchPath(
-        latestSession,
-        round.id,
+    Future<void> _flushProgress(bool isIncomplete) async {
+      final updatedRound = round.copyWith(
+        assistantThinking:
+            accumulator.reasoning.isEmpty ? null : accumulator.reasoning,
+        assistantContent:
+            accumulator.content.isEmpty ? null : accumulator.content,
+        isIncomplete: isIncomplete,
+        hasUnseenUpdate: false,
       );
+      await repository.updateRound(fileName, round.id, updatedRound);
+    }
 
+    try {
       final apiContext = await ChatContextBuilder.buildFromRounds(
         contextRounds,
         repository,
@@ -272,16 +283,11 @@ class ChatController {
         if (!chunk.isDone) {
           accumulator.add(chunk);
 
-          final updatedRound = round.copyWith(
-            assistantThinking:
-                accumulator.reasoning.isEmpty ? null : accumulator.reasoning,
-            assistantContent:
-                accumulator.content.isEmpty ? null : accumulator.content,
-            isIncomplete: true,
-            hasUnseenUpdate: false,
-          );
-
-          await repository.updateRound(fileName, round.id, updatedRound);
+          final now = DateTime.now().millisecondsSinceEpoch;
+          if (now - lastUpdateTimestamp >= throttleMs) {
+            await _flushProgress(true);
+            lastUpdateTimestamp = now;
+          }
           continue;
         }
 
@@ -307,7 +313,7 @@ class ChatController {
         finalContent = _appendStoppedSuffix(finalContent);
       }
 
-      await _finalizeRoundPersistence(round.id, finalContent, finalReasoning);
+      await _finalizeRoundPersistence(round, finalContent, finalReasoning);
       _stoppingRoundIds.remove(round.id);
     }
   }
@@ -327,25 +333,20 @@ class ChatController {
   }
 
   Future<void> _finalizeRoundPersistence(
-    String roundId,
+    ChatRound round,
     String content,
     String reasoning,
   ) async {
     final repository = ref.read(conversationRepositoryProvider);
-    final session = await _getLatestSession();
-    if (session == null) return;
 
-    final originalRound = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
-    if (originalRound == null) return;
-
-    final updatedRound = originalRound.copyWith(
+    final updatedRound = round.copyWith(
       assistantContent: content.trim().isEmpty ? null : content,
       assistantThinking: reasoning.trim().isEmpty ? null : reasoning,
       isIncomplete: false,
       hasUnseenUpdate: true,
     );
 
-    await repository.updateRound(fileName, roundId, updatedRound);
+    await repository.updateRound(fileName, round.id, updatedRound);
   }
 
   void stopGeneration(String roundId) {
@@ -354,16 +355,15 @@ class ChatController {
     apiSource.cancelRequest(roundId);
   }
 
-  Future<void> markRoundSeen(String roundId) async {
-    final session = await _getLatestSession();
-    if (session == null) return;
-
-    final target = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
-    if (target == null || !target.hasUnseenUpdate) return;
+  Future<void> markRoundSeen(ChatRound round) async {
+    if (!round.hasUnseenUpdate) return;
 
     final repository = ref.read(conversationRepositoryProvider);
-    final updatedRound = target.copyWith(hasUnseenUpdate: false);
-    await repository.updateRound(fileName, roundId, updatedRound);
+    await repository.updateRound(
+      fileName,
+      round.id,
+      round.copyWith(hasUnseenUpdate: false),
+    );
   }
 }
 

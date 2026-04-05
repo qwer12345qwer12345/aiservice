@@ -1,3 +1,4 @@
+import 'package:aiservice/core/utils/id_generator.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../di/providers.dart';
 import '../../domain/models/session_list_item.dart';
@@ -33,13 +34,10 @@ class SessionListController {
 
   Future<String> createSession(String title) async {
     final repository = ref.read(conversationRepositoryProvider);
-    final cleanTitle = title.trim().isEmpty ? '新对话' : title.trim();
 
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final sessionId = now.toString();
-    final fileName = '$sessionId.json';
+    final fileName = '${IdGenerator.generate()}.json';
 
-    await repository.createSession(fileName: fileName, title: cleanTitle);
+    await repository.createSession(fileName: fileName, title: '新对话');
     return fileName;
   }
 }

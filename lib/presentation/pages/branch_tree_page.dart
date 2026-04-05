@@ -1,9 +1,9 @@
+// presentation/pages/branch_tree_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:graphview/GraphView.dart';
 import '../../core/models/chat_round.dart';
-import '../../core/models/session.dart';
 import '../../core/utils/time_format_utils.dart';
 import '../../di/providers.dart';
 import '../../domain/models/tree_node.dart';
@@ -11,6 +11,39 @@ import '../../domain/services/tree_builder.dart';
 import '../providers/chat_notifier.dart' show chatSessionProvider;
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_toast.dart';
+
+// ==========================================
+// 🟢 第一层：结构层 Provider
+// ==========================================
+
+/// 1. 拓扑数据提取器：
+/// 将无关内容的字段剔除，使得 AI 回复文本时，该 Provider 产出的 List 完全一样（利用 Freezed 相等性）。
+/// 从而切断流式更新向下游的传递。
+final _sessionTopologyProvider = Provider.family<List<ChatRound>, String>((ref, fileName) {
+  return ref.watch(chatSessionProvider(fileName).select((sessionAsync) {
+    final rounds = sessionAsync.valueOrNull?.rounds ?? const [];
+    return rounds.map((r) => r.copyWith(
+      userContent: '',
+      assistantContent: null,
+      assistantThinking: null,
+      userAttachments: const [],
+      isIncomplete: false,
+      hasUnseenUpdate: false,
+    )).toList();
+  }));
+});
+
+/// 2. 结构树 Provider：
+/// 仅依赖干净的拓扑数据。只要新增、删除分支，才会重建整棵树。
+final branchTreeStructureProvider = Provider.family<List<TreeNode>, String>((ref, fileName) {
+  final topologyRounds = ref.watch(_sessionTopologyProvider(fileName));
+  if (topologyRounds.isEmpty) return const [];
+  return TreeBuilder.buildTree(topologyRounds);
+});
+
+// ==========================================
+// 📄 页面主结构
+// ==========================================
 
 class BranchTreePage extends ConsumerStatefulWidget {
   final String fileName;
@@ -28,13 +61,9 @@ class BranchTreePage extends ConsumerStatefulWidget {
 
 class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   final GlobalKey _viewerKey = GlobalKey();
-  final TransformationController _transformationController =
-      TransformationController();
-  final BuchheimWalkerConfiguration _builder =
-      BuchheimWalkerConfiguration();
+  final TransformationController _transformationController = TransformationController();
+  final BuchheimWalkerConfiguration _builder = BuchheimWalkerConfiguration();
 
-  List<TreeNode> _roots = [];
-  String _lastSignature = '';
   GlobalKey? _targetNodeKey;
   bool _hasFocused = false;
   int _focusRetryCount = 0;
@@ -63,37 +92,8 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     _scheduleFocusToTarget();
   }
 
-  void _reloadTree(
-    List<ChatRound> rounds, {
-    bool resetViewport = false,
-  }) {
-    final roots = rounds.isEmpty ? <TreeNode>[] : TreeBuilder.buildTree(rounds);
-    final signature = _buildSignature(roots);
-
-    if (!resetViewport && signature == _lastSignature) {
-      return;
-    }
-
-    if (resetViewport) {
-      _transformationController.value = Matrix4.identity();
-      _hasFocused = false;
-      _focusRetryCount = 0;
-      _targetNodeKey = GlobalKey();
-    }
-
-    setState(() {
-      _roots = roots;
-      _lastSignature = signature;
-    });
-
-    _scheduleFocusToTarget();
-  }
-
   void _scheduleFocusToTarget() {
-    if (_hasFocused || _targetNodeKey == null) {
-      return;
-    }
-
+    if (_hasFocused || _targetNodeKey == null) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _focusOnTargetNode();
@@ -101,11 +101,10 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   }
 
   void _focusOnTargetNode() {
-    if (_hasFocused) return;
-    if (_targetNodeKey == null) return;
-
+    if (_hasFocused || _targetNodeKey == null) return;
     final targetContext = _targetNodeKey!.currentContext;
     final viewerContext = _viewerKey.currentContext;
+    
     if (targetContext == null || viewerContext == null) {
       _retryFocus();
       return;
@@ -113,19 +112,13 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
 
     final targetBox = targetContext.findRenderObject() as RenderBox?;
     final viewerBox = viewerContext.findRenderObject() as RenderBox?;
-    if (targetBox == null || viewerBox == null) {
-      _retryFocus();
-      return;
-    }
-    if (!targetBox.hasSize || !viewerBox.hasSize) {
+    
+    if (targetBox == null || viewerBox == null || !targetBox.hasSize || !viewerBox.hasSize) {
       _retryFocus();
       return;
     }
 
-    final targetTopLeft = targetBox.localToGlobal(
-      Offset.zero,
-      ancestor: viewerBox,
-    );
+    final targetTopLeft = targetBox.localToGlobal(Offset.zero, ancestor: viewerBox);
     final targetSize = targetBox.size;
     final viewerSize = viewerBox.size;
 
@@ -149,22 +142,11 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   }
 
   void _retryFocus() {
-    if (_hasFocused) return;
-    if (_focusRetryCount >= 8) return;
-
+    if (_hasFocused || _focusRetryCount >= 8) return;
     _focusRetryCount++;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _focusOnTargetNode();
+      if (mounted) _focusOnTargetNode();
     });
-  }
-
-  String _buildSignature(List<TreeNode> roots) {
-    return roots.map((e) => e.toJson().toString()).join('|');
-  }
-
-  String _buildNodeSignature(TreeNode node) {
-    return node.toJson().toString();
   }
 
   Set<String> _collectSubtreeIds(TreeNode node) {
@@ -192,19 +174,14 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     return null;
   }
 
-  Future<void> _deleteNode(String nodeId, Session session) async {
-    final repository = ref.read(conversationRepositoryProvider);
-
-    final roots = session.rounds.isEmpty
-        ? <TreeNode>[]
-        : TreeBuilder.buildTree(session.rounds);
+  Future<void> _deleteNode(String nodeId) async {
+    final roots = ref.read(branchTreeStructureProvider(widget.fileName));
     final targetNode = _findTreeNodeById(roots, nodeId);
-    if (targetNode == null) {
-      throw Exception('未找到要删除的节点');
-    }
+    if (targetNode == null) throw Exception('未找到要删除的节点');
 
     final idsToDelete = _collectSubtreeIds(targetNode).toList();
-
+    final repository = ref.read(conversationRepositoryProvider);
+    
     try {
       await repository.deleteRoundsAndCleanupOrphanAttachments(
         widget.fileName,
@@ -216,152 +193,103 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     }
   }
 
-  Future<bool> _confirmDelete(TreeNode node) async {
+  Future<bool> _confirmDelete() async {
     return await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('删除节点'),
             content: const Text('确定删除这一轮及其后续全部分支吗？'),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                child: const Text('删除'),
-              ),
+              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
+              FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('删除')),
             ],
           ),
-        ) ??
-        false;
+        ) ?? false;
   }
 
   @override
   Widget build(BuildContext context) {
-    final sessionAsync = ref.watch(chatSessionProvider(widget.fileName));
+    // 基础状态监听：标题、加载状态（这些几乎不会频繁改变）
+    final sessionTitle = ref.watch(chatSessionProvider(widget.fileName).select((s) => s.valueOrNull?.title ?? '分支树'));
+    final isLoading = ref.watch(chatSessionProvider(widget.fileName).select((s) => s.isLoading && !s.hasValue));
+    final hasError = ref.watch(chatSessionProvider(widget.fileName).select((s) => s.hasError));
 
-    return sessionAsync.when(
-      loading: () => AppPageScaffold(
-        appBar: AppBar(
-          title: const Text('分支树'),
-        ),
-        body: const Center(
-          child: CircularProgressIndicator(),
-        ),
+    if (isLoading) {
+      return AppPageScaffold(appBar: AppBar(title: Text(sessionTitle)), body: const Center(child: CircularProgressIndicator()));
+    }
+    if (hasError) {
+      return AppPageScaffold(appBar: AppBar(title: Text(sessionTitle)), body: const Center(child: Text('加载失败')));
+    }
+
+    final topologyRounds = ref.watch(_sessionTopologyProvider(widget.fileName));
+    final roots = ref.watch(branchTreeStructureProvider(widget.fileName));
+    
+    final structKey = topologyRounds.length.toString();
+
+    if (!_hasFocused && roots.isNotEmpty) {
+      _scheduleFocusToTarget();
+    }
+
+    return AppPageScaffold(
+      appBar: AppBar(
+        title: Text(sessionTitle, overflow: TextOverflow.ellipsis),
       ),
-      error: (e, _) => AppPageScaffold(
-        appBar: AppBar(
-          title: const Text('分支树'),
-        ),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text('加载会话失败：$e'),
-          ),
-        ),
-      ),
-      data: (session) {
-        if (session == null) {
-          return AppPageScaffold(
-            appBar: AppBar(
-              title: const Text('分支树'),
-            ),
-            body: const Center(
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: Text('会话不存在'),
-              ),
-            ),
-          );
-        }
-
-        final latestRoots = session.rounds.isEmpty
-            ? <TreeNode>[]
-            : TreeBuilder.buildTree(session.rounds);
-        final latestSignature = _buildSignature(latestRoots);
-
-        if (latestSignature != _lastSignature) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted) return;
-            _reloadTree(session.rounds);
-          });
-        }
-
-        return AppPageScaffold(
-          appBar: AppBar(
-            title: Text(
-              session.title,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          body: _roots.isEmpty
-              ? _buildEmptyState(context)
-              : Column(
-                  children: [
-                    _GraphToolbar(
-                      onZoomIn: () {
-                        final current = _transformationController.value.clone();
-                        current.scale(1.1);
-                        _transformationController.value = current;
-                      },
-                      onZoomOut: () {
-                        final current = _transformationController.value.clone();
-                        current.scale(0.9);
-                        _transformationController.value = current;
-                      },
-                      onReset: _resetViewport,
-                    ),
-                    Expanded(
-                      child: InteractiveViewer(
-                        key: _viewerKey,
-                        constrained: false,
-                        boundaryMargin: const EdgeInsets.all(double.infinity),
-                        minScale: 0.1,
-                        maxScale: 3.0,
-                        transformationController: _transformationController,
-                        child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Wrap(
-                            spacing: 40,
-                            runSpacing: 40,
-                            crossAxisAlignment: WrapCrossAlignment.start,
-                            children: [
-                              for (final root in _roots)
-                                _RootTreeGroup(
-                                  key: ValueKey(
-                                    'root-tree-${root.id}-${_buildNodeSignature(root)}',
-                                  ),
-                                  root: root,
-                                  graphSignature: _buildNodeSignature(root),
-                                  builderConfig: _builder,
-                                  targetNodeId: widget.initialFocusRoundId,
-                                  targetNodeKey: _targetNodeKey,
-                                  onSwitch: (treeNode) async {
-                                    if (context.mounted) {
-                                      Navigator.of(context).pop(treeNode.id);
-                                    }
-                                  },
-                                  onDelete: (treeNode) async {
-                                    final confirmed =
-                                        await _confirmDelete(treeNode);
-                                    if (!confirmed) return;
-                                    try {
-                                      await _deleteNode(treeNode.id, session);
-                                    } catch (e) {
-                                      await AppToast.show('删除失败：$e');
-                                    }
-                                  },
-                                ),
-                            ],
-                          ),
-                        ),
+      body: roots.isEmpty
+          ? _buildEmptyState(context)
+          : Column(
+              children: [
+                _GraphToolbar(
+                  onZoomIn: () {
+                    final current = _transformationController.value.clone();
+                    current.scale(1.1);
+                    _transformationController.value = current;
+                  },
+                  onZoomOut: () {
+                    final current = _transformationController.value.clone();
+                    current.scale(0.9);
+                    _transformationController.value = current;
+                  },
+                  onReset: _resetViewport,
+                ),
+                Expanded(
+                  child: InteractiveViewer(
+                    key: _viewerKey,
+                    constrained: false,
+                    boundaryMargin: const EdgeInsets.all(double.infinity),
+                    minScale: 0.1,
+                    maxScale: 3.0,
+                    transformationController: _transformationController,
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Wrap(
+                        spacing: 40,
+                        runSpacing: 40,
+                        crossAxisAlignment: WrapCrossAlignment.start,
+                        children: roots.map((root) => _RootTreeGroup(
+                          key: ValueKey('root-tree-${root.id}-$structKey'), // 锁定算法
+                          root: root,
+                          fileName: widget.fileName,
+                          graphSignature: structKey,
+                          builderConfig: _builder,
+                          targetNodeId: widget.initialFocusRoundId,
+                          targetNodeKey: _targetNodeKey,
+                          onSwitch: (roundId) => Navigator.of(context).pop(roundId),
+                          onDelete: (roundId) async {
+                            if (await _confirmDelete()) {
+                              try {
+                                await _deleteNode(roundId);
+                              } catch (e) {
+                                await AppToast.show('删除失败：$e');
+                              }
+                            }
+                          },
+                        )).toList(),
                       ),
                     ),
-                  ],
+                  ),
                 ),
-        );
-      },
+              ],
+            ),
     );
   }
 
@@ -372,20 +300,14 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 360),
-            child: Column(
+            child: const Column(
               mainAxisSize: MainAxisSize.min,
-              children: const [
+              children: [
                 Icon(Icons.account_tree_outlined, size: 40),
                 SizedBox(height: 16),
-                Text(
-                  '暂无分支结构',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-                ),
+                Text('暂无分支结构', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
                 SizedBox(height: 8),
-                Text(
-                  '当你对历史轮次重新生成回复时，这里会显示完整的分支关系。',
-                  textAlign: TextAlign.center,
-                ),
+                Text('当你对历史轮次重新生成回复时，这里会显示完整的分支关系。', textAlign: TextAlign.center),
               ],
             ),
           ),
@@ -395,18 +317,24 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   }
 }
 
+// ==========================================
+// 🎨 Graph 布局层
+// ==========================================
+
 class _RootTreeGroup extends StatelessWidget {
   final TreeNode root;
+  final String fileName;
   final String graphSignature;
   final BuchheimWalkerConfiguration builderConfig;
-  final Future<void> Function(TreeNode treeNode) onSwitch;
-  final Future<void> Function(TreeNode treeNode) onDelete;
+  final Function(String roundId) onSwitch;
+  final Function(String roundId) onDelete;
   final String? targetNodeId;
   final GlobalKey? targetNodeKey;
 
   const _RootTreeGroup({
     super.key,
     required this.root,
+    required this.fileName,
     required this.graphSignature,
     required this.builderConfig,
     required this.onSwitch,
@@ -442,13 +370,10 @@ class _RootTreeGroup extends StatelessWidget {
     addTree(root, null);
 
     return GraphView(
-      key: ValueKey('graph-${root.id}-$graphSignature'),
+      key: ValueKey('graph-${root.id}-$graphSignature'), // 图布局器不再因节点文本变化而销毁重建
       graph: graph,
       animated: false,
-      algorithm: BuchheimWalkerAlgorithm(
-        builderConfig,
-        TreeEdgeRenderer(builderConfig),
-      ),
+      algorithm: BuchheimWalkerAlgorithm(builderConfig, TreeEdgeRenderer(builderConfig)),
       paint: Paint()
         ..color = Theme.of(context).dividerColor
         ..strokeWidth = 1.6
@@ -459,73 +384,36 @@ class _RootTreeGroup extends StatelessWidget {
 
         final isTarget = targetNodeId != null && treeNode.id == targetNodeId;
 
+        // 向下传递必需的关键参数，不再传递可能变化的完整 TreeNode
         return _GraphNodeCard(
-          key: isTarget
-              ? targetNodeKey
-              : ValueKey('${treeNode.id}-$graphSignature'),
-          treeNode: treeNode,
-          onSwitch: () => onSwitch(treeNode),
-          onDelete: () => onDelete(treeNode),
+          key: isTarget ? targetNodeKey : ValueKey('${treeNode.id}-$graphSignature'),
+          fileName: fileName,
+          roundId: treeNode.id,
+          depth: treeNode.depth,
+          onSwitch: () => onSwitch(treeNode.id),
+          onDelete: () => onDelete(treeNode.id),
         );
       },
     );
   }
 }
 
-class _GraphToolbar extends StatelessWidget {
-  final VoidCallback onZoomIn;
-  final VoidCallback onZoomOut;
-  final VoidCallback onReset;
+// ==========================================
+// 🔵 第二层：卡片内容层（精细化监听重绘点）
+// ==========================================
 
-  const _GraphToolbar({
-    required this.onZoomIn,
-    required this.onZoomOut,
-    required this.onReset,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          children: [
-            const Icon(Icons.tune_outlined, size: 18),
-            const SizedBox(width: 8),
-            const Expanded(
-              child: Text('缩放、拖拽查看对话分支结构'),
-            ),
-            IconButton(
-              tooltip: '缩小',
-              onPressed: onZoomOut,
-              icon: const Icon(Icons.remove_rounded),
-            ),
-            IconButton(
-              tooltip: '放大',
-              onPressed: onZoomIn,
-              icon: const Icon(Icons.add_rounded),
-            ),
-            TextButton.icon(
-              onPressed: onReset,
-              icon: const Icon(Icons.center_focus_strong_outlined, size: 18),
-              label: const Text('重置'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _GraphNodeCard extends StatelessWidget {
-  final TreeNode treeNode;
+class _GraphNodeCard extends ConsumerWidget {
+  final String fileName;
+  final String roundId;
+  final int depth;
   final VoidCallback onSwitch;
   final VoidCallback onDelete;
 
   const _GraphNodeCard({
     super.key,
-    required this.treeNode,
+    required this.fileName,
+    required this.roundId,
+    required this.depth,
     required this.onSwitch,
     required this.onDelete,
   });
@@ -539,12 +427,24 @@ class _GraphNodeCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final isIncomplete = treeNode.round.isIncomplete;
-    final hasUnseenUpdate = treeNode.round.hasUnseenUpdate;
-    final aiContent = (treeNode.round.assistantContent ?? '').trim().isEmpty
+  Widget build(BuildContext context, WidgetRef ref) {
+    // ⚡ 重点：这里独立监听数据库流出的实时数据，仅更新本卡片
+    final round = ref.watch(chatSessionProvider(fileName).select((s) {
+      final rounds = s.valueOrNull?.rounds ?? const [];
+      return rounds.firstWhere(
+        (r) => r.id == roundId,
+        // 防止在被删除那帧报错，提供一个空 Fallback
+        orElse: () => ChatRound(id: roundId, createdAt: 0, userContent: '', isIncomplete: false),
+      );
+    }));
+
+    if (round.createdAt == 0) return const SizedBox.shrink();
+
+    final isIncomplete = round.isIncomplete;
+    final hasUnseenUpdate = round.hasUnseenUpdate;
+    final aiContent = (round.assistantContent ?? '').trim().isEmpty
         ? '（等待回复）'
-        : treeNode.round.assistantContent!;
+        : round.assistantContent!;
 
     return Card(
       child: SizedBox(
@@ -558,33 +458,20 @@ class _GraphNodeCard extends StatelessWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  _buildChip(
-                    '深度 ${treeNode.depth + 1}',
-                    icon: Icons.layers_outlined,
-                  ),
-                  if (isIncomplete)
-                    _buildChip(
-                      '未完成',
-                      icon: Icons.hourglass_empty_outlined,
-                    ),
-                  if (hasUnseenUpdate)
-                    _buildChip(
-                      '未查看',
-                      icon: Icons.mark_chat_unread_outlined,
-                    ),
+                  _buildChip('深度 ${depth + 1}', icon: Icons.layers_outlined),
+                  if (isIncomplete) _buildChip('未完成', icon: Icons.hourglass_empty_outlined),
+                  if (hasUnseenUpdate) _buildChip('未查看', icon: Icons.mark_chat_unread_outlined),
                 ],
               ),
               const SizedBox(height: 10),
               Text(
-                TimeFormatUtils.formatTimestamp(treeNode.round.createdAt),
+                TimeFormatUtils.formatTimestamp(round.createdAt),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 12),
               _PreviewBlock(
                 label: 'YOU',
-                content: treeNode.round.userContent.trim().isEmpty
-                    ? '（空输入）'
-                    : treeNode.round.userContent,
+                content: round.userContent.trim().isEmpty ? '（空输入）' : round.userContent,
               ),
               const SizedBox(height: 8),
               _PreviewBlock(
@@ -619,10 +506,7 @@ class _PreviewBlock extends StatelessWidget {
   final String label;
   final String content;
 
-  const _PreviewBlock({
-    required this.label,
-    required this.content,
-  });
+  const _PreviewBlock({required this.label, required this.content});
 
   @override
   Widget build(BuildContext context) {
@@ -633,12 +517,7 @@ class _PreviewBlock extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '$label  ',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
+            Text('$label  ', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700)),
             Expanded(
               child: Text(
                 content,
@@ -647,6 +526,38 @@ class _PreviewBlock extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GraphToolbar extends StatelessWidget {
+  final VoidCallback onZoomIn;
+  final VoidCallback onZoomOut;
+  final VoidCallback onReset;
+
+  const _GraphToolbar({
+    required this.onZoomIn,
+    required this.onZoomOut,
+    required this.onReset,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            const Icon(Icons.tune_outlined, size: 18),
+            const SizedBox(width: 8),
+            const Expanded(child: Text('缩放、拖拽查看对话分支结构')),
+            IconButton(tooltip: '缩小', onPressed: onZoomOut, icon: const Icon(Icons.remove_rounded)),
+            IconButton(tooltip: '放大', onPressed: onZoomIn, icon: const Icon(Icons.add_rounded)),
+            TextButton.icon(onPressed: onReset, icon: const Icon(Icons.center_focus_strong_outlined, size: 18), label: const Text('重置')),
           ],
         ),
       ),

@@ -66,7 +66,6 @@ lib/core/models/session.freezed.dart
 lib/core/models/session.g.dart
 lib/core/models/sse_event.dart
 lib/core/utils/app_route_observer.dart
-lib/core/utils/file_name_utils.dart
 lib/core/utils/id_generator.dart
 lib/core/utils/json_utils.dart
 lib/core/utils/sse_parser.dart
@@ -83,6 +82,8 @@ lib/data/services/file_service.dart
 lib/di/providers.dart
 lib/domain/models/chat_page.dart
 lib/domain/models/chat_page.freezed.dart
+lib/domain/models/session_card_meta.dart
+lib/domain/models/session_list_item.dart
 lib/domain/models/tree_node.dart
 lib/domain/models/tree_node.freezed.dart
 lib/domain/models/tree_node.g.dart
@@ -107,10 +108,7 @@ lib/presentation/pages/text_attachment_viewer_page.dart
 lib/presentation/providers/attachment_bytes_provider.dart
 lib/presentation/providers/chat_notifier.dart
 lib/presentation/providers/config_notifier.dart
-lib/presentation/providers/global_streaming_provider.dart
-lib/presentation/providers/home_session_list_provider.dart
 lib/presentation/providers/input_draft_provider.dart
-lib/presentation/providers/session_card_provider.dart
 lib/presentation/providers/session_list_notifier.dart
 lib/presentation/themes/app_theme.dart
 lib/presentation/themes/app_tokens.dart
@@ -2728,37 +2726,6 @@ Map<String, dynamic> _$$ModelInfoImplToJson(_$ModelInfoImpl instance) =>
 import 'package:flutter/material.dart';
 final RouteObserver<ModalRoute<void>> appRouteObserver =
     RouteObserver<ModalRoute<void>>();
-```
-
-## File: lib/core/utils/file_name_utils.dart
-```dart
-abstract class FileNameUtils {
-  // Windows/Android/iOS 通用非法字符
-  static final _illegalChars = RegExp(r'[<>:"/\\|?*]');
-  // 清理非法字符
-  static String sanitize(String name) {
-    return name.replaceAll(_illegalChars, '_').trim();
-  }
-  // 生成唯一文件名 (如果存在冲突，自动加数字)
-  // 注意：这里只处理字符串逻辑，实际文件存在性检查应在 Service 层
-  static String makeUnique(String baseName, List<String> existingNames) {
-    final cleanName = sanitize(baseName);
-    if (!existingNames.contains('$cleanName.json')) {
-      return '$cleanName.json';
-    }
-    int counter = 1;
-    while (existingNames.contains('$cleanName$counter.json')) {
-      counter++;
-    }
-    return '$cleanName$counter.json';
-  }
-  // 从文件名提取标题 (去掉 .json)
-  static String extractTitle(String fileName) {
-    return fileName.endsWith('.json') 
-        ? fileName.substring(0, fileName.length - 5) 
-        : fileName;
-  }
-}
 ```
 
 ## File: lib/core/utils/id_generator.dart
@@ -6751,6 +6718,26 @@ class $AppDatabaseManager {
 }
 ```
 
+## File: lib/domain/models/session_card_meta.dart
+```dart
+class SessionCardMeta {
+  final int roundCount;
+  final String? previewRoundId;
+  final String userPreview;
+  final String aiPreview;
+  final bool hasUnseen;
+  final bool isStreaming;
+  const SessionCardMeta({
+    required this.roundCount,
+    required this.previewRoundId,
+    required this.userPreview,
+    required this.aiPreview,
+    required this.hasUnseen,
+    required this.isStreaming,
+  });
+}
+```
+
 ## File: lib/domain/models/tree_node.g.dart
 ```dart
 // GENERATED CODE - DO NOT MODIFY BY HAND
@@ -7414,31 +7401,6 @@ class PendingAttachment {
     this.mimeType,
   });
 }
-```
-
-## File: lib/presentation/providers/session_card_provider.dart
-```dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/session.dart';
-import '../../di/providers.dart';
-final sessionFileNamesProvider = FutureProvider<List<String>>((ref) async {
-  final repository = ref.read(conversationRepositoryProvider);
-  final fileNames = await repository.getAllSessionFileNames();
-  final sessions = <Session>[];
-  for (final fileName in fileNames) {
-    try {
-      final session = await repository.getSession(fileName);
-      sessions.add(session);
-    } catch (_) {}
-  }
-  sessions.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-  return sessions.map((e) => '${e.id}.json').toList();
-});
-final sessionCardProvider =
-    FutureProvider.family<Session, String>((ref, fileName) async {
-  final repository = ref.read(conversationRepositoryProvider);
-  return repository.getSession(fileName);
-});
 ```
 
 ## File: lib/presentation/utils/page_utils.dart
@@ -9095,6 +9057,20 @@ abstract class _ChatPageList implements ChatPageList {
 }
 ```
 
+## File: lib/domain/models/session_list_item.dart
+```dart
+class SessionListItem {
+  final String id;
+  final String title;
+  final int updatedAt;
+  const SessionListItem({
+    required this.id,
+    required this.title,
+    required this.updatedAt,
+  });
+}
+```
+
 ## File: lib/domain/models/tree_node.dart
 ```dart
 // lib/domain/models/tree_node.dart
@@ -9617,478 +9593,6 @@ class MessagePaginator {
   static int getTotalPages(List<ChatRound> rounds) {
     return rounds.length;
   }
-}
-```
-
-## File: lib/domain/states/chat_state.dart
-```dart
-import 'package:freezed_annotation/freezed_annotation.dart';
-import '../../core/models/session.dart';
-import '../models/chat_page.dart';
-part 'chat_state.freezed.dart';
-@freezed
-class StreamStatus with _$StreamStatus {
-  const factory StreamStatus({
-    @Default('') String content,
-    @Default('') String reasoning,
-    @Default(false) bool isStreaming,
-  }) = _StreamStatus;
-}
-@freezed
-class ChatState with _$ChatState {
-  const factory ChatState({
-    Session? session,
-    String? currentRoundId,
-    ChatPageList? pageList,
-    String? error,
-    @Default(false) bool isLoading,
-  }) = _ChatState;
-  factory ChatState.initial() => const ChatState(
-        error: null,
-        isLoading: false,
-      );
-}
-extension ChatStateX on ChatState {
-  ChatState copyWithSession(Session session) {
-    return copyWith(
-      session: session,
-      isLoading: false,
-    );
-  }
-  ChatState copyWithCurrentRoundId(String roundId) {
-    return copyWith(currentRoundId: roundId);
-  }
-  ChatState copyWithError(String error) {
-    return copyWith(
-      error: error,
-      isLoading: false,
-    );
-  }
-  ChatState copyWithLoading(bool loading) {
-    return copyWith(isLoading: loading);
-  }
-}
-```
-
-## File: lib/domain/states/chat_state.freezed.dart
-```dart
-// coverage:ignore-file
-// GENERATED CODE - DO NOT MODIFY BY HAND
-// ignore_for_file: type=lint
-// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
-part of 'chat_state.dart';
-// **************************************************************************
-// FreezedGenerator
-// **************************************************************************
-T _$identity<T>(T value) => value;
-final _privateConstructorUsedError = UnsupportedError(
-  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
-);
-/// @nodoc
-mixin _$StreamStatus {
-  String get content => throw _privateConstructorUsedError;
-  String get reasoning => throw _privateConstructorUsedError;
-  bool get isStreaming => throw _privateConstructorUsedError;
-  /// Create a copy of StreamStatus
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $StreamStatusCopyWith<StreamStatus> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-/// @nodoc
-abstract class $StreamStatusCopyWith<$Res> {
-  factory $StreamStatusCopyWith(
-    StreamStatus value,
-    $Res Function(StreamStatus) then,
-  ) = _$StreamStatusCopyWithImpl<$Res, StreamStatus>;
-  @useResult
-  $Res call({String content, String reasoning, bool isStreaming});
-}
-/// @nodoc
-class _$StreamStatusCopyWithImpl<$Res, $Val extends StreamStatus>
-    implements $StreamStatusCopyWith<$Res> {
-  _$StreamStatusCopyWithImpl(this._value, this._then);
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-  /// Create a copy of StreamStatus
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? content = null,
-    Object? reasoning = null,
-    Object? isStreaming = null,
-  }) {
-    return _then(
-      _value.copyWith(
-            content: null == content
-                ? _value.content
-                : content // ignore: cast_nullable_to_non_nullable
-                      as String,
-            reasoning: null == reasoning
-                ? _value.reasoning
-                : reasoning // ignore: cast_nullable_to_non_nullable
-                      as String,
-            isStreaming: null == isStreaming
-                ? _value.isStreaming
-                : isStreaming // ignore: cast_nullable_to_non_nullable
-                      as bool,
-          )
-          as $Val,
-    );
-  }
-}
-/// @nodoc
-abstract class _$$StreamStatusImplCopyWith<$Res>
-    implements $StreamStatusCopyWith<$Res> {
-  factory _$$StreamStatusImplCopyWith(
-    _$StreamStatusImpl value,
-    $Res Function(_$StreamStatusImpl) then,
-  ) = __$$StreamStatusImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({String content, String reasoning, bool isStreaming});
-}
-/// @nodoc
-class __$$StreamStatusImplCopyWithImpl<$Res>
-    extends _$StreamStatusCopyWithImpl<$Res, _$StreamStatusImpl>
-    implements _$$StreamStatusImplCopyWith<$Res> {
-  __$$StreamStatusImplCopyWithImpl(
-    _$StreamStatusImpl _value,
-    $Res Function(_$StreamStatusImpl) _then,
-  ) : super(_value, _then);
-  /// Create a copy of StreamStatus
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? content = null,
-    Object? reasoning = null,
-    Object? isStreaming = null,
-  }) {
-    return _then(
-      _$StreamStatusImpl(
-        content: null == content
-            ? _value.content
-            : content // ignore: cast_nullable_to_non_nullable
-                  as String,
-        reasoning: null == reasoning
-            ? _value.reasoning
-            : reasoning // ignore: cast_nullable_to_non_nullable
-                  as String,
-        isStreaming: null == isStreaming
-            ? _value.isStreaming
-            : isStreaming // ignore: cast_nullable_to_non_nullable
-                  as bool,
-      ),
-    );
-  }
-}
-/// @nodoc
-class _$StreamStatusImpl implements _StreamStatus {
-  const _$StreamStatusImpl({
-    this.content = '',
-    this.reasoning = '',
-    this.isStreaming = false,
-  });
-  @override
-  @JsonKey()
-  final String content;
-  @override
-  @JsonKey()
-  final String reasoning;
-  @override
-  @JsonKey()
-  final bool isStreaming;
-  @override
-  String toString() {
-    return 'StreamStatus(content: $content, reasoning: $reasoning, isStreaming: $isStreaming)';
-  }
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$StreamStatusImpl &&
-            (identical(other.content, content) || other.content == content) &&
-            (identical(other.reasoning, reasoning) ||
-                other.reasoning == reasoning) &&
-            (identical(other.isStreaming, isStreaming) ||
-                other.isStreaming == isStreaming));
-  }
-  @override
-  int get hashCode => Object.hash(runtimeType, content, reasoning, isStreaming);
-  /// Create a copy of StreamStatus
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$StreamStatusImplCopyWith<_$StreamStatusImpl> get copyWith =>
-      __$$StreamStatusImplCopyWithImpl<_$StreamStatusImpl>(this, _$identity);
-}
-abstract class _StreamStatus implements StreamStatus {
-  const factory _StreamStatus({
-    final String content,
-    final String reasoning,
-    final bool isStreaming,
-  }) = _$StreamStatusImpl;
-  @override
-  String get content;
-  @override
-  String get reasoning;
-  @override
-  bool get isStreaming;
-  /// Create a copy of StreamStatus
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$StreamStatusImplCopyWith<_$StreamStatusImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-/// @nodoc
-mixin _$ChatState {
-  Session? get session => throw _privateConstructorUsedError;
-  String? get currentRoundId => throw _privateConstructorUsedError;
-  ChatPageList? get pageList => throw _privateConstructorUsedError;
-  String? get error => throw _privateConstructorUsedError;
-  bool get isLoading => throw _privateConstructorUsedError;
-  /// Create a copy of ChatState
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $ChatStateCopyWith<ChatState> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-/// @nodoc
-abstract class $ChatStateCopyWith<$Res> {
-  factory $ChatStateCopyWith(ChatState value, $Res Function(ChatState) then) =
-      _$ChatStateCopyWithImpl<$Res, ChatState>;
-  @useResult
-  $Res call({
-    Session? session,
-    String? currentRoundId,
-    ChatPageList? pageList,
-    String? error,
-    bool isLoading,
-  });
-  $SessionCopyWith<$Res>? get session;
-  $ChatPageListCopyWith<$Res>? get pageList;
-}
-/// @nodoc
-class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
-    implements $ChatStateCopyWith<$Res> {
-  _$ChatStateCopyWithImpl(this._value, this._then);
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-  /// Create a copy of ChatState
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? session = freezed,
-    Object? currentRoundId = freezed,
-    Object? pageList = freezed,
-    Object? error = freezed,
-    Object? isLoading = null,
-  }) {
-    return _then(
-      _value.copyWith(
-            session: freezed == session
-                ? _value.session
-                : session // ignore: cast_nullable_to_non_nullable
-                      as Session?,
-            currentRoundId: freezed == currentRoundId
-                ? _value.currentRoundId
-                : currentRoundId // ignore: cast_nullable_to_non_nullable
-                      as String?,
-            pageList: freezed == pageList
-                ? _value.pageList
-                : pageList // ignore: cast_nullable_to_non_nullable
-                      as ChatPageList?,
-            error: freezed == error
-                ? _value.error
-                : error // ignore: cast_nullable_to_non_nullable
-                      as String?,
-            isLoading: null == isLoading
-                ? _value.isLoading
-                : isLoading // ignore: cast_nullable_to_non_nullable
-                      as bool,
-          )
-          as $Val,
-    );
-  }
-  /// Create a copy of ChatState
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @pragma('vm:prefer-inline')
-  $SessionCopyWith<$Res>? get session {
-    if (_value.session == null) {
-      return null;
-    }
-    return $SessionCopyWith<$Res>(_value.session!, (value) {
-      return _then(_value.copyWith(session: value) as $Val);
-    });
-  }
-  /// Create a copy of ChatState
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @pragma('vm:prefer-inline')
-  $ChatPageListCopyWith<$Res>? get pageList {
-    if (_value.pageList == null) {
-      return null;
-    }
-    return $ChatPageListCopyWith<$Res>(_value.pageList!, (value) {
-      return _then(_value.copyWith(pageList: value) as $Val);
-    });
-  }
-}
-/// @nodoc
-abstract class _$$ChatStateImplCopyWith<$Res>
-    implements $ChatStateCopyWith<$Res> {
-  factory _$$ChatStateImplCopyWith(
-    _$ChatStateImpl value,
-    $Res Function(_$ChatStateImpl) then,
-  ) = __$$ChatStateImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({
-    Session? session,
-    String? currentRoundId,
-    ChatPageList? pageList,
-    String? error,
-    bool isLoading,
-  });
-  @override
-  $SessionCopyWith<$Res>? get session;
-  @override
-  $ChatPageListCopyWith<$Res>? get pageList;
-}
-/// @nodoc
-class __$$ChatStateImplCopyWithImpl<$Res>
-    extends _$ChatStateCopyWithImpl<$Res, _$ChatStateImpl>
-    implements _$$ChatStateImplCopyWith<$Res> {
-  __$$ChatStateImplCopyWithImpl(
-    _$ChatStateImpl _value,
-    $Res Function(_$ChatStateImpl) _then,
-  ) : super(_value, _then);
-  /// Create a copy of ChatState
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? session = freezed,
-    Object? currentRoundId = freezed,
-    Object? pageList = freezed,
-    Object? error = freezed,
-    Object? isLoading = null,
-  }) {
-    return _then(
-      _$ChatStateImpl(
-        session: freezed == session
-            ? _value.session
-            : session // ignore: cast_nullable_to_non_nullable
-                  as Session?,
-        currentRoundId: freezed == currentRoundId
-            ? _value.currentRoundId
-            : currentRoundId // ignore: cast_nullable_to_non_nullable
-                  as String?,
-        pageList: freezed == pageList
-            ? _value.pageList
-            : pageList // ignore: cast_nullable_to_non_nullable
-                  as ChatPageList?,
-        error: freezed == error
-            ? _value.error
-            : error // ignore: cast_nullable_to_non_nullable
-                  as String?,
-        isLoading: null == isLoading
-            ? _value.isLoading
-            : isLoading // ignore: cast_nullable_to_non_nullable
-                  as bool,
-      ),
-    );
-  }
-}
-/// @nodoc
-class _$ChatStateImpl implements _ChatState {
-  const _$ChatStateImpl({
-    this.session,
-    this.currentRoundId,
-    this.pageList,
-    this.error,
-    this.isLoading = false,
-  });
-  @override
-  final Session? session;
-  @override
-  final String? currentRoundId;
-  @override
-  final ChatPageList? pageList;
-  @override
-  final String? error;
-  @override
-  @JsonKey()
-  final bool isLoading;
-  @override
-  String toString() {
-    return 'ChatState(session: $session, currentRoundId: $currentRoundId, pageList: $pageList, error: $error, isLoading: $isLoading)';
-  }
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$ChatStateImpl &&
-            (identical(other.session, session) || other.session == session) &&
-            (identical(other.currentRoundId, currentRoundId) ||
-                other.currentRoundId == currentRoundId) &&
-            (identical(other.pageList, pageList) ||
-                other.pageList == pageList) &&
-            (identical(other.error, error) || other.error == error) &&
-            (identical(other.isLoading, isLoading) ||
-                other.isLoading == isLoading));
-  }
-  @override
-  int get hashCode => Object.hash(
-    runtimeType,
-    session,
-    currentRoundId,
-    pageList,
-    error,
-    isLoading,
-  );
-  /// Create a copy of ChatState
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$ChatStateImplCopyWith<_$ChatStateImpl> get copyWith =>
-      __$$ChatStateImplCopyWithImpl<_$ChatStateImpl>(this, _$identity);
-}
-abstract class _ChatState implements ChatState {
-  const factory _ChatState({
-    final Session? session,
-    final String? currentRoundId,
-    final ChatPageList? pageList,
-    final String? error,
-    final bool isLoading,
-  }) = _$ChatStateImpl;
-  @override
-  Session? get session;
-  @override
-  String? get currentRoundId;
-  @override
-  ChatPageList? get pageList;
-  @override
-  String? get error;
-  @override
-  bool get isLoading;
-  /// Create a copy of ChatState
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$ChatStateImplCopyWith<_$ChatStateImpl> get copyWith =>
-      throw _privateConstructorUsedError;
 }
 ```
 
@@ -10709,31 +10213,6 @@ abstract class AppConstants {
 }
 ```
 
-## File: lib/core/interfaces/config_service.dart
-```dart
-// core/interfaces/config_service.dart
-import '../models/app_config.dart';
-import '../models/app_config_store.dart';
-abstract class IConfigService {
-  // 现有的同步方法
-  Future<AppConfigStore> loadConfigStore();
-  Future<AppConfig> loadConfig();
-  Future<void> saveConfig(AppConfig config);
-  Future<void> refreshModels();
-  Future<List<ConfigProfile>> getProfiles();
-  Future<String> getActiveProfileId();
-  Future<void> switchProfile(String profileId);
-  Future<void> createProfile(String name);
-  Future<void> renameProfile(String profileId, String name);
-  Future<void> deleteProfile(String profileId);
-  // ========== 新增：watch 方法 ==========
-  /// 监听配置Store的变更
-  Stream<AppConfigStore> watchConfigStore();
-  /// 监听当前配置
-  Stream<AppConfig> watchConfig();
-}
-```
-
 ## File: lib/core/interfaces/file_service.dart
 ```dart
 import 'dart:typed_data';
@@ -10934,167 +10413,6 @@ final attachmentBytesProvider =
     return repository.getAttachment(relativePath);
   },
 );
-```
-
-## File: lib/presentation/providers/config_notifier.dart
-```dart
-// presentation/providers/config_notifier.dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/app_config.dart';
-import '../../core/models/app_config_store.dart';
-import '../../di/providers.dart';
-/// 使用纯声明式 StreamProvider - 所有状态来自 Drift 数据库流
-final configProvider = StreamProvider<AppConfig>((ref) {
-  final repository = ref.watch(configRepositoryProvider);
-  return repository.watchConfig();
-});
-final configProfilesProvider = StreamProvider<AppConfigStore>((ref) {
-  final repository = ref.watch(configRepositoryProvider);
-  return repository.watchConfigStore();
-});
-/// 直接使用 StreamProvider，不额外维护本地状态
-/// 所有配置操作直接调用 Repository 方法，写入数据库后流自动更新
-class ConfigNotifier extends StateNotifier<AsyncValue<AppConfig>> {
-  final Ref ref;
-  ConfigNotifier(this.ref) : super(const AsyncValue.loading()) {
-    // 监听 StreamProvider，自动同步本地状态
-    ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
-      state = next;
-    });
-  }
-  Future<void> updateBaseUrl(String baseUrl) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.updateBaseUrl(baseUrl);
-    // 无需手动更新状态，流会自动推送
-  }
-  Future<void> updateApiKey(String apiKey) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.updateApiKey(apiKey);
-  }
-  Future<void> updateModelsPath(String modelsPath) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.updateModelsPath(modelsPath);
-  }
-  Future<void> updateChatPath(String chatPath) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.updateChatPath(chatPath);
-  }
-  Future<void> updateApiMode(String apiMode) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.updateApiMode(apiMode);
-  }
-  Future<void> updateSelectedModel(String? model) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.updateSelectedModel(model);
-  }
-  Future<void> saveFullConfig(AppConfig config) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.saveFullConfig(config);
-  }
-  Future<void> saveAndRefreshModels(AppConfig config) async {
-    state = const AsyncValue.loading();
-    final repository = ref.read(configRepositoryProvider);
-    await repository.saveConfig(config.copyWith(availableModels: []));
-    await repository.refreshModels();
-  }
-  Future<void> refreshModels() async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.refreshModels();
-  }
-}
-final configNotifierProvider = Provider<ConfigNotifier>((ref) {
-  return ConfigNotifier(ref);
-});
-class ConfigProfilesNotifier extends StateNotifier<AsyncValue<AppConfigStore>> {
-  final Ref ref;
-  ConfigProfilesNotifier(this.ref) : super(const AsyncValue.loading()) {
-    ref.listen<AsyncValue<AppConfigStore>>(configProfilesProvider, (previous, next) {
-      state = next;
-    });
-  }
-  Future<void> load() async {
-    // Stream 会自动同步，无需手动操作
-  }
-  Future<void> switchProfile(String profileId) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.switchProfile(profileId);
-  }
-  Future<void> createProfile(String name) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.createProfile(name);
-  }
-  Future<void> renameProfile(String profileId, String name) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.renameProfile(profileId, name);
-  }
-  Future<void> deleteProfile(String profileId) async {
-    final repository = ref.read(configRepositoryProvider);
-    await repository.deleteProfile(profileId);
-  }
-}
-final configProfilesNotifierProvider = Provider<ConfigProfilesNotifier>((ref) {
-  return ConfigProfilesNotifier(ref);
-});
-```
-
-## File: lib/presentation/providers/session_list_notifier.dart
-```dart
-// presentation/providers/session_list_notifier.dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/session.dart';
-import '../../di/providers.dart';
-// ✅ 使用纯声明式 StreamProvider
-final sessionListProvider = StreamProvider<List<Session>>((ref) {
-  final repository = ref.watch(conversationRepositoryProvider);
-  return repository.watchAllSessions();
-});
-// ✅ 保留命令式 notifier 用于需要直接调用方法的场景
-class SessionListNotifier extends StateNotifier<AsyncValue<List<Session>>> {
-  final Ref ref;
-  SessionListNotifier(this.ref) : super(const AsyncValue.loading()) {
-    // 监听上面的 StreamProvider
-    ref.listen<AsyncValue<List<Session>>>(sessionListProvider, (previous, next) {
-      state = next;
-    });
-  }
-  Future<void> refresh() async {
-    // Stream 会自动同步，保留此方法用于兼容性
-  }
-  Future<void> deleteSession(String fileName) async {
-    try {
-      final repository = ref.read(conversationRepositoryProvider);
-      await repository.deleteSession(fileName);
-      // Stream 会自动同步
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
-  }
-  Future<void> updateSessionTitle(String fileName, String newTitle) async {
-    try {
-      final repository = ref.read(conversationRepositoryProvider);
-      final cleanTitle = newTitle.trim();
-      if (cleanTitle.isEmpty) return;
-      await repository.updateSessionTitle(fileName, cleanTitle);
-      // Stream 会自动同步
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
-  }
-  Future<String> createSession(String title) async {
-    final repository = ref.read(conversationRepositoryProvider);
-    final cleanTitle = title.trim().isEmpty ? '新对话' : title.trim();
-    // 使用时间戳生成临时 ID
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final sessionId = now.toString();
-    final fileName = '$sessionId.json';
-    await repository.createSession(fileName: fileName, title: cleanTitle);
-    return fileName;
-  }
-}
-// ✅ 使用 Provider 而非 StateNotifierProvider
-final sessionListNotifierProvider = Provider<SessionListNotifier>((ref) {
-  return SessionListNotifier(ref);
-});
 ```
 
 ## File: lib/presentation/themes/app_tokens.dart
@@ -11382,375 +10700,28 @@ class AppPageScaffold extends StatelessWidget {
 }
 ```
 
-## File: lib/data/repositories/conversation_repository.dart
+## File: lib/core/interfaces/config_service.dart
 ```dart
-// data/repositories/conversation_repository.dart
-import 'dart:async';
-import 'dart:typed_data';
-import 'package:drift/drift.dart';
-import '../../core/interfaces/file_service.dart';
-import '../../core/models/attachment.dart';
-import '../../core/models/chat_round.dart';
-import '../../core/models/session.dart';
-import '../database/database.dart';
-import '../../core/utils/id_generator.dart';
-class ConversationRepository {
-  final AppDatabase _db;
-  final IFileService _fileService;
-  ConversationRepository(this._db, this._fileService);
-  String _getId(String fileName) => fileName.replaceAll('.json', '');
-  // 检查附件是否被其他 Round 引用
-  Future<bool> _isAttachmentUsedElsewhere(
-      String relativePath, List<String> excludeRoundIds) async {
-    final query = _db.select(_db.dbAttachments).join([
-      innerJoin(
-        _db.dbChatRounds,
-        _db.dbChatRounds.id.equalsExp(_db.dbAttachments.roundId),
-      )
-    ])
-      ..where(_db.dbAttachments.relativePath.equals(relativePath))
-      ..where(_db.dbChatRounds.id.isNotIn(excludeRoundIds));
-    final result = await query.get();
-    return result.isNotEmpty;
-  }
-  // ========== 核心改造：添加 watch 方法 ==========
-  /// 监听所有会话列表，返回按更新时间倒序的会话 Stream
-  Stream<List<Session>> watchAllSessions() {
-    final query = _db.select(_db.dbSessions)
-      ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]);
-    return query.watch().asyncMap((sessionRows) async {
-      final sessions = <Session>[];
-      for (final sessionRow in sessionRows) {
-        final session = await _buildSessionFromRow(sessionRow);
-        sessions.add(session);
-      }
-      return sessions;
-    });
-  }
-  /// 监听单个会话的完整数据（包含所有轮次和附件）
-  Stream<Session?> watchSession(String fileName) {
-    final sessionId = _getId(fileName);
-    // 监听会话元数据变更
-    final sessionQuery = _db.select(_db.dbSessions)
-      ..where((t) => t.id.equals(sessionId));
-    return sessionQuery.watchSingleOrNull().asyncMap((sessionRow) async {
-      if (sessionRow == null) return null;
-      return _buildSessionFromRow(sessionRow);
-    });
-  }
-  /// 监听会话的轮次列表
-  Stream<List<ChatRound>> watchRounds(String sessionId) {
-    final roundsQuery = _db.select(_db.dbChatRounds)
-      ..where((t) => t.sessionId.equals(sessionId))
-      ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]);
-    return roundsQuery.watch().asyncMap((roundRows) async {
-      final rounds = <ChatRound>[];
-      for (final round in roundRows) {
-        final attachments = await _getAttachmentsForRound(round.id);
-        rounds.add(_mapToChatRound(round, attachments));
-      }
-      return rounds;
-    });
-  }
-  /// 监听单个轮次的数据
-  Stream<ChatRound?> watchRound(String roundId) {
-    final query = _db.select(_db.dbChatRounds)
-      ..where((t) => t.id.equals(roundId));
-    return query.watchSingleOrNull().asyncMap((roundRow) async {
-      if (roundRow == null) return null;
-      final attachments = await _getAttachmentsForRound(roundId);
-      return _mapToChatRound(roundRow, attachments);
-    });
-  }
-  // ========== 私有辅助方法 ==========
-  Future<Session> _buildSessionFromRow(DbSession sessionRow) async {
-    final sessionId = sessionRow.id;
-    // 查询所有轮次
-    final roundsQuery = _db.select(_db.dbChatRounds)
-      ..where((t) => t.sessionId.equals(sessionId))
-      ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]);
-    final roundRows = await roundsQuery.get();
-    if (roundRows.isEmpty) {
-      return Session(
-        id: sessionRow.id,
-        title: sessionRow.title,
-        createdAt: sessionRow.createdAt,
-        updatedAt: sessionRow.updatedAt,
-        config: sessionRow.config,
-        hasUnseenUpdate: sessionRow.hasUnseenUpdate,
-        rounds: const [],
-      );
-    }
-    // 查询所有相关附件
-    final roundIds = roundRows.map((r) => r.id).toList();
-    final attachmentsQuery = _db.select(_db.dbAttachments)
-      ..where((t) => t.roundId.isIn(roundIds));
-    final attachmentRows = await attachmentsQuery.get();
-    // 组装 Attachments Map
-    final attachMap = <String, List<Attachment>>{};
-    for (final a in attachmentRows) {
-      attachMap.putIfAbsent(a.roundId, () => []).add(
-            Attachment(
-              id: a.id,
-              name: a.name,
-              relativePath: a.relativePath,
-              isImage: a.isImage,
-              mimeType: a.mimeType,
-            ),
-          );
-    }
-    // 组装 Rounds
-    final rounds = roundRows
-        .map((r) => _mapToChatRound(r, attachMap[r.id] ?? []))
-        .toList();
-    return Session(
-      id: sessionRow.id,
-      title: sessionRow.title,
-      createdAt: sessionRow.createdAt,
-      updatedAt: sessionRow.updatedAt,
-      config: sessionRow.config,
-      hasUnseenUpdate: sessionRow.hasUnseenUpdate,
-      rounds: rounds,
-    );
-  }
-  Future<List<Attachment>> _getAttachmentsForRound(String roundId) async {
-    final query = _db.select(_db.dbAttachments)
-      ..where((t) => t.roundId.equals(roundId));
-    final rows = await query.get();
-    return rows
-        .map((a) => Attachment(
-              id: a.id,
-              name: a.name,
-              relativePath: a.relativePath,
-              isImage: a.isImage,
-              mimeType: a.mimeType,
-            ))
-        .toList();
-  }
-  ChatRound _mapToChatRound(DbChatRound row, List<Attachment> attachments) {
-    return ChatRound(
-      id: row.id,
-      parentId: row.parentId,
-      createdAt: row.createdAt,
-      userContent: row.userContent,
-      userAttachments: attachments,
-      assistantThinking: row.assistantThinking,
-      assistantContent: row.assistantContent,
-      isIncomplete: row.isIncomplete,
-      hasUnseenUpdate: row.hasUnseenUpdate,
-    );
-  }
-  // ========== 现有的同步方法保留，用于初始化和一次性读取 ==========
-  Future<List<String>> getAllSessionFileNames() async {
-    final sessions = await (_db.select(_db.dbSessions)
-          ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]))
-        .get();
-    return sessions.map((s) => '${s.id}.json').toList();
-  }
-  Future<Session> getSession(String fileName) async {
-    final sessionId = _getId(fileName);
-    final sessionRow = await (_db.select(_db.dbSessions)
-          ..where((t) => t.id.equals(sessionId)))
-        .getSingle();
-    return _buildSessionFromRow(sessionRow);
-  }
-  Future<void> deleteRounds(String sessionId, List<String> roundIds) async {
-    if (roundIds.isEmpty) return;
-    await (_db.delete(_db.dbChatRounds)
-          ..where((t) => t.sessionId.equals(sessionId) & t.id.isIn(roundIds)))
-        .go();
-  }
-  Future<void> saveSession(
-      String fileName, Session newSession) async {
-    final sessionId = _getId(fileName);
-    await _db.transaction(() async {
-      final allAttachments = <DbAttachmentsCompanion>[];
-      for (final round in newSession.rounds) {
-        await _db.into(_db.dbChatRounds).insertOnConflictUpdate(
-              DbChatRoundsCompanion.insert(
-                id: round.id,
-                sessionId: sessionId,
-                parentId: Value(round.parentId),
-                createdAt: round.createdAt,
-                userContent: round.userContent,
-                assistantThinking: Value(round.assistantThinking),
-                assistantContent: Value(round.assistantContent),
-                isIncomplete: Value(round.isIncomplete),
-                hasUnseenUpdate: Value(round.hasUnseenUpdate),
-              ),
-            );
-        allAttachments.addAll(round.userAttachments
-            .map((a) => DbAttachmentsCompanion.insert(
-                  id: a.id,
-                  roundId: round.id,
-                  name: a.name,
-                  relativePath: a.relativePath,
-                  isImage: Value(a.isImage),
-                  mimeType: Value(a.mimeType),
-                )));
-      }
-      for (final attach in allAttachments) {
-        await _db.into(_db.dbAttachments).insertOnConflictUpdate(attach);
-      }
-      await _db.into(_db.dbSessions).insertOnConflictUpdate(
-            DbSessionsCompanion(
-              id: Value(sessionId),
-              title: Value(newSession.title),
-              createdAt: Value(newSession.createdAt),
-              updatedAt: Value(newSession.updatedAt),
-              config: Value(newSession.config),
-              hasUnseenUpdate: Value(newSession.hasUnseenUpdate),
-            ),
-          );
-    });
-  }
-  Future<void> saveSessionAndCleanupOrphanAttachments(
-    String fileName, Session oldSession, Session newSession,
-  ) async {
-    final oldPaths = oldSession.rounds
-        .expand((r) => r.userAttachments)
-        .map((a) => a.relativePath)
-        .toSet();
-    final newPaths = newSession.rounds
-        .expand((r) => r.userAttachments)
-        .map((a) => a.relativePath)
-        .toSet();
-    final removedPaths = oldPaths.difference(newPaths);
-    final deletedRoundIds = oldSession.rounds
-        .where((oldR) => !newSession.rounds.any((newR) => newR.id == oldR.id))
-        .map((r) => r.id)
-        .toList();
-    await saveSession(fileName, newSession);
-    for (final path in removedPaths) {
-      if (!await _isAttachmentUsedElsewhere(path, deletedRoundIds)) {
-        try {
-          await _fileService.deleteAttachment(path);
-        } catch (_) {}
-      }
-    }
-  }
-  Future<void> deleteSession(String fileName) async {
-    final sessionId = _getId(fileName);
-    Session? targetSession;
-    try {
-      targetSession = await getSession(fileName);
-    } catch (_) {}
-    if (targetSession != null) {
-      final paths = targetSession.rounds
-          .expand((r) => r.userAttachments)
-          .map((a) => a.relativePath)
-          .toSet();
-      final allRoundIds = targetSession.rounds.map((r) => r.id).toList();
-      for (final path in paths) {
-        if (!await _isAttachmentUsedElsewhere(path, allRoundIds)) {
-          try {
-            await _fileService.deleteAttachment(path);
-          } catch (_) {}
-        }
-      }
-    }
-    await (_db.delete(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-        .go();
-  }
-  Future<String> saveAttachment(Uint8List data, String fileName) async =>
-      await _fileService.saveAttachment(data, fileName);
-  Future<Uint8List> getAttachment(String relativePath) async =>
-      await _fileService.readAttachment(relativePath);
-  Future<void> deleteAttachment(String relativePath) async =>
-      await _fileService.deleteAttachment(relativePath);
-  Future<Session> createSession({required String fileName, required String title}) async {
-    final sessionId = _getId(fileName);
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final session = Session(
-        id: sessionId,
-        title: title,
-        createdAt: now,
-        updatedAt: now,
-        rounds: []);
-    await _db.into(_db.dbSessions).insert(
-          DbSessionsCompanion.insert(
-            id: session.id,
-            title: session.title,
-            createdAt: session.createdAt,
-            updatedAt: session.updatedAt,
-          ),
-        );
-    return session;
-  }
-  Future<Session> createSessionWithGeneratedId({required String title}) async {
-    final sessionId = IdGenerator.generate();
-    return createSession(fileName: '$sessionId.json', title: title);
-  }
-  Future<void> updateSessionTitle(String fileName, String title) async {
-    final sessionId = _getId(fileName);
-    await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-        .write(DbSessionsCompanion(
-          title: Value(title),
-          updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
-        ));
-  }
-  Future<List<Session>> getAllSessions() async {
-    final ids = await getAllSessionFileNames();
-    final sessions = <Session>[];
-    for (final id in ids) {
-      try {
-        sessions.add(await getSession(id));
-      } catch (_) {}
-    }
-    return sessions;
-  }
-  Future<void> appendRound(String fileName, ChatRound round) async {
-    final sessionId = _getId(fileName);
-    await _db.transaction(() async {
-      await _db.into(_db.dbChatRounds).insert(
-            DbChatRoundsCompanion.insert(
-              id: round.id,
-              sessionId: sessionId,
-              parentId: Value(round.parentId),
-              createdAt: round.createdAt,
-              userContent: round.userContent,
-              assistantThinking: Value(round.assistantThinking),
-              assistantContent: Value(round.assistantContent),
-              isIncomplete: Value(round.isIncomplete),
-              hasUnseenUpdate: Value(round.hasUnseenUpdate),
-            ),
-          );
-      for (final attach in round.userAttachments) {
-        await _db.into(_db.dbAttachments).insert(
-              DbAttachmentsCompanion.insert(
-                id: attach.id,
-                roundId: round.id,
-                name: attach.name,
-                relativePath: attach.relativePath,
-                isImage: Value(attach.isImage),
-                mimeType: Value(attach.mimeType),
-              ),
-            );
-      }
-      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-          .write(DbSessionsCompanion(
-              updatedAt: Value(DateTime.now().millisecondsSinceEpoch)));
-    });
-  }
-  Future<void> updateRound(
-      String fileName, String roundId, ChatRound updatedRound) async {
-    final sessionId = _getId(fileName);
-    await _db.transaction(() async {
-      await (_db.update(_db.dbChatRounds)
-            ..where((t) => t.id.equals(roundId)))
-          .write(
-            DbChatRoundsCompanion(
-              assistantThinking: Value(updatedRound.assistantThinking),
-              assistantContent: Value(updatedRound.assistantContent),
-              isIncomplete: Value(updatedRound.isIncomplete),
-              hasUnseenUpdate: Value(updatedRound.hasUnseenUpdate),
-            ),
-          );
-      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-          .write(DbSessionsCompanion(
-              updatedAt: Value(DateTime.now().millisecondsSinceEpoch)));
-    });
-  }
+// core/interfaces/config_service.dart
+import '../models/app_config.dart';
+import '../models/app_config_store.dart';
+abstract class IConfigService {
+  // 现有的同步方法
+  Future<AppConfigStore> loadConfigStore();
+  Future<AppConfig> loadConfig();
+  Future<void> saveConfig(AppConfig config);
+  Future<void> refreshModels();
+  Future<List<ConfigProfile>> getProfiles();
+  Future<String> getActiveProfileId();
+  Future<void> switchProfile(String profileId);
+  Future<void> createProfile(String name);
+  Future<void> renameProfile(String profileId, String name);
+  Future<void> deleteProfile(String profileId);
+  // ========== 新增：watch 方法 ==========
+  /// 监听配置Store的变更
+  Stream<AppConfigStore> watchConfigStore();
+  /// 监听当前配置
+  Stream<AppConfig> watchConfig();
 }
 ```
 
@@ -12014,163 +10985,89 @@ class MyApp extends StatelessWidget {
 }
 ```
 
-## File: lib/presentation/providers/global_streaming_provider.dart
+## File: lib/presentation/providers/config_notifier.dart
 ```dart
-// presentation/providers/global_streaming_provider.dart
+// presentation/providers/config_notifier.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/chat_round.dart';
-import '../../domain/states/chat_state.dart';
-typedef SessionStreamMap = Map<String, StreamStatus>;
-typedef GlobalStreamMap = Map<String, SessionStreamMap>;
-// 这个 Provider 持有正在流式生成的数据
-// 当流式结束时，数据会写入数据库，UI 通过 watch 获取
-// 此 Provider 主要用于避免重复请求和实时显示
-class GlobalStreamCacheNotifier extends StateNotifier<GlobalStreamMap> {
-  GlobalStreamCacheNotifier() : super(const {});
-  StreamStatus? getRoundStream(String fileName, String roundId) {
-    return state[fileName]?[roundId];
+import '../../core/models/app_config.dart';
+import '../../core/models/app_config_store.dart';
+import '../../di/providers.dart';
+final configProvider = StreamProvider<AppConfig>((ref) {
+  final repository = ref.watch(configRepositoryProvider);
+  return repository.watchConfig();
+});
+final configProfilesProvider = StreamProvider<AppConfigStore>((ref) {
+  final repository = ref.watch(configRepositoryProvider);
+  return repository.watchConfigStore();
+});
+class ConfigController {
+  final Ref ref;
+  ConfigController(this.ref);
+  Future<void> updateBaseUrl(String baseUrl) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.updateBaseUrl(baseUrl);
   }
-  bool hasRoundStream(String fileName, String roundId) {
-    return state[fileName]?.containsKey(roundId) ?? false;
+  Future<void> updateApiKey(String apiKey) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.updateApiKey(apiKey);
   }
-  void setRoundStream(
-    String fileName,
-    String roundId,
-    StreamStatus status,
-  ) {
-    final sessionMap = Map<String, StreamStatus>.from(state[fileName] ?? {});
-    sessionMap[roundId] = status;
-    state = {
-      ...state,
-      fileName: sessionMap,
-    };
+  Future<void> updateModelsPath(String modelsPath) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.updateModelsPath(modelsPath);
   }
-  void updateRoundStream(
-    String fileName,
-    String roundId, {
-    String? content,
-    String? reasoning,
-    bool? isStreaming,
-  }) {
-    final sessionMap = Map<String, StreamStatus>.from(state[fileName] ?? {});
-    final current = sessionMap[roundId] ?? const StreamStatus();
-    sessionMap[roundId] = current.copyWith(
-      content: content ?? current.content,
-      reasoning: reasoning ?? current.reasoning,
-      isStreaming: isStreaming ?? current.isStreaming,
-    );
-    state = {
-      ...state,
-      fileName: sessionMap,
-    };
+  Future<void> updateChatPath(String chatPath) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.updateChatPath(chatPath);
   }
-  void ensureRoundLoaded(String fileName, ChatRound round) {
-    if (hasRoundStream(fileName, round.id)) return;
-    final sessionMap = Map<String, StreamStatus>.from(state[fileName] ?? {});
-    sessionMap[round.id] = StreamStatus(
-      content: round.assistantContent ?? '',
-      reasoning: round.assistantThinking ?? '',
-      isStreaming: false,
-    );
-    state = {
-      ...state,
-      fileName: sessionMap,
-    };
+  Future<void> updateApiMode(String apiMode) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.updateApiMode(apiMode);
   }
-  void ensureRoundLoadedWithContent(
-    String fileName,
-    String roundId,
-    String content,
-    String reasoning,
-  ) {
-    final sessionMap = Map<String, StreamStatus>.from(state[fileName] ?? {});
-    if (!sessionMap.containsKey(roundId)) {
-      sessionMap[roundId] = StreamStatus(
-        content: content,
-        reasoning: reasoning,
-        isStreaming: false,
-      );
-    }
-    state = {
-      ...state,
-      fileName: sessionMap,
-    };
+  Future<void> updateSelectedModel(String? model) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.updateSelectedModel(model);
   }
-  void ensureRoundsLoaded(String fileName, List<ChatRound> rounds) {
-    if (rounds.isEmpty) return;
-    final sessionMap = Map<String, StreamStatus>.from(state[fileName] ?? {});
-    var changed = false;
-    for (final round in rounds) {
-      if (sessionMap.containsKey(round.id)) continue;
-      sessionMap[round.id] = StreamStatus(
-        content: round.assistantContent ?? '',
-        reasoning: round.assistantThinking ?? '',
-        isStreaming: false,
-      );
-      changed = true;
-    }
-    if (!changed) return;
-    state = {
-      ...state,
-      fileName: sessionMap,
-    };
+  Future<void> saveFullConfig(AppConfig config) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.saveFullConfig(config);
   }
-  void clearRoundStream(String fileName, String roundId) {
-    final sessionMap = state[fileName];
-    if (sessionMap == null) return;
-    final next = Map<String, StreamStatus>.from(sessionMap);
-    next.remove(roundId);
-    if (next.isEmpty) {
-      final global = Map<String, SessionStreamMap>.from(state);
-      global.remove(fileName);
-      state = global;
-    } else {
-      state = {
-        ...state,
-        fileName: next,
-      };
-    }
+  Future<void> saveAndRefreshModels(AppConfig config) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.saveConfig(config.copyWith(availableModels: []));
+    await repository.refreshModels();
   }
-  void clearNonStreamingForSession(String fileName) {
-    final sessionMap = state[fileName];
-    if (sessionMap == null) return;
-    final retained = <String, StreamStatus>{};
-    for (final entry in sessionMap.entries) {
-      if (entry.value.isStreaming) {
-        retained[entry.key] = entry.value;
-      }
-    }
-    state = {
-      ...state,
-      fileName: retained,
-    };
-  }
-  void clearSession(String fileName) {
-    final next = Map<String, SessionStreamMap>.from(state);
-    next.remove(fileName);
-    state = next;
+  Future<void> refreshModels() async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.refreshModels();
   }
 }
-final globalStreamCacheProvider =
-    StateNotifierProvider<GlobalStreamCacheNotifier, GlobalStreamMap>((ref) {
-  // 当没有任何监听时可以自动清理
-  ref.onDispose(() {
-    // 可以在这里做一些清理工作
-  });
-  return GlobalStreamCacheNotifier();
+final configControllerProvider = Provider<ConfigController>((ref) {
+  return ConfigController(ref);
 });
-final sessionStreamMapProvider =
-    Provider.family<SessionStreamMap, String>((ref, fileName) {
-  final globalMap = ref.watch(globalStreamCacheProvider);
-  return globalMap[fileName] ?? const {};
+class ConfigProfilesController {
+  final Ref ref;
+  ConfigProfilesController(this.ref);
+  Future<void> switchProfile(String profileId) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.switchProfile(profileId);
+  }
+  Future<void> createProfile(String name) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.createProfile(name);
+  }
+  Future<void> renameProfile(String profileId, String name) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.renameProfile(profileId, name);
+  }
+  Future<void> deleteProfile(String profileId) async {
+    final repository = ref.read(configRepositoryProvider);
+    await repository.deleteProfile(profileId);
+  }
+}
+final configProfilesControllerProvider =
+    Provider<ConfigProfilesController>((ref) {
+  return ConfigProfilesController(ref);
 });
-final roundStreamProvider =
-    Provider.family<StreamStatus?, ({String fileName, String roundId})>(
-  (ref, args) {
-    final sessionMap = ref.watch(sessionStreamMapProvider(args.fileName));
-    return sessionMap[args.roundId];
-  },
-);
 ```
 
 ## File: lib/presentation/widgets/message_bubble.dart
@@ -12321,6 +11218,421 @@ class MessageBubble extends StatelessWidget {
 }
 ```
 
+## File: lib/domain/states/chat_state.dart
+```dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+part 'chat_state.freezed.dart';
+@freezed
+class StreamStatus with _$StreamStatus {
+  const factory StreamStatus({
+    @Default('') String content,
+    @Default('') String reasoning,
+    @Default(false) bool isStreaming,
+  }) = _StreamStatus;
+}
+@freezed
+class ChatState with _$ChatState {
+  const factory ChatState({
+    String? currentRoundId,
+    String? branchLeafRoundId,
+    String? error,
+    @Default(false) bool isLoading,
+  }) = _ChatState;
+  factory ChatState.initial() => const ChatState(
+        error: null,
+        isLoading: false,
+      );
+}
+extension ChatStateX on ChatState {
+  ChatState copyWithCurrentRoundId(String roundId) {
+    return copyWith(currentRoundId: roundId);
+  }
+  ChatState copyWithBranchLeafRoundId(String roundId) {
+    return copyWith(branchLeafRoundId: roundId);
+  }
+  ChatState copyWithError(String error) {
+    return copyWith(
+      error: error,
+      isLoading: false,
+    );
+  }
+  ChatState copyWithLoading(bool loading) {
+    return copyWith(isLoading: loading);
+  }
+}
+```
+
+## File: lib/domain/states/chat_state.freezed.dart
+```dart
+// coverage:ignore-file
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint
+// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
+part of 'chat_state.dart';
+// **************************************************************************
+// FreezedGenerator
+// **************************************************************************
+T _$identity<T>(T value) => value;
+final _privateConstructorUsedError = UnsupportedError(
+  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
+);
+/// @nodoc
+mixin _$StreamStatus {
+  String get content => throw _privateConstructorUsedError;
+  String get reasoning => throw _privateConstructorUsedError;
+  bool get isStreaming => throw _privateConstructorUsedError;
+  /// Create a copy of StreamStatus
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $StreamStatusCopyWith<StreamStatus> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+/// @nodoc
+abstract class $StreamStatusCopyWith<$Res> {
+  factory $StreamStatusCopyWith(
+    StreamStatus value,
+    $Res Function(StreamStatus) then,
+  ) = _$StreamStatusCopyWithImpl<$Res, StreamStatus>;
+  @useResult
+  $Res call({String content, String reasoning, bool isStreaming});
+}
+/// @nodoc
+class _$StreamStatusCopyWithImpl<$Res, $Val extends StreamStatus>
+    implements $StreamStatusCopyWith<$Res> {
+  _$StreamStatusCopyWithImpl(this._value, this._then);
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+  /// Create a copy of StreamStatus
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? content = null,
+    Object? reasoning = null,
+    Object? isStreaming = null,
+  }) {
+    return _then(
+      _value.copyWith(
+            content: null == content
+                ? _value.content
+                : content // ignore: cast_nullable_to_non_nullable
+                      as String,
+            reasoning: null == reasoning
+                ? _value.reasoning
+                : reasoning // ignore: cast_nullable_to_non_nullable
+                      as String,
+            isStreaming: null == isStreaming
+                ? _value.isStreaming
+                : isStreaming // ignore: cast_nullable_to_non_nullable
+                      as bool,
+          )
+          as $Val,
+    );
+  }
+}
+/// @nodoc
+abstract class _$$StreamStatusImplCopyWith<$Res>
+    implements $StreamStatusCopyWith<$Res> {
+  factory _$$StreamStatusImplCopyWith(
+    _$StreamStatusImpl value,
+    $Res Function(_$StreamStatusImpl) then,
+  ) = __$$StreamStatusImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({String content, String reasoning, bool isStreaming});
+}
+/// @nodoc
+class __$$StreamStatusImplCopyWithImpl<$Res>
+    extends _$StreamStatusCopyWithImpl<$Res, _$StreamStatusImpl>
+    implements _$$StreamStatusImplCopyWith<$Res> {
+  __$$StreamStatusImplCopyWithImpl(
+    _$StreamStatusImpl _value,
+    $Res Function(_$StreamStatusImpl) _then,
+  ) : super(_value, _then);
+  /// Create a copy of StreamStatus
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? content = null,
+    Object? reasoning = null,
+    Object? isStreaming = null,
+  }) {
+    return _then(
+      _$StreamStatusImpl(
+        content: null == content
+            ? _value.content
+            : content // ignore: cast_nullable_to_non_nullable
+                  as String,
+        reasoning: null == reasoning
+            ? _value.reasoning
+            : reasoning // ignore: cast_nullable_to_non_nullable
+                  as String,
+        isStreaming: null == isStreaming
+            ? _value.isStreaming
+            : isStreaming // ignore: cast_nullable_to_non_nullable
+                  as bool,
+      ),
+    );
+  }
+}
+/// @nodoc
+class _$StreamStatusImpl implements _StreamStatus {
+  const _$StreamStatusImpl({
+    this.content = '',
+    this.reasoning = '',
+    this.isStreaming = false,
+  });
+  @override
+  @JsonKey()
+  final String content;
+  @override
+  @JsonKey()
+  final String reasoning;
+  @override
+  @JsonKey()
+  final bool isStreaming;
+  @override
+  String toString() {
+    return 'StreamStatus(content: $content, reasoning: $reasoning, isStreaming: $isStreaming)';
+  }
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$StreamStatusImpl &&
+            (identical(other.content, content) || other.content == content) &&
+            (identical(other.reasoning, reasoning) ||
+                other.reasoning == reasoning) &&
+            (identical(other.isStreaming, isStreaming) ||
+                other.isStreaming == isStreaming));
+  }
+  @override
+  int get hashCode => Object.hash(runtimeType, content, reasoning, isStreaming);
+  /// Create a copy of StreamStatus
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$StreamStatusImplCopyWith<_$StreamStatusImpl> get copyWith =>
+      __$$StreamStatusImplCopyWithImpl<_$StreamStatusImpl>(this, _$identity);
+}
+abstract class _StreamStatus implements StreamStatus {
+  const factory _StreamStatus({
+    final String content,
+    final String reasoning,
+    final bool isStreaming,
+  }) = _$StreamStatusImpl;
+  @override
+  String get content;
+  @override
+  String get reasoning;
+  @override
+  bool get isStreaming;
+  /// Create a copy of StreamStatus
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$StreamStatusImplCopyWith<_$StreamStatusImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+/// @nodoc
+mixin _$ChatState {
+  String? get currentRoundId => throw _privateConstructorUsedError;
+  String? get branchLeafRoundId => throw _privateConstructorUsedError;
+  String? get error => throw _privateConstructorUsedError;
+  bool get isLoading => throw _privateConstructorUsedError;
+  /// Create a copy of ChatState
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $ChatStateCopyWith<ChatState> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+/// @nodoc
+abstract class $ChatStateCopyWith<$Res> {
+  factory $ChatStateCopyWith(ChatState value, $Res Function(ChatState) then) =
+      _$ChatStateCopyWithImpl<$Res, ChatState>;
+  @useResult
+  $Res call({
+    String? currentRoundId,
+    String? branchLeafRoundId,
+    String? error,
+    bool isLoading,
+  });
+}
+/// @nodoc
+class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
+    implements $ChatStateCopyWith<$Res> {
+  _$ChatStateCopyWithImpl(this._value, this._then);
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+  /// Create a copy of ChatState
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? currentRoundId = freezed,
+    Object? branchLeafRoundId = freezed,
+    Object? error = freezed,
+    Object? isLoading = null,
+  }) {
+    return _then(
+      _value.copyWith(
+            currentRoundId: freezed == currentRoundId
+                ? _value.currentRoundId
+                : currentRoundId // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            branchLeafRoundId: freezed == branchLeafRoundId
+                ? _value.branchLeafRoundId
+                : branchLeafRoundId // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            error: freezed == error
+                ? _value.error
+                : error // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            isLoading: null == isLoading
+                ? _value.isLoading
+                : isLoading // ignore: cast_nullable_to_non_nullable
+                      as bool,
+          )
+          as $Val,
+    );
+  }
+}
+/// @nodoc
+abstract class _$$ChatStateImplCopyWith<$Res>
+    implements $ChatStateCopyWith<$Res> {
+  factory _$$ChatStateImplCopyWith(
+    _$ChatStateImpl value,
+    $Res Function(_$ChatStateImpl) then,
+  ) = __$$ChatStateImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({
+    String? currentRoundId,
+    String? branchLeafRoundId,
+    String? error,
+    bool isLoading,
+  });
+}
+/// @nodoc
+class __$$ChatStateImplCopyWithImpl<$Res>
+    extends _$ChatStateCopyWithImpl<$Res, _$ChatStateImpl>
+    implements _$$ChatStateImplCopyWith<$Res> {
+  __$$ChatStateImplCopyWithImpl(
+    _$ChatStateImpl _value,
+    $Res Function(_$ChatStateImpl) _then,
+  ) : super(_value, _then);
+  /// Create a copy of ChatState
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? currentRoundId = freezed,
+    Object? branchLeafRoundId = freezed,
+    Object? error = freezed,
+    Object? isLoading = null,
+  }) {
+    return _then(
+      _$ChatStateImpl(
+        currentRoundId: freezed == currentRoundId
+            ? _value.currentRoundId
+            : currentRoundId // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        branchLeafRoundId: freezed == branchLeafRoundId
+            ? _value.branchLeafRoundId
+            : branchLeafRoundId // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        error: freezed == error
+            ? _value.error
+            : error // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        isLoading: null == isLoading
+            ? _value.isLoading
+            : isLoading // ignore: cast_nullable_to_non_nullable
+                  as bool,
+      ),
+    );
+  }
+}
+/// @nodoc
+class _$ChatStateImpl implements _ChatState {
+  const _$ChatStateImpl({
+    this.currentRoundId,
+    this.branchLeafRoundId,
+    this.error,
+    this.isLoading = false,
+  });
+  @override
+  final String? currentRoundId;
+  @override
+  final String? branchLeafRoundId;
+  @override
+  final String? error;
+  @override
+  @JsonKey()
+  final bool isLoading;
+  @override
+  String toString() {
+    return 'ChatState(currentRoundId: $currentRoundId, branchLeafRoundId: $branchLeafRoundId, error: $error, isLoading: $isLoading)';
+  }
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$ChatStateImpl &&
+            (identical(other.currentRoundId, currentRoundId) ||
+                other.currentRoundId == currentRoundId) &&
+            (identical(other.branchLeafRoundId, branchLeafRoundId) ||
+                other.branchLeafRoundId == branchLeafRoundId) &&
+            (identical(other.error, error) || other.error == error) &&
+            (identical(other.isLoading, isLoading) ||
+                other.isLoading == isLoading));
+  }
+  @override
+  int get hashCode => Object.hash(
+    runtimeType,
+    currentRoundId,
+    branchLeafRoundId,
+    error,
+    isLoading,
+  );
+  /// Create a copy of ChatState
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$ChatStateImplCopyWith<_$ChatStateImpl> get copyWith =>
+      __$$ChatStateImplCopyWithImpl<_$ChatStateImpl>(this, _$identity);
+}
+abstract class _ChatState implements ChatState {
+  const factory _ChatState({
+    final String? currentRoundId,
+    final String? branchLeafRoundId,
+    final String? error,
+    final bool isLoading,
+  }) = _$ChatStateImpl;
+  @override
+  String? get currentRoundId;
+  @override
+  String? get branchLeafRoundId;
+  @override
+  String? get error;
+  @override
+  bool get isLoading;
+  /// Create a copy of ChatState
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$ChatStateImplCopyWith<_$ChatStateImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+```
+
 ## File: lib/presentation/pages/settings_page.dart
 ```dart
 // presentation/pages/settings_page.dart
@@ -12353,7 +11665,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     _chatPathController.dispose();
     super.dispose();
   }
-  /// 同步表单值到配置流，自动触发，无需手动保存
   void _syncControllersWithConfig(AppConfig config) {
     _isSyncing = true;
     setState(() {
@@ -12371,7 +11682,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget build(BuildContext context) {
     final configAsync = ref.watch(configProvider);
     final profilesAsync = ref.watch(configProfilesProvider);
-    // 监听配置变化，自动同步到表单
     ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
       next.whenData((config) {
         _syncControllersWithConfig(config);
@@ -12400,7 +11710,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(child: Text('加载配置失败：$e')),
             data: (config) {
-              // 首次加载时同步 Controller
               if (_baseUrlController.text.isEmpty) {
                 _syncControllersWithConfig(config);
               }
@@ -12420,7 +11729,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // 配置存档
         AppSection(
           title: '配置存档',
           subtitle: '切换后自动同步到表单',
@@ -12435,7 +11743,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ? null
                   : (value) async {
                       if (value == null) return;
-                      await ref.read(configProfilesNotifierProvider).switchProfile(value);
+                      await ref
+                          .read(configProfilesControllerProvider)
+                          .switchProfile(value);
                     },
             ),
             const SizedBox(height: 12),
@@ -12450,22 +11760,27 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   onPressed: isBusy
                       ? null
                       : () => _showRenameProfileDialog(
-                          store.profiles.firstWhere((p) => p.id == store.activeProfileId)),
+                            store.profiles.firstWhere(
+                              (p) => p.id == store.activeProfileId,
+                            ),
+                          ),
                   child: const Text('重命名'),
                 ),
                 OutlinedButton(
                   onPressed: isBusy
                       ? null
                       : () => _deleteProfile(
-                          store.profiles.firstWhere((p) => p.id == store.activeProfileId),
-                          store.profiles.length),
+                            store.profiles.firstWhere(
+                              (p) => p.id == store.activeProfileId,
+                            ),
+                            store.profiles.length,
+                          ),
                   child: const Text('删除'),
                 ),
               ],
             ),
           ],
         ),
-        // 连接配置
         AppSection(
           title: '连接配置',
           subtitle: '修改后自动保存到当前配置',
@@ -12473,10 +11788,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             TextField(
               controller: _baseUrlController,
               enabled: !isBusy,
-              decoration: const InputDecoration(labelText: 'Base URL', hintText: 'https://api.openai.com'),
+              decoration: const InputDecoration(
+                labelText: 'Base URL',
+                hintText: 'https://api.openai.com',
+              ),
               onChanged: (v) {
                 if (_isSyncing) return;
-                ref.read(configNotifierProvider).updateBaseUrl(v);
+                ref.read(configControllerProvider).updateBaseUrl(v);
               },
             ),
             const SizedBox(height: 12),
@@ -12487,27 +11805,37 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               decoration: const InputDecoration(labelText: 'API Key'),
               onChanged: (v) {
                 if (_isSyncing) return;
-                ref.read(configNotifierProvider).updateApiKey(v);
+                ref.read(configControllerProvider).updateApiKey(v);
               },
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _modelsPathController,
               enabled: !isBusy,
-              decoration: const InputDecoration(labelText: 'Models Path', hintText: _defaultModelsPath),
+              decoration: const InputDecoration(
+                labelText: 'Models Path',
+                hintText: _defaultModelsPath,
+              ),
               onChanged: (v) {
                 if (_isSyncing) return;
-                ref.read(configNotifierProvider).updateModelsPath(v.isEmpty ? _defaultModelsPath : v);
+                ref
+                    .read(configControllerProvider)
+                    .updateModelsPath(v.isEmpty ? _defaultModelsPath : v);
               },
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _chatPathController,
               enabled: !isBusy,
-              decoration: InputDecoration(labelText: 'Chat Path', hintText: _defaultChatPathForApiMode(config.apiMode)),
+              decoration: InputDecoration(
+                labelText: 'Chat Path',
+                hintText: _defaultChatPathForApiMode(config.apiMode),
+              ),
               onChanged: (v) {
                 if (_isSyncing) return;
-                ref.read(configNotifierProvider).updateChatPath(v.isEmpty ? _defaultChatPathForApiMode(config.apiMode) : v);
+                ref.read(configControllerProvider).updateChatPath(
+                      v.isEmpty ? _defaultChatPathForApiMode(config.apiMode) : v,
+                    );
               },
             ),
             const SizedBox(height: 12),
@@ -12515,23 +11843,31 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               value: config.apiMode,
               decoration: const InputDecoration(labelText: 'API Mode'),
               items: const [
-                DropdownMenuItem(value: 'chat_completions', child: Text('chat_completions')),
-                DropdownMenuItem(value: 'responses', child: Text('responses')),
+                DropdownMenuItem(
+                  value: 'chat_completions',
+                  child: Text('chat_completions'),
+                ),
+                DropdownMenuItem(
+                  value: 'responses',
+                  child: Text('responses'),
+                ),
               ],
               onChanged: isBusy
                   ? null
                   : (value) {
                       if (value == null || _isSyncing) return;
-                      ref.read(configNotifierProvider).updateApiMode(value);
+                      ref.read(configControllerProvider).updateApiMode(value);
                       if (_chatPathController.text.isEmpty) {
-                        _chatPathController.text = _defaultChatPathForApiMode(value);
-                        ref.read(configNotifierProvider).updateChatPath(_chatPathController.text);
+                        _chatPathController.text =
+                            _defaultChatPathForApiMode(value);
+                        ref
+                            .read(configControllerProvider)
+                            .updateChatPath(_chatPathController.text);
                       }
                     },
             ),
           ],
         ),
-        // 模型配置
         AppSection(
           title: '模型配置',
           subtitle: '选择后自动保存到当前配置',
@@ -12553,7 +11889,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ],
     );
   }
-  Widget _buildModelSelector(BuildContext context, AppConfig config, bool isBusy) {
+  Widget _buildModelSelector(
+    BuildContext context,
+    AppConfig config,
+    bool isBusy,
+  ) {
     final models = config.availableModels ?? const [];
     final selectedId = config.selectedModel;
     return SearchAnchor(
@@ -12561,8 +11901,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         return GestureDetector(
           onTap: isBusy ? null : () => controller.openView(),
           child: InputDecorator(
-            decoration: const InputDecoration(labelText: '当前模型', suffixIcon: Icon(Icons.arrow_drop_down)),
-            child: Text(_getSelectedModelDisplayText(models, selectedId), overflow: TextOverflow.ellipsis),
+            decoration: const InputDecoration(
+              labelText: '当前模型',
+              suffixIcon: Icon(Icons.arrow_drop_down),
+            ),
+            child: Text(
+              _getSelectedModelDisplayText(models, selectedId),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         );
       },
@@ -12573,24 +11919,34 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           final name = (m.name ?? '').toLowerCase();
           return query.isEmpty || id.contains(query) || name.contains(query);
         }).toList();
-        if (filtered.isEmpty) return const [ListTile(title: Text('没有匹配的模型'))];
+        if (filtered.isEmpty) {
+          return const [
+            ListTile(title: Text('没有匹配的模型')),
+          ];
+        }
         return [
-          ...filtered.map((model) => ListTile(
-                title: Text((model.name ?? '').trim().isNotEmpty ? model.name! : model.id),
-                trailing: model.id == selectedId ? const Icon(Icons.check) : null,
-                onTap: () {
-                  if (_isSyncing) return;
-                  ref.read(configNotifierProvider).updateSelectedModel(model.id);
-                  controller.closeView(model.id);
-                },
-              )),
+          ...filtered.map(
+            (model) => ListTile(
+              title: Text(
+                (model.name ?? '').trim().isNotEmpty ? model.name! : model.id,
+              ),
+              trailing: model.id == selectedId ? const Icon(Icons.check) : null,
+              onTap: () {
+                if (_isSyncing) return;
+                ref
+                    .read(configControllerProvider)
+                    .updateSelectedModel(model.id);
+                controller.closeView(model.id);
+              },
+            ),
+          ),
           ListTile(
             title: const Text('自定义模型 ID'),
             onTap: () {
               final text = controller.text;
               controller.closeView(null);
               if (text.isNotEmpty && !_isSyncing) {
-                ref.read(configNotifierProvider).updateSelectedModel(text);
+                ref.read(configControllerProvider).updateSelectedModel(text);
               }
             },
           ),
@@ -12600,26 +11956,55 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
   Widget _buildModelChips(AppConfig config) {
     final selectedId = config.selectedModel;
-    if (selectedId == null || selectedId.trim().isEmpty) return const SizedBox.shrink();
-    final model = (config.availableModels ?? const []).where((m) => m.id == selectedId).firstOrNull;
-    if (model == null) return const SizedBox.shrink();
+    if (selectedId == null || selectedId.trim().isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final model = (config.availableModels ?? const [])
+        .where((m) => m.id == selectedId)
+        .firstOrNull;
+    if (model == null) {
+      return const SizedBox.shrink();
+    }
     final chips = <Widget>[];
     if (model.supportsVision == true) {
-      chips.add(const Chip(avatar: Icon(Icons.image_outlined, size: 16), label: Text('Vision'), visualDensity: VisualDensity.compact));
+      chips.add(
+        const Chip(
+          avatar: Icon(Icons.image_outlined, size: 16),
+          label: Text('Vision'),
+          visualDensity: VisualDensity.compact,
+        ),
+      );
     }
     if (model.supportsReasoning == true) {
-      chips.add(const Chip(avatar: Icon(Icons.psychology_alt_outlined, size: 16), label: Text('Reasoning'), visualDensity: VisualDensity.compact));
+      chips.add(
+        const Chip(
+          avatar: Icon(Icons.psychology_alt_outlined, size: 16),
+          label: Text('Reasoning'),
+          visualDensity: VisualDensity.compact,
+        ),
+      );
     }
-    if (chips.isEmpty) return const SizedBox.shrink();
+    if (chips.isEmpty) {
+      return const SizedBox.shrink();
+    }
     return Padding(
       padding: const EdgeInsets.only(top: 12),
-      child: Wrap(spacing: 8, runSpacing: 8, children: chips),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: chips,
+      ),
     );
   }
-  String _getSelectedModelDisplayText(List<ModelInfo> models, String? selectedId) {
+  String _getSelectedModelDisplayText(
+    List<ModelInfo> models,
+    String? selectedId,
+  ) {
     if (selectedId == null || selectedId.trim().isEmpty) return '请选择模型';
     for (final m in models) {
-      if (m.id == selectedId) return (m.name ?? '').trim().isNotEmpty ? m.name! : m.id;
+      if (m.id == selectedId) {
+        return (m.name ?? '').trim().isNotEmpty ? m.name! : m.id;
+      }
     }
     return selectedId;
   }
@@ -12628,7 +12013,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final config = configAsync.valueOrNull;
     if (config == null) return;
     try {
-      await ref.read(configNotifierProvider).saveAndRefreshModels(config);
+      await ref.read(configControllerProvider).saveAndRefreshModels(config);
       await AppToast.show('模型列表已同步');
     } catch (e) {
       await AppToast.show('同步模型失败：$e');
@@ -12642,10 +12027,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             title: const Text('恢复默认设置'),
             content: const Text('确定要将当前配置存档恢复为默认设置吗？'),
             actions: [
-              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('取消'),
+              ),
               FilledButton(
                 onPressed: () => Navigator.of(ctx).pop(true),
-                style: FilledButton.styleFrom(backgroundColor: colorScheme.error, foregroundColor: colorScheme.onError),
+                style: FilledButton.styleFrom(
+                  backgroundColor: colorScheme.error,
+                  foregroundColor: colorScheme.onError,
+                ),
                 child: const Text('恢复默认'),
               ),
             ],
@@ -12654,7 +12045,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         false;
     if (!confirmed) return;
     try {
-      await ref.read(configNotifierProvider).saveFullConfig(AppConfig.defaultConfig());
+      await ref
+          .read(configControllerProvider)
+          .saveFullConfig(AppConfig.defaultConfig());
     } catch (e) {
       await AppToast.show('恢复默认失败：$e');
     }
@@ -12665,15 +12058,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('新建配置存档'),
-        content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(hintText: '输入配置名称')),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: '输入配置名称'),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(controller.text.trim()), child: const Text('创建')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            child: const Text('创建'),
+          ),
         ],
       ),
     );
     if (result == null || result.isEmpty) return;
-    await ref.read(configProfilesNotifierProvider).createProfile(result);
+    await ref.read(configProfilesControllerProvider).createProfile(result);
   }
   Future<void> _showRenameProfileDialog(ConfigProfile profile) async {
     final controller = TextEditingController(text: profile.name);
@@ -12681,15 +12084,27 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('重命名配置存档'),
-        content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(hintText: '输入配置名称')),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: '输入配置名称'),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(controller.text.trim()), child: const Text('保存')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            child: const Text('保存'),
+          ),
         ],
       ),
     );
     if (result == null || result.isEmpty) return;
-    await ref.read(configProfilesNotifierProvider).renameProfile(profile.id, result);
+    await ref
+        .read(configProfilesControllerProvider)
+        .renameProfile(profile.id, result);
   }
   Future<void> _deleteProfile(ConfigProfile profile, int profileCount) async {
     if (profileCount <= 1) {
@@ -12702,70 +12117,371 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             title: const Text('删除配置存档'),
             content: Text('确定删除 "${profile.name}" 吗？'),
             actions: [
-              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
-              FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('删除')),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('删除'),
+              ),
             ],
           ),
         ) ??
         false;
     if (!confirmed) return;
-    await ref.read(configProfilesNotifierProvider).deleteProfile(profile.id);
+    await ref
+        .read(configProfilesControllerProvider)
+        .deleteProfile(profile.id);
   }
 }
 ```
 
-## File: lib/presentation/providers/home_session_list_provider.dart
+## File: lib/presentation/providers/session_list_notifier.dart
 ```dart
-// presentation/providers/home_session_list_provider.dart
+import 'package:aiservice/core/utils/id_generator.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/session.dart';
-import 'session_list_notifier.dart';
-class HomeSessionItem {
-  final Session session;
-  final bool hasUnseen;
-  final String userPreview;
-  final int roundCount;
-  final int updatedAt;
-  final String? previewRoundId;
-  const HomeSessionItem({
-    required this.session,
-    required this.hasUnseen,
-    required this.userPreview,
-    required this.roundCount,
-    required this.updatedAt,
-    required this.previewRoundId,
-  });
+import '../../di/providers.dart';
+import '../../domain/models/session_list_item.dart';
+import '../../domain/models/session_card_meta.dart';
+final sessionListProvider = StreamProvider<List<SessionListItem>>((ref) {
+  final repository = ref.watch(conversationRepositoryProvider);
+  return repository.watchSessionListItems();
+});
+final sessionCardMetaProvider =
+    StreamProvider.family<SessionCardMeta, String>((ref, sessionId) {
+  final repository = ref.watch(conversationRepositoryProvider);
+  return repository.watchSessionCardMeta(sessionId);
+});
+class SessionListController {
+  final Ref ref;
+  SessionListController(this.ref);
+  Future<void> deleteSession(String fileName) async {
+    final repository = ref.read(conversationRepositoryProvider);
+    await repository.deleteSession(fileName);
+  }
+  Future<void> updateSessionTitle(String fileName, String newTitle) async {
+    final repository = ref.read(conversationRepositoryProvider);
+    final cleanTitle = newTitle.trim();
+    if (cleanTitle.isEmpty) return;
+    await repository.updateSessionTitle(fileName, cleanTitle);
+  }
+  Future<String> createSession(String title) async {
+    final repository = ref.read(conversationRepositoryProvider);
+    final fileName = '${IdGenerator.generate()}.json';
+    await repository.createSession(fileName: fileName, title: '新对话');
+    return fileName;
+  }
 }
-// 简化：直接监听 sessionListProvider，无需额外处理
-final homeSessionListProvider = Provider<AsyncValue<List<HomeSessionItem>>>((ref) {
-  final sessionsAsync = ref.watch(sessionListProvider);
-  return sessionsAsync.whenData((sessions) {
-    final items = sessions.map((session) {
-      final hasUnseen = session.rounds.any((r) => r.hasUnseenUpdate);
-      final roundCount = session.rounds.length;
-      // 直接获取最后一个 round 作为预览
-      final previewRound = session.rounds.isEmpty 
-          ? null 
-          : session.rounds.last;
-      final previewRoundId = previewRound?.id;
+final sessionListControllerProvider = Provider<SessionListController>((ref) {
+  return SessionListController(ref);
+});
+```
+
+## File: lib/data/repositories/conversation_repository.dart
+```dart
+// data/repositories/conversation_repository.dart
+import 'dart:async';
+import 'dart:typed_data';
+import 'package:drift/drift.dart';
+import '../../core/interfaces/file_service.dart';
+import '../../core/models/attachment.dart';
+import '../../core/models/chat_round.dart';
+import '../../core/models/session.dart';
+import '../../domain/models/session_list_item.dart';
+import '../database/database.dart';
+import '../../domain/models/session_card_meta.dart';
+class ConversationRepository {
+  final AppDatabase _db;
+  final IFileService _fileService;
+  ConversationRepository(this._db, this._fileService);
+  String _getId(String fileName) => fileName.replaceAll('.json', '');
+  // ========== 响应式查询 ==========
+  Stream<List<SessionListItem>> watchSessionListItems() {
+    final query = (_db.select(_db.dbSessions)
+      ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]));
+    return query.watch().map((sessions) {
+      return sessions.map((session) {
+        return SessionListItem(
+          id: session.id,
+          title: session.title,
+          updatedAt: session.updatedAt,
+        );
+      }).toList();
+    });
+  }
+  Stream<SessionCardMeta> watchSessionCardMeta(String sessionId) {
+    final query = (_db.select(_db.dbChatRounds)
+      ..where((t) => t.sessionId.equals(sessionId))
+      ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]));
+    return query.watch().map((rounds) {
+      final previewRound = rounds.isEmpty ? null : rounds.last;
+      final hasUnseen = rounds.any((r) => r.hasUnseenUpdate);
       final userPreview = previewRound == null
           ? '点击开始新的对话'
           : previewRound.userContent.trim().isEmpty
               ? '（空输入）'
               : previewRound.userContent.trim();
-      return HomeSessionItem(
-        session: session,
-        hasUnseen: hasUnseen,
+      final aiPreview = previewRound == null
+          ? '（等待回复）'
+          : (previewRound.assistantContent?.trim().isNotEmpty ?? false)
+              ? previewRound.assistantContent!
+              : (previewRound.isIncomplete ? '正在生成...' : '（等待回复）');
+      return SessionCardMeta(
+        roundCount: rounds.length,
+        previewRoundId: previewRound?.id,
         userPreview: userPreview,
-        roundCount: roundCount,
-        updatedAt: session.updatedAt,
-        previewRoundId: previewRoundId,
+        aiPreview: aiPreview,
+        hasUnseen: hasUnseen,
+        isStreaming: previewRound?.isIncomplete == true,
       );
-    }).toList();
-    items.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-    return items;
-  });
-});
+    });
+  }
+  Stream<Session?> watchSession(String fileName) {
+    final sessionId = _getId(fileName);
+    final query = _db.select(_db.dbSessions).join([
+      leftOuterJoin(
+        _db.dbChatRounds,
+        _db.dbChatRounds.sessionId.equalsExp(_db.dbSessions.id),
+      ),
+      leftOuterJoin(
+        _db.dbAttachments,
+        _db.dbAttachments.roundId.equalsExp(_db.dbChatRounds.id),
+      ),
+    ])
+      ..where(_db.dbSessions.id.equals(sessionId))
+      ..orderBy([OrderingTerm.asc(_db.dbChatRounds.createdAt)]);
+    return query.watch().map(_mapSessionFromJoinedRows);
+  }
+  // ========== 私有辅助方法 ==========
+  Session? _mapSessionFromJoinedRows(List<TypedResult> rows) {
+    if (rows.isEmpty) return null;
+    final sessionRow = rows.first.readTable(_db.dbSessions);
+    final roundMap = <String, DbChatRound>{};
+    final attachmentMap = <String, List<Attachment>>{};
+    for (final row in rows) {
+      final roundRow = row.readTableOrNull(_db.dbChatRounds);
+      if (roundRow == null) continue;
+      roundMap.putIfAbsent(roundRow.id, () => roundRow);
+      final attachmentRow = row.readTableOrNull(_db.dbAttachments);
+      if (attachmentRow != null) {
+        attachmentMap.putIfAbsent(roundRow.id, () => []).add(
+          Attachment(
+            id: attachmentRow.id,
+            name: attachmentRow.name,
+            relativePath: attachmentRow.relativePath,
+            isImage: attachmentRow.isImage,
+            mimeType: attachmentRow.mimeType,
+          ),
+        );
+      }
+    }
+    final sortedRoundRows = roundMap.values.toList()
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    final rounds = sortedRoundRows
+        .map((roundRow) => _mapToChatRound(
+              roundRow,
+              attachmentMap[roundRow.id] ?? const <Attachment>[],
+            ))
+        .toList();
+    return Session(
+      id: sessionRow.id,
+      title: sessionRow.title,
+      createdAt: sessionRow.createdAt,
+      updatedAt: sessionRow.updatedAt,
+      config: sessionRow.config,
+      hasUnseenUpdate: sessionRow.hasUnseenUpdate,
+      rounds: rounds,
+    );
+  }
+  ChatRound _mapToChatRound(DbChatRound row, List<Attachment> attachments) {
+    return ChatRound(
+      id: row.id,
+      parentId: row.parentId,
+      createdAt: row.createdAt,
+      userContent: row.userContent,
+      userAttachments: attachments,
+      assistantThinking: row.assistantThinking,
+      assistantContent: row.assistantContent,
+      isIncomplete: row.isIncomplete,
+      hasUnseenUpdate: row.hasUnseenUpdate,
+    );
+  }
+  // ========== 附件清理逻辑 (简化版) ==========
+  /// 检查数据库中是否仍存在该附件的引用
+  Future<bool> _hasAttachmentReference(String relativePath) async {
+    final row = await (_db.select(_db.dbAttachments)
+          ..where((t) => t.relativePath.equals(relativePath))
+          ..limit(1))
+        .getSingleOrNull();
+    return row != null;
+  }
+  /// 统一清理孤儿附件：检查引用，无引用则删除物理文件
+  Future<void> _cleanupOrphanAttachments(Iterable<String> relativePaths) async {
+    for (final path in relativePaths.toSet()) {
+      if (!await _hasAttachmentReference(path)) {
+        try {
+          await _fileService.deleteAttachment(path);
+        } catch (_) {
+          // 忽略删除失败，避免阻塞流程
+        }
+      }
+    }
+  }
+  // ========== 写操作 ==========
+  Future<void> deleteRoundsAndCleanupOrphanAttachments(
+    String fileName,
+    List<String> roundIds,
+  ) async {
+    if (roundIds.isEmpty) return;
+    final sessionId = _getId(fileName);
+    // 1. 收集候选附件路径
+    final candidatePaths = (await (_db.select(_db.dbAttachments).join([
+      innerJoin(
+        _db.dbChatRounds,
+        _db.dbChatRounds.id.equalsExp(_db.dbAttachments.roundId),
+      ),
+    ])
+          ..where(_db.dbChatRounds.sessionId.equals(sessionId))
+          ..where(_db.dbChatRounds.id.isIn(roundIds)))
+        .get())
+        .map((row) => row.readTable(_db.dbAttachments).relativePath)
+        .toSet();
+    // 2. 提交数据库变更 (级联删除会自动清理 dbAttachments)
+    await _db.transaction(() async {
+      await (_db.delete(_db.dbChatRounds)
+            ..where((t) => t.sessionId.equals(sessionId) & t.id.isIn(roundIds)))
+          .go();
+      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
+          .write(
+        DbSessionsCompanion(
+          updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+        ),
+      );
+    });
+    // 3. 基于最终态清理物理文件
+    await _cleanupOrphanAttachments(candidatePaths);
+  }
+  Future<void> deleteSession(String fileName) async {
+    final sessionId = _getId(fileName);
+    // 1. 收集候选附件路径
+    final candidatePaths = (await (_db.select(_db.dbAttachments).join([
+      innerJoin(
+        _db.dbChatRounds,
+        _db.dbChatRounds.id.equalsExp(_db.dbAttachments.roundId),
+      ),
+    ])
+          ..where(_db.dbChatRounds.sessionId.equals(sessionId)))
+        .get())
+        .map((row) => row.readTable(_db.dbAttachments).relativePath)
+        .toSet();
+    // 2. 提交数据库变更
+    await (_db.delete(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
+        .go();
+    // 3. 基于最终态清理物理文件
+    await _cleanupOrphanAttachments(candidatePaths);
+  }
+  Future<Session> createSession({
+    required String fileName,
+    required String title,
+  }) async {
+    final sessionId = _getId(fileName);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final session = Session(
+      id: sessionId,
+      title: title,
+      createdAt: now,
+      updatedAt: now,
+      rounds: [],
+    );
+    await _db.into(_db.dbSessions).insert(
+          DbSessionsCompanion.insert(
+            id: session.id,
+            title: session.title,
+            createdAt: session.createdAt,
+            updatedAt: session.updatedAt,
+          ),
+        );
+    return session;
+  }
+  Future<void> updateSessionTitle(String fileName, String title) async {
+    final sessionId = _getId(fileName);
+    await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
+        .write(
+      DbSessionsCompanion(
+        title: Value(title),
+        updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
+  }
+  Future<void> appendRound(String fileName, ChatRound round) async {
+    final sessionId = _getId(fileName);
+    await _db.transaction(() async {
+      await _db.into(_db.dbChatRounds).insert(
+            DbChatRoundsCompanion.insert(
+              id: round.id,
+              sessionId: sessionId,
+              parentId: Value(round.parentId),
+              createdAt: round.createdAt,
+              userContent: round.userContent,
+              assistantThinking: Value(round.assistantThinking),
+              assistantContent: Value(round.assistantContent),
+              isIncomplete: Value(round.isIncomplete),
+              hasUnseenUpdate: Value(round.hasUnseenUpdate),
+            ),
+          );
+      for (final attach in round.userAttachments) {
+        await _db.into(_db.dbAttachments).insert(
+              DbAttachmentsCompanion.insert(
+                id: attach.id,
+                roundId: round.id,
+                name: attach.name,
+                relativePath: attach.relativePath,
+                isImage: Value(attach.isImage),
+                mimeType: Value(attach.mimeType),
+              ),
+            );
+      }
+      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
+          .write(
+        DbSessionsCompanion(
+          updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+        ),
+      );
+    });
+  }
+  Future<void> updateRound(
+    String fileName,
+    String roundId,
+    ChatRound updatedRound,
+  ) async {
+    final sessionId = _getId(fileName);
+    await _db.transaction(() async {
+      await (_db.update(_db.dbChatRounds)..where((t) => t.id.equals(roundId)))
+          .write(
+        DbChatRoundsCompanion(
+          assistantThinking: Value(updatedRound.assistantThinking),
+          assistantContent: Value(updatedRound.assistantContent),
+          isIncomplete: Value(updatedRound.isIncomplete),
+          hasUnseenUpdate: Value(updatedRound.hasUnseenUpdate),
+        ),
+      );
+      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
+          .write(
+        DbSessionsCompanion(
+          updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+        ),
+      );
+    });
+  }
+  // ========== 附件读写接口保留 ==========
+  Future<String> saveAttachment(Uint8List data, String fileName) async =>
+      await _fileService.saveAttachment(data, fileName);
+  Future<Uint8List> getAttachment(String relativePath) async =>
+      await _fileService.readAttachment(relativePath);
+  Future<void> deleteAttachment(String relativePath) async =>
+      await _fileService.deleteAttachment(relativePath);
+}
 ```
 
 ## File: lib/presentation/pages/home_page.dart
@@ -12773,10 +12489,8 @@ final homeSessionListProvider = Provider<AsyncValue<List<HomeSessionItem>>>((ref
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
-import '../../core/models/session.dart';
 import '../../core/utils/time_format_utils.dart';
-import '../providers/global_streaming_provider.dart';
-import '../providers/home_session_list_provider.dart';
+import '../../domain/models/session_list_item.dart';
 import '../providers/session_list_notifier.dart';
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/input_bar.dart';
@@ -12786,16 +12500,16 @@ class HomePage extends ConsumerWidget {
   const HomePage({super.key});
   Future<void> _showRenameDialog(
     BuildContext context,
-    SessionListNotifier notifier,
-    Session session,
+    SessionListController controller,
+    SessionListItem item,
   ) async {
-    final controller = TextEditingController(text: session.title);
+    final controllerText = TextEditingController(text: item.title);
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('重命名会话'),
         content: TextField(
-          controller: controller,
+          controller: controllerText,
           autofocus: true,
           decoration: const InputDecoration(
             hintText: '输入新的会话名称',
@@ -12808,30 +12522,27 @@ class HomePage extends ConsumerWidget {
             child: const Text('取消'),
           ),
           FilledButton(
-            onPressed: () =>
-                Navigator.of(ctx).pop(controller.text.trim()),
+            onPressed: () => Navigator.of(ctx).pop(controllerText.text.trim()),
             child: const Text('保存'),
           ),
         ],
       ),
     );
-    if (result != null &&
-        result.isNotEmpty &&
-        result != session.title) {
-      await notifier.updateSessionTitle('${session.id}.json', result);
+    if (result != null && result.isNotEmpty && result != item.title) {
+      await controller.updateSessionTitle('${item.id}.json', result);
     }
   }
   Future<void> _showDeleteConfirmDialog(
     BuildContext context,
-    SessionListNotifier notifier,
-    Session session,
+    SessionListController controller,
+    SessionListItem item,
   ) async {
     final colorScheme = Theme.of(context).colorScheme;
     final confirmed = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('删除会话'),
-            content: Text('确定要删除 “${session.title}” 吗？\n此操作无法撤销。'),
+            content: Text('确定要删除 “${item.title}” 吗？\n此操作无法撤销。'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(false),
@@ -12850,15 +12561,13 @@ class HomePage extends ConsumerWidget {
         ) ??
         false;
     if (confirmed == true) {
-      await notifier.deleteSession('${session.id}.json');
+      await controller.deleteSession('${item.id}.json');
     }
   }
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 关键修复：必须监听 homeSessionListProvider
-    final sessionsAsync = ref.watch(homeSessionListProvider);
-    // 操作类 notifier：仍用 sessionListProvider.notifier
-    final notifier = ref.read(sessionListNotifierProvider);
+    final sessionsAsync = ref.watch(sessionListProvider);
+    final controller = ref.read(sessionListControllerProvider);
     return AppPageScaffold(
       appBar: AppBar(
         title: const Text('AI Chat'),
@@ -12887,7 +12596,7 @@ class HomePage extends ConsumerWidget {
               error: (e, st) => _HomeErrorState(
                 message: '加载会话失败：$e',
                 onRetry: () async {
-                  await notifier.refresh();
+                  ref.invalidate(sessionListProvider);
                 },
               ),
               data: (items) {
@@ -12902,11 +12611,11 @@ class HomePage extends ConsumerWidget {
                     final item = items[index];
                     return _SessionCard(
                       item: item,
-                      notifier: notifier,
-                      onRename: (session) =>
-                          _showRenameDialog(context, notifier, session),
-                      onDelete: (session) =>
-                          _showDeleteConfirmDialog(context, notifier, session),
+                      controller: controller,
+                      onRename: (item) =>
+                          _showRenameDialog(context, controller, item),
+                      onDelete: (item) =>
+                          _showDeleteConfirmDialog(context, controller, item),
                     );
                   },
                 );
@@ -12916,7 +12625,7 @@ class HomePage extends ConsumerWidget {
           InputBar(
             hintText: '发送消息',
             onSend: (content, attachments) async {
-              final newFileName = await notifier.createSession('新对话');
+              final newFileName = await controller.createSession('新对话');
               if (context.mounted) {
                 await Navigator.push(
                   context,
@@ -12928,9 +12637,6 @@ class HomePage extends ConsumerWidget {
                     ),
                   ),
                 );
-                if (context.mounted) {
-                  await notifier.refresh();
-                }
               }
             },
           ),
@@ -13019,53 +12725,17 @@ class _HomeErrorState extends StatelessWidget {
     );
   }
 }
-class _SessionCard extends ConsumerStatefulWidget {
-  final HomeSessionItem item;
-  final SessionListNotifier notifier;
-  final Future<void> Function(Session session) onRename;
-  final Future<void> Function(Session session) onDelete;
+class _SessionCard extends ConsumerWidget {
+  final SessionListItem item;
+  final SessionListController controller;
+  final Future<void> Function(SessionListItem item) onRename;
+  final Future<void> Function(SessionListItem item) onDelete;
   const _SessionCard({
     required this.item,
-    required this.notifier,
+    required this.controller,
     required this.onRename,
     required this.onDelete,
   });
-  @override
-  ConsumerState<_SessionCard> createState() => _SessionCardState();
-}
-class _SessionCardState extends ConsumerState<_SessionCard> {
-  bool _requested = false;
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _ensurePreviewLoaded();
-  }
-  @override
-  void didUpdateWidget(covariant _SessionCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    final oldItem = oldWidget.item;
-    final newItem = widget.item;
-    if (oldItem.previewRoundId != newItem.previewRoundId ||
-        oldItem.session.id != newItem.session.id) {
-      _requested = false;
-      _ensurePreviewLoaded();
-    }
-  }
-  void _ensurePreviewLoaded() {
-    final previewRoundId = widget.item.previewRoundId;
-    if (_requested || previewRoundId == null) return;
-    _requested = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final fileName = '${widget.item.session.id}.json';
-      final previewRound =
-          widget.item.session.rounds.firstWhere((r) => r.id == previewRoundId);
-      ref.read(globalStreamCacheProvider.notifier).ensureRoundLoaded(
-            fileName,
-            previewRound,
-          );
-    });
-  }
   Widget _buildMetaChip(String label, {IconData? icon}) {
     return Chip(
       avatar: icon == null ? null : Icon(icon, size: 16),
@@ -13074,117 +12744,182 @@ class _SessionCardState extends ConsumerState<_SessionCard> {
     );
   }
   @override
-  Widget build(BuildContext context) {
-    final session = widget.item.session;
-    final fileName = '${session.id}.json';
-    final updatedAt = TimeFormatUtils.formatTimestamp(widget.item.updatedAt);
-    final previewRoundId = widget.item.previewRoundId;
-    final stream = previewRoundId == null
-        ? null
-        : ref.watch(
-            roundStreamProvider((fileName: fileName, roundId: previewRoundId)),
-          );
-    final aiPreview = stream == null
-        ? '加载中...'
-        : stream.content.trim().isEmpty
-            ? (stream.isStreaming ? '正在生成...' : '（等待回复）')
-            : stream.content;
-    final isStreaming = stream?.isStreaming == true;
-    return Slidable(
-      key: ValueKey(fileName),
-      endActionPane: ActionPane(
-        motion: const DrawerMotion(),
-        extentRatio: 0.34,
-        children: [
-          CustomSlidableAction(
-            onPressed: (_) => widget.onRename(session),
-            backgroundColor: Theme.of(context).colorScheme.secondary,
-            child: const Icon(
-              Icons.edit_outlined,
-              color: Colors.white,
-            ),
-          ),
-          CustomSlidableAction(
-            onPressed: (_) => widget.onDelete(session),
-            backgroundColor: Theme.of(context).colorScheme.error,
-            child: Icon(
-              Icons.delete_outline,
-              color: Theme.of(context).colorScheme.onError,
-            ),
-          ),
-        ],
-      ),
-      child: Card(
-        child: ListTile(
-          onTap: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ChatPage(
-                  fileName: fileName,
-                  initialRoundId: widget.item.previewRoundId,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final fileName = '${item.id}.json';
+    final updatedAt = TimeFormatUtils.formatTimestamp(item.updatedAt);
+    final metaAsync = ref.watch(sessionCardMetaProvider(item.id));
+    return metaAsync.when(
+      loading: () {
+        return Card(
+          child: ListTile(
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ChatPage(fileName: fileName),
                 ),
+              );
+            },
+            leading: const Icon(Icons.forum_outlined),
+            title: Text(
+              item.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('加载中...'),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildMetaChip(updatedAt, icon: Icons.schedule_outlined),
+                    ],
+                  ),
+                ],
               ),
-            );
-            if (context.mounted) {
-              await widget.notifier.refresh();
-            }
-          },
-          leading: const Icon(Icons.forum_outlined),
-          title: Row(
+            ),
+            trailing: const Icon(Icons.chevron_right_rounded),
+          ),
+        );
+      },
+      error: (e, st) {
+        return Card(
+          child: ListTile(
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ChatPage(fileName: fileName),
+                ),
+              );
+            },
+            leading: const Icon(Icons.forum_outlined),
+            title: Text(
+              item.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('加载摘要失败'),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildMetaChip(updatedAt, icon: Icons.schedule_outlined),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            trailing: const Icon(Icons.chevron_right_rounded),
+          ),
+        );
+      },
+      data: (meta) {
+        return Slidable(
+          key: ValueKey(fileName),
+          endActionPane: ActionPane(
+            motion: const DrawerMotion(),
+            extentRatio: 0.34,
             children: [
-              Expanded(
-                child: Text(
-                  session.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+              CustomSlidableAction(
+                onPressed: (_) => onRename(item),
+                backgroundColor: Theme.of(context).colorScheme.secondary,
+                child: const Icon(
+                  Icons.edit_outlined,
+                  color: Colors.white,
                 ),
               ),
-              if (isStreaming) ...[
-                const SizedBox(width: 8),
-                _buildMetaChip('生成中', icon: Icons.bolt_outlined),
-              ],
-              if (widget.item.hasUnseen == true) ...[
-                const SizedBox(width: 8),
-                _buildMetaChip('未查看', icon: Icons.mark_chat_unread_outlined),
-              ],
+              CustomSlidableAction(
+                onPressed: (_) => onDelete(item),
+                backgroundColor: Theme.of(context).colorScheme.error,
+                child: Icon(
+                  Icons.delete_outline,
+                  color: Theme.of(context).colorScheme.onError,
+                ),
+              ),
             ],
           ),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _PreviewLine(
-                  label: 'YOU',
-                  text: widget.item.userPreview,
-                ),
-                const SizedBox(height: 4),
-                _PreviewLine(
-                  label: 'AI',
-                  text: aiPreview,
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _buildMetaChip(
-                      '${widget.item.roundCount} 轮',
-                      icon: Icons.chat_bubble_outline,
+          child: Card(
+            child: ListTile(
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ChatPage(
+                      fileName: fileName,
+                      initialRoundId: meta.previewRoundId,
                     ),
-                    _buildMetaChip(
-                      updatedAt,
-                      icon: Icons.schedule_outlined,
+                  ),
+                );
+              },
+              leading: const Icon(Icons.forum_outlined),
+              title: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (meta.isStreaming) ...[
+                    const SizedBox(width: 8),
+                    _buildMetaChip('生成中', icon: Icons.bolt_outlined),
+                  ],
+                  if (meta.hasUnseen) ...[
+                    const SizedBox(width: 8),
+                    _buildMetaChip('未查看', icon: Icons.mark_chat_unread_outlined),
+                  ],
+                ],
+              ),
+              subtitle: Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _PreviewLine(
+                      label: 'YOU',
+                      text: meta.userPreview,
+                    ),
+                    const SizedBox(height: 4),
+                    _PreviewLine(
+                      label: 'AI',
+                      text: meta.aiPreview,
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _buildMetaChip(
+                          '${meta.roundCount} 轮',
+                          icon: Icons.chat_bubble_outline,
+                        ),
+                        _buildMetaChip(
+                          updatedAt,
+                          icon: Icons.schedule_outlined,
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
             ),
           ),
-          trailing: const Icon(Icons.chevron_right_rounded),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -13221,651 +12956,6 @@ class _PreviewLine extends StatelessWidget {
 }
 ```
 
-## File: lib/presentation/pages/chat_page.dart
-```dart
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/chat_round.dart';
-import '../../core/utils/app_route_observer.dart';
-import '../../core/utils/time_format_utils.dart';
-import '../../domain/states/chat_state.dart';
-import '../models/pending_attachment.dart';
-import '../providers/chat_notifier.dart';
-import '../providers/global_streaming_provider.dart';
-import '../providers/input_draft_provider.dart';
-import '../widgets/attachment_list.dart';
-import '../widgets/input_bar.dart';
-import '../widgets/message_bubble.dart';
-import '../widgets/thought_bubble.dart';
-import '../widgets/common/app_card.dart';
-import '../widgets/common/app_page_scaffold.dart';
-import '../widgets/common/app_toast.dart';
-import 'branch_tree_page.dart';
-import '../utils/page_utils.dart';
-class ChatPage extends ConsumerStatefulWidget {
-  final String fileName;
-  final String? initialRoundId;
-  final String? initialMessage;
-  final List<PendingAttachment>? initialAttachments;
-  const ChatPage({
-    super.key,
-    required this.fileName,
-    this.initialRoundId,
-    this.initialMessage,
-    this.initialAttachments,
-  });
-  @override
-  ConsumerState<ChatPage> createState() => _ChatPageState();
-}
-class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
-  PageController? _pageController;
-  late final ProviderSubscription<ChatState> _chatSubscription;
-  bool _initialMessageHandled = false;
-  bool _isMarkingSeen = false;
-  bool _isRouteVisible = false;
-  ModalRoute<dynamic>? _route;
-  @override
-  void initState() {
-    super.initState();
-    _chatSubscription = ref.listenManual<ChatState>(
-      chatProvider(widget.fileName),
-      (previous, next) {
-        // 原有分页逻辑保持不变
-        final nextPageList = next.pageList;
-        if (nextPageList != null && nextPageList.pages.isNotEmpty) {
-          if (_pageController == null) {
-            final initialIndex = nextPageList.currentPageIndex;
-            _pageController = PageController(initialPage: initialIndex);
-            if (mounted) {
-              setState(() {});
-            }
-            return;
-          }
-          final controller = _pageController!;
-          if (controller.hasClients) {
-            final prevIndex = previous?.pageList?.currentPageIndex;
-            final nextIndex = nextPageList.currentPageIndex;
-            if (prevIndex != nextIndex) {
-              final currentPage = controller.page?.round() ?? controller.initialPage;
-              if (currentPage != nextIndex) {
-                controller.jumpToPage(nextIndex);
-              }
-            }
-          }
-        }
-        // ========== 新增：会话加载完成后处理初始消息 ==========
-        if (next.session != null && !_initialMessageHandled && mounted) {
-          final message = widget.initialMessage?.trim() ?? '';
-          final attachments = widget.initialAttachments ?? const <PendingAttachment>[];
-          final hasContent = message.isNotEmpty || attachments.isNotEmpty;
-          if (hasContent) {
-            _initialMessageHandled = true;
-            // 异步发送不阻塞UI，添加错误捕获
-            ref.read(chatProvider(widget.fileName).notifier)
-                .sendMessage(message, attachments: attachments)
-                .catchError((e) {
-                  if (mounted) AppToast.show('发送失败：${e.toString()}');
-                });
-          }
-        }
-      },
-    );
-    // 原有微任务逻辑删除初始消息处理部分
-    Future.microtask(() async {
-      final notifier = ref.read(chatProvider(widget.fileName).notifier);
-      await notifier.loadSession(initialRoundId: widget.initialRoundId);
-      final state = ref.read(chatProvider(widget.fileName));
-      final currentRoundId = state.currentRoundId;
-      if (currentRoundId != null) {
-        await notifier.ensureRoundLoaded(currentRoundId);
-      }
-    });
-  }
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final route = ModalRoute.of(context);
-    if (route != null && route != _route) {
-      if (_route != null) {
-        appRouteObserver.unsubscribe(this);
-      }
-      _route = route;
-      appRouteObserver.subscribe(this, route as PageRoute);
-    }
-  }
-  @override
-  void dispose() {
-    _chatSubscription.close();
-    appRouteObserver.unsubscribe(this);
-    _pageController?.dispose();
-    super.dispose();
-  }
-  @override
-  void didPush() {
-    _isRouteVisible = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
-      await _syncSeenWithVisiblePage();
-    });
-  }
-  @override
-  void didPopNext() {
-    _isRouteVisible = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
-      await _syncSeenWithVisiblePage();
-    });
-  }
-  @override
-  void didPushNext() {
-    _isRouteVisible = false;
-  }
-  @override
-  void didPop() {
-    _isRouteVisible = false;
-    if (_isInEditMode()) {
-      _cancelEditMode();
-    }
-  }
-  Future<void> _copyText(String text) async {
-    await Clipboard.setData(ClipboardData(text: text));
-    await AppToast.show('已复制到剪贴板');
-  }
-  void _enterEditMode(String roundId, String text) {
-    ref.read(globalInputDraftProvider.notifier).state = text;
-    ref.read(globalEditSourceRoundIdProvider.notifier).state = roundId;
-    FocusScope.of(context).unfocus();
-  }
-  void _cancelEditMode() {
-    ref.read(globalEditSourceRoundIdProvider.notifier).state = null;
-    ref.read(globalInputDraftProvider.notifier).state = '';
-    ref.read(globalAttachmentDraftProvider.notifier).state = [];
-  }
-  bool _isInEditMode() {
-    return ref.read(globalEditSourceRoundIdProvider) != null;
-  }
-  Future<void> _syncSeenWithVisiblePage() async {
-    if (!_isRouteVisible) return;
-    if (_isMarkingSeen) return;
-    final controller = _pageController;
-    if (controller == null || !controller.hasClients) return;
-    final state = ref.read(chatProvider(widget.fileName));
-    final pageList = state.pageList;
-    if (pageList == null || pageList.pages.isEmpty) return;
-    final currentPage = controller.page;
-    final index = currentPage != null 
-        ? currentPage.round().clamp(0, pageList.pages.length - 1)
-        : pageList.currentPageIndex;
-    final round = pageList.pages[index].round;
-    if (!round.hasUnseenUpdate) return;
-    _isMarkingSeen = true;
-    try {
-      await ref
-          .read(chatProvider(widget.fileName).notifier)
-          .markRoundSeen(round.id);
-    } finally {
-      _isMarkingSeen = false;
-    }
-  }
-  @override
-  Widget build(BuildContext context) {
-    final state = ref.watch(chatProvider(widget.fileName));
-    final notifier = ref.read(chatProvider(widget.fileName).notifier);
-    final editSourceRoundId = ref.watch(globalEditSourceRoundIdProvider);
-    final isEditMode = editSourceRoundId != null;
-    final hasPages = state.pageList != null && state.pageList!.pages.isNotEmpty;
-    final textTheme = Theme.of(context).textTheme;
-    final currentRoundId = state.currentRoundId;
-    final currentStream = currentRoundId == null
-        ? null
-        : ref.watch(
-            roundStreamProvider(
-              (fileName: widget.fileName, roundId: currentRoundId),
-            ),
-          );
-    final currentIsStreaming = currentStream?.isStreaming == true;
-    return AppPageScaffold(
-      appBar: AppBar(
-        title: Text(
-          state.session?.title ?? '对话',
-          style: textTheme.titleMedium,
-        ),
-        actions: [
-          if (state.session != null)
-            IconButton(
-              tooltip: isEditMode ? '编辑模式下不可切换页面' : '查看分支树',
-              icon: const Icon(Icons.account_tree_outlined),
-              onPressed: isEditMode
-                  ? null
-                  : () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => BranchTreePage(
-                            fileName: widget.fileName,
-                            initialFocusRoundId: state.currentRoundId!,
-                          ),
-                        ),
-                      );
-                    },
-            ),
-        ],
-      ),
-      body: Column(
-        children: [
-          if (state.pageList != null && state.pageList!.totalPages > 0)
-            _PaginationBar(
-              currentIndex: state.pageList!.currentPageIndex,  // ✅ 直接传递 0-based
-              totalPages: state.pageList!.totalPages,
-              onPrev: isEditMode
-                  ? null
-                  : state.pageList!.currentPageIndex > 0
-                      ? () => _pageController?.previousPage(
-                            duration: const Duration(milliseconds: 260),
-                            curve: Curves.easeOutCubic,
-                          )
-                      : null,
-              onNext: isEditMode
-                  ? null
-                  : state.pageList!.currentPageIndex < state.pageList!.totalPages - 1
-                      ? () => _pageController?.nextPage(
-                            duration: const Duration(milliseconds: 260),
-                            curve: Curves.easeOutCubic,
-                          )
-                      : null,
-              isEditMode: isEditMode,
-            ),
-          if (isEditMode)
-            _EditModeBanner(
-              onCancel: _cancelEditMode,
-            ),
-          Expanded(
-            child: state.isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : state.session == null
-                    ? _buildErrorState(state.error ?? '会话不存在')
-                    : !hasPages
-                        ? _buildWelcomeEmpty(context)
-                        : _pageController == null
-                            ? const Center(child: CircularProgressIndicator())
-                            : PageView.builder(
-                                controller: _pageController,
-                                physics: isEditMode
-                                    ? const NeverScrollableScrollPhysics()
-                                    : const PageScrollPhysics(),
-                                itemCount: state.pageList?.pages.length ?? 0,
-                                onPageChanged: (index) async {
-                                  // ✅ index 已经是 0-based，无需转换
-                                  if (state.pageList == null) return;
-                                  if (index != state.pageList!.currentPageIndex) {
-                                    notifier.changePage(index);  // ✅ 直接传递 0-based
-                                  }
-                                  final round = state.pageList!.pages[index].round;
-                                  await notifier.ensureRoundLoaded(round.id);
-                                  await _syncSeenWithVisiblePage();
-                                },
-                                itemBuilder: (context, index) {
-                                  final round = state.pageList!.pages[index].round;
-                                  final stream = ref.watch(
-                                    roundStreamProvider(
-                                      (fileName: widget.fileName, roundId: round.id),
-                                    ),
-                                  );
-                                  final canEdit = stream?.isStreaming != true;                              
-                                  return _ChatRoundPage(
-                                    key: ValueKey(round.id),
-                                    fileName: widget.fileName,
-                                    round: round,
-                                    canEdit: canEdit,
-                                    onRetryReply: () => notifier.retryFromRound(round.id),
-                                    onEdit: canEdit 
-                                        ? () => _enterEditMode(round.id, round.userContent) 
-                                        : null,
-                                    onCopyText: _copyText,
-                                  );
-                                },
-                              ),
-          ),
-          InputBar(
-            hintText: isEditMode ? '修改文本后发送' : '发送消息',
-            isStreaming: currentIsStreaming,
-            onStop: notifier.stopGeneration,
-            onSend: (text, attachments) async {
-              if (editSourceRoundId != null) {
-                await notifier.editAndResendFromRound(
-                  editSourceRoundId,
-                  text,
-                  attachments: attachments,
-                );
-                _cancelEditMode();
-                return;
-              }
-              await notifier.sendMessage(text, attachments: attachments);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-  Widget _buildErrorState(String message) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: AppCard(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.error_outline,
-                size: 40,
-                color: colorScheme.error,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '无法加载会话',
-                style: textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: textTheme.bodySmall,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-  Widget _buildWelcomeEmpty(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: AppCard(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.auto_awesome_outlined,
-                size: 36,
-                color: colorScheme.primary,
-              ),
-              const SizedBox(height: 18),
-              Text(
-                '开始一段新的对话',
-                style: textTheme.titleLarge,
-              ),
-              const SizedBox(height: 10),
-              Text(
-                '你可以输入问题、上传图片或文件，并在不同分支中回看每一轮回复。',
-                textAlign: TextAlign.center,
-                style: textTheme.bodyMedium,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-class _ChatRoundPage extends StatelessWidget {
-  final String fileName;
-  final ChatRound round;
-  final bool canEdit;
-  final VoidCallback onRetryReply;
-  final VoidCallback? onEdit;
-  final Future<void> Function(String text) onCopyText;
-  const _ChatRoundPage({
-    super.key,
-    required this.fileName,
-    required this.round,
-    required this.canEdit,
-    required this.onRetryReply,
-    required this.onEdit,
-    required this.onCopyText,
-  });
-  @override
-  Widget build(BuildContext context) {
-    final hasUser = round.userContent.trim().isNotEmpty;
-    final hasAttachments = round.userAttachments.isNotEmpty;
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      children: [
-        AppCard(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _RoundHeader(createdAt: round.createdAt),
-              const SizedBox(height: 16),
-              const _SectionLabel(
-                icon: Icons.person_outline,
-                text: '你的输入',
-              ),
-              const SizedBox(height: 10),
-              if (hasUser)
-                MessageBubble(
-                  content: round.userContent,
-                  isUser: true,
-                  onCopy: () => onCopyText(round.userContent),
-                  onRetryReply: onRetryReply,
-                  onEdit: onEdit,
-                ),
-              if (hasAttachments) ...[
-                if (hasUser) const SizedBox(height: 8),
-                AttachmentList(
-                  attachments: round.userAttachments,
-                  rightAligned: true,
-                ),
-              ],
-              _RoundAnswerSection(
-                fileName: fileName,
-                roundId: round.id,
-                onRetryReply: onRetryReply,
-                onCopyText: onCopyText,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-class _RoundAnswerSection extends ConsumerWidget {
-  final String fileName;
-  final String roundId;
-  final VoidCallback onRetryReply;
-  final Future<void> Function(String text) onCopyText;
-  const _RoundAnswerSection({
-    required this.fileName,
-    required this.roundId,
-    required this.onRetryReply,
-    required this.onCopyText,
-  });
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final stream = ref.watch(
-      roundStreamProvider((fileName: fileName, roundId: roundId)),
-    );
-    if (stream == null) {
-      return const SizedBox.shrink();
-    }
-    final thinking = stream.reasoning;
-    final assistantContent = stream.content;
-    final hasThinking = thinking.trim().isNotEmpty;
-    final hasAssistant = assistantContent.trim().isNotEmpty;
-    final isStreaming = stream.isStreaming;
-    if (!hasThinking && !hasAssistant && !isStreaming) {
-      return const SizedBox.shrink();
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (hasThinking) ...[
-          const SizedBox(height: 20),
-          const Divider(),
-          const SizedBox(height: 16),
-          const _SectionLabel(
-            icon: Icons.psychology_alt_outlined,
-            text: '推理过程',
-          ),
-          const SizedBox(height: 10),
-          ThoughtBubble(content: thinking),
-        ],
-        if (hasAssistant || isStreaming) ...[
-          const SizedBox(height: 20),
-          const Divider(),
-          const SizedBox(height: 16),
-          const _SectionLabel(
-            icon: Icons.smart_toy_outlined,
-            text: '回答',
-          ),
-          const SizedBox(height: 10),
-          if (hasAssistant)
-            MessageBubble(
-              content: assistantContent,
-              isUser: false,
-              onCopy: () => onCopyText(assistantContent),
-              onRetryReply: onRetryReply,
-            )
-          else
-            const Card(
-              margin: EdgeInsets.zero,
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                    SizedBox(width: 12),
-                    Text('正在生成回答...'),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ],
-    );
-  }
-}
-class _EditModeBanner extends StatelessWidget {
-  final VoidCallback onCancel;
-  const _EditModeBanner({
-    required this.onCancel,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return MaterialBanner(
-      content: const Text('正在编辑重试，发送前不可切换页面，发送时将保留原附件'),
-      actions: [
-        TextButton(
-          onPressed: onCancel,
-          child: const Text('取消编辑'),
-        ),
-      ],
-    );
-  }
-}
-class _RoundHeader extends StatelessWidget {
-  final int createdAt;
-  const _RoundHeader({
-    required this.createdAt,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return Chip(
-      label: Text(TimeFormatUtils.formatTimestamp(createdAt)),
-      visualDensity: VisualDensity.compact,
-    );
-  }
-}
-class _SectionLabel extends StatelessWidget {
-  final IconData icon;
-  final String text;
-  const _SectionLabel({
-    required this.icon,
-    required this.text,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 18),
-        const SizedBox(width: 6),
-        Text(
-          text,
-          style: Theme.of(context).textTheme.titleSmall,
-        ),
-      ],
-    );
-  }
-}
-class _PaginationBar extends StatelessWidget {
-  final int currentIndex;    // ✅ 0-based 索引
-  final int totalPages;
-  final VoidCallback? onPrev;
-  final VoidCallback? onNext;
-  final bool isEditMode;
-  const _PaginationBar({
-    required this.currentIndex,
-    required this.totalPages,
-    required this.onPrev,
-    required this.onNext,
-    required this.isEditMode,
-  });
-  @override
-  Widget build(BuildContext context) {
-    // ✅ 使用统一工具类计算进度
-    final progress = PageUtils.calculateProgress(currentIndex, totalPages);
-    final textTheme = Theme.of(context).textTheme;
-    return Material(
-      elevation: 1,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-        child: Row(
-          children: [
-            IconButton(
-              onPressed: onPrev,
-              icon: const Icon(Icons.chevron_left_rounded),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    // ✅ 使用统一工具类格式化
-                    isEditMode
-                        ? '编辑中｜${PageUtils.format(currentIndex, totalPages)}'
-                        : PageUtils.format(currentIndex, totalPages),
-                    style: textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 8),
-                  LinearProgressIndicator(value: progress),
-                ],
-              ),
-            ),
-            const SizedBox(width: 10),
-            IconButton(
-              onPressed: onNext,
-              icon: const Icon(Icons.chevron_right_rounded),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-```
-
 ## File: lib/presentation/pages/branch_tree_page.dart
 ```dart
 import 'package:flutter/material.dart';
@@ -13873,11 +12963,12 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:graphview/GraphView.dart';
 import '../../core/models/chat_round.dart';
+import '../../core/models/session.dart';
 import '../../core/utils/time_format_utils.dart';
 import '../../di/providers.dart';
 import '../../domain/models/tree_node.dart';
 import '../../domain/services/tree_builder.dart';
-import '../providers/chat_notifier.dart';
+import '../providers/chat_notifier.dart' show chatSessionProvider;
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_toast.dart';
 class BranchTreePage extends ConsumerStatefulWidget {
@@ -13923,9 +13014,6 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     _focusRetryCount = 0;
     _scheduleFocusToTarget();
   }
-  bool _treeContainsNodeId(List<TreeNode> roots, String nodeId) {
-    return _findTreeNodeById(roots, nodeId) != null;
-  }
   void _reloadTree(
     List<ChatRound> rounds, {
     bool resetViewport = false,
@@ -13939,12 +13027,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
       _transformationController.value = Matrix4.identity();
       _hasFocused = false;
       _focusRetryCount = 0;
-      if (_treeContainsNodeId(roots, widget.initialFocusRoundId)) {
-        _targetNodeKey = GlobalKey();
-      } else {
-        _targetNodeKey = null;
-        _hasFocused = true;
-      }
+      _targetNodeKey = GlobalKey();
     }
     setState(() {
       _roots = roots;
@@ -14038,15 +13121,8 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     }
     return null;
   }
-  /// 完整删除分支节点逻辑，和原有业务逻辑完全一致，仅优化删除性能
-  Future<void> _deleteNode(String nodeId) async {
+  Future<void> _deleteNode(String nodeId, Session session) async {
     final repository = ref.read(conversationRepositoryProvider);
-    final chatState = ref.read(chatProvider(widget.fileName));
-    final session = chatState.session;
-    if (session == null) {
-      throw Exception('会话未加载');
-    }
-    // ========== 原有逻辑：构建树、查找要删除的节点 ==========
     final roots = session.rounds.isEmpty
         ? <TreeNode>[]
         : TreeBuilder.buildTree(session.rounds);
@@ -14054,49 +13130,13 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     if (targetNode == null) {
       throw Exception('未找到要删除的节点');
     }
-    // 收集当前节点+所有子节点的ID（原有逻辑不变）
-    final idsToDelete = _collectSubtreeIds(targetNode);
+    final idsToDelete = _collectSubtreeIds(targetNode).toList();
     try {
-      // ====================== ✅ 新增优化：调用专用批量删除方法，直接删除指定Round，比原来全量覆盖性能提升10倍+ ======================
-      // 从fileName中提取sessionId（去掉.json后缀，对应Repository中的_getId逻辑）
-      final sessionId = widget.fileName.replaceAll('.json', '');
-      // 批量删除要移除的Round，外键自动删除对应附件
-      await repository.deleteRounds(sessionId, idsToDelete.toList());
-      // ========== 原有逻辑：生成更新后的会话 ==========
-      final updatedRounds = session.rounds
-          .where((round) => !idsToDelete.contains(round.id))
-          .toList();
-      final updatedSession = session.copyWith(
-        rounds: updatedRounds,
-        updatedAt: DateTime.now().millisecondsSinceEpoch,
-      );
-      // ========== 原有逻辑：清理孤儿附件+保存会话 ==========
-      await repository.saveSessionAndCleanupOrphanAttachments(
+      await repository.deleteRoundsAndCleanupOrphanAttachments(
         widget.fileName,
-        session,
-        updatedSession,
+        idsToDelete,
       );
-      // ========== 原有逻辑：更新Chat状态 ==========
-      // ✅ 判断是否删除了当前焦点节点
-      final deletedCurrentFocus = idsToDelete.contains(widget.initialFocusRoundId);
-      // 直接更新chatNotifier状态，不需要invalidate
-      final chatNotifier = ref.read(chatProvider(widget.fileName).notifier);
-      chatNotifier.state = chatNotifier.state.copyWith(
-        session: updatedSession,
-        pageList: deletedCurrentFocus ? null : chatNotifier.state.pageList,
-      );
-      // 如果删除了当前焦点节点，重新加载会话，让聊天页返回时定位到有效页
-      if (deletedCurrentFocus) {
-        await chatNotifier.loadSession();
-      }
-      // ========== 原有逻辑：更新本地树状态 ==========
-      if (deletedCurrentFocus) {
-        _targetNodeKey = null;
-        _hasFocused = true;
-      }
-      _reloadTree(updatedRounds);
     } catch (e) {
-      // 原有异常提示逻辑不变
       await AppToast.show('删除失败：$e');
       rethrow;
     }
@@ -14123,119 +13163,125 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   }
   @override
   Widget build(BuildContext context) {
-    final chatState = ref.watch(chatProvider(widget.fileName));
-    if (chatState.isLoading && chatState.session == null) {
-      return AppPageScaffold(
+    final sessionAsync = ref.watch(chatSessionProvider(widget.fileName));
+    return sessionAsync.when(
+      loading: () => AppPageScaffold(
         appBar: AppBar(
           title: const Text('分支树'),
         ),
         body: const Center(
           child: CircularProgressIndicator(),
         ),
-      );
-    }
-    if (chatState.session == null) {
-      return AppPageScaffold(
+      ),
+      error: (e, _) => AppPageScaffold(
         appBar: AppBar(
           title: const Text('分支树'),
         ),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text(chatState.error ?? '会话不存在'),
+            child: Text('加载会话失败：$e'),
           ),
         ),
-      );
-    }
-    final session = chatState.session!;
-    final latestRoots = session.rounds.isEmpty
-        ? <TreeNode>[]
-        : TreeBuilder.buildTree(session.rounds);
-    final latestSignature = _buildSignature(latestRoots);
-    if (latestSignature != _lastSignature) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        if (!_treeContainsNodeId(latestRoots, widget.initialFocusRoundId)) {
-          _targetNodeKey = null;
-          _hasFocused = true;
-        }
-        _reloadTree(session.rounds);
-      });
-    }
-    final chatNotifier = ref.read(chatProvider(widget.fileName).notifier);
-    return AppPageScaffold(
-      appBar: AppBar(
-        title: Text(
-          session.title,
-          overflow: TextOverflow.ellipsis,
-        ),
       ),
-      body: _roots.isEmpty
-          ? _buildEmptyState(context)
-          : Column(
-              children: [
-                _GraphToolbar(
-                  onZoomIn: () {
-                    final current = _transformationController.value.clone();
-                    current.scale(1.1);
-                    _transformationController.value = current;
-                  },
-                  onZoomOut: () {
-                    final current = _transformationController.value.clone();
-                    current.scale(0.9);
-                    _transformationController.value = current;
-                  },
-                  onReset: _resetViewport,
-                ),
-                Expanded(
-                  child: InteractiveViewer(
-                    key: _viewerKey,
-                    constrained: false,
-                    boundaryMargin: const EdgeInsets.all(double.infinity),
-                    minScale: 0.1,
-                    maxScale: 3.0,
-                    transformationController: _transformationController,
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Wrap(
-                        spacing: 40,
-                        runSpacing: 40,
-                        crossAxisAlignment: WrapCrossAlignment.start,
-                        children: [
-                          for (final root in _roots)
-                            _RootTreeGroup(
-                              key: ValueKey(
-                                'root-tree-${root.id}-${_buildNodeSignature(root)}',
-                              ),
-                              root: root,
-                              graphSignature: _buildNodeSignature(root),
-                              builderConfig: _builder,
-                              targetNodeId: widget.initialFocusRoundId,
-                              targetNodeKey: _targetNodeKey,
-                              onSwitch: (treeNode) async {
-                                await chatNotifier.switchBranch(treeNode.id);
-                                if (context.mounted) {
-                                  Navigator.of(context).pop();
-                                }
-                              },
-                              onDelete: (treeNode) async {
-                                final confirmed =
-                                    await _confirmDelete(treeNode);
-                                if (!confirmed) return;
-                                try {
-                                  await _deleteNode(treeNode.id);
-                                } catch (e) {
-                                  await AppToast.show('删除失败：$e');
-                                }
-                              },
-                            ),
-                        ],
+      data: (session) {
+        if (session == null) {
+          return AppPageScaffold(
+            appBar: AppBar(
+              title: const Text('分支树'),
+            ),
+            body: const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text('会话不存在'),
+              ),
+            ),
+          );
+        }
+        final latestRoots = session.rounds.isEmpty
+            ? <TreeNode>[]
+            : TreeBuilder.buildTree(session.rounds);
+        final latestSignature = _buildSignature(latestRoots);
+        if (latestSignature != _lastSignature) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            _reloadTree(session.rounds);
+          });
+        }
+        return AppPageScaffold(
+          appBar: AppBar(
+            title: Text(
+              session.title,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          body: _roots.isEmpty
+              ? _buildEmptyState(context)
+              : Column(
+                  children: [
+                    _GraphToolbar(
+                      onZoomIn: () {
+                        final current = _transformationController.value.clone();
+                        current.scale(1.1);
+                        _transformationController.value = current;
+                      },
+                      onZoomOut: () {
+                        final current = _transformationController.value.clone();
+                        current.scale(0.9);
+                        _transformationController.value = current;
+                      },
+                      onReset: _resetViewport,
+                    ),
+                    Expanded(
+                      child: InteractiveViewer(
+                        key: _viewerKey,
+                        constrained: false,
+                        boundaryMargin: const EdgeInsets.all(double.infinity),
+                        minScale: 0.1,
+                        maxScale: 3.0,
+                        transformationController: _transformationController,
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Wrap(
+                            spacing: 40,
+                            runSpacing: 40,
+                            crossAxisAlignment: WrapCrossAlignment.start,
+                            children: [
+                              for (final root in _roots)
+                                _RootTreeGroup(
+                                  key: ValueKey(
+                                    'root-tree-${root.id}-${_buildNodeSignature(root)}',
+                                  ),
+                                  root: root,
+                                  graphSignature: _buildNodeSignature(root),
+                                  builderConfig: _builder,
+                                  targetNodeId: widget.initialFocusRoundId,
+                                  targetNodeKey: _targetNodeKey,
+                                  onSwitch: (treeNode) async {
+                                    if (context.mounted) {
+                                      Navigator.of(context).pop(treeNode.id);
+                                    }
+                                  },
+                                  onDelete: (treeNode) async {
+                                    final confirmed =
+                                        await _confirmDelete(treeNode);
+                                    if (!confirmed) return;
+                                    try {
+                                      await _deleteNode(treeNode.id, session);
+                                    } catch (e) {
+                                      await AppToast.show('删除失败：$e');
+                                    }
+                                  },
+                                ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
+        );
+      },
     );
   }
   Widget _buildEmptyState(BuildContext context) {
@@ -14507,6 +13553,721 @@ class _PreviewBlock extends StatelessWidget {
 }
 ```
 
+## File: lib/presentation/pages/chat_page.dart
+```dart
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/chat_round.dart';
+import '../../core/models/session.dart';
+import '../../core/utils/app_route_observer.dart';
+import '../../core/utils/time_format_utils.dart';
+import '../models/pending_attachment.dart';
+import '../providers/chat_notifier.dart';
+import '../providers/input_draft_provider.dart';
+import '../widgets/attachment_list.dart';
+import '../widgets/input_bar.dart';
+import '../widgets/message_bubble.dart';
+import '../widgets/thought_bubble.dart';
+import '../widgets/common/app_page_scaffold.dart';
+import '../widgets/common/app_toast.dart';
+import 'branch_tree_page.dart';
+import '../utils/page_utils.dart';
+import '../../domain/services/branch_navigator.dart';
+class ChatPage extends ConsumerStatefulWidget {
+  final String fileName;
+  final String? initialRoundId;
+  final String? initialMessage;
+  final List<PendingAttachment>? initialAttachments;
+  const ChatPage({
+    super.key,
+    required this.fileName,
+    this.initialRoundId,
+    this.initialMessage,
+    this.initialAttachments,
+  });
+  @override
+  ConsumerState<ChatPage> createState() => _ChatPageState();
+}
+class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
+  PageController? _pageController;
+  late final ProviderSubscription<AsyncValue<Session?>> _sessionSubscription;
+  bool _initialMessageHandled = false;
+  bool _isMarkingSeen = false;
+  bool _isRouteVisible = false;
+  ModalRoute<dynamic>? _route;
+  String? _branchRoundId;
+  String? _currentRoundId;
+  @override
+  void initState() {
+    super.initState();
+    _branchRoundId = widget.initialRoundId;
+    _currentRoundId = widget.initialRoundId;
+    _sessionSubscription = ref.listenManual<AsyncValue<Session?>>(
+      chatSessionProvider(widget.fileName),
+      (previous, next) async {
+        final session = next.valueOrNull;
+        _reconcileSession(session);
+        if (_initialMessageHandled || session == null || !mounted) {
+          return;
+        }
+        final message = widget.initialMessage?.trim() ?? '';
+        final attachments =
+            widget.initialAttachments ?? const <PendingAttachment>[];
+        final hasContent = message.isNotEmpty || attachments.isNotEmpty;
+        if (!hasContent) return;
+        _initialMessageHandled = true;
+        try {
+          final newRoundId =
+              await ref.read(chatControllerProvider(widget.fileName)).sendMessage(
+                    content: message,
+                    parentRoundId: _currentRoundId,
+                    attachments: attachments,
+                  );
+          if (!mounted) return;
+          setState(() {
+            _branchRoundId = newRoundId;
+            _currentRoundId = newRoundId;
+          });
+        } catch (e) {
+          if (mounted) {
+            AppToast.show('发送失败：${e.toString()}');
+          }
+        }
+      },
+    );
+  }
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null && route != _route) {
+      if (_route != null) {
+        appRouteObserver.unsubscribe(this);
+      }
+      _route = route;
+      appRouteObserver.subscribe(this, route as PageRoute);
+    }
+  }
+  @override
+  void dispose() {
+    _sessionSubscription.close();
+    appRouteObserver.unsubscribe(this);
+    _pageController?.dispose();
+    super.dispose();
+  }
+  List<ChatRound> _buildVisibleRounds(
+    Session? session,
+    String? branchRoundId,
+  ) {
+    if (session == null || branchRoundId == null) {
+      return const <ChatRound>[];
+    }
+    return BranchNavigator.getCurrentBranchPath(session, branchRoundId);
+  }
+  int _resolveCurrentIndex(List<ChatRound> visibleRounds, String? currentRoundId) {
+    if (visibleRounds.isEmpty || currentRoundId == null) return 0;
+    final index = visibleRounds.indexWhere((round) => round.id == currentRoundId);
+    if (index < 0) return visibleRounds.length - 1;
+    return index;
+  }
+  String? _resolveBranchRoundId(Session session, String? preferredRoundId) {
+    if (preferredRoundId != null &&
+        session.rounds.any((r) => r.id == preferredRoundId)) {
+      return preferredRoundId;
+    }
+    final leaves = BranchNavigator.getAllBranchLeaves(session);
+    if (leaves.isNotEmpty) {
+      return leaves.last.id;
+    }
+    if (session.rounds.isNotEmpty) {
+      return session.rounds.first.id;
+    }
+    return null;
+  }
+  String? _resolveCurrentRoundId(
+    List<ChatRound> visibleRounds,
+    String? preferredRoundId,
+  ) {
+    if (preferredRoundId != null &&
+        visibleRounds.any((r) => r.id == preferredRoundId)) {
+      return preferredRoundId;
+    }
+    return visibleRounds.isNotEmpty ? visibleRounds.last.id : null;
+  }
+  void _reconcileSession(Session? session) {
+    if (!mounted) return;
+    if (session == null) {
+      setState(() {
+        _branchRoundId = null;
+        _currentRoundId = null;
+      });
+      return;
+    }
+    final nextBranchRoundId = _resolveBranchRoundId(session, _branchRoundId);
+    final visibleRounds = nextBranchRoundId == null
+        ? const <ChatRound>[]
+        : BranchNavigator.getCurrentBranchPath(session, nextBranchRoundId);
+    final nextCurrentRoundId =
+        _resolveCurrentRoundId(visibleRounds, _currentRoundId);
+    final nextIndex = _resolveCurrentIndex(visibleRounds, nextCurrentRoundId);
+    final shouldUpdateState = nextBranchRoundId != _branchRoundId ||
+        nextCurrentRoundId != _currentRoundId;
+    if (shouldUpdateState) {
+      setState(() {
+        _branchRoundId = nextBranchRoundId;
+        _currentRoundId = nextCurrentRoundId;
+      });
+    }
+    final controller = _pageController;
+    if (controller != null && controller.hasClients) {
+      final currentPage = controller.page?.round() ?? controller.initialPage;
+      if (currentPage != nextIndex) {
+        controller.jumpToPage(nextIndex);
+      }
+    }
+  }
+  @override
+  void didPush() {
+    _isRouteVisible = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await _syncSeenWithVisiblePage();
+    });
+  }
+  @override
+  void didPopNext() {
+    _isRouteVisible = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await _syncSeenWithVisiblePage();
+    });
+  }
+  @override
+  void didPushNext() {
+    _isRouteVisible = false;
+  }
+  @override
+  void didPop() {
+    _isRouteVisible = false;
+    if (_isInEditMode()) {
+      _cancelEditMode();
+    }
+  }
+  Future<void> _copyText(String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    await AppToast.show('已复制到剪贴板');
+  }
+  void _enterEditMode(String roundId, String text) {
+    ref.read(globalInputDraftProvider.notifier).state = text;
+    ref.read(globalEditSourceRoundIdProvider.notifier).state = roundId;
+    FocusScope.of(context).unfocus();
+  }
+  void _cancelEditMode() {
+    ref.read(globalEditSourceRoundIdProvider.notifier).state = null;
+    ref.read(globalInputDraftProvider.notifier).state = '';
+    ref.read(globalAttachmentDraftProvider.notifier).state = [];
+  }
+  bool _isInEditMode() {
+    return ref.read(globalEditSourceRoundIdProvider) != null;
+  }
+  Future<void> _syncSeenWithVisiblePage() async {
+    if (!_isRouteVisible) return;
+    if (_isMarkingSeen) return;
+    final controller = _pageController;
+    if (controller == null || !controller.hasClients) return;
+    final session = ref.read(chatSessionProvider(widget.fileName)).valueOrNull;
+    final visibleRounds = _buildVisibleRounds(session, _branchRoundId);
+    if (visibleRounds.isEmpty) return;
+    final currentIndex = _resolveCurrentIndex(visibleRounds, _currentRoundId);
+    final currentPage = controller.page;
+    final index = currentPage != null
+        ? currentPage.round().clamp(0, visibleRounds.length - 1)
+        : currentIndex;
+    final round = visibleRounds[index];
+    if (!round.hasUnseenUpdate) return;
+    _isMarkingSeen = true;
+    try {
+      await ref
+          .read(chatControllerProvider(widget.fileName))
+          .markRoundSeen(round);
+    } finally {
+      _isMarkingSeen = false;
+    }
+  }
+  Future<void> _retryFromRound(String roundId) async {
+    try {
+      final newRoundId =
+          await ref.read(chatControllerProvider(widget.fileName)).retryFromRound(
+                roundId,
+              );
+      if (!mounted) return;
+      setState(() {
+        _branchRoundId = newRoundId;
+        _currentRoundId = newRoundId;
+      });
+    } catch (e) {
+      if (mounted) {
+        await AppToast.show('重新生成失败：$e');
+      }
+    }
+  }
+  @override
+  Widget build(BuildContext context) {
+    final sessionAsync = ref.watch(chatSessionProvider(widget.fileName));
+    final session = sessionAsync.valueOrNull;
+    final chatController = ref.read(chatControllerProvider(widget.fileName));
+    final editSourceRoundId = ref.watch(globalEditSourceRoundIdProvider);
+    final isEditMode = editSourceRoundId != null;
+    final visibleRounds = _buildVisibleRounds(session, _branchRoundId);
+    final currentIndex = _resolveCurrentIndex(visibleRounds, _currentRoundId);
+    final hasPages = visibleRounds.isNotEmpty;
+    final pageController = hasPages
+        ? (_pageController ??= PageController(initialPage: currentIndex))
+        : null;
+    final textTheme = Theme.of(context).textTheme;
+    final currentRound =
+        hasPages && PageUtils.isValidIndex(currentIndex, visibleRounds.length)
+            ? visibleRounds[currentIndex]
+            : null;
+    final currentIsStreaming = currentRound?.isIncomplete == true;
+    return AppPageScaffold(
+      appBar: AppBar(
+        title: Text(
+          session?.title ?? '对话',
+          style: textTheme.titleMedium,
+        ),
+        actions: [
+          if (session != null && _currentRoundId != null)
+            IconButton(
+              tooltip: isEditMode ? '编辑模式下不可切换页面' : '查看分支树',
+              icon: const Icon(Icons.account_tree_outlined),
+              onPressed: isEditMode
+                  ? null
+                  : () async {
+                      final selectedRoundId =
+                          await Navigator.of(context).push<String?>(
+                        MaterialPageRoute(
+                          builder: (_) => BranchTreePage(
+                            fileName: widget.fileName,
+                            initialFocusRoundId: _currentRoundId!,
+                          ),
+                        ),
+                      );
+                      if (!mounted || selectedRoundId == null) {
+                        return;
+                      }
+                      setState(() {
+                        _branchRoundId = selectedRoundId;
+                        _currentRoundId = selectedRoundId;
+                      });
+                      final nextVisibleRounds =
+                          _buildVisibleRounds(session, _branchRoundId);
+                      final nextIndex = _resolveCurrentIndex(
+                        nextVisibleRounds,
+                        _currentRoundId,
+                      );
+                      if (_pageController != null && _pageController!.hasClients) {
+                        _pageController!.jumpToPage(nextIndex);
+                      }
+                    },
+            ),
+        ],
+      ),
+      body: Column(
+        children: [
+          if (hasPages)
+            _PaginationBar(
+              currentIndex: currentIndex,
+              totalPages: visibleRounds.length,
+              onPrev: isEditMode
+                  ? null
+                  : currentIndex > 0
+                      ? () => pageController?.previousPage(
+                            duration: const Duration(milliseconds: 260),
+                            curve: Curves.easeOutCubic,
+                          )
+                      : null,
+              onNext: isEditMode
+                  ? null
+                  : currentIndex < visibleRounds.length - 1
+                      ? () => pageController?.nextPage(
+                            duration: const Duration(milliseconds: 260),
+                            curve: Curves.easeOutCubic,
+                          )
+                      : null,
+              isEditMode: isEditMode,
+            ),
+          if (isEditMode)
+            _EditModeBanner(
+              onCancel: _cancelEditMode,
+            ),
+          Expanded(
+            child: !hasPages
+                ? _buildWelcomeEmpty(context)
+                : PageView.builder(
+                    controller: pageController,
+                    physics: isEditMode
+                        ? const NeverScrollableScrollPhysics()
+                        : const PageScrollPhysics(),
+                    itemCount: visibleRounds.length,
+                    onPageChanged: (index) async {
+                      if (!PageUtils.isValidIndex(
+                        index,
+                        visibleRounds.length,
+                      )) {
+                        return;
+                      }
+                      final round = visibleRounds[index];
+                      setState(() {
+                        _currentRoundId = round.id;
+                      });
+                      await _syncSeenWithVisiblePage();
+                    },
+                    itemBuilder: (context, index) {
+                      final round = visibleRounds[index];
+                      final canEdit = !round.isIncomplete;
+                      return _ChatRoundPage(
+                        key: ValueKey(round.id),
+                        fileName: widget.fileName,
+                        round: round,
+                        canEdit: canEdit,
+                        onRetryReply: () => _retryFromRound(round.id),
+                        onEdit: canEdit
+                            ? () => _enterEditMode(
+                                  round.id,
+                                  round.userContent,
+                                )
+                            : null,
+                        onCopyText: _copyText,
+                      );
+                    },
+                  ),
+          ),
+          InputBar(
+            hintText: isEditMode ? '修改文本后发送' : '发送消息',
+            isStreaming: currentIsStreaming,
+            onStop: currentRound == null
+                ? null
+                : () => chatController.stopGeneration(currentRound.id),
+            onSend: (text, attachments) async {
+              try {
+                if (editSourceRoundId != null) {
+                  final newRoundId =
+                      await chatController.editAndResendFromRound(
+                    editSourceRoundId,
+                    text,
+                    attachments: attachments,
+                  );
+                  if (!mounted) return;
+                  setState(() {
+                    _branchRoundId = newRoundId;
+                    _currentRoundId = newRoundId;
+                  });
+                  _cancelEditMode();
+                  return;
+                }
+                final newRoundId = await chatController.sendMessage(
+                  content: text,
+                  parentRoundId: _currentRoundId,
+                  attachments: attachments,
+                );
+                if (!mounted) return;
+                setState(() {
+                  _branchRoundId = newRoundId;
+                  _currentRoundId = newRoundId;
+                });
+              } catch (e) {
+                if (mounted) {
+                  await AppToast.show('发送失败：$e');
+                }
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+  Widget _buildWelcomeEmpty(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.auto_awesome_outlined,
+                  size: 36,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  '开始一段新的对话',
+                  style: textTheme.titleLarge,
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  '你可以输入问题、上传图片或文件，并在不同分支中回看每一轮回复。',
+                  textAlign: TextAlign.center,
+                  style: textTheme.bodyMedium,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+class _ChatRoundPage extends StatelessWidget {
+  final String fileName;
+  final ChatRound round;
+  final bool canEdit;
+  final VoidCallback onRetryReply;
+  final VoidCallback? onEdit;
+  final Future<void> Function(String text) onCopyText;
+  const _ChatRoundPage({
+    super.key,
+    required this.fileName,
+    required this.round,
+    required this.canEdit,
+    required this.onRetryReply,
+    required this.onEdit,
+    required this.onCopyText,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final hasUser = round.userContent.trim().isNotEmpty;
+    final hasAttachments = round.userAttachments.isNotEmpty;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      children: [
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _RoundHeader(createdAt: round.createdAt),
+                const SizedBox(height: 16),
+                const _SectionLabel(
+                  icon: Icons.person_outline,
+                  text: '你的输入',
+                ),
+                const SizedBox(height: 10),
+                if (hasUser)
+                  MessageBubble(
+                    content: round.userContent,
+                    isUser: true,
+                    onCopy: () => onCopyText(round.userContent),
+                    onRetryReply: onRetryReply,
+                    onEdit: onEdit,
+                  ),
+                if (hasAttachments) ...[
+                  if (hasUser) const SizedBox(height: 8),
+                  AttachmentList(
+                    attachments: round.userAttachments,
+                    rightAligned: true,
+                  ),
+                ],
+                _RoundAnswerSection(
+                  round: round,
+                  onRetryReply: onRetryReply,
+                  onCopyText: onCopyText,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+class _RoundAnswerSection extends StatelessWidget {
+  final ChatRound round;
+  final VoidCallback onRetryReply;
+  final Future<void> Function(String text) onCopyText;
+  const _RoundAnswerSection({
+    required this.round,
+    required this.onRetryReply,
+    required this.onCopyText,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final thinking = round.assistantThinking ?? '';
+    final assistantContent = round.assistantContent ?? '';
+    final hasThinking = thinking.trim().isNotEmpty;
+    final hasAssistant = assistantContent.trim().isNotEmpty;
+    final isStreaming = round.isIncomplete;
+    if (!hasThinking && !hasAssistant && !isStreaming) {
+      return const SizedBox.shrink();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (hasThinking) ...[
+          const SizedBox(height: 20),
+          const Divider(),
+          const SizedBox(height: 16),
+          const _SectionLabel(
+            icon: Icons.psychology_alt_outlined,
+            text: '推理过程',
+          ),
+          const SizedBox(height: 10),
+          ThoughtBubble(content: thinking),
+        ],
+        if (hasAssistant || isStreaming) ...[
+          const SizedBox(height: 20),
+          const Divider(),
+          const SizedBox(height: 16),
+          const _SectionLabel(
+            icon: Icons.smart_toy_outlined,
+            text: '回答',
+          ),
+          const SizedBox(height: 10),
+          if (hasAssistant)
+            MessageBubble(
+              content: assistantContent,
+              isUser: false,
+              onCopy: () => onCopyText(assistantContent),
+              onRetryReply: isStreaming ? null : onRetryReply,
+            )
+          else
+            const Card(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    SizedBox(width: 12),
+                    Text('正在生成回答...'),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+}
+class _EditModeBanner extends StatelessWidget {
+  final VoidCallback onCancel;
+  const _EditModeBanner({
+    required this.onCancel,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return MaterialBanner(
+      content: const Text('正在编辑重试，发送前不可切换页面，发送时将保留原附件'),
+      actions: [
+        TextButton(
+          onPressed: onCancel,
+          child: const Text('取消编辑'),
+        ),
+      ],
+    );
+  }
+}
+class _RoundHeader extends StatelessWidget {
+  final int createdAt;
+  const _RoundHeader({
+    required this.createdAt,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      label: Text(TimeFormatUtils.formatTimestamp(createdAt)),
+      visualDensity: VisualDensity.compact,
+    );
+  }
+}
+class _SectionLabel extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _SectionLabel({
+    required this.icon,
+    required this.text,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+      ],
+    );
+  }
+}
+class _PaginationBar extends StatelessWidget {
+  final int currentIndex;
+  final int totalPages;
+  final VoidCallback? onPrev;
+  final VoidCallback? onNext;
+  final bool isEditMode;
+  const _PaginationBar({
+    required this.currentIndex,
+    required this.totalPages,
+    required this.onPrev,
+    required this.onNext,
+    required this.isEditMode,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final progress = PageUtils.calculateProgress(currentIndex, totalPages);
+    final textTheme = Theme.of(context).textTheme;
+    return Material(
+      elevation: 1,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        child: Row(
+          children: [
+            IconButton(
+              onPressed: onPrev,
+              icon: const Icon(Icons.chevron_left_rounded),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    isEditMode
+                        ? '编辑中｜${PageUtils.format(currentIndex, totalPages)}'
+                        : PageUtils.format(currentIndex, totalPages),
+                    style: textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 8),
+                  LinearProgressIndicator(value: progress),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            IconButton(
+              onPressed: onNext,
+              icon: const Icon(Icons.chevron_right_rounded),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+
 ## File: lib/presentation/providers/chat_notifier.dart
 ```dart
 // presentation/providers/chat_notifier.dart
@@ -14518,93 +14279,31 @@ import '../../core/models/model_info.dart';
 import '../../core/models/session.dart';
 import '../../core/models/attachment.dart';
 import '../../di/providers.dart';
-import '../../domain/models/chat_page.dart';
 import '../../domain/services/attachment_preparer.dart';
 import '../../domain/services/branch_navigator.dart';
 import '../../domain/services/chat_context_builder.dart';
 import '../../domain/services/chat_stream_accumulator.dart';
-import '../../domain/states/chat_state.dart';
 import '../models/pending_attachment.dart';
-import '../utils/page_utils.dart';
-import 'global_streaming_provider.dart';
 import '../../core/utils/id_generator.dart';
 import 'config_notifier.dart';
-/// 辅助函数
 T? _firstWhereOrNull<T>(List<T> list, bool Function(T) test) {
   for (final element in list) {
     if (test(element)) return element;
   }
   return null;
 }
-class ChatNotifier extends StateNotifier<ChatState> {
+/// 会话事实数据完全来自数据库 watch
+final chatSessionProvider =
+    StreamProvider.family<Session?, String>((ref, fileName) {
+  final repository = ref.watch(conversationRepositoryProvider);
+  return repository.watchSession(fileName);
+});
+class ChatController {
   final Ref ref;
   final String fileName;
   final Set<String> _stoppingRoundIds = {};
-  StreamSubscription? _sessionSubscription;
-  int _currentPageIndex = 0;
-  ChatNotifier(this.ref, this.fileName) : super(ChatState.initial()) {
-    _initWatch();
-  }
-  void _initWatch() {
-    final repository = ref.read(conversationRepositoryProvider);
-    _sessionSubscription = repository.watchSession(fileName).listen((session) {
-      if (session == null) {
-        state = state.copyWith(
-          session: null,
-          error: '会话不存在',
-          isLoading: false,
-        );
-        return;
-      }
-      final leaves = BranchNavigator.getAllBranchLeaves(session);
-      String? currentRoundId;
-      List<ChatRound> branchPath;
-      int targetPageIndex;
-      if (leaves.isNotEmpty) {
-        currentRoundId = leaves.last.id;
-        branchPath = BranchNavigator.getCurrentBranchPath(session, currentRoundId);
-        targetPageIndex = branchPath.isNotEmpty ? branchPath.length - 1 : 0;
-      } else {
-        currentRoundId = null;
-        branchPath = [];
-        targetPageIndex = 0;
-      }
-      _currentPageIndex = targetPageIndex;
-      final chatPages = branchPath.map((round) => ChatPage(round: round)).toList();
-      state = state.copyWith(
-        session: session,
-        currentRoundId: currentRoundId,
-        pageList: ChatPageList.fromPages(chatPages, _currentPageIndex),
-        error: null,
-        isLoading: false,
-      );
-      if (currentRoundId != null && branchPath.isNotEmpty) {
-        final round = branchPath.last;
-        _streamCache.ensureRoundLoaded(fileName, round);
-      }
-    });
-  }
-  GlobalStreamCacheNotifier get _streamCache =>
-      ref.read(globalStreamCacheProvider.notifier);
-  StreamStatus? _getRoundStream(String roundId) {
-    final globalMap = ref.read(globalStreamCacheProvider);
-    return globalMap[fileName]?[roundId];
-  }
-  Future<void> ensureRoundLoaded(String roundId) async {
-    final session = state.session;
-    if (session == null) return;
-    final round = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
-    if (round == null) return;
-    _streamCache.ensureRoundLoaded(fileName, round);
-  }
-  Future<void> loadSession({String? initialRoundId}) async {
-    if (initialRoundId != null) {
-      state = state.copyWith(currentRoundId: initialRoundId);
-    }
-  }
-  /// 从配置流获取最新的模型信息，避免缓存导致切换配置后用旧模型
+  ChatController(this.ref, this.fileName);
   ModelInfo? _findSelectedModelInfo() {
-    // 从 StreamProvider 获取最新配置
     final configAsync = ref.read(configProvider);
     final config = configAsync.valueOrNull;
     if (config == null) return null;
@@ -14613,14 +14312,11 @@ class ChatNotifier extends StateNotifier<ChatState> {
     final models = config.availableModels ?? const <ModelInfo>[];
     return _firstWhereOrNull(models, (m) => m.id == selectedId);
   }
-  /// 从配置流获取最新的配置，避免缓存导致切换配置后用旧配置请求
   Future<AppConfig> _getCurrentConfig() async {
-    // 优先从 Stream 获取最新配置
     final configAsync = ref.read(configProvider);
     if (configAsync.hasValue) {
       return configAsync.valueOrNull!;
     }
-    // 如果 Stream 还没值，降级使用同步方法
     return await ref.read(configRepositoryProvider).getConfig();
   }
   bool _shouldEnableReasoning(AppConfig config) {
@@ -14638,151 +14334,136 @@ class ChatNotifier extends StateNotifier<ChatState> {
       throw Exception('当前模型未声明支持图片输入');
     }
   }
-  Future<void> sendMessage(
-    String content, {
+  Future<String> sendMessage({
+    required String content,
+    required String? parentRoundId,
     List<PendingAttachment>? attachments,
   }) async {
-    final session = state.session;
+    final session = ref.read(chatSessionProvider(fileName)).valueOrNull ??
+        await ref.read(chatSessionProvider(fileName).future);
     if (session == null) {
-      state = state.copyWithError('会话未初始化');
-      return;
+      throw Exception('会话未初始化');
     }
-    try {
-      final pendingAttachments = attachments ?? const <PendingAttachment>[];
-      final repository = ref.read(conversationRepositoryProvider);
-      // 从流获取最新配置
-      final config = await _getCurrentConfig();
-      _validateRequestCapability(config: config, attachments: pendingAttachments);
-      final savedAttachments = await AttachmentPreparer.savePendingAttachments(
-        repository,
-        pendingAttachments,
-      );
-      final newRound = ChatRound(
-        id: IdGenerator.generate(),
-        parentId: state.currentRoundId,
-        createdAt: DateTime.now().millisecondsSinceEpoch,
-        userContent: content,
-        userAttachments: savedAttachments,
-        isIncomplete: true,
-        hasUnseenUpdate: false,
-      );
-      await repository.appendRound(fileName, newRound);
-      state = state.copyWith(currentRoundId: newRound.id);
-      _streamCache.setRoundStream(
-        fileName,
-        newRound.id,
-        const StreamStatus(content: '', reasoning: '', isStreaming: true),
-      );
-      _handleStreamTask(newRound, session, config);
-    } catch (e) {
-      state = state.copyWithError(e.toString());
+    if (parentRoundId != null &&
+        !session.rounds.any((r) => r.id == parentRoundId)) {
+      throw Exception('当前引用的轮次不存在');
     }
+    final pendingAttachments = attachments ?? const <PendingAttachment>[];
+    final repository = ref.read(conversationRepositoryProvider);
+    final config = await _getCurrentConfig();
+    _validateRequestCapability(config: config, attachments: pendingAttachments);
+    final savedAttachments = await AttachmentPreparer.savePendingAttachments(
+      repository,
+      pendingAttachments,
+    );
+    final newRound = ChatRound(
+      id: IdGenerator.generate(),
+      parentId: parentRoundId,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+      userContent: content,
+      userAttachments: savedAttachments,
+      isIncomplete: true,
+      hasUnseenUpdate: false,
+    );
+    final contextRounds = BranchNavigator.getCurrentBranchPath(
+      session.copyWith(rounds: [...session.rounds, newRound]),
+      newRound.id,
+    );
+    await repository.appendRound(fileName, newRound);
+    unawaited(_handleStreamTask(newRound, config, contextRounds));
+    return newRound.id;
   }
-  Future<void> retryFromRound(String roundId) async {
-    final session = state.session;
+  Future<String> retryFromRound(String roundId) async {
+    final session = ref.read(chatSessionProvider(fileName)).valueOrNull ??
+        await ref.read(chatSessionProvider(fileName).future);
     if (session == null) {
-      state = state.copyWithError('会话未初始化');
-      return;
+      throw Exception('会话未初始化');
     }
-    try {
-      final repository = ref.read(conversationRepositoryProvider);
-      final config = await _getCurrentConfig();
-      final sourceRound = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
-      if (sourceRound == null) {
-        state = state.copyWithError('未找到要重新回复的对话');
-        return;
-      }
-      final selectedModel = _findSelectedModelInfo();
-      if (selectedModel != null) {
-        final hasImage = sourceRound.userAttachments.any((a) => a.isImage);
-        if (hasImage && selectedModel.supportsVision != true) {
-          state = state.copyWithError('当前模型未声明支持图片输入');
-          return;
-        }
-      }
-      final newRound = ChatRound(
-        id: IdGenerator.generate(),
-        parentId: sourceRound.parentId,
-        createdAt: DateTime.now().millisecondsSinceEpoch,
-        userContent: sourceRound.userContent,
-        userAttachments: sourceRound.userAttachments,
-        isIncomplete: true,
-        hasUnseenUpdate: false,
-      );
-      await repository.appendRound(fileName, newRound);
-      state = state.copyWith(currentRoundId: newRound.id);
-      _streamCache.setRoundStream(
-        fileName,
-        newRound.id,
-        const StreamStatus(content: '', reasoning: '', isStreaming: true),
-      );
-      _handleStreamTask(newRound, session, config);
-    } catch (e) {
-      state = state.copyWithError(e.toString());
+    final repository = ref.read(conversationRepositoryProvider);
+    final config = await _getCurrentConfig();
+    final sourceRound = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
+    if (sourceRound == null) {
+      throw Exception('未找到要重新回复的对话');
     }
+    final selectedModel = _findSelectedModelInfo();
+    if (selectedModel != null) {
+      final hasImage = sourceRound.userAttachments.any((a) => a.isImage);
+      if (hasImage && selectedModel.supportsVision != true) {
+        throw Exception('当前模型未声明支持图片输入');
+      }
+    }
+    final newRound = ChatRound(
+      id: IdGenerator.generate(),
+      parentId: sourceRound.parentId,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+      userContent: sourceRound.userContent,
+      userAttachments: sourceRound.userAttachments,
+      isIncomplete: true,
+      hasUnseenUpdate: false,
+    );
+    final contextRounds = BranchNavigator.getCurrentBranchPath(
+      session.copyWith(rounds: [...session.rounds, newRound]),
+      newRound.id,
+    );
+    await repository.appendRound(fileName, newRound);
+    unawaited(_handleStreamTask(newRound, config, contextRounds));
+    return newRound.id;
   }
-  Future<void> editAndResendFromRound(
+  Future<String> editAndResendFromRound(
     String roundId,
     String newContent, {
     List<PendingAttachment>? attachments,
   }) async {
-    final session = state.session;
+    final session = ref.read(chatSessionProvider(fileName)).valueOrNull ??
+        await ref.read(chatSessionProvider(fileName).future);
     if (session == null) {
-      state = state.copyWithError('会话未初始化');
-      return;
+      throw Exception('会话未初始化');
     }
-    try {
-      final repository = ref.read(conversationRepositoryProvider);
-      final config = await _getCurrentConfig();
-      final pendingAttachments = attachments ?? const <PendingAttachment>[];
-      _validateRequestCapability(config: config, attachments: pendingAttachments);
-      final sourceRound = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
-      if (sourceRound == null) {
-        state = state.copyWithError('未找到要编辑重试的对话');
-        return;
-      }
-      final selectedModel = _findSelectedModelInfo();
-      if (selectedModel != null) {
-        final hasImage = sourceRound.userAttachments.any((a) => a.isImage) ||
-            pendingAttachments.any((a) => a.isImage);
-        if (hasImage && selectedModel.supportsVision != true) {
-          state = state.copyWithError('当前模型未声明支持图片输入');
-          return;
-        }
-      }
-      final savedAttachments = await AttachmentPreparer.savePendingAttachments(
-        repository,
-        pendingAttachments,
-      );
-      final mergedAttachments = <Attachment>[
-        ...sourceRound.userAttachments,
-        ...savedAttachments,
-      ];
-      final newRound = ChatRound(
-        id: IdGenerator.generate(),
-        parentId: sourceRound.parentId,
-        createdAt: DateTime.now().millisecondsSinceEpoch,
-        userContent: newContent,
-        userAttachments: mergedAttachments,
-        isIncomplete: true,
-        hasUnseenUpdate: false,
-      );
-      await repository.appendRound(fileName, newRound);
-      state = state.copyWith(currentRoundId: newRound.id);
-      _streamCache.setRoundStream(
-        fileName,
-        newRound.id,
-        const StreamStatus(content: '', reasoning: '', isStreaming: true),
-      );
-      _handleStreamTask(newRound, session, config);
-    } catch (e) {
-      state = state.copyWithError(e.toString());
+    final repository = ref.read(conversationRepositoryProvider);
+    final config = await _getCurrentConfig();
+    final pendingAttachments = attachments ?? const <PendingAttachment>[];
+    _validateRequestCapability(config: config, attachments: pendingAttachments);
+    final sourceRound = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
+    if (sourceRound == null) {
+      throw Exception('未找到要编辑重试的对话');
     }
+    final selectedModel = _findSelectedModelInfo();
+    if (selectedModel != null) {
+      final hasImage = sourceRound.userAttachments.any((a) => a.isImage) ||
+          pendingAttachments.any((a) => a.isImage);
+      if (hasImage && selectedModel.supportsVision != true) {
+        throw Exception('当前模型未声明支持图片输入');
+      }
+    }
+    final savedAttachments = await AttachmentPreparer.savePendingAttachments(
+      repository,
+      pendingAttachments,
+    );
+    final mergedAttachments = <Attachment>[
+      ...sourceRound.userAttachments,
+      ...savedAttachments,
+    ];
+    final newRound = ChatRound(
+      id: IdGenerator.generate(),
+      parentId: sourceRound.parentId,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+      userContent: newContent,
+      userAttachments: mergedAttachments,
+      isIncomplete: true,
+      hasUnseenUpdate: false,
+    );
+    final contextRounds = BranchNavigator.getCurrentBranchPath(
+      session.copyWith(rounds: [...session.rounds, newRound]),
+      newRound.id,
+    );
+    await repository.appendRound(fileName, newRound);
+    unawaited(_handleStreamTask(newRound, config, contextRounds));
+    return newRound.id;
   }
   Future<void> _handleStreamTask(
     ChatRound round,
-    Session session,
     AppConfig config,
+    List<ChatRound> contextRounds,
   ) async {
     final apiSource = ref.read(remoteApiSourceProvider);
     final repository = ref.read(conversationRepositoryProvider);
@@ -14791,7 +14472,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
     String? errorMessage;
     var wasStopped = false;
     try {
-      final contextRounds = BranchNavigator.getCurrentBranchPath(session, round.id);
       final apiContext = await ChatContextBuilder.buildFromRounds(
         contextRounds,
         repository,
@@ -14814,22 +14494,15 @@ class ChatNotifier extends StateNotifier<ChatState> {
         }
         if (!chunk.isDone) {
           accumulator.add(chunk);
-          _streamCache.updateRoundStream(
-            fileName,
-            round.id,
-            content: accumulator.content,
-            reasoning: accumulator.reasoning,
-            isStreaming: true,
+          final updatedRound = round.copyWith(
+            assistantThinking:
+                accumulator.reasoning.isEmpty ? null : accumulator.reasoning,
+            assistantContent:
+                accumulator.content.isEmpty ? null : accumulator.content,
+            isIncomplete: true,
+            hasUnseenUpdate: false,
           );
-          if (accumulator.reasoning.isNotEmpty || accumulator.content.isNotEmpty) {
-            final updatedRound = round.copyWith(
-              assistantThinking: accumulator.reasoning,
-              assistantContent: accumulator.content,
-              isIncomplete: true,
-              hasUnseenUpdate: false,
-            );
-            await repository.updateRound(fileName, round.id, updatedRound);
-          }
+          await repository.updateRound(fileName, round.id, updatedRound);
           continue;
         }
         if (_stoppingRoundIds.contains(round.id)) {
@@ -14852,14 +14525,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
       } else if (wasStopped) {
         finalContent = _appendStoppedSuffix(finalContent);
       }
-      _streamCache.updateRoundStream(
-        fileName,
-        round.id,
-        content: finalContent,
-        reasoning: finalReasoning,
-        isStreaming: false,
-      );
-      await _finalizeRoundPersistence(round.id, finalContent, finalReasoning);
+      await _finalizeRoundPersistence(round, finalContent, finalReasoning);
       _stoppingRoundIds.remove(round.id);
     }
   }
@@ -14876,71 +14542,37 @@ class ChatNotifier extends StateNotifier<ChatState> {
     return '$trimmed\n\n$errorText';
   }
   Future<void> _finalizeRoundPersistence(
-    String roundId,
+    ChatRound round,
     String content,
     String reasoning,
   ) async {
     final repository = ref.read(conversationRepositoryProvider);
-    final session = state.session;
-    if (session == null) return;
-    final originalRound = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
-    if (originalRound == null) return;
-    final updatedRound = originalRound.copyWith(
+    final updatedRound = round.copyWith(
       assistantContent: content.trim().isEmpty ? null : content,
       assistantThinking: reasoning.trim().isEmpty ? null : reasoning,
       isIncomplete: false,
       hasUnseenUpdate: true,
     );
-    await repository.updateRound(fileName, roundId, updatedRound);
-    _streamCache.updateRoundStream(fileName, roundId, isStreaming: false);
+    await repository.updateRound(fileName, round.id, updatedRound);
   }
-  void stopGeneration() {
-    if (state.pageList == null || state.pageList!.pages.isEmpty) return;
-    final viewingRound = state.pageList!.pages[_currentPageIndex].round;
-    final stream = _getRoundStream(viewingRound.id);
-    if (stream?.isStreaming != true) return;
-    _stoppingRoundIds.add(viewingRound.id);
+  void stopGeneration(String roundId) {
+    _stoppingRoundIds.add(roundId);
     final apiSource = ref.read(remoteApiSourceProvider);
-    apiSource.cancelRequest(viewingRound.id);
+    apiSource.cancelRequest(roundId);
   }
-  Future<void> switchBranch(String targetRoundId) async {
-    final session = state.session;
-    if (session == null) return;
-    final newRoundId = BranchNavigator.switchBranch(session, targetRoundId);
-    state = state.copyWithCurrentRoundId(newRoundId);
-    await ensureRoundLoaded(newRoundId);
-}
-  void changePage(int pageIndex) {
-    if (state.pageList == null) return;
-    final pages = state.pageList!.pages;
-    if (!PageUtils.isValidIndex(pageIndex, pages.length)) return;
-    final targetPage = pages[pageIndex];
-    final newRoundId = targetPage.round.id;
-    _currentPageIndex = pageIndex;
-    state = state.copyWith(
-      currentRoundId: newRoundId,
-      pageList: state.pageList!.copyWith(currentPageIndex: pageIndex),
-    );
-    ensureRoundLoaded(newRoundId);
-  }
-  Future<void> markRoundSeen(String roundId) async {
-    final session = state.session;
-    if (session == null) return;
-    final target = _firstWhereOrNull(session.rounds, (r) => r.id == roundId);
-    if (target == null || !target.hasUnseenUpdate) return;
+  Future<void> markRoundSeen(ChatRound round) async {
+    if (!round.hasUnseenUpdate) return;
     final repository = ref.read(conversationRepositoryProvider);
-    final updatedRound = target.copyWith(hasUnseenUpdate: false);
-    await repository.updateRound(fileName, roundId, updatedRound);
-  }
-  @override
-  void dispose() {
-    _sessionSubscription?.cancel();
-    super.dispose();
+    await repository.updateRound(
+      fileName,
+      round.id,
+      round.copyWith(hasUnseenUpdate: false),
+    );
   }
 }
-final chatProvider = StateNotifierProvider.family<ChatNotifier, ChatState, String>(
+final chatControllerProvider = Provider.family<ChatController, String>(
   (ref, fileName) {
-    return ChatNotifier(ref, fileName);
+    return ChatController(ref, fileName);
   },
 );
 ```

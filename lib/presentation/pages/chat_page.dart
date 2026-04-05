@@ -12,7 +12,6 @@ import '../widgets/attachment_list.dart';
 import '../widgets/input_bar.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/thought_bubble.dart';
-import '../widgets/common/app_card.dart';
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_toast.dart';
 import 'branch_tree_page.dart';
@@ -58,41 +57,40 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
 
     _sessionSubscription = ref.listenManual<AsyncValue<Session?>>(
       chatSessionProvider(widget.fileName),
-      (previous, next) {
-        next.whenData((session) async {
-          _reconcileSession(session);
+      (previous, next) async {
+        final session = next.valueOrNull;
+        _reconcileSession(session);
 
-          if (_initialMessageHandled || session == null || !mounted) {
-            return;
+        if (_initialMessageHandled || session == null || !mounted) {
+          return;
+        }
+
+        final message = widget.initialMessage?.trim() ?? '';
+        final attachments =
+            widget.initialAttachments ?? const <PendingAttachment>[];
+        final hasContent = message.isNotEmpty || attachments.isNotEmpty;
+
+        if (!hasContent) return;
+
+        _initialMessageHandled = true;
+        try {
+          final newRoundId =
+              await ref.read(chatControllerProvider(widget.fileName)).sendMessage(
+                    content: message,
+                    parentRoundId: _currentRoundId,
+                    attachments: attachments,
+                  );
+
+          if (!mounted) return;
+          setState(() {
+            _branchRoundId = newRoundId;
+            _currentRoundId = newRoundId;
+          });
+        } catch (e) {
+          if (mounted) {
+            AppToast.show('发送失败：${e.toString()}');
           }
-
-          final message = widget.initialMessage?.trim() ?? '';
-          final attachments =
-              widget.initialAttachments ?? const <PendingAttachment>[];
-          final hasContent = message.isNotEmpty || attachments.isNotEmpty;
-
-          if (!hasContent) return;
-
-          _initialMessageHandled = true;
-          try {
-            final newRoundId =
-                await ref.read(chatControllerProvider(widget.fileName)).sendMessage(
-                      content: message,
-                      parentRoundId: _currentRoundId,
-                      attachments: attachments,
-                    );
-
-            if (!mounted) return;
-            setState(() {
-              _branchRoundId = newRoundId;
-              _currentRoundId = newRoundId;
-            });
-          } catch (e) {
-            if (mounted) {
-              AppToast.show('发送失败：${e.toString()}');
-            }
-          }
-        });
+        }
       },
     );
   }
@@ -197,14 +195,6 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
       });
     }
 
-    if (visibleRounds.isNotEmpty && _pageController == null) {
-      _pageController = PageController(initialPage: nextIndex);
-      if (mounted) {
-        setState(() {});
-      }
-      return;
-    }
-
     final controller = _pageController;
     if (controller != null && controller.hasClients) {
       final currentPage = controller.page?.round() ?? controller.initialPage;
@@ -290,7 +280,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     try {
       await ref
           .read(chatControllerProvider(widget.fileName))
-          .markRoundSeen(round.id);
+          .markRoundSeen(round);
     } finally {
       _isMarkingSeen = false;
     }
@@ -318,239 +308,187 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
   @override
   Widget build(BuildContext context) {
     final sessionAsync = ref.watch(chatSessionProvider(widget.fileName));
+    final session = sessionAsync.valueOrNull;
     final chatController = ref.read(chatControllerProvider(widget.fileName));
     final editSourceRoundId = ref.watch(globalEditSourceRoundIdProvider);
     final isEditMode = editSourceRoundId != null;
 
-    return sessionAsync.when(
-      loading: () => AppPageScaffold(
-        appBar: AppBar(
-          title: const Text('对话'),
+    final visibleRounds = _buildVisibleRounds(session, _branchRoundId);
+    final currentIndex = _resolveCurrentIndex(visibleRounds, _currentRoundId);
+    final hasPages = visibleRounds.isNotEmpty;
+    final pageController = hasPages
+        ? (_pageController ??= PageController(initialPage: currentIndex))
+        : null;
+    final textTheme = Theme.of(context).textTheme;
+    final currentRound =
+        hasPages && PageUtils.isValidIndex(currentIndex, visibleRounds.length)
+            ? visibleRounds[currentIndex]
+            : null;
+    final currentIsStreaming = currentRound?.isIncomplete == true;
+
+    return AppPageScaffold(
+      appBar: AppBar(
+        title: Text(
+          session?.title ?? '对话',
+          style: textTheme.titleMedium,
         ),
-        body: const Center(child: CircularProgressIndicator()),
-      ),
-      error: (e, _) => AppPageScaffold(
-        appBar: AppBar(
-          title: const Text('对话'),
-        ),
-        body: _buildErrorState('加载会话失败：$e'),
-      ),
-      data: (session) {
-        final visibleRounds = _buildVisibleRounds(session, _branchRoundId);
-        final currentIndex =
-            _resolveCurrentIndex(visibleRounds, _currentRoundId);
-        final hasPages = visibleRounds.isNotEmpty;
-        final textTheme = Theme.of(context).textTheme;
-        final currentRound =
-            hasPages && PageUtils.isValidIndex(currentIndex, visibleRounds.length)
-                ? visibleRounds[currentIndex]
-                : null;
-        final currentIsStreaming = currentRound?.isIncomplete == true;
-
-        return AppPageScaffold(
-          appBar: AppBar(
-            title: Text(
-              session?.title ?? '对话',
-              style: textTheme.titleMedium,
-            ),
-            actions: [
-              if (session != null && _currentRoundId != null)
-                IconButton(
-                  tooltip: isEditMode ? '编辑模式下不可切换页面' : '查看分支树',
-                  icon: const Icon(Icons.account_tree_outlined),
-                  onPressed: isEditMode
-                      ? null
-                      : () async {
-                          final selectedRoundId =
-                              await Navigator.of(context).push<String?>(
-                            MaterialPageRoute(
-                              builder: (_) => BranchTreePage(
-                                fileName: widget.fileName,
-                                initialFocusRoundId: _currentRoundId!,
-                              ),
-                            ),
-                          );
-
-                          if (!mounted ||
-                              selectedRoundId == null) {
-                            return;
-                          }
-
-                          setState(() {
-                            _branchRoundId = selectedRoundId;
-                            _currentRoundId = selectedRoundId;
-                          });
-
-                          final nextVisibleRounds =
-                              _buildVisibleRounds(session, _branchRoundId);
-                          final nextIndex = _resolveCurrentIndex(
-                            nextVisibleRounds,
-                            _currentRoundId,
-                          );
-
-                          if (_pageController != null &&
-                              _pageController!.hasClients) {
-                            _pageController!.jumpToPage(nextIndex);
-                          }
-                        },
-                ),
-            ],
-          ),
-          body: Column(
-            children: [
-              if (hasPages)
-                _PaginationBar(
-                  currentIndex: currentIndex,
-                  totalPages: visibleRounds.length,
-                  onPrev: isEditMode
-                      ? null
-                      : currentIndex > 0
-                          ? () => _pageController?.previousPage(
-                                duration: const Duration(milliseconds: 260),
-                                curve: Curves.easeOutCubic,
-                              )
-                          : null,
-                  onNext: isEditMode
-                      ? null
-                      : currentIndex < visibleRounds.length - 1
-                          ? () => _pageController?.nextPage(
-                                duration: const Duration(milliseconds: 260),
-                                curve: Curves.easeOutCubic,
-                              )
-                          : null,
-                  isEditMode: isEditMode,
-                ),
-              if (isEditMode)
-                _EditModeBanner(
-                  onCancel: _cancelEditMode,
-                ),
-              Expanded(
-                child: session == null
-                    ? _buildErrorState('会话不存在')
-                    : !hasPages
-                        ? _buildWelcomeEmpty(context)
-                        : _pageController == null
-                            ? const Center(child: CircularProgressIndicator())
-                            : PageView.builder(
-                                controller: _pageController,
-                                physics: isEditMode
-                                    ? const NeverScrollableScrollPhysics()
-                                    : const PageScrollPhysics(),
-                                itemCount: visibleRounds.length,
-                                onPageChanged: (index) async {
-                                  if (!PageUtils.isValidIndex(
-                                    index,
-                                    visibleRounds.length,
-                                  )) {
-                                    return;
-                                  }
-
-                                  final round = visibleRounds[index];
-                                  setState(() {
-                                    _currentRoundId = round.id;
-                                  });
-
-                                  await _syncSeenWithVisiblePage();
-                                },
-                                itemBuilder: (context, index) {
-                                  final round = visibleRounds[index];
-                                  final canEdit = !round.isIncomplete;
-                                  return _ChatRoundPage(
-                                    key: ValueKey(round.id),
-                                    fileName: widget.fileName,
-                                    round: round,
-                                    canEdit: canEdit,
-                                    onRetryReply: () => _retryFromRound(round.id),
-                                    onEdit: canEdit
-                                        ? () => _enterEditMode(
-                                              round.id,
-                                              round.userContent,
-                                            )
-                                        : null,
-                                    onCopyText: _copyText,
-                                  );
-                                },
-                              ),
-              ),
-              InputBar(
-                hintText: isEditMode ? '修改文本后发送' : '发送消息',
-                isStreaming: currentIsStreaming,
-                onStop: currentRound == null
-                    ? null
-                    : () => chatController.stopGeneration(currentRound.id),
-                onSend: (text, attachments) async {
-                  try {
-                    if (editSourceRoundId != null) {
-                      final newRoundId =
-                          await chatController.editAndResendFromRound(
-                        editSourceRoundId,
-                        text,
-                        attachments: attachments,
+        actions: [
+          if (session != null && _currentRoundId != null)
+            IconButton(
+              tooltip: isEditMode ? '编辑模式下不可切换页面' : '查看分支树',
+              icon: const Icon(Icons.account_tree_outlined),
+              onPressed: isEditMode
+                  ? null
+                  : () async {
+                      final selectedRoundId =
+                          await Navigator.of(context).push<String?>(
+                        MaterialPageRoute(
+                          builder: (_) => BranchTreePage(
+                            fileName: widget.fileName,
+                            initialFocusRoundId: _currentRoundId!,
+                          ),
+                        ),
                       );
 
-                      if (!mounted) return;
+                      if (!mounted || selectedRoundId == null) {
+                        return;
+                      }
+
                       setState(() {
-                        _branchRoundId = newRoundId;
-                        _currentRoundId = newRoundId;
+                        _branchRoundId = selectedRoundId;
+                        _currentRoundId = selectedRoundId;
                       });
-                      _cancelEditMode();
-                      return;
-                    }
 
-                    final newRoundId = await chatController.sendMessage(
-                      content: text,
-                      parentRoundId: _currentRoundId,
-                      attachments: attachments,
-                    );
+                      final nextVisibleRounds =
+                          _buildVisibleRounds(session, _branchRoundId);
+                      final nextIndex = _resolveCurrentIndex(
+                        nextVisibleRounds,
+                        _currentRoundId,
+                      );
 
-                    if (!mounted) return;
-                    setState(() {
-                      _branchRoundId = newRoundId;
-                      _currentRoundId = newRoundId;
-                    });
-                  } catch (e) {
-                    if (mounted) {
-                      await AppToast.show('发送失败：$e');
-                    }
-                  }
-                },
-              ),
-            ],
+                      if (_pageController != null && _pageController!.hasClients) {
+                        _pageController!.jumpToPage(nextIndex);
+                      }
+                    },
+            ),
+        ],
+      ),
+      body: Column(
+        children: [
+          if (hasPages)
+            _PaginationBar(
+              currentIndex: currentIndex,
+              totalPages: visibleRounds.length,
+              onPrev: isEditMode
+                  ? null
+                  : currentIndex > 0
+                      ? () => pageController?.previousPage(
+                            duration: const Duration(milliseconds: 260),
+                            curve: Curves.easeOutCubic,
+                          )
+                      : null,
+              onNext: isEditMode
+                  ? null
+                  : currentIndex < visibleRounds.length - 1
+                      ? () => pageController?.nextPage(
+                            duration: const Duration(milliseconds: 260),
+                            curve: Curves.easeOutCubic,
+                          )
+                      : null,
+              isEditMode: isEditMode,
+            ),
+          if (isEditMode)
+            _EditModeBanner(
+              onCancel: _cancelEditMode,
+            ),
+          Expanded(
+            child: !hasPages
+                ? _buildWelcomeEmpty(context)
+                : PageView.builder(
+                    controller: pageController,
+                    physics: isEditMode
+                        ? const NeverScrollableScrollPhysics()
+                        : const PageScrollPhysics(),
+                    itemCount: visibleRounds.length,
+                    onPageChanged: (index) async {
+                      if (!PageUtils.isValidIndex(
+                        index,
+                        visibleRounds.length,
+                      )) {
+                        return;
+                      }
+
+                      final round = visibleRounds[index];
+                      setState(() {
+                        _currentRoundId = round.id;
+                      });
+
+                      await _syncSeenWithVisiblePage();
+                    },
+                    itemBuilder: (context, index) {
+                      final round = visibleRounds[index];
+                      final canEdit = !round.isIncomplete;
+                      return _ChatRoundPage(
+                        key: ValueKey(round.id),
+                        fileName: widget.fileName,
+                        round: round,
+                        canEdit: canEdit,
+                        onRetryReply: () => _retryFromRound(round.id),
+                        onEdit: canEdit
+                            ? () => _enterEditMode(
+                                  round.id,
+                                  round.userContent,
+                                )
+                            : null,
+                        onCopyText: _copyText,
+                      );
+                    },
+                  ),
           ),
-        );
-      },
-    );
-  }
+          InputBar(
+            hintText: isEditMode ? '修改文本后发送' : '发送消息',
+            isStreaming: currentIsStreaming,
+            onStop: currentRound == null
+                ? null
+                : () => chatController.stopGeneration(currentRound.id),
+            onSend: (text, attachments) async {
+              try {
+                if (editSourceRoundId != null) {
+                  final newRoundId =
+                      await chatController.editAndResendFromRound(
+                    editSourceRoundId,
+                    text,
+                    attachments: attachments,
+                  );
 
-  Widget _buildErrorState(String message) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: AppCard(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.error_outline,
-                size: 40,
-                color: colorScheme.error,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '无法加载会话',
-                style: textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: textTheme.bodySmall,
-              ),
-            ],
+                  if (!mounted) return;
+                  setState(() {
+                    _branchRoundId = newRoundId;
+                    _currentRoundId = newRoundId;
+                  });
+                  _cancelEditMode();
+                  return;
+                }
+
+                final newRoundId = await chatController.sendMessage(
+                  content: text,
+                  parentRoundId: _currentRoundId,
+                  attachments: attachments,
+                );
+
+                if (!mounted) return;
+                setState(() {
+                  _branchRoundId = newRoundId;
+                  _currentRoundId = newRoundId;
+                });
+              } catch (e) {
+                if (mounted) {
+                  await AppToast.show('发送失败：$e');
+                }
+              }
+            },
           ),
-        ),
+        ],
       ),
     );
   }
@@ -561,28 +499,30 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: AppCard(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.auto_awesome_outlined,
-                size: 36,
-                color: colorScheme.primary,
-              ),
-              const SizedBox(height: 18),
-              Text(
-                '开始一段新的对话',
-                style: textTheme.titleLarge,
-              ),
-              const SizedBox(height: 10),
-              Text(
-                '你可以输入问题、上传图片或文件，并在不同分支中回看每一轮回复。',
-                textAlign: TextAlign.center,
-                style: textTheme.bodyMedium,
-              ),
-            ],
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.auto_awesome_outlined,
+                  size: 36,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  '开始一段新的对话',
+                  style: textTheme.titleLarge,
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  '你可以输入问题、上传图片或文件，并在不同分支中回看每一轮回复。',
+                  textAlign: TextAlign.center,
+                  style: textTheme.bodyMedium,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -615,39 +555,41 @@ class _ChatRoundPage extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       children: [
-        AppCard(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _RoundHeader(createdAt: round.createdAt),
-              const SizedBox(height: 16),
-              const _SectionLabel(
-                icon: Icons.person_outline,
-                text: '你的输入',
-              ),
-              const SizedBox(height: 10),
-              if (hasUser)
-                MessageBubble(
-                  content: round.userContent,
-                  isUser: true,
-                  onCopy: () => onCopyText(round.userContent),
-                  onRetryReply: onRetryReply,
-                  onEdit: onEdit,
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _RoundHeader(createdAt: round.createdAt),
+                const SizedBox(height: 16),
+                const _SectionLabel(
+                  icon: Icons.person_outline,
+                  text: '你的输入',
                 ),
-              if (hasAttachments) ...[
-                if (hasUser) const SizedBox(height: 8),
-                AttachmentList(
-                  attachments: round.userAttachments,
-                  rightAligned: true,
+                const SizedBox(height: 10),
+                if (hasUser)
+                  MessageBubble(
+                    content: round.userContent,
+                    isUser: true,
+                    onCopy: () => onCopyText(round.userContent),
+                    onRetryReply: onRetryReply,
+                    onEdit: onEdit,
+                  ),
+                if (hasAttachments) ...[
+                  if (hasUser) const SizedBox(height: 8),
+                  AttachmentList(
+                    attachments: round.userAttachments,
+                    rightAligned: true,
+                  ),
+                ],
+                _RoundAnswerSection(
+                  round: round,
+                  onRetryReply: onRetryReply,
+                  onCopyText: onCopyText,
                 ),
               ],
-              _RoundAnswerSection(
-                round: round,
-                onRetryReply: onRetryReply,
-                onCopyText: onCopyText,
-              ),
-            ],
+            ),
           ),
         ),
       ],
