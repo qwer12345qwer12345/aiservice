@@ -1080,6 +1080,7 @@ import 'package:http/http.dart' as http;
 import '../../core/errors/exceptions.dart';
 import '../../core/models/model_info.dart';
 import '../../core/models/api_message.dart';
+import '../../core/models/app_config.dart';
 import '../../core/models/chat_chunk.dart';
 import '../../core/utils/sse_parser.dart';
 import '../../domain/services/model_capability_registry.dart';
@@ -1094,11 +1095,7 @@ abstract class IRemoteApiSource {
 
   Stream<ChatChunk> chatStream({
     required String taskId,
-    required String baseUrl,
-    required String apiKey,
-    required String chatPath,
-    required String apiMode,
-    required String model,
+    required Future<AppConfig> Function() loadConfig,
     required List<ApiMessage> context,
     bool enableReasoning = false,
   });
@@ -1366,11 +1363,7 @@ class RemoteApiSource implements IRemoteApiSource {
   @override
   Stream<ChatChunk> chatStream({
     required String taskId,
-    required String baseUrl,
-    required String apiKey,
-    required String chatPath,
-    required String apiMode,
-    required String model,
+    required Future<AppConfig> Function() loadConfig,
     required List<ApiMessage> context,
     bool enableReasoning = false,
   }) async* {
@@ -1379,6 +1372,34 @@ class RemoteApiSource implements IRemoteApiSource {
     _activeClients[taskId] = client;
 
     try {
+      final config = await loadConfig();
+
+      final baseUrl = config.baseUrl.trim();
+      final apiKey = config.apiKey.trim();
+      final chatPath = config.chatPath.trim();
+      final apiMode = config.apiMode.trim();
+      final model = config.selectedModel?.trim() ?? '';
+
+      if (baseUrl.isEmpty) {
+        yield const ChatChunk(isDone: true, error: 'Base URL 为空');
+        return;
+      }
+
+      if (apiKey.isEmpty) {
+        yield const ChatChunk(isDone: true, error: 'API Key 为空');
+        return;
+      }
+
+      if (chatPath.isEmpty) {
+        yield const ChatChunk(isDone: true, error: 'Chat Path 为空');
+        return;
+      }
+
+      if (model.isEmpty) {
+        yield const ChatChunk(isDone: true, error: '未选择模型');
+        return;
+      }
+
       final url = Uri.parse(_buildUrl(baseUrl, chatPath));
       final requestBody = _buildRequestBody(
         apiMode: apiMode,
@@ -1387,10 +1408,6 @@ class RemoteApiSource implements IRemoteApiSource {
         enableReasoning: enableReasoning,
       );
       final body = jsonEncode(requestBody);
-
-      // 调试用：必要时打开
-      // print('REQUEST URL => $url');
-      // print('REQUEST BODY => $body');
 
       final request = http.Request('POST', url)
         ..headers.addAll({
@@ -1443,14 +1460,11 @@ class RemoteApiSource implements IRemoteApiSource {
               return;
             }
           } catch (e) {
-            // 保持原逻辑风格：单条 SSE 事件解析失败不让整个流崩掉
-            // 如需调试，可打开下面这行：
-            // print('SSE decode error: $e, event=$event');
+            // 单条 SSE 解析失败不让整个流中断
           }
         }
       }
 
-      // 流结束时 flush 一次，避免最后一个事件未被空行结尾
       final lastEvent = parser.close();
       if (lastEvent != null) {
         try {
@@ -5313,6 +5327,58 @@ class ConversationRepository {
     });
   }
 
+  /// 一次性读取某 round 对应的完整上下文链（从根到该 round）
+  Future<List<ChatRound>> getContextRounds(String fileName, String roundId) async {
+    final sessionId = _getId(fileName);
+    final query = _db.select(_db.dbChatRounds).join([
+      leftOuterJoin(
+        _db.dbAttachments,
+        _db.dbAttachments.roundId.equalsExp(_db.dbChatRounds.id),
+      ),
+    ])
+      ..where(_db.dbChatRounds.sessionId.equals(sessionId))
+      ..orderBy([OrderingTerm.asc(_db.dbChatRounds.createdAt)]);
+
+    final rows = await query.get();
+
+    final roundMap = <String, DbChatRound>{};
+    final attachmentMap = <String, List<Attachment>>{};
+
+    for (final row in rows) {
+      final roundRow = row.readTable(_db.dbChatRounds);
+      roundMap.putIfAbsent(roundRow.id, () => roundRow);
+
+      final attachmentRow = row.readTableOrNull(_db.dbAttachments);
+      if (attachmentRow != null) {
+        attachmentMap.putIfAbsent(roundRow.id, () => []).add(
+          Attachment(
+            id: attachmentRow.id,
+            name: attachmentRow.name,
+            relativePath: attachmentRow.relativePath,
+            isImage: attachmentRow.isImage,
+            mimeType: attachmentRow.mimeType,
+          ),
+        );
+      }
+    }
+
+    final path = <ChatRound>[];
+    String? currentId = roundId;
+
+    while (currentId != null && roundMap.containsKey(currentId)) {
+      final roundRow = roundMap[currentId]!;
+      path.add(
+        _mapToChatRound(
+          roundRow,
+          attachmentMap[currentId] ?? const <Attachment>[],
+        ),
+      );
+      currentId = roundRow.parentId;
+    }
+
+    return path.reversed.toList();
+  }
+
   // ========== 私有辅助方法 ==========
 
   Session? _mapSessionFromJoinedRows(List<TypedResult> rows) {
@@ -9011,11 +9077,10 @@ class ChatController {
     required String? parentRoundId,
     List<dynamic>? attachments,
   }) async {
-    // ========== 阶段1: 准备并持久化用户消息 ==========
     final repository = ref.read(conversationRepositoryProvider);
     final saved = await AttachmentPreparer.savePendingAttachments(
-      repository, 
-      attachments?.cast() ?? []
+      repository,
+      attachments?.cast() ?? [],
     );
 
     final newRound = ChatRound(
@@ -9025,69 +9090,82 @@ class ChatController {
       userContent: content,
       userAttachments: saved,
       isIncomplete: true,
+      hasUnseenUpdate: false,
     );
 
     await repository.appendRound(fileName, newRound);
-    
-    // ========== 阶段2: 内联流式任务（真正 inline，fire-and-forget）==========
-    () async {
-      // 1. 原子快照读取
-      final apiSource = ref.read(remoteApiSourceProvider);
-      final sessionRounds = ref.read(chatSessionProvider(fileName)).valueOrNull?.rounds ?? [];
-      if (sessionRounds.isEmpty) return;
 
-      final config = await ref.read(configServiceProvider).loadConfig();
+    () async {
+      final apiSource = ref.read(remoteApiSourceProvider);
       final accumulator = ChatStreamAccumulator();
       String? error;
-
+      DateTime? lastDbUpdateTime;
+      const updateInterval = Duration(seconds: 1);
       try {
-        // 2. 构建上下文路径
-        final contextPath = _buildContextPathFromSnapshot(newRound.id, sessionRounds);
-        final apiContext = await ChatContextBuilder.buildFromRounds(contextPath, repository);
+        final contextRounds = await repository.getContextRounds(
+          fileName,
+          newRound.id,
+        );
+        final apiContext = await ChatContextBuilder.buildFromRounds(
+          contextRounds,
+          repository,
+        );
 
-        // 3. 发起流式请求
         final stream = apiSource.chatStream(
           taskId: newRound.id,
-          baseUrl: config.baseUrl,
-          apiKey: config.apiKey,
-          chatPath: config.chatPath,
-          apiMode: config.apiMode,
-          model: config.selectedModel ?? '',
+          loadConfig: () => ref.read(configServiceProvider).loadConfig(),
           context: apiContext,
           enableReasoning: true,
         );
 
-        // 4. 流式消费 + 增量更新
         await for (final chunk in stream) {
-          if (chunk.error != null) { error = chunk.error; break; }
+          if (chunk.error != null) {
+            error = chunk.error;
+            break;
+          }
           if (chunk.isDone) break;
+
           accumulator.add(chunk);
-          await repository.updateRound(fileName, newRound.id, newRound.copyWith(
-            assistantContent: accumulator.content,
-            assistantThinking: accumulator.reasoning,
-          ));
+
+          final now = DateTime.now();
+          if (lastDbUpdateTime == null || now.difference(lastDbUpdateTime) >= updateInterval) {
+            await repository.updateRound(
+              fileName,
+              newRound.id,
+              newRound.copyWith(
+                assistantContent: accumulator.content,
+                assistantThinking: accumulator.reasoning,
+              ),
+            );
+            lastDbUpdateTime = now;
+          }
         }
       } catch (e) {
         error = e.toString();
       } finally {
-        // 5. 最终状态持久化
         String finalContent = accumulator.content;
         if (error != null) {
-          finalContent += "\n\n[错误]\n$error ";
+          finalContent += '\n\n[错误]\n$error';
         } else if (_stoppingRoundIds.contains(newRound.id)) {
-          finalContent += "\n\n[已停止] ";
+          finalContent += '\n\n[已停止]';
         }
 
-        await repository.updateRound(fileName, newRound.id, newRound.copyWith(
-          assistantContent: finalContent.trim().isEmpty ? null : finalContent,
-          assistantThinking: accumulator.reasoning.trim().isEmpty ? null : accumulator.reasoning,
-          isIncomplete: false,
-          hasUnseenUpdate: true,
-        ));
+        await repository.updateRound(
+          fileName,
+          newRound.id,
+          newRound.copyWith(
+            assistantContent: finalContent.trim().isEmpty ? null : finalContent,
+            assistantThinking: accumulator.reasoning.trim().isEmpty
+                ? null
+                : accumulator.reasoning,
+            isIncomplete: false,
+            hasUnseenUpdate: true,
+          ),
+        );
         _stoppingRoundIds.remove(newRound.id);
       }
-    }(); // ← 立即执行 async 闭包，不 await，实现 fire-and-forget
-    
+    }();
+
     return newRound.id;
   }
 
@@ -9103,26 +9181,17 @@ class ChatController {
     return sendMessage(content: content, parentRoundId: source.parentId, attachments: attachments);
   }
 
-  /// 基于原子快照构建消息路径（替代原内部循环）
-  List<ChatRound> _buildContextPathFromSnapshot(String roundId, List<ChatRound> allRounds) {
-    final roundMap = {for (final r in allRounds) r.id: r};
-    final path = <ChatRound>[];
-    String? currentId = roundId;
-
-    while (currentId != null && roundMap.containsKey(currentId)) {
-      path.add(roundMap[currentId]!);
-      currentId = roundMap[currentId]!.parentId;
-    }
-    return path.reversed.toList();
-  }
-
   void stopGeneration(String roundId) {
     _stoppingRoundIds.add(roundId);
     ref.read(remoteApiSourceProvider).cancelRequest(roundId);
   }
 
   Future<void> markRoundSeen(ChatRound round) async {
-    await ref.read(conversationRepositoryProvider).updateRound(fileName, round.id, round.copyWith(hasUnseenUpdate: false));
+    await ref.read(conversationRepositoryProvider).updateRound(
+      fileName,
+      round.id,
+      round.copyWith(hasUnseenUpdate: false),
+    );
   }
 }
 

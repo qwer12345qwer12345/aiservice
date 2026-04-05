@@ -123,6 +123,58 @@ class ConversationRepository {
     });
   }
 
+  /// 一次性读取某 round 对应的完整上下文链（从根到该 round）
+  Future<List<ChatRound>> getContextRounds(String fileName, String roundId) async {
+    final sessionId = _getId(fileName);
+    final query = _db.select(_db.dbChatRounds).join([
+      leftOuterJoin(
+        _db.dbAttachments,
+        _db.dbAttachments.roundId.equalsExp(_db.dbChatRounds.id),
+      ),
+    ])
+      ..where(_db.dbChatRounds.sessionId.equals(sessionId))
+      ..orderBy([OrderingTerm.asc(_db.dbChatRounds.createdAt)]);
+
+    final rows = await query.get();
+
+    final roundMap = <String, DbChatRound>{};
+    final attachmentMap = <String, List<Attachment>>{};
+
+    for (final row in rows) {
+      final roundRow = row.readTable(_db.dbChatRounds);
+      roundMap.putIfAbsent(roundRow.id, () => roundRow);
+
+      final attachmentRow = row.readTableOrNull(_db.dbAttachments);
+      if (attachmentRow != null) {
+        attachmentMap.putIfAbsent(roundRow.id, () => []).add(
+          Attachment(
+            id: attachmentRow.id,
+            name: attachmentRow.name,
+            relativePath: attachmentRow.relativePath,
+            isImage: attachmentRow.isImage,
+            mimeType: attachmentRow.mimeType,
+          ),
+        );
+      }
+    }
+
+    final path = <ChatRound>[];
+    String? currentId = roundId;
+
+    while (currentId != null && roundMap.containsKey(currentId)) {
+      final roundRow = roundMap[currentId]!;
+      path.add(
+        _mapToChatRound(
+          roundRow,
+          attachmentMap[currentId] ?? const <Attachment>[],
+        ),
+      );
+      currentId = roundRow.parentId;
+    }
+
+    return path.reversed.toList();
+  }
+
   // ========== 私有辅助方法 ==========
 
   Session? _mapSessionFromJoinedRows(List<TypedResult> rows) {

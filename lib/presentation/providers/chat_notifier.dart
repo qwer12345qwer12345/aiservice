@@ -68,11 +68,10 @@ class ChatController {
     required String? parentRoundId,
     List<dynamic>? attachments,
   }) async {
-    // ========== 阶段1: 准备并持久化用户消息 ==========
     final repository = ref.read(conversationRepositoryProvider);
     final saved = await AttachmentPreparer.savePendingAttachments(
-      repository, 
-      attachments?.cast() ?? []
+      repository,
+      attachments?.cast() ?? [],
     );
 
     final newRound = ChatRound(
@@ -82,68 +81,82 @@ class ChatController {
       userContent: content,
       userAttachments: saved,
       isIncomplete: true,
+      hasUnseenUpdate: false,
     );
 
     await repository.appendRound(fileName, newRound);
-    
-    // ========== 阶段2: 内联流式任务（真正 inline，fire-and-forget）==========
-    () async {
-      // 1. 原子快照读取
-      final apiSource = ref.read(remoteApiSourceProvider);
-      final sessionRounds = ref.read(chatSessionProvider(fileName)).valueOrNull?.rounds ?? [];
 
-      final config = await ref.read(configServiceProvider).loadConfig();
+    () async {
+      final apiSource = ref.read(remoteApiSourceProvider);
       final accumulator = ChatStreamAccumulator();
       String? error;
-
+      DateTime? lastDbUpdateTime;
+      const updateInterval = Duration(seconds: 1);
       try {
-        // 2. 构建上下文路径
-        final contextPath = _buildContextPathFromSnapshot(newRound.id, sessionRounds);
-        final apiContext = await ChatContextBuilder.buildFromRounds(contextPath, repository);
+        final contextRounds = await repository.getContextRounds(
+          fileName,
+          newRound.id,
+        );
+        final apiContext = await ChatContextBuilder.buildFromRounds(
+          contextRounds,
+          repository,
+        );
 
-        // 3. 发起流式请求
         final stream = apiSource.chatStream(
           taskId: newRound.id,
-          baseUrl: config.baseUrl,
-          apiKey: config.apiKey,
-          chatPath: config.chatPath,
-          apiMode: config.apiMode,
-          model: config.selectedModel ?? '',
+          loadConfig: () => ref.read(configServiceProvider).loadConfig(),
           context: apiContext,
           enableReasoning: true,
         );
 
-        // 4. 流式消费 + 增量更新
         await for (final chunk in stream) {
-          if (chunk.error != null) { error = chunk.error; break; }
+          if (chunk.error != null) {
+            error = chunk.error;
+            break;
+          }
           if (chunk.isDone) break;
+
           accumulator.add(chunk);
-          await repository.updateRound(fileName, newRound.id, newRound.copyWith(
-            assistantContent: accumulator.content,
-            assistantThinking: accumulator.reasoning,
-          ));
+
+          final now = DateTime.now();
+          if (lastDbUpdateTime == null || now.difference(lastDbUpdateTime) >= updateInterval) {
+            await repository.updateRound(
+              fileName,
+              newRound.id,
+              newRound.copyWith(
+                assistantContent: accumulator.content,
+                assistantThinking: accumulator.reasoning,
+              ),
+            );
+            lastDbUpdateTime = now;
+          }
         }
       } catch (e) {
         error = e.toString();
       } finally {
-        // 5. 最终状态持久化
         String finalContent = accumulator.content;
         if (error != null) {
-          finalContent += "\n\n[错误]\n$error ";
+          finalContent += '\n\n[错误]\n$error';
         } else if (_stoppingRoundIds.contains(newRound.id)) {
-          finalContent += "\n\n[已停止] ";
+          finalContent += '\n\n[已停止]';
         }
 
-        await repository.updateRound(fileName, newRound.id, newRound.copyWith(
-          assistantContent: finalContent.trim().isEmpty ? null : finalContent,
-          assistantThinking: accumulator.reasoning.trim().isEmpty ? null : accumulator.reasoning,
-          isIncomplete: false,
-          hasUnseenUpdate: true,
-        ));
+        await repository.updateRound(
+          fileName,
+          newRound.id,
+          newRound.copyWith(
+            assistantContent: finalContent.trim().isEmpty ? null : finalContent,
+            assistantThinking: accumulator.reasoning.trim().isEmpty
+                ? null
+                : accumulator.reasoning,
+            isIncomplete: false,
+            hasUnseenUpdate: true,
+          ),
+        );
         _stoppingRoundIds.remove(newRound.id);
       }
-    }(); // ← 立即执行 async 闭包，不 await，实现 fire-and-forget
-    
+    }();
+
     return newRound.id;
   }
 
@@ -159,26 +172,17 @@ class ChatController {
     return sendMessage(content: content, parentRoundId: source.parentId, attachments: attachments);
   }
 
-  /// 基于原子快照构建消息路径（替代原内部循环）
-  List<ChatRound> _buildContextPathFromSnapshot(String roundId, List<ChatRound> allRounds) {
-    final roundMap = {for (final r in allRounds) r.id: r};
-    final path = <ChatRound>[];
-    String? currentId = roundId;
-
-    while (currentId != null && roundMap.containsKey(currentId)) {
-      path.add(roundMap[currentId]!);
-      currentId = roundMap[currentId]!.parentId;
-    }
-    return path.reversed.toList();
-  }
-
   void stopGeneration(String roundId) {
     _stoppingRoundIds.add(roundId);
     ref.read(remoteApiSourceProvider).cancelRequest(roundId);
   }
 
   Future<void> markRoundSeen(ChatRound round) async {
-    await ref.read(conversationRepositoryProvider).updateRound(fileName, round.id, round.copyWith(hasUnseenUpdate: false));
+    await ref.read(conversationRepositoryProvider).updateRound(
+      fileName,
+      round.id,
+      round.copyWith(hasUnseenUpdate: false),
+    );
   }
 }
 

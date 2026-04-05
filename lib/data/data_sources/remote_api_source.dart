@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import '../../core/errors/exceptions.dart';
 import '../../core/models/model_info.dart';
 import '../../core/models/api_message.dart';
+import '../../core/models/app_config.dart';
 import '../../core/models/chat_chunk.dart';
 import '../../core/utils/sse_parser.dart';
 import '../../domain/services/model_capability_registry.dart';
@@ -17,11 +18,7 @@ abstract class IRemoteApiSource {
 
   Stream<ChatChunk> chatStream({
     required String taskId,
-    required String baseUrl,
-    required String apiKey,
-    required String chatPath,
-    required String apiMode,
-    required String model,
+    required Future<AppConfig> Function() loadConfig,
     required List<ApiMessage> context,
     bool enableReasoning = false,
   });
@@ -289,11 +286,7 @@ class RemoteApiSource implements IRemoteApiSource {
   @override
   Stream<ChatChunk> chatStream({
     required String taskId,
-    required String baseUrl,
-    required String apiKey,
-    required String chatPath,
-    required String apiMode,
-    required String model,
+    required Future<AppConfig> Function() loadConfig,
     required List<ApiMessage> context,
     bool enableReasoning = false,
   }) async* {
@@ -302,6 +295,34 @@ class RemoteApiSource implements IRemoteApiSource {
     _activeClients[taskId] = client;
 
     try {
+      final config = await loadConfig();
+
+      final baseUrl = config.baseUrl.trim();
+      final apiKey = config.apiKey.trim();
+      final chatPath = config.chatPath.trim();
+      final apiMode = config.apiMode.trim();
+      final model = config.selectedModel?.trim() ?? '';
+
+      if (baseUrl.isEmpty) {
+        yield const ChatChunk(isDone: true, error: 'Base URL 为空');
+        return;
+      }
+
+      if (apiKey.isEmpty) {
+        yield const ChatChunk(isDone: true, error: 'API Key 为空');
+        return;
+      }
+
+      if (chatPath.isEmpty) {
+        yield const ChatChunk(isDone: true, error: 'Chat Path 为空');
+        return;
+      }
+
+      if (model.isEmpty) {
+        yield const ChatChunk(isDone: true, error: '未选择模型');
+        return;
+      }
+
       final url = Uri.parse(_buildUrl(baseUrl, chatPath));
       final requestBody = _buildRequestBody(
         apiMode: apiMode,
@@ -310,10 +331,6 @@ class RemoteApiSource implements IRemoteApiSource {
         enableReasoning: enableReasoning,
       );
       final body = jsonEncode(requestBody);
-
-      // 调试用：必要时打开
-      // print('REQUEST URL => $url');
-      // print('REQUEST BODY => $body');
 
       final request = http.Request('POST', url)
         ..headers.addAll({
@@ -366,14 +383,11 @@ class RemoteApiSource implements IRemoteApiSource {
               return;
             }
           } catch (e) {
-            // 保持原逻辑风格：单条 SSE 事件解析失败不让整个流崩掉
-            // 如需调试，可打开下面这行：
-            // print('SSE decode error: $e, event=$event');
+            // 单条 SSE 解析失败不让整个流中断
           }
         }
       }
 
-      // 流结束时 flush 一次，避免最后一个事件未被空行结尾
       final lastEvent = parser.close();
       if (lastEvent != null) {
         try {
