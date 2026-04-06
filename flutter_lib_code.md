@@ -5204,7 +5204,6 @@ class $AppDatabaseManager {
 ```dart
 // data/repositories/conversation_repository.dart
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:drift/drift.dart';
 import '../data_sources/local_file_source.dart';
 import '../../core/models/attachment.dart';
@@ -5634,15 +5633,15 @@ class ConversationRepository {
 
 ## File: data/services/config_service.dart
 ```dart
-// data/services/config_service.dart
-
 import 'dart:async';
 import 'package:drift/drift.dart';
 import '../../core/interfaces/config_service.dart';
 import '../../core/models/app_config.dart';
 import '../../core/models/app_config_store.dart';
+import '../../core/models/model_info.dart';
 import '../../core/utils/id_generator.dart';
 import '../../data/data_sources/remote_api_source.dart';
+import '../../domain/services/model_capability_registry.dart';
 import '../database/database.dart';
 
 class ConfigService implements IConfigService {
@@ -5651,7 +5650,6 @@ class ConfigService implements IConfigService {
 
   ConfigService(this._db, this._apiSource);
 
-  /// 确保数据库有默认数据，返回合法的配置存储
   Future<AppConfigStore> _ensureInitialized() async {
     final storeRow = await _db.select(_db.dbConfigStore).getSingleOrNull();
     var activeId = storeRow?.activeProfileId ?? 'default';
@@ -5673,22 +5671,30 @@ class ConfigService implements IConfigService {
         ),
       );
       await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
-        const DbConfigStoreCompanion(id: Value(1), activeProfileId: Value('default')),
+        const DbConfigStoreCompanion(
+          id: Value(1),
+          activeProfileId: Value('default'),
+        ),
       );
 
       activeId = 'default';
-      return AppConfigStore(activeProfileId: activeId, profiles: [defaultProfile]);
+      return AppConfigStore(
+        activeProfileId: activeId,
+        profiles: [defaultProfile],
+      );
     }
 
     final profiles = profileRows
         .map((p) => ConfigProfile(id: p.id, name: p.name, config: p.config))
         .toList();
 
-    // 校验 activeId 有效性，不合法则切换到第一个
     if (!profiles.any((p) => p.id == activeId)) {
       activeId = profiles.first.id;
       await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
-        DbConfigStoreCompanion(id: const Value(1), activeProfileId: Value(activeId)),
+        DbConfigStoreCompanion(
+          id: const Value(1),
+          activeProfileId: Value(activeId),
+        ),
       );
     }
 
@@ -5703,7 +5709,6 @@ class ConfigService implements IConfigService {
   @override
   Future<AppConfig> loadConfig() async {
     final store = await loadConfigStore();
-    // 使用 firstWhere 带 orElse，避免抛异常
     return store.profiles.firstWhere(
       (p) => p.id == store.activeProfileId,
       orElse: () => store.profiles.first,
@@ -5713,20 +5718,48 @@ class ConfigService implements IConfigService {
   @override
   Future<void> saveConfig(AppConfig config) async {
     final activeId = await getActiveProfileId();
-    await (_db.update(_db.dbConfigProfiles)
-          ..where((t) => t.id.equals(activeId)))
+    await (_db.update(_db.dbConfigProfiles)..where((t) => t.id.equals(activeId)))
         .write(DbConfigProfilesCompanion(config: Value(config)));
   }
 
   @override
   Future<void> refreshModels() async {
     final activeConfig = await loadConfig();
-    final models = await _apiSource.fetchModels(
+
+    final remoteModels = await _apiSource.fetchModels(
       baseUrl: activeConfig.baseUrl,
       apiKey: activeConfig.apiKey,
       modelsPath: activeConfig.modelsPath,
     );
-    final updatedConfig = activeConfig.copyWith(availableModels: models);
+
+    final oldModels = activeConfig.availableModels ?? const <ModelInfo>[];
+    final oldById = {for (final model in oldModels) model.id: model};
+    final remoteIds = remoteModels.map((e) => e.id).toSet();
+
+    final mergedRemoteModels = remoteModels.map((remote) {
+      final old = oldById[remote.id];
+      final merged = remote.copyWith(
+        overrideSupportsReasoning: old?.overrideSupportsReasoning,
+        overrideSupportsVision: old?.overrideSupportsVision,
+      );
+      return ModelCapabilityRegistry.enhance(merged);
+    }).toList();
+
+    final customOnlyModels = oldModels
+        .where((old) => !remoteIds.contains(old.id))
+        .where((old) =>
+            old.overrideSupportsReasoning != null ||
+            old.overrideSupportsVision != null)
+        .map(ModelCapabilityRegistry.enhance)
+        .toList();
+
+    final updatedConfig = activeConfig.copyWith(
+      availableModels: [
+        ...mergedRemoteModels,
+        ...customOnlyModels,
+      ],
+    );
+
     await saveConfig(updatedConfig);
   }
 
@@ -5741,12 +5774,14 @@ class ConfigService implements IConfigService {
     final storeRow = await _db.select(_db.dbConfigStore).getSingleOrNull();
     var activeId = storeRow?.activeProfileId ?? 'default';
 
-    // 校验有效性
     final profiles = await _db.select(_db.dbConfigProfiles).get();
     if (!profiles.any((p) => p.id == activeId) && profiles.isNotEmpty) {
       activeId = profiles.first.id;
       await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
-        DbConfigStoreCompanion(id: const Value(1), activeProfileId: Value(activeId)),
+        DbConfigStoreCompanion(
+          id: const Value(1),
+          activeProfileId: Value(activeId),
+        ),
       );
     }
 
@@ -5755,9 +5790,11 @@ class ConfigService implements IConfigService {
 
   @override
   Future<void> switchProfile(String profileId) async {
-    // 直接写入数据库，依赖 Drift 触发流更新
     await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
-      DbConfigStoreCompanion(id: const Value(1), activeProfileId: Value(profileId)),
+      DbConfigStoreCompanion(
+        id: const Value(1),
+        activeProfileId: Value(profileId),
+      ),
     );
   }
 
@@ -5780,7 +5817,8 @@ class ConfigService implements IConfigService {
   @override
   Future<void> renameProfile(String profileId, String name) async {
     if (name.trim().isEmpty) return;
-    await (_db.update(_db.dbConfigProfiles)..where((t) => t.id.equals(profileId)))
+    await (_db.update(_db.dbConfigProfiles)
+          ..where((t) => t.id.equals(profileId)))
         .write(DbConfigProfilesCompanion(name: Value(name.trim())));
   }
 
@@ -5788,10 +5826,8 @@ class ConfigService implements IConfigService {
   Future<void> deleteProfile(String profileId) async {
     final store = await loadConfigStore();
 
-    // 只有一个配置文件时不允许删除
     if (store.profiles.length <= 1) return;
 
-    // 如果要删除的是当前激活的配置，先切换到其他配置
     if (store.activeProfileId == profileId) {
       final remaining = store.profiles.where((p) => p.id != profileId).toList();
       if (remaining.isNotEmpty) {
@@ -5799,41 +5835,29 @@ class ConfigService implements IConfigService {
       }
     }
 
-    await (_db.delete(_db.dbConfigProfiles)..where((t) => t.id.equals(profileId))).go();
+    await (_db.delete(_db.dbConfigProfiles)
+          ..where((t) => t.id.equals(profileId)))
+        .go();
   }
 
-  /// 同时监听两个表的变更，用原生Dart的Stream实现组合
   @override
   Stream<AppConfigStore> watchConfigStore() {
-    // 首次执行初始化
     _ensureInitialized();
 
-    // 监听配置存储表（activeProfileId）
     final storeStream = _db.select(_db.dbConfigStore).watchSingleOrNull();
-
-    // 监听配置存档列表
     final profilesStream = _db.select(_db.dbConfigProfiles).watch();
 
-    // 用StreamController手动合并两个流
-    // 各自维护最新的值，任意一个流更新时用两个最新值计算结果
     final outputController = StreamController<AppConfigStore>();
 
-    // 存储各自最新的值
     DbConfigStoreData? latestStoreRow;
     List<DbConfigProfile> latestProfileRows = [];
 
-    // 计算并输出最新的AppConfigStore
     void computeAndOutput() {
       final storeRow = latestStoreRow;
       final profileRows = latestProfileRows;
 
-      // 如果两个值都还没有，不输出
       if (storeRow == null && profileRows.isEmpty) return;
-
-      // 兜底：如果配置列表为空，重新初始化
-      if (profileRows.isEmpty) {
-        return;
-      }
+      if (profileRows.isEmpty) return;
 
       var activeId = storeRow?.activeProfileId ?? 'default';
 
@@ -5841,19 +5865,21 @@ class ConfigService implements IConfigService {
           .map((p) => ConfigProfile(id: p.id, name: p.name, config: p.config))
           .toList();
 
-      // 确保 activeId 合法
       if (!profiles.any((p) => p.id == activeId)) {
         activeId = profiles.first.id;
-        // 自动修正
         _db.into(_db.dbConfigStore).insertOnConflictUpdate(
-          DbConfigStoreCompanion(id: const Value(1), activeProfileId: Value(activeId)),
+          DbConfigStoreCompanion(
+            id: const Value(1),
+            activeProfileId: Value(activeId),
+          ),
         );
       }
 
-      outputController.add(AppConfigStore(activeProfileId: activeId, profiles: profiles));
+      outputController.add(
+        AppConfigStore(activeProfileId: activeId, profiles: profiles),
+      );
     }
 
-    // 订阅 storeStream
     final storeSubscription = storeStream.listen(
       (row) {
         latestStoreRow = row;
@@ -5864,7 +5890,6 @@ class ConfigService implements IConfigService {
       },
     );
 
-    // 订阅 profilesStream
     final profilesSubscription = profilesStream.listen(
       (rows) {
         latestProfileRows = rows;
@@ -5875,7 +5900,6 @@ class ConfigService implements IConfigService {
       },
     );
 
-    // 清理资源
     outputController.onCancel = () {
       storeSubscription.cancel();
       profilesSubscription.cancel();
@@ -5884,7 +5908,6 @@ class ConfigService implements IConfigService {
     return outputController.stream;
   }
 
-  /// 监听当前激活的配置
   @override
   Stream<AppConfig> watchConfig() {
     return watchConfigStore().map((store) {
@@ -6973,7 +6996,6 @@ class PendingAttachment {
 ```dart
 // presentation/pages/branch_tree_page.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:graphview/GraphView.dart';
 import '../../core/models/chat_round.dart';
@@ -6981,7 +7003,7 @@ import '../../core/utils/time_format_utils.dart';
 import '../../di/providers.dart';
 import '../../domain/models/tree_node.dart';
 import '../../domain/services/tree_builder.dart';
-import '../providers/chat_notifier.dart' show chatSessionProvider;
+import '../providers/chat_notifier.dart' show chatSessionProvider, chatTopologyProvider, roundDetailProvider;
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_toast.dart';
 
@@ -6993,17 +7015,18 @@ import '../widgets/common/app_toast.dart';
 /// 将无关内容的字段剔除，使得 AI 回复文本时，该 Provider 产出的 List 完全一样（利用 Freezed 相等性）。
 /// 从而切断流式更新向下游的传递。
 final _sessionTopologyProvider = Provider.family<List<ChatRound>, String>((ref, fileName) {
-  return ref.watch(chatSessionProvider(fileName).select((sessionAsync) {
-    final rounds = sessionAsync.valueOrNull?.rounds ?? const [];
-    return rounds.map((r) => r.copyWith(
-      userContent: '',
-      assistantContent: null,
-      assistantThinking: null,
-      userAttachments: const [],
-      isIncomplete: false,
-      hasUnseenUpdate: false,
-    )).toList();
-  }));
+  final topology = ref.watch(chatTopologyProvider(fileName)).valueOrNull ?? [];
+  return topology.map((t) => ChatRound(
+    id: t.id,
+    parentId: t.parentId,
+    createdAt: 0,
+    userContent: '',
+    assistantContent: null,
+    assistantThinking: null,
+    userAttachments: const [],
+    isIncomplete: false,
+    hasUnseenUpdate: false,
+  )).toList();
 });
 
 /// 2. 结构树 Provider：
@@ -7184,14 +7207,13 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   Widget build(BuildContext context) {
     // 基础状态监听：标题、加载状态（这些几乎不会频繁改变）
     final sessionTitle = ref.watch(chatSessionProvider(widget.fileName).select((s) => s.valueOrNull?.title ?? '分支树'));
-    final isLoading = ref.watch(chatSessionProvider(widget.fileName).select((s) => s.isLoading && !s.hasValue));
     final hasError = ref.watch(chatSessionProvider(widget.fileName).select((s) => s.hasError));
 
-    if (isLoading) {
-      return AppPageScaffold(appBar: AppBar(title: Text(sessionTitle)), body: const Center(child: CircularProgressIndicator()));
-    }
     if (hasError) {
-      return AppPageScaffold(appBar: AppBar(title: Text(sessionTitle)), body: const Center(child: Text('加载失败')));
+      return AppPageScaffold(
+        appBar: AppBar(title: Text(sessionTitle)),
+        body: const Center(child: Text('加载失败')),
+      );
     }
 
     final topologyRounds = ref.watch(_sessionTopologyProvider(widget.fileName));
@@ -7401,17 +7423,8 @@ class _GraphNodeCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // ⚡ 重点：这里独立监听数据库流出的实时数据，仅更新本卡片
-    final round = ref.watch(chatSessionProvider(fileName).select((s) {
-      final rounds = s.valueOrNull?.rounds ?? const [];
-      return rounds.firstWhere(
-        (r) => r.id == roundId,
-        // 防止在被删除那帧报错，提供一个空 Fallback
-        orElse: () => ChatRound(id: roundId, createdAt: 0, userContent: '', isIncomplete: false),
-      );
-    }));
-
-    if (round.createdAt == 0) return const SizedBox.shrink();
+    final round = ref.watch(roundDetailProvider(roundId)).valueOrNull;
+    if (round == null) return const SizedBox.shrink();
 
     final isIncomplete = round.isIncomplete;
     final hasUnseenUpdate = round.hasUnseenUpdate;
@@ -7547,6 +7560,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/utils/app_route_observer.dart';
 import '../../core/utils/time_format_utils.dart';
 import '../providers/chat_notifier.dart';
+import '../providers/config_notifier.dart';
 import '../providers/input_draft_provider.dart';
 import '../widgets/attachment_list.dart';
 import '../widgets/input_bar.dart';
@@ -7559,7 +7573,7 @@ import '../utils/page_utils.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   final String fileName;
-  final String? initialRoundId; 
+  final String? initialRoundId;
   final String? initialMessage;
   final List<dynamic>? initialAttachments;
 
@@ -7603,11 +7617,12 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     _initialMessageHandled = true;
 
     try {
-      final newId = await ref.read(chatControllerProvider(widget.fileName)).sendMessage(
-        content: widget.initialMessage!,
-        parentRoundId: _currentRoundId,
-        attachments: widget.initialAttachments?.cast() ?? [],
-      );
+      final newId =
+          await ref.read(chatControllerProvider(widget.fileName)).sendMessage(
+                content: widget.initialMessage!,
+                parentRoundId: _currentRoundId,
+                attachments: widget.initialAttachments?.cast() ?? [],
+              );
       _updateBranch(newId);
     } catch (e) {
       AppToast.show('发送失败：$e');
@@ -7640,19 +7655,30 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
-    final sessionAsync = ref.watch(chatSessionProvider(widget.fileName));
+    final sessionTitle = ref.watch(
+      chatSessionProvider(widget.fileName).select((s) => s.valueOrNull?.title ?? '对话'),
+    );
+    final currentRoundAsync = ref.watch(roundDetailProvider(_currentRoundId ?? ''));
+    final isStreaming = currentRoundAsync.valueOrNull?.isIncomplete ?? false;
+    final configAsync = ref.watch(configProvider);
     final editSourceRoundId = ref.watch(globalEditSourceRoundIdProvider);
     final isEditMode = editSourceRoundId != null;
 
-    if (_branchLeafId == null && sessionAsync.hasValue) {
-      final rounds = sessionAsync.value!.rounds;
-      if (rounds.isNotEmpty) {
-        _branchLeafId = rounds.last.id;
+    final currentConfig = configAsync.valueOrNull;
+    final selectedModelId = currentConfig?.selectedModel;
+    final selectedModel = currentConfig?.availableModels
+        ?.where((m) => m.id == selectedModelId)
+        .firstOrNull;
+    final allowImages = selectedModel?.supportsVision == true;
+
+    if (_branchLeafId == null) {
+      final topology = ref.watch(chatTopologyProvider(widget.fileName)).valueOrNull;
+      if (topology != null && topology.isNotEmpty) {
+        _branchLeafId = topology.last.id;
         _currentRoundId = _branchLeafId;
       }
     }
 
-    // ⚡️ 核心优化：仅观察 ID 列表。内容变化不触发 PageView 构建
     final visibleRoundIds = ref.watch(visibleRoundIdsProvider((
       fileName: widget.fileName,
       roundId: _branchLeafId,
@@ -7665,26 +7691,32 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
 
     if (visibleRoundIds.isNotEmpty) {
       _pageController ??= PageController(initialPage: currentIndex);
-      if (_pageController!.hasClients && _pageController!.page?.round() != currentIndex) {
+      if (_pageController!.hasClients &&
+          _pageController!.page?.round() != currentIndex) {
         _pageController!.jumpToPage(currentIndex);
       }
     }
 
     return AppPageScaffold(
       appBar: AppBar(
-        title: Text(sessionAsync.valueOrNull?.title ?? '对话'),
+        title: Text(sessionTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.account_tree_outlined),
-            onPressed: (isEditMode || _currentRoundId == null) ? null : () async {
-              final selectedId = await Navigator.of(context).push<String>(
-                MaterialPageRoute(builder: (_) => BranchTreePage(
-                  fileName: widget.fileName, 
-                  initialFocusRoundId: _currentRoundId!
-                )),
-              );
-              if (selectedId != null) _updateBranch(selectedId);
-            },
+            onPressed: (isEditMode || _currentRoundId == null)
+                ? null
+                : () async {
+                    final selectedId =
+                        await Navigator.of(context).push<String>(
+                      MaterialPageRoute(
+                        builder: (_) => BranchTreePage(
+                          fileName: widget.fileName,
+                          initialFocusRoundId: _currentRoundId!,
+                        ),
+                      ),
+                    );
+                    if (selectedId != null) _updateBranch(selectedId);
+                  },
           ),
         ],
       ),
@@ -7694,21 +7726,38 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
             _PaginationBar(
               currentIndex: currentIndex,
               totalPages: visibleRoundIds.length,
-              onPrev: (currentIndex > 0 && !isEditMode) ? () => _pageController?.previousPage(duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic) : null,
-              onNext: (currentIndex < visibleRoundIds.length - 1 && !isEditMode) ? () => _pageController?.nextPage(duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic) : null,
+              onPrev: (currentIndex > 0 && !isEditMode)
+                  ? () => _pageController?.previousPage(
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeOutCubic,
+                      )
+                  : null,
+              onNext: (currentIndex < visibleRoundIds.length - 1 && !isEditMode)
+                  ? () => _pageController?.nextPage(
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeOutCubic,
+                      )
+                  : null,
               isEditMode: isEditMode,
             ),
-          if (isEditMode) 
+          if (isEditMode)
             MaterialBanner(
               content: const Text('正在编辑，发送前不可切换页面'),
-              actions: [TextButton(onPressed: () => _setEditMode(null, ''), child: const Text('取消'))],
+              actions: [
+                TextButton(
+                  onPressed: () => _setEditMode(null, ''),
+                  child: const Text('取消'),
+                ),
+              ],
             ),
           Expanded(
             child: visibleRoundIds.isEmpty
                 ? const Center(child: Text('新对话'))
                 : PageView.builder(
                     controller: _pageController,
-                    physics: isEditMode ? const NeverScrollableScrollPhysics() : const PageScrollPhysics(),
+                    physics: isEditMode
+                        ? const NeverScrollableScrollPhysics()
+                        : const PageScrollPhysics(),
                     itemCount: visibleRoundIds.length,
                     onPageChanged: (index) {
                       final targetId = visibleRoundIds[index];
@@ -7726,13 +7775,24 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
           ),
           InputBar(
             hintText: isEditMode ? '编辑并重试' : '发送消息',
-            isStreaming: sessionAsync.valueOrNull?.rounds.any((r) => r.id == _currentRoundId && r.isIncomplete) ?? false,
-            onStop: () => ref.read(chatControllerProvider(widget.fileName)).stopGeneration(_currentRoundId!),
+            allowImages: allowImages,
+            isStreaming: isStreaming,
+            onStop: () => ref
+                .read(chatControllerProvider(widget.fileName))
+                .stopGeneration(_currentRoundId!),
             onSend: (text, attachments) async {
               final controller = ref.read(chatControllerProvider(widget.fileName));
               final newId = isEditMode
-                  ? await controller.editAndResendFromRound(editSourceRoundId, text, attachments: attachments)
-                  : await controller.sendMessage(content: text, parentRoundId: _currentRoundId, attachments: attachments);
+                  ? await controller.editAndResendFromRound(
+                      editSourceRoundId,
+                      text,
+                      attachments: attachments,
+                    )
+                  : await controller.sendMessage(
+                      content: text,
+                      parentRoundId: _currentRoundId,
+                      attachments: attachments,
+                    );
               _updateBranch(newId);
               _setEditMode(null, '');
             },
@@ -7744,15 +7804,16 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
 
   void _markAsSeen(String roundId) {
     if (!_isRouteVisible) return;
-    final rounds = ref.read(chatSessionProvider(widget.fileName)).valueOrNull?.rounds ?? [];
-    final round = rounds.where((r) => r.id == roundId).firstOrNull;
+    final roundAsync = ref.read(roundDetailProvider(roundId));
+    final round = roundAsync.valueOrNull;  
     if (round?.hasUnseenUpdate == true) {
       ref.read(chatControllerProvider(widget.fileName)).markRoundSeen(round!);
     }
   }
 
   void _retry(String roundId) async {
-    final newId = await ref.read(chatControllerProvider(widget.fileName)).retryFromRound(roundId);
+    final newId =
+        await ref.read(chatControllerProvider(widget.fileName)).retryFromRound(roundId);
     _updateBranch(newId);
   }
 
@@ -7763,11 +7824,13 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
 
   @override
   void didPush() => _isRouteVisible = true;
+
   @override
   void didPopNext() {
     _isRouteVisible = true;
     if (_currentRoundId != null) _markAsSeen(_currentRoundId!);
   }
+
   @override
   void didPushNext() => _isRouteVisible = false;
 }
@@ -7778,7 +7841,13 @@ class _ChatRoundPage extends StatelessWidget {
   final VoidCallback onRetryReply;
   final Function(String) onEdit;
 
-  const _ChatRoundPage({super.key, required this.fileName, required this.roundId, required this.onRetryReply, required this.onEdit});
+  const _ChatRoundPage({
+    super.key,
+    required this.fileName,
+    required this.roundId,
+    required this.onRetryReply,
+    required this.onEdit,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -7791,9 +7860,16 @@ class _ChatRoundPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _UserSection(roundId: roundId, onEdit: onEdit, onRetryReply: onRetryReply),
+                _UserSection(
+                  roundId: roundId,
+                  onEdit: onEdit,
+                  onRetryReply: onRetryReply,
+                ),
                 _ThinkingSection(roundId: roundId),
-                _AiReplySection(roundId: roundId, onRetryReply: onRetryReply),
+                _AiReplySection(
+                  roundId: roundId,
+                  onRetryReply: onRetryReply,
+                ),
               ],
             ),
           ),
@@ -7807,65 +7883,110 @@ class _UserSection extends ConsumerWidget {
   final String roundId;
   final Function(String) onEdit;
   final VoidCallback onRetryReply;
-  const _UserSection({required this.roundId, required this.onEdit, required this.onRetryReply});
+
+  const _UserSection({
+    required this.roundId,
+    required this.onEdit,
+    required this.onRetryReply,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // ⚡️ 仅当该 Round 的用户部分发生变动时刷新
     final round = ref.watch(roundDetailProvider(roundId).select((s) {
       final r = s.valueOrNull;
-      return r == null ? null : (content: r.userContent, time: r.createdAt, attach: r.userAttachments, inc: r.isIncomplete);
+      return r == null
+          ? null
+          : (
+              content: r.userContent,
+              time: r.createdAt,
+              attach: r.userAttachments,
+              inc: r.isIncomplete
+            );
     }));
 
     if (round == null) return const SizedBox.shrink();
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Chip(label: Text(TimeFormatUtils.formatTimestamp(round.time))),
-      const SizedBox(height: 12),
-      MessageBubble(
-        content: round.content, 
-        isUser: true, 
-        onEdit: round.inc ? null : () => onEdit(round.content),
-        onCopy: () => Clipboard.setData(ClipboardData(text: round.content)),
-      ),
-      if (round.attach.isNotEmpty) ...[const SizedBox(height: 8), AttachmentList(attachments: round.attach)],
-    ]);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Chip(label: Text(TimeFormatUtils.formatTimestamp(round.time))),
+        const SizedBox(height: 12),
+        MessageBubble(
+          content: round.content,
+          isUser: true,
+          onEdit: round.inc ? null : () => onEdit(round.content),
+          onCopy: () => Clipboard.setData(ClipboardData(text: round.content)),
+        ),
+        if (round.attach.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          AttachmentList(attachments: round.attach),
+        ],
+      ],
+    );
   }
 }
 
 class _ThinkingSection extends ConsumerWidget {
   final String roundId;
+
   const _ThinkingSection({required this.roundId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // ⚡️ 仅当该 Round 的推理内容变动时刷新
-    final thinking = ref.watch(roundDetailProvider(roundId).select((s) => 
-      s.valueOrNull?.assistantThinking
-    ));
-    if (thinking == null || thinking.trim().isEmpty) return const SizedBox.shrink();
-    return Column(children: [const Divider(height: 32), ThoughtBubble(content: thinking)]);
+    final thinking = ref.watch(
+      roundDetailProvider(roundId).select((s) => s.valueOrNull?.assistantThinking),
+    );
+    if (thinking == null || thinking.trim().isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Column(
+      children: [
+        const Divider(height: 32),
+        ThoughtBubble(content: thinking),
+      ],
+    );
   }
 }
 
 class _AiReplySection extends ConsumerWidget {
   final String roundId;
   final VoidCallback onRetryReply;
-  const _AiReplySection({required this.roundId, required this.onRetryReply});
+
+  const _AiReplySection({
+    required this.roundId,
+    required this.onRetryReply,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // ⚡️ 仅当该 Round 的 AI 内容或完成状态变动时刷新
     final ai = ref.watch(roundDetailProvider(roundId).select((s) {
       final r = s.valueOrNull;
-      return r == null ? null : (content: r.assistantContent, isIncomplete: r.isIncomplete);
+      return r == null
+          ? null
+          : (content: r.assistantContent, isIncomplete: r.isIncomplete);
     }));
-    
-    if (ai == null || (ai.content == null && !ai.isIncomplete)) return const SizedBox.shrink();
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Divider(height: 32),
-      if (ai.content != null) MessageBubble(content: ai.content!, isUser: false, onRetryReply: ai.isIncomplete ? null : onRetryReply, onCopy: () => Clipboard.setData(ClipboardData(text: ai.content!)))
-      else const Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator(strokeWidth: 2)),
-    ]);
+
+    if (ai == null || (ai.content == null && !ai.isIncomplete)) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(height: 32),
+        if (ai.content != null)
+          MessageBubble(
+            content: ai.content!,
+            isUser: false,
+            onRetryReply: ai.isIncomplete ? null : onRetryReply,
+            onCopy: () => Clipboard.setData(ClipboardData(text: ai.content!)),
+          )
+        else
+          const Padding(
+            padding: EdgeInsets.all(8),
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+      ],
+    );
   }
 }
 
@@ -7873,22 +7994,45 @@ class _PaginationBar extends StatelessWidget {
   final int currentIndex, totalPages;
   final VoidCallback? onPrev, onNext;
   final bool isEditMode;
-  const _PaginationBar({required this.currentIndex, required this.totalPages, this.onPrev, this.onNext, required this.isEditMode});
+
+  const _PaginationBar({
+    required this.currentIndex,
+    required this.totalPages,
+    this.onPrev,
+    this.onNext,
+    required this.isEditMode,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(color: Theme.of(context).cardColor, border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor))),
-      child: Row(children: [
-        IconButton(onPressed: onPrev, icon: const Icon(Icons.chevron_left)),
-        Expanded(child: Column(children: [
-          Text(PageUtils.formatSimple(currentIndex, totalPages), style: Theme.of(context).textTheme.bodySmall),
-          const SizedBox(height: 4),
-          LinearProgressIndicator(value: PageUtils.calculateProgress(currentIndex, totalPages)),
-        ])),
-        IconButton(onPressed: onNext, icon: const Icon(Icons.chevron_right)),
-      ]),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        border: Border(
+          bottom: BorderSide(color: Theme.of(context).dividerColor),
+        ),
+      ),
+      child: Row(
+        children: [
+          IconButton(onPressed: onPrev, icon: const Icon(Icons.chevron_left)),
+          Expanded(
+            child: Column(
+              children: [
+                Text(
+                  PageUtils.formatSimple(currentIndex, totalPages),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 4),
+                LinearProgressIndicator(
+                  value: PageUtils.calculateProgress(currentIndex, totalPages),
+                ),
+              ],
+            ),
+          ),
+          IconButton(onPressed: onNext, icon: const Icon(Icons.chevron_right)),
+        ],
+      ),
     );
   }
 }
@@ -7901,6 +8045,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../core/utils/time_format_utils.dart';
 import '../../domain/models/session_list_item.dart';
+import '../providers/config_notifier.dart';
 import '../providers/session_list_notifier.dart';
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/input_bar.dart';
@@ -7983,6 +8128,14 @@ class HomePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final sessionsAsync = ref.watch(sessionListProvider);
     final controller = ref.read(sessionListControllerProvider);
+    final configAsync = ref.watch(configProvider);
+
+    final currentConfig = configAsync.valueOrNull;
+    final selectedModelId = currentConfig?.selectedModel;
+    final selectedModel = currentConfig?.availableModels
+        ?.where((m) => m.id == selectedModelId)
+        .firstOrNull;
+    final allowImages = selectedModel?.supportsVision == true;
 
     return AppPageScaffold(
       appBar: AppBar(
@@ -8022,7 +8175,7 @@ class HomePage extends ConsumerWidget {
                 return ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                   itemCount: items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  separatorBuilder: (context, index) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final item = items[index];
                     return _SessionCard(
@@ -8040,6 +8193,7 @@ class HomePage extends ConsumerWidget {
           ),
           InputBar(
             hintText: '发送消息',
+            allowImages: allowImages,
             onSend: (content, attachments) async {
               final newFileName = await controller.createSession('新对话');
               if (context.mounted) {
@@ -8387,13 +8541,14 @@ class _PreviewLine extends StatelessWidget {
 
 ## File: presentation/pages/settings_page.dart
 ```dart
-// presentation/pages/settings_page.dart
-
 import 'package:flutter/material.dart';
+import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../core/models/app_config.dart';
 import '../../core/models/app_config_store.dart';
 import '../../core/models/model_info.dart';
+import '../../domain/services/model_capability_registry.dart';
 import '../providers/config_notifier.dart';
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_section.dart';
@@ -8409,35 +8564,119 @@ class SettingsPage extends ConsumerStatefulWidget {
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   static const String _defaultModelsPath = 'v1/models';
 
-  final _baseUrlController = TextEditingController();
-  final _apiKeyController = TextEditingController();
-  final _modelsPathController = TextEditingController();
-  final _chatPathController = TextEditingController();
-
-  bool _isSyncing = false;
-
-  @override
-  void dispose() {
-    _baseUrlController.dispose();
-    _apiKeyController.dispose();
-    _modelsPathController.dispose();
-    _chatPathController.dispose();
-    super.dispose();
-  }
-
-  void _syncControllersWithConfig(AppConfig config) {
-    _isSyncing = true;
-    setState(() {
-      _baseUrlController.text = config.baseUrl;
-      _apiKeyController.text = config.apiKey;
-      _modelsPathController.text = config.modelsPath;
-      _chatPathController.text = config.chatPath;
-    });
-    _isSyncing = false;
-  }
+  final _formKey = GlobalKey<FormBuilderState>();
+  bool _isPatching = false;
+  bool _isModelListExpanded = false;
 
   String _defaultChatPathForApiMode(String apiMode) {
     return apiMode == 'responses' ? 'v1/responses' : 'v1/chat/completions';
+  }
+
+  ModelInfo? _findModel(AppConfig config, String? modelId) {
+    final id = modelId?.trim() ?? '';
+    if (id.isEmpty) return null;
+    return config.availableModels?.where((m) => m.id == id).firstOrNull;
+  }
+
+  bool _effectiveReasoningSwitch(ModelInfo? model) {
+    return model?.overrideSupportsReasoning ??
+        model?.supportsReasoning ??
+        false;
+  }
+
+  bool _effectiveVisionSwitch(ModelInfo? model) {
+    return model?.overrideSupportsVision ??
+        model?.supportsVision ??
+        false;
+  }
+
+  void _patchForm(AppConfig config) {
+    final form = _formKey.currentState;
+    if (form == null) return;
+
+    final selectedModelId = config.selectedModel ?? '';
+    final model = _findModel(config, selectedModelId);
+
+    _isPatching = true;
+    form.patchValue({
+      'baseUrl': config.baseUrl,
+      'apiKey': config.apiKey,
+      'modelsPath': config.modelsPath,
+      'chatPath': config.chatPath,
+      'apiMode': config.apiMode,
+      'selectedModel': selectedModelId,
+      'overrideSupportsReasoning': _effectiveReasoningSwitch(model),
+      'overrideSupportsVision': _effectiveVisionSwitch(model),
+    });
+    _isPatching = false;
+  }
+
+  void _patchModelCapabilityFields(AppConfig config, String? modelId) {
+    final form = _formKey.currentState;
+    if (form == null) return;
+
+    final model = _findModel(config, modelId);
+
+    _isPatching = true;
+    form.patchValue({
+      'overrideSupportsReasoning': _effectiveReasoningSwitch(model),
+      'overrideSupportsVision': _effectiveVisionSwitch(model),
+    });
+    _isPatching = false;
+  }
+
+  Future<void> _save(AppConfig currentConfig) async {
+    final form = _formKey.currentState;
+    if (form == null) return;
+    if (!form.saveAndValidate()) return;
+
+    final values = form.value;
+
+    final selectedModelId = (values['selectedModel'] as String? ?? '').trim();
+    final overrideSupportsReasoning =
+        values['overrideSupportsReasoning'] as bool? ?? false;
+    final overrideSupportsVision =
+        values['overrideSupportsVision'] as bool? ?? false;
+
+    final models = [...(currentConfig.availableModels ?? const <ModelInfo>[])];
+
+    if (selectedModelId.isNotEmpty) {
+      final index = models.indexWhere((m) => m.id == selectedModelId);
+      final baseModel =
+          index >= 0 ? models[index] : ModelInfo(id: selectedModelId);
+
+      final updatedModel = ModelCapabilityRegistry.enhance(
+        baseModel.copyWith(
+          overrideSupportsReasoning: overrideSupportsReasoning,
+          overrideSupportsVision: overrideSupportsVision,
+        ),
+      );
+
+      if (index >= 0) {
+        models[index] = updatedModel;
+      } else {
+        models.add(updatedModel);
+      }
+    }
+
+    final nextApiMode = values['apiMode'] as String? ?? currentConfig.apiMode;
+    final rawModelsPath = (values['modelsPath'] as String? ?? '').trim();
+    final rawChatPath = (values['chatPath'] as String? ?? '').trim();
+
+    final updatedConfig = currentConfig.copyWith(
+      baseUrl: (values['baseUrl'] as String? ?? '').trim(),
+      apiKey: (values['apiKey'] as String? ?? '').trim(),
+      modelsPath: rawModelsPath.isEmpty ? _defaultModelsPath : rawModelsPath,
+      chatPath: rawChatPath.isEmpty
+          ? _defaultChatPathForApiMode(nextApiMode)
+          : rawChatPath,
+      apiMode: nextApiMode,
+      selectedModel: selectedModelId.isEmpty ? null : selectedModelId,
+      availableModels: models,
+    );
+
+    await ref.read(configControllerProvider).saveFullConfig(updatedConfig);
+    await AppToast.show('设置已保存');
   }
 
   @override
@@ -8447,25 +8686,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
       next.whenData((config) {
-        _syncControllersWithConfig(config);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _patchForm(config);
+        });
       });
     });
-
-    final isBusy = configAsync.isLoading || profilesAsync.isLoading;
 
     return AppPageScaffold(
       appBar: AppBar(
         title: const Text('设置'),
-        actions: [
-          IconButton(
-            onPressed: isBusy ? null : _confirmRestoreDefaults,
-            icon: const Icon(Icons.restart_alt),
-            tooltip: '恢复默认',
-            style: IconButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
-            ),
-          ),
-        ],
       ),
       body: profilesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -8475,10 +8705,54 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(child: Text('加载配置失败：$e')),
             data: (config) {
-              if (_baseUrlController.text.isEmpty) {
-                _syncControllersWithConfig(config);
-              }
-              return _buildSettingsContent(context, store, config, isBusy);
+              return FormBuilder(
+                key: _formKey,
+                initialValue: {
+                  'baseUrl': config.baseUrl,
+                  'apiKey': config.apiKey,
+                  'modelsPath': config.modelsPath,
+                  'chatPath': config.chatPath,
+                  'apiMode': config.apiMode,
+                  'selectedModel': config.selectedModel ?? '',
+                  'overrideSupportsReasoning': _effectiveReasoningSwitch(
+                    _findModel(config, config.selectedModel),
+                  ),
+                  'overrideSupportsVision': _effectiveVisionSwitch(
+                    _findModel(config, config.selectedModel),
+                  ),
+                },
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    _buildProfileSection(store),
+                    _buildConnectionSection(config),
+                    _buildModelSection(config),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => _patchForm(config),
+                            child: const Text('重置'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () => _save(config),
+                            child: const Text('保存'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton(
+                      onPressed: _confirmRestoreDefaults,
+                      child: const Text('恢复默认'),
+                    ),
+                  ],
+                ),
+              );
             },
           );
         },
@@ -8486,313 +8760,217 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
-  Widget _buildSettingsContent(
-    BuildContext context,
-    AppConfigStore store,
-    AppConfig config,
-    bool isBusy,
-  ) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
+  Widget _buildProfileSection(AppConfigStore store) {
+    return AppSection(
+      title: '配置存档',
+      subtitle: '切换后表单会刷新为该存档内容',
       children: [
-        AppSection(
-          title: '配置存档',
-          subtitle: '切换后自动同步到表单',
-          children: [
-            DropdownButtonFormField<String>(
-              value: store.activeProfileId,
-              decoration: const InputDecoration(labelText: '当前配置存档'),
-              items: store.profiles
-                  .map((p) => DropdownMenuItem(value: p.id, child: Text(p.name)))
-                  .toList(),
-              onChanged: isBusy
-                  ? null
-                  : (value) async {
-                      if (value == null) return;
-                      await ref
-                          .read(configProfilesControllerProvider)
-                          .switchProfile(value);
-                    },
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 12,
-              children: [
-                OutlinedButton(
-                  onPressed: isBusy ? null : _showCreateProfileDialog,
-                  child: const Text('新建'),
-                ),
-                OutlinedButton(
-                  onPressed: isBusy
-                      ? null
-                      : () => _showRenameProfileDialog(
-                            store.profiles.firstWhere(
-                              (p) => p.id == store.activeProfileId,
-                            ),
-                          ),
-                  child: const Text('重命名'),
-                ),
-                OutlinedButton(
-                  onPressed: isBusy
-                      ? null
-                      : () => _deleteProfile(
-                            store.profiles.firstWhere(
-                              (p) => p.id == store.activeProfileId,
-                            ),
-                            store.profiles.length,
-                          ),
-                  child: const Text('删除'),
-                ),
-              ],
-            ),
-          ],
+        DropdownButtonFormField<String>(
+          value: store.activeProfileId,
+          decoration: const InputDecoration(labelText: '当前配置存档'),
+          items: store.profiles
+              .map((p) => DropdownMenuItem(value: p.id, child: Text(p.name)))
+              .toList(),
+          onChanged: (value) async {
+            if (value == null) return;
+            await ref.read(configProfilesControllerProvider).switchProfile(value);
+          },
         ),
-
-        AppSection(
-          title: '连接配置',
-          subtitle: '修改后自动保存到当前配置',
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 12,
           children: [
-            TextField(
-              controller: _baseUrlController,
-              enabled: !isBusy,
-              decoration: const InputDecoration(
-                labelText: 'Base URL',
-                hintText: 'https://api.openai.com',
-              ),
-              onChanged: (v) {
-                if (_isSyncing) return;
-                ref.read(configControllerProvider).updateBaseUrl(v);
+            OutlinedButton(
+              onPressed: _showCreateProfileDialog,
+              child: const Text('新建'),
+            ),
+            OutlinedButton(
+              onPressed: () {
+                final profile = store.profiles.firstWhere(
+                  (p) => p.id == store.activeProfileId,
+                );
+                _showRenameProfileDialog(profile);
               },
+              child: const Text('重命名'),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _apiKeyController,
-              enabled: !isBusy,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'API Key'),
-              onChanged: (v) {
-                if (_isSyncing) return;
-                ref.read(configControllerProvider).updateApiKey(v);
+            OutlinedButton(
+              onPressed: () {
+                final profile = store.profiles.firstWhere(
+                  (p) => p.id == store.activeProfileId,
+                );
+                _deleteProfile(profile, store.profiles.length);
               },
+              child: const Text('删除'),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _modelsPathController,
-              enabled: !isBusy,
-              decoration: const InputDecoration(
-                labelText: 'Models Path',
-                hintText: _defaultModelsPath,
-              ),
-              onChanged: (v) {
-                if (_isSyncing) return;
-                ref
-                    .read(configControllerProvider)
-                    .updateModelsPath(v.isEmpty ? _defaultModelsPath : v);
-              },
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _chatPathController,
-              enabled: !isBusy,
-              decoration: InputDecoration(
-                labelText: 'Chat Path',
-                hintText: _defaultChatPathForApiMode(config.apiMode),
-              ),
-              onChanged: (v) {
-                if (_isSyncing) return;
-                ref.read(configControllerProvider).updateChatPath(
-                      v.isEmpty ? _defaultChatPathForApiMode(config.apiMode) : v,
-                    );
-              },
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: config.apiMode,
-              decoration: const InputDecoration(labelText: 'API Mode'),
-              items: const [
-                DropdownMenuItem(
-                  value: 'chat_completions',
-                  child: Text('chat_completions'),
-                ),
-                DropdownMenuItem(
-                  value: 'responses',
-                  child: Text('responses'),
-                ),
-              ],
-              onChanged: isBusy
-                  ? null
-                  : (value) {
-                      if (value == null || _isSyncing) return;
-                      ref.read(configControllerProvider).updateApiMode(value);
-                      if (_chatPathController.text.isEmpty) {
-                        _chatPathController.text =
-                            _defaultChatPathForApiMode(value);
-                        ref
-                            .read(configControllerProvider)
-                            .updateChatPath(_chatPathController.text);
-                      }
-                    },
-            ),
-          ],
-        ),
-
-        AppSection(
-          title: '模型配置',
-          subtitle: '选择后自动保存到当前配置',
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: _buildModelSelector(context, config, isBusy)),
-                const SizedBox(width: 12),
-                FilledButton(
-                  onPressed: isBusy ? null : _refreshModels,
-                  child: const Text('同步模型'),
-                ),
-              ],
-            ),
-            _buildModelChips(config),
           ],
         ),
       ],
     );
   }
 
-  Widget _buildModelSelector(
-    BuildContext context,
-    AppConfig config,
-    bool isBusy,
-  ) {
-    final models = config.availableModels ?? const [];
-    final selectedId = config.selectedModel;
-
-    return SearchAnchor(
-      builder: (context, controller) {
-        return GestureDetector(
-          onTap: isBusy ? null : () => controller.openView(),
-          child: InputDecorator(
-            decoration: const InputDecoration(
-              labelText: '当前模型',
-              suffixIcon: Icon(Icons.arrow_drop_down),
-            ),
-            child: Text(
-              _getSelectedModelDisplayText(models, selectedId),
-              overflow: TextOverflow.ellipsis,
-            ),
+  Widget _buildConnectionSection(AppConfig config) {
+    return AppSection(
+      title: '连接配置',
+      children: [
+        FormBuilderTextField(
+          name: 'baseUrl',
+          decoration: const InputDecoration(
+            labelText: 'Base URL',
+            hintText: 'https://api.openai.com',
           ),
-        );
-      },
-      suggestionsBuilder: (context, controller) {
-        final query = controller.text.trim().toLowerCase();
-        final filtered = models.where((m) {
-          final id = m.id.toLowerCase();
-          final name = (m.name ?? '').toLowerCase();
-          return query.isEmpty || id.contains(query) || name.contains(query);
-        }).toList();
-
-        if (filtered.isEmpty) {
-          return const [
-            ListTile(title: Text('没有匹配的模型')),
-          ];
-        }
-
-        return [
-          ...filtered.map(
-            (model) => ListTile(
-              title: Text(
-                (model.name ?? '').trim().isNotEmpty ? model.name! : model.id,
-              ),
-              trailing: model.id == selectedId ? const Icon(Icons.check) : null,
-              onTap: () {
-                if (_isSyncing) return;
-                ref
-                    .read(configControllerProvider)
-                    .updateSelectedModel(model.id);
-                controller.closeView(model.id);
-              },
-            ),
+        ),
+        const SizedBox(height: 12),
+        FormBuilderTextField(
+          name: 'apiKey',
+          decoration: const InputDecoration(labelText: 'API Key'),
+        ),
+        const SizedBox(height: 12),
+        FormBuilderTextField(
+          name: 'modelsPath',
+          decoration: const InputDecoration(
+            labelText: 'Models Path',
+            hintText: _defaultModelsPath,
           ),
-          ListTile(
-            title: const Text('自定义模型 ID'),
+        ),
+        const SizedBox(height: 12),
+        FormBuilderTextField(
+          name: 'chatPath',
+          decoration: InputDecoration(
+            labelText: 'Chat Path',
+            hintText: _defaultChatPathForApiMode(config.apiMode),
+          ),
+        ),
+        const SizedBox(height: 12),
+        FormBuilderDropdown<String>(
+          name: 'apiMode',
+          decoration: const InputDecoration(labelText: 'API Mode'),
+          items: const [
+            DropdownMenuItem(
+              value: 'chat_completions',
+              child: Text('chat_completions'),
+            ),
+            DropdownMenuItem(
+              value: 'responses',
+              child: Text('responses'),
+            ),
+          ],
+          onChanged: (value) {
+            if (_isPatching || value == null) return;
+            final chatPathField = _formKey.currentState?.fields['chatPath'];
+            final current = (chatPathField?.value as String? ?? '').trim();
+            if (current.isEmpty) {
+              _isPatching = true;
+              _formKey.currentState?.patchValue({
+                'chatPath': _defaultChatPathForApiMode(value),
+              });
+              _isPatching = false;
+            }
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildModelSection(AppConfig config) {
+    final models = config.availableModels ?? const <ModelInfo>[];
+
+    return AppSection(
+      title: '当前模型',
+      subtitle: '可直接输入自定义模型 ID，下方能力开关将保存到该模型',
+      children: [
+        FormBuilderTextField(
+          name: 'selectedModel',
+          decoration: const InputDecoration(
+            labelText: '模型 ID',
+            hintText: '输入模型 ID',
+          ),
+          onChanged: (value) {
+            if (_isPatching) return;
+            _patchModelCapabilityFields(config, value);
+          },
+        ),
+        const SizedBox(height: 12),
+        if (models.isNotEmpty) ...[
+          InkWell(
+            borderRadius: BorderRadius.circular(12),
             onTap: () {
-              final text = controller.text;
-              controller.closeView(null);
-              if (text.isNotEmpty && !_isSyncing) {
-                ref.read(configControllerProvider).updateSelectedModel(text);
-              }
+              setState(() {
+                _isModelListExpanded = !_isModelListExpanded;
+              });
             },
+            child: InputDecorator(
+              decoration: const InputDecoration(
+                labelText: '已同步模型快捷选择',
+                border: OutlineInputBorder(),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _isModelListExpanded ? '点击收起模型列表' : '点击展开模型列表',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ),
+                  Icon(
+                    _isModelListExpanded
+                        ? Icons.expand_less
+                        : Icons.expand_more,
+                  ),
+                ],
+              ),
+            ),
           ),
-        ];
-      },
-    );
-  }
-
-  Widget _buildModelChips(AppConfig config) {
-    final selectedId = config.selectedModel;
-    if (selectedId == null || selectedId.trim().isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    final model = (config.availableModels ?? const [])
-        .where((m) => m.id == selectedId)
-        .firstOrNull;
-    if (model == null) {
-      return const SizedBox.shrink();
-    }
-
-    final chips = <Widget>[];
-    if (model.supportsVision == true) {
-      chips.add(
-        const Chip(
-          avatar: Icon(Icons.image_outlined, size: 16),
-          label: Text('Vision'),
-          visualDensity: VisualDensity.compact,
+          if (_isModelListExpanded) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: models.map((model) {
+                final label = (model.name ?? '').trim().isNotEmpty
+                    ? '${model.name} (${model.id})'
+                    : model.id;
+                return ActionChip(
+                  label: Text(label),
+                  onPressed: () {
+                    _isPatching = true;
+                    _formKey.currentState?.patchValue({
+                      'selectedModel': model.id,
+                    });
+                    _isPatching = false;
+                    _patchModelCapabilityFields(config, model.id);
+                    setState(() {
+                      _isModelListExpanded = false;
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+          ],
+          const SizedBox(height: 12),
+        ],
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton(
+            onPressed: _refreshModels,
+            child: const Text('同步模型'),
+          ),
         ),
-      );
-    }
-    if (model.supportsReasoning == true) {
-      chips.add(
-        const Chip(
-          avatar: Icon(Icons.psychology_alt_outlined, size: 16),
-          label: Text('Reasoning'),
-          visualDensity: VisualDensity.compact,
+        const SizedBox(height: 16),
+        FormBuilderSwitch(
+          name: 'overrideSupportsReasoning',
+          title: const Text('该模型启用思考'),
         ),
-      );
-    }
-    if (chips.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: chips,
-      ),
+        FormBuilderSwitch(
+          name: 'overrideSupportsVision',
+          title: const Text('该模型允许图片输入'),
+        ),
+      ],
     );
-  }
-
-  String _getSelectedModelDisplayText(
-    List<ModelInfo> models,
-    String? selectedId,
-  ) {
-    if (selectedId == null || selectedId.trim().isEmpty) return '请选择模型';
-    for (final m in models) {
-      if (m.id == selectedId) {
-        return (m.name ?? '').trim().isNotEmpty ? m.name! : m.id;
-      }
-    }
-    return selectedId;
   }
 
   Future<void> _refreshModels() async {
-    final configAsync = ref.read(configProvider);
-    final config = configAsync.valueOrNull;
-    if (config == null) return;
-
     try {
-      await ref.read(configControllerProvider).saveAndRefreshModels(config);
+      await ref.read(configControllerProvider).refreshModels();
       await AppToast.show('模型列表已同步');
     } catch (e) {
       await AppToast.show('同步模型失败：$e');
@@ -8800,7 +8978,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Future<void> _confirmRestoreDefaults() async {
-    final colorScheme = Theme.of(context).colorScheme;
     final confirmed = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
@@ -8813,10 +8990,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
               FilledButton(
                 onPressed: () => Navigator.of(ctx).pop(true),
-                style: FilledButton.styleFrom(
-                  backgroundColor: colorScheme.error,
-                  foregroundColor: colorScheme.onError,
-                ),
                 child: const Text('恢复默认'),
               ),
             ],
@@ -8826,13 +8999,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     if (!confirmed) return;
 
-    try {
-      await ref
-          .read(configControllerProvider)
-          .saveFullConfig(AppConfig.defaultConfig());
-    } catch (e) {
-      await AppToast.show('恢复默认失败：$e');
-    }
+    await ref.read(configControllerProvider).saveFullConfig(AppConfig.defaultConfig());
   }
 
   Future<void> _showCreateProfileDialog() async {
@@ -8919,9 +9086,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         false;
 
     if (!confirmed) return;
-    await ref
-        .read(configProfilesControllerProvider)
-        .deleteProfile(profile.id);
+    await ref.read(configProfilesControllerProvider).deleteProfile(profile.id);
   }
 }
 ```
@@ -9017,53 +9182,38 @@ import '../../domain/services/attachment_preparer.dart';
 import '../../domain/services/chat_context_builder.dart';
 import '../../domain/services/chat_stream_accumulator.dart';
 
-// 数据源
 final chatSessionProvider = StreamProvider.family<Session?, String>((ref, fileName) {
   return ref.watch(conversationRepositoryProvider).watchSession(fileName);
 });
 
-// 新增：拓扑结构监听（仅 ID 和父 ID）
-final chatTopologyProvider = StreamProvider.family<List<({String id, String? parentId})>, String>((ref, fileName) {
-  return ref.watch(conversationRepositoryProvider).watchSessionTopology(fileName);
-});
+final chatTopologyProvider =
+    StreamProvider.family<List<({String id, String? parentId})>, String>(
+  (ref, fileName) {
+    return ref.watch(conversationRepositoryProvider).watchSessionTopology(fileName);
+  },
+);
 
-// 新增：单条详情监听
 final roundDetailProvider = StreamProvider.family<ChatRound?, String>((ref, roundId) {
   return ref.watch(conversationRepositoryProvider).watchSingleRound(roundId);
 });
 
-// 新增：ID 列表计算路径。AI 说话时，ID 列表不变，由此 Provider 驱动的 Widget 不会重绘
-final visibleRoundIdsProvider = Provider.family<List<String>, ({String fileName, String? roundId})>((ref, args) {
-  final topology = ref.watch(chatTopologyProvider(args.fileName)).valueOrNull ?? [];
-  if (args.roundId == null) return const [];
-  
-  final idToParent = {for (var t in topology) t.id: t.parentId};
-  final path = <String>[];
-  String? currentId = args.roundId;
+final visibleRoundIdsProvider =
+    Provider.family<List<String>, ({String fileName, String? roundId})>(
+  (ref, args) {
+    final topology = ref.watch(chatTopologyProvider(args.fileName)).valueOrNull ?? [];
+    if (args.roundId == null) return const [];
 
-  while (currentId != null && idToParent.containsKey(currentId)) {
-    path.add(currentId);
-    currentId = idToParent[currentId];
-  }
-  return path.reversed.toList();
-});
+    final idToParent = {for (var t in topology) t.id: t.parentId};
+    final path = <String>[];
+    String? currentId = args.roundId;
 
-// 保持计算路径：仅供其他需要全量对象的场景使用
-final visibleRoundsProvider = Provider.family<List<ChatRound>, ({String fileName, String? roundId})>((ref, args) {
-  final session = ref.watch(chatSessionProvider(args.fileName)).valueOrNull;
-  if (session == null || args.roundId == null) return const [];
-  
-  final roundMap = {for (final r in session.rounds) r.id: r};
-  final path = <ChatRound>[];
-  String? currentId = args.roundId;
-
-  while (currentId != null && roundMap.containsKey(currentId)) {
-    final r = roundMap[currentId]!;
-    path.add(r);
-    currentId = r.parentId;
-  }
-  return path.reversed.toList();
-});
+    while (currentId != null && idToParent.containsKey(currentId)) {
+      path.add(currentId);
+      currentId = idToParent[currentId];
+    }
+    return path.reversed.toList();
+  },
+);
 
 class ChatController {
   final Ref ref;
@@ -9101,6 +9251,7 @@ class ChatController {
       String? error;
       DateTime? lastDbUpdateTime;
       const updateInterval = Duration(seconds: 1);
+
       try {
         final contextRounds = await repository.getContextRounds(
           fileName,
@@ -9111,11 +9262,18 @@ class ChatController {
           repository,
         );
 
+        final currentConfig = await ref.read(configServiceProvider).loadConfig();
+        final selectedId = currentConfig.selectedModel;
+        final selectedModel = currentConfig.availableModels
+            ?.where((m) => m.id == selectedId)
+            .firstOrNull;
+        final enableReasoning = selectedModel?.supportsReasoning == true;
+
         final stream = apiSource.chatStream(
           taskId: newRound.id,
-          loadConfig: () => ref.read(configServiceProvider).loadConfig(),
+          loadConfig: () async => currentConfig,
           context: apiContext,
-          enableReasoning: true,
+          enableReasoning: enableReasoning,
         );
 
         await for (final chunk in stream) {
@@ -9128,7 +9286,8 @@ class ChatController {
           accumulator.add(chunk);
 
           final now = DateTime.now();
-          if (lastDbUpdateTime == null || now.difference(lastDbUpdateTime) >= updateInterval) {
+          if (lastDbUpdateTime == null ||
+              now.difference(lastDbUpdateTime) >= updateInterval) {
             await repository.updateRound(
               fileName,
               newRound.id,
@@ -9170,15 +9329,27 @@ class ChatController {
   }
 
   Future<String> retryFromRound(String roundId) async {
-    final rounds = ref.read(chatSessionProvider(fileName)).valueOrNull?.rounds ?? [];
-    final source = rounds.firstWhere((r) => r.id == roundId);
-    return sendMessage(content: source.userContent, parentRoundId: source.parentId);
+    final source = await ref.read(roundDetailProvider(roundId).future);
+    if (source == null) throw Exception('找不到对应的对话轮次');
+
+    return sendMessage(
+      content: source.userContent,
+      parentRoundId: source.parentId,
+    );
   }
 
-  Future<String> editAndResendFromRound(String roundId, String content, {List<dynamic>? attachments}) async {
-    final rounds = ref.read(chatSessionProvider(fileName)).valueOrNull?.rounds ?? [];
-    final source = rounds.firstWhere((r) => r.id == roundId);
-    return sendMessage(content: content, parentRoundId: source.parentId, attachments: attachments);
+  Future<String> editAndResendFromRound(
+    String roundId,
+    String content, {
+    List<dynamic>? attachments,
+  }) async {
+    final source = await ref.read(roundDetailProvider(roundId).future);
+    if (source == null) throw Exception('找不到对应的对话轮次');
+    return sendMessage(
+      content: content,
+      parentRoundId: source.parentId,
+      attachments: attachments,
+    );
   }
 
   void stopGeneration(String roundId) {
@@ -9195,7 +9366,10 @@ class ChatController {
   }
 }
 
-final chatControllerProvider = Provider.family<ChatController, String>((ref, fileName) => ChatController(ref, fileName));
+final chatControllerProvider =
+    Provider.family<ChatController, String>((ref, fileName) {
+  return ChatController(ref, fileName);
+});
 ```
 
 ## File: presentation/providers/config_notifier.dart
@@ -9930,6 +10104,7 @@ class InputBar extends ConsumerStatefulWidget {
   final bool isStreaming;
   final bool enabled;
   final String hintText;
+  final bool allowImages;
 
   const InputBar({
     super.key,
@@ -9938,6 +10113,7 @@ class InputBar extends ConsumerStatefulWidget {
     this.isStreaming = false,
     this.enabled = true,
     this.hintText = '输入消息...',
+    this.allowImages = false,
   });
 
   @override
@@ -9997,8 +10173,6 @@ class _InputBarState extends ConsumerState<InputBar> {
       setState(() {});
     }
   }
-
-
 
   bool _isImageFile(String name) {
     final lower = name.toLowerCase();
@@ -10098,14 +10272,15 @@ class _InputBarState extends ConsumerState<InputBar> {
                   await _pickFileAttachment();
                 },
               ),
-              ListTile(
-                leading: const Icon(Icons.photo_library_outlined),
-                title: const Text('相册'),
-                onTap: () async {
-                  Navigator.of(context).pop();
-                  await _pickImageFromGallery();
-                },
-              ),
+              if (widget.allowImages)
+                ListTile(
+                  leading: const Icon(Icons.photo_library_outlined),
+                  title: const Text('相册'),
+                  onTap: () async {
+                    Navigator.of(context).pop();
+                    await _pickImageFromGallery();
+                  },
+                ),
             ],
           ),
         );

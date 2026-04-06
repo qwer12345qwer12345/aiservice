@@ -99,7 +99,11 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
-    final sessionAsync = ref.watch(chatSessionProvider(widget.fileName));
+    final sessionTitle = ref.watch(
+      chatSessionProvider(widget.fileName).select((s) => s.valueOrNull?.title ?? '对话'),
+    );
+    final currentRoundAsync = ref.watch(roundDetailProvider(_currentRoundId ?? ''));
+    final isStreaming = currentRoundAsync.valueOrNull?.isIncomplete ?? false;
     final configAsync = ref.watch(configProvider);
     final editSourceRoundId = ref.watch(globalEditSourceRoundIdProvider);
     final isEditMode = editSourceRoundId != null;
@@ -111,10 +115,10 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
         .firstOrNull;
     final allowImages = selectedModel?.supportsVision == true;
 
-    if (_branchLeafId == null && sessionAsync.hasValue) {
-      final rounds = sessionAsync.value!.rounds;
-      if (rounds.isNotEmpty) {
-        _branchLeafId = rounds.last.id;
+    if (_branchLeafId == null) {
+      final topology = ref.watch(chatTopologyProvider(widget.fileName)).valueOrNull;
+      if (topology != null && topology.isNotEmpty) {
+        _branchLeafId = topology.last.id;
         _currentRoundId = _branchLeafId;
       }
     }
@@ -139,7 +143,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
 
     return AppPageScaffold(
       appBar: AppBar(
-        title: Text(sessionAsync.valueOrNull?.title ?? '对话'),
+        title: Text(sessionTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.account_tree_outlined),
@@ -216,10 +220,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
           InputBar(
             hintText: isEditMode ? '编辑并重试' : '发送消息',
             allowImages: allowImages,
-            isStreaming: sessionAsync.valueOrNull?.rounds.any(
-                  (r) => r.id == _currentRoundId && r.isIncomplete,
-                ) ??
-                false,
+            isStreaming: isStreaming,
             onStop: () => ref
                 .read(chatControllerProvider(widget.fileName))
                 .stopGeneration(_currentRoundId!),
@@ -247,9 +248,8 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
 
   void _markAsSeen(String roundId) {
     if (!_isRouteVisible) return;
-    final rounds =
-        ref.read(chatSessionProvider(widget.fileName)).valueOrNull?.rounds ?? [];
-    final round = rounds.where((r) => r.id == roundId).firstOrNull;
+    final roundAsync = ref.read(roundDetailProvider(roundId));
+    final round = roundAsync.valueOrNull;  
     if (round?.hasUnseenUpdate == true) {
       ref.read(chatControllerProvider(widget.fileName)).markRoundSeen(round!);
     }

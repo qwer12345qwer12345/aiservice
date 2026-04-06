@@ -1,6 +1,5 @@
 // data/repositories/conversation_repository.dart
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:drift/drift.dart';
 import '../data_sources/local_file_source.dart';
 import '../../core/models/attachment.dart';

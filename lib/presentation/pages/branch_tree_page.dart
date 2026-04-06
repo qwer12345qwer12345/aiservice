@@ -1,6 +1,5 @@
 // presentation/pages/branch_tree_page.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:graphview/GraphView.dart';
 import '../../core/models/chat_round.dart';
@@ -8,7 +7,7 @@ import '../../core/utils/time_format_utils.dart';
 import '../../di/providers.dart';
 import '../../domain/models/tree_node.dart';
 import '../../domain/services/tree_builder.dart';
-import '../providers/chat_notifier.dart' show chatSessionProvider;
+import '../providers/chat_notifier.dart' show chatSessionProvider, chatTopologyProvider, roundDetailProvider;
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_toast.dart';
 
@@ -20,17 +19,18 @@ import '../widgets/common/app_toast.dart';
 /// 将无关内容的字段剔除，使得 AI 回复文本时，该 Provider 产出的 List 完全一样（利用 Freezed 相等性）。
 /// 从而切断流式更新向下游的传递。
 final _sessionTopologyProvider = Provider.family<List<ChatRound>, String>((ref, fileName) {
-  return ref.watch(chatSessionProvider(fileName).select((sessionAsync) {
-    final rounds = sessionAsync.valueOrNull?.rounds ?? const [];
-    return rounds.map((r) => r.copyWith(
-      userContent: '',
-      assistantContent: null,
-      assistantThinking: null,
-      userAttachments: const [],
-      isIncomplete: false,
-      hasUnseenUpdate: false,
-    )).toList();
-  }));
+  final topology = ref.watch(chatTopologyProvider(fileName)).valueOrNull ?? [];
+  return topology.map((t) => ChatRound(
+    id: t.id,
+    parentId: t.parentId,
+    createdAt: 0,
+    userContent: '',
+    assistantContent: null,
+    assistantThinking: null,
+    userAttachments: const [],
+    isIncomplete: false,
+    hasUnseenUpdate: false,
+  )).toList();
 });
 
 /// 2. 结构树 Provider：
@@ -211,14 +211,13 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   Widget build(BuildContext context) {
     // 基础状态监听：标题、加载状态（这些几乎不会频繁改变）
     final sessionTitle = ref.watch(chatSessionProvider(widget.fileName).select((s) => s.valueOrNull?.title ?? '分支树'));
-    final isLoading = ref.watch(chatSessionProvider(widget.fileName).select((s) => s.isLoading && !s.hasValue));
     final hasError = ref.watch(chatSessionProvider(widget.fileName).select((s) => s.hasError));
 
-    if (isLoading) {
-      return AppPageScaffold(appBar: AppBar(title: Text(sessionTitle)), body: const Center(child: CircularProgressIndicator()));
-    }
     if (hasError) {
-      return AppPageScaffold(appBar: AppBar(title: Text(sessionTitle)), body: const Center(child: Text('加载失败')));
+      return AppPageScaffold(
+        appBar: AppBar(title: Text(sessionTitle)),
+        body: const Center(child: Text('加载失败')),
+      );
     }
 
     final topologyRounds = ref.watch(_sessionTopologyProvider(widget.fileName));
@@ -428,17 +427,8 @@ class _GraphNodeCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // ⚡ 重点：这里独立监听数据库流出的实时数据，仅更新本卡片
-    final round = ref.watch(chatSessionProvider(fileName).select((s) {
-      final rounds = s.valueOrNull?.rounds ?? const [];
-      return rounds.firstWhere(
-        (r) => r.id == roundId,
-        // 防止在被删除那帧报错，提供一个空 Fallback
-        orElse: () => ChatRound(id: roundId, createdAt: 0, userContent: '', isIncomplete: false),
-      );
-    }));
-
-    if (round.createdAt == 0) return const SizedBox.shrink();
+    final round = ref.watch(roundDetailProvider(roundId)).valueOrNull;
+    if (round == null) return const SizedBox.shrink();
 
     final isIncomplete = round.isIncomplete;
     final hasUnseenUpdate = round.hasUnseenUpdate;

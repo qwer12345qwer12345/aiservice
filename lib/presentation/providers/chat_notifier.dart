@@ -41,25 +41,6 @@ final visibleRoundIdsProvider =
   },
 );
 
-final visibleRoundsProvider =
-    Provider.family<List<ChatRound>, ({String fileName, String? roundId})>(
-  (ref, args) {
-    final session = ref.watch(chatSessionProvider(args.fileName)).valueOrNull;
-    if (session == null || args.roundId == null) return const [];
-
-    final roundMap = {for (final r in session.rounds) r.id: r};
-    final path = <ChatRound>[];
-    String? currentId = args.roundId;
-
-    while (currentId != null && roundMap.containsKey(currentId)) {
-      final r = roundMap[currentId]!;
-      path.add(r);
-      currentId = r.parentId;
-    }
-    return path.reversed.toList();
-  },
-);
-
 class ChatController {
   final Ref ref;
   final String fileName;
@@ -174,9 +155,13 @@ class ChatController {
   }
 
   Future<String> retryFromRound(String roundId) async {
-    final rounds = ref.read(chatSessionProvider(fileName)).valueOrNull?.rounds ?? [];
-    final source = rounds.firstWhere((r) => r.id == roundId);
-    return sendMessage(content: source.userContent, parentRoundId: source.parentId);
+    final source = await ref.read(roundDetailProvider(roundId).future);
+    if (source == null) throw Exception('找不到对应的对话轮次');
+
+    return sendMessage(
+      content: source.userContent,
+      parentRoundId: source.parentId,
+    );
   }
 
   Future<String> editAndResendFromRound(
@@ -184,8 +169,8 @@ class ChatController {
     String content, {
     List<dynamic>? attachments,
   }) async {
-    final rounds = ref.read(chatSessionProvider(fileName)).valueOrNull?.rounds ?? [];
-    final source = rounds.firstWhere((r) => r.id == roundId);
+    final source = await ref.read(roundDetailProvider(roundId).future);
+    if (source == null) throw Exception('找不到对应的对话轮次');
     return sendMessage(
       content: content,
       parentRoundId: source.parentId,
