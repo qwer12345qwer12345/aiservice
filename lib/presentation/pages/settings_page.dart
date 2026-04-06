@@ -1,10 +1,11 @@
-// presentation/pages/settings_page.dart
-
 import 'package:flutter/material.dart';
+import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../core/models/app_config.dart';
 import '../../core/models/app_config_store.dart';
 import '../../core/models/model_info.dart';
+import '../../domain/services/model_capability_registry.dart';
 import '../providers/config_notifier.dart';
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_section.dart';
@@ -20,35 +21,119 @@ class SettingsPage extends ConsumerStatefulWidget {
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   static const String _defaultModelsPath = 'v1/models';
 
-  final _baseUrlController = TextEditingController();
-  final _apiKeyController = TextEditingController();
-  final _modelsPathController = TextEditingController();
-  final _chatPathController = TextEditingController();
-
-  bool _isSyncing = false;
-
-  @override
-  void dispose() {
-    _baseUrlController.dispose();
-    _apiKeyController.dispose();
-    _modelsPathController.dispose();
-    _chatPathController.dispose();
-    super.dispose();
-  }
-
-  void _syncControllersWithConfig(AppConfig config) {
-    _isSyncing = true;
-    setState(() {
-      _baseUrlController.text = config.baseUrl;
-      _apiKeyController.text = config.apiKey;
-      _modelsPathController.text = config.modelsPath;
-      _chatPathController.text = config.chatPath;
-    });
-    _isSyncing = false;
-  }
+  final _formKey = GlobalKey<FormBuilderState>();
+  bool _isPatching = false;
+  bool _isModelListExpanded = false;
 
   String _defaultChatPathForApiMode(String apiMode) {
     return apiMode == 'responses' ? 'v1/responses' : 'v1/chat/completions';
+  }
+
+  ModelInfo? _findModel(AppConfig config, String? modelId) {
+    final id = modelId?.trim() ?? '';
+    if (id.isEmpty) return null;
+    return config.availableModels?.where((m) => m.id == id).firstOrNull;
+  }
+
+  bool _effectiveReasoningSwitch(ModelInfo? model) {
+    return model?.overrideSupportsReasoning ??
+        model?.supportsReasoning ??
+        false;
+  }
+
+  bool _effectiveVisionSwitch(ModelInfo? model) {
+    return model?.overrideSupportsVision ??
+        model?.supportsVision ??
+        false;
+  }
+
+  void _patchForm(AppConfig config) {
+    final form = _formKey.currentState;
+    if (form == null) return;
+
+    final selectedModelId = config.selectedModel ?? '';
+    final model = _findModel(config, selectedModelId);
+
+    _isPatching = true;
+    form.patchValue({
+      'baseUrl': config.baseUrl,
+      'apiKey': config.apiKey,
+      'modelsPath': config.modelsPath,
+      'chatPath': config.chatPath,
+      'apiMode': config.apiMode,
+      'selectedModel': selectedModelId,
+      'overrideSupportsReasoning': _effectiveReasoningSwitch(model),
+      'overrideSupportsVision': _effectiveVisionSwitch(model),
+    });
+    _isPatching = false;
+  }
+
+  void _patchModelCapabilityFields(AppConfig config, String? modelId) {
+    final form = _formKey.currentState;
+    if (form == null) return;
+
+    final model = _findModel(config, modelId);
+
+    _isPatching = true;
+    form.patchValue({
+      'overrideSupportsReasoning': _effectiveReasoningSwitch(model),
+      'overrideSupportsVision': _effectiveVisionSwitch(model),
+    });
+    _isPatching = false;
+  }
+
+  Future<void> _save(AppConfig currentConfig) async {
+    final form = _formKey.currentState;
+    if (form == null) return;
+    if (!form.saveAndValidate()) return;
+
+    final values = form.value;
+
+    final selectedModelId = (values['selectedModel'] as String? ?? '').trim();
+    final overrideSupportsReasoning =
+        values['overrideSupportsReasoning'] as bool? ?? false;
+    final overrideSupportsVision =
+        values['overrideSupportsVision'] as bool? ?? false;
+
+    final models = [...(currentConfig.availableModels ?? const <ModelInfo>[])];
+
+    if (selectedModelId.isNotEmpty) {
+      final index = models.indexWhere((m) => m.id == selectedModelId);
+      final baseModel =
+          index >= 0 ? models[index] : ModelInfo(id: selectedModelId);
+
+      final updatedModel = ModelCapabilityRegistry.enhance(
+        baseModel.copyWith(
+          overrideSupportsReasoning: overrideSupportsReasoning,
+          overrideSupportsVision: overrideSupportsVision,
+        ),
+      );
+
+      if (index >= 0) {
+        models[index] = updatedModel;
+      } else {
+        models.add(updatedModel);
+      }
+    }
+
+    final nextApiMode = values['apiMode'] as String? ?? currentConfig.apiMode;
+    final rawModelsPath = (values['modelsPath'] as String? ?? '').trim();
+    final rawChatPath = (values['chatPath'] as String? ?? '').trim();
+
+    final updatedConfig = currentConfig.copyWith(
+      baseUrl: (values['baseUrl'] as String? ?? '').trim(),
+      apiKey: (values['apiKey'] as String? ?? '').trim(),
+      modelsPath: rawModelsPath.isEmpty ? _defaultModelsPath : rawModelsPath,
+      chatPath: rawChatPath.isEmpty
+          ? _defaultChatPathForApiMode(nextApiMode)
+          : rawChatPath,
+      apiMode: nextApiMode,
+      selectedModel: selectedModelId.isEmpty ? null : selectedModelId,
+      availableModels: models,
+    );
+
+    await ref.read(configControllerProvider).saveFullConfig(updatedConfig);
+    await AppToast.show('设置已保存');
   }
 
   @override
@@ -58,25 +143,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
       next.whenData((config) {
-        _syncControllersWithConfig(config);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _patchForm(config);
+        });
       });
     });
-
-    final isBusy = configAsync.isLoading || profilesAsync.isLoading;
 
     return AppPageScaffold(
       appBar: AppBar(
         title: const Text('设置'),
-        actions: [
-          IconButton(
-            onPressed: isBusy ? null : _confirmRestoreDefaults,
-            icon: const Icon(Icons.restart_alt),
-            tooltip: '恢复默认',
-            style: IconButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
-            ),
-          ),
-        ],
       ),
       body: profilesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -86,10 +162,54 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(child: Text('加载配置失败：$e')),
             data: (config) {
-              if (_baseUrlController.text.isEmpty) {
-                _syncControllersWithConfig(config);
-              }
-              return _buildSettingsContent(context, store, config, isBusy);
+              return FormBuilder(
+                key: _formKey,
+                initialValue: {
+                  'baseUrl': config.baseUrl,
+                  'apiKey': config.apiKey,
+                  'modelsPath': config.modelsPath,
+                  'chatPath': config.chatPath,
+                  'apiMode': config.apiMode,
+                  'selectedModel': config.selectedModel ?? '',
+                  'overrideSupportsReasoning': _effectiveReasoningSwitch(
+                    _findModel(config, config.selectedModel),
+                  ),
+                  'overrideSupportsVision': _effectiveVisionSwitch(
+                    _findModel(config, config.selectedModel),
+                  ),
+                },
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    _buildProfileSection(store),
+                    _buildConnectionSection(config),
+                    _buildModelSection(config),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => _patchForm(config),
+                            child: const Text('重置'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () => _save(config),
+                            child: const Text('保存'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton(
+                      onPressed: _confirmRestoreDefaults,
+                      child: const Text('恢复默认'),
+                    ),
+                  ],
+                ),
+              );
             },
           );
         },
@@ -97,313 +217,217 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
-  Widget _buildSettingsContent(
-    BuildContext context,
-    AppConfigStore store,
-    AppConfig config,
-    bool isBusy,
-  ) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
+  Widget _buildProfileSection(AppConfigStore store) {
+    return AppSection(
+      title: '配置存档',
+      subtitle: '切换后表单会刷新为该存档内容',
       children: [
-        AppSection(
-          title: '配置存档',
-          subtitle: '切换后自动同步到表单',
-          children: [
-            DropdownButtonFormField<String>(
-              value: store.activeProfileId,
-              decoration: const InputDecoration(labelText: '当前配置存档'),
-              items: store.profiles
-                  .map((p) => DropdownMenuItem(value: p.id, child: Text(p.name)))
-                  .toList(),
-              onChanged: isBusy
-                  ? null
-                  : (value) async {
-                      if (value == null) return;
-                      await ref
-                          .read(configProfilesControllerProvider)
-                          .switchProfile(value);
-                    },
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 12,
-              children: [
-                OutlinedButton(
-                  onPressed: isBusy ? null : _showCreateProfileDialog,
-                  child: const Text('新建'),
-                ),
-                OutlinedButton(
-                  onPressed: isBusy
-                      ? null
-                      : () => _showRenameProfileDialog(
-                            store.profiles.firstWhere(
-                              (p) => p.id == store.activeProfileId,
-                            ),
-                          ),
-                  child: const Text('重命名'),
-                ),
-                OutlinedButton(
-                  onPressed: isBusy
-                      ? null
-                      : () => _deleteProfile(
-                            store.profiles.firstWhere(
-                              (p) => p.id == store.activeProfileId,
-                            ),
-                            store.profiles.length,
-                          ),
-                  child: const Text('删除'),
-                ),
-              ],
-            ),
-          ],
+        DropdownButtonFormField<String>(
+          value: store.activeProfileId,
+          decoration: const InputDecoration(labelText: '当前配置存档'),
+          items: store.profiles
+              .map((p) => DropdownMenuItem(value: p.id, child: Text(p.name)))
+              .toList(),
+          onChanged: (value) async {
+            if (value == null) return;
+            await ref.read(configProfilesControllerProvider).switchProfile(value);
+          },
         ),
-
-        AppSection(
-          title: '连接配置',
-          subtitle: '修改后自动保存到当前配置',
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 12,
           children: [
-            TextField(
-              controller: _baseUrlController,
-              enabled: !isBusy,
-              decoration: const InputDecoration(
-                labelText: 'Base URL',
-                hintText: 'https://api.openai.com',
-              ),
-              onChanged: (v) {
-                if (_isSyncing) return;
-                ref.read(configControllerProvider).updateBaseUrl(v);
+            OutlinedButton(
+              onPressed: _showCreateProfileDialog,
+              child: const Text('新建'),
+            ),
+            OutlinedButton(
+              onPressed: () {
+                final profile = store.profiles.firstWhere(
+                  (p) => p.id == store.activeProfileId,
+                );
+                _showRenameProfileDialog(profile);
               },
+              child: const Text('重命名'),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _apiKeyController,
-              enabled: !isBusy,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'API Key'),
-              onChanged: (v) {
-                if (_isSyncing) return;
-                ref.read(configControllerProvider).updateApiKey(v);
+            OutlinedButton(
+              onPressed: () {
+                final profile = store.profiles.firstWhere(
+                  (p) => p.id == store.activeProfileId,
+                );
+                _deleteProfile(profile, store.profiles.length);
               },
+              child: const Text('删除'),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _modelsPathController,
-              enabled: !isBusy,
-              decoration: const InputDecoration(
-                labelText: 'Models Path',
-                hintText: _defaultModelsPath,
-              ),
-              onChanged: (v) {
-                if (_isSyncing) return;
-                ref
-                    .read(configControllerProvider)
-                    .updateModelsPath(v.isEmpty ? _defaultModelsPath : v);
-              },
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _chatPathController,
-              enabled: !isBusy,
-              decoration: InputDecoration(
-                labelText: 'Chat Path',
-                hintText: _defaultChatPathForApiMode(config.apiMode),
-              ),
-              onChanged: (v) {
-                if (_isSyncing) return;
-                ref.read(configControllerProvider).updateChatPath(
-                      v.isEmpty ? _defaultChatPathForApiMode(config.apiMode) : v,
-                    );
-              },
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: config.apiMode,
-              decoration: const InputDecoration(labelText: 'API Mode'),
-              items: const [
-                DropdownMenuItem(
-                  value: 'chat_completions',
-                  child: Text('chat_completions'),
-                ),
-                DropdownMenuItem(
-                  value: 'responses',
-                  child: Text('responses'),
-                ),
-              ],
-              onChanged: isBusy
-                  ? null
-                  : (value) {
-                      if (value == null || _isSyncing) return;
-                      ref.read(configControllerProvider).updateApiMode(value);
-                      if (_chatPathController.text.isEmpty) {
-                        _chatPathController.text =
-                            _defaultChatPathForApiMode(value);
-                        ref
-                            .read(configControllerProvider)
-                            .updateChatPath(_chatPathController.text);
-                      }
-                    },
-            ),
-          ],
-        ),
-
-        AppSection(
-          title: '模型配置',
-          subtitle: '选择后自动保存到当前配置',
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: _buildModelSelector(context, config, isBusy)),
-                const SizedBox(width: 12),
-                FilledButton(
-                  onPressed: isBusy ? null : _refreshModels,
-                  child: const Text('同步模型'),
-                ),
-              ],
-            ),
-            _buildModelChips(config),
           ],
         ),
       ],
     );
   }
 
-  Widget _buildModelSelector(
-    BuildContext context,
-    AppConfig config,
-    bool isBusy,
-  ) {
-    final models = config.availableModels ?? const [];
-    final selectedId = config.selectedModel;
-
-    return SearchAnchor(
-      builder: (context, controller) {
-        return GestureDetector(
-          onTap: isBusy ? null : () => controller.openView(),
-          child: InputDecorator(
-            decoration: const InputDecoration(
-              labelText: '当前模型',
-              suffixIcon: Icon(Icons.arrow_drop_down),
-            ),
-            child: Text(
-              _getSelectedModelDisplayText(models, selectedId),
-              overflow: TextOverflow.ellipsis,
-            ),
+  Widget _buildConnectionSection(AppConfig config) {
+    return AppSection(
+      title: '连接配置',
+      children: [
+        FormBuilderTextField(
+          name: 'baseUrl',
+          decoration: const InputDecoration(
+            labelText: 'Base URL',
+            hintText: 'https://api.openai.com',
           ),
-        );
-      },
-      suggestionsBuilder: (context, controller) {
-        final query = controller.text.trim().toLowerCase();
-        final filtered = models.where((m) {
-          final id = m.id.toLowerCase();
-          final name = (m.name ?? '').toLowerCase();
-          return query.isEmpty || id.contains(query) || name.contains(query);
-        }).toList();
-
-        if (filtered.isEmpty) {
-          return const [
-            ListTile(title: Text('没有匹配的模型')),
-          ];
-        }
-
-        return [
-          ...filtered.map(
-            (model) => ListTile(
-              title: Text(
-                (model.name ?? '').trim().isNotEmpty ? model.name! : model.id,
-              ),
-              trailing: model.id == selectedId ? const Icon(Icons.check) : null,
-              onTap: () {
-                if (_isSyncing) return;
-                ref
-                    .read(configControllerProvider)
-                    .updateSelectedModel(model.id);
-                controller.closeView(model.id);
-              },
-            ),
+        ),
+        const SizedBox(height: 12),
+        FormBuilderTextField(
+          name: 'apiKey',
+          decoration: const InputDecoration(labelText: 'API Key'),
+        ),
+        const SizedBox(height: 12),
+        FormBuilderTextField(
+          name: 'modelsPath',
+          decoration: const InputDecoration(
+            labelText: 'Models Path',
+            hintText: _defaultModelsPath,
           ),
-          ListTile(
-            title: const Text('自定义模型 ID'),
+        ),
+        const SizedBox(height: 12),
+        FormBuilderTextField(
+          name: 'chatPath',
+          decoration: InputDecoration(
+            labelText: 'Chat Path',
+            hintText: _defaultChatPathForApiMode(config.apiMode),
+          ),
+        ),
+        const SizedBox(height: 12),
+        FormBuilderDropdown<String>(
+          name: 'apiMode',
+          decoration: const InputDecoration(labelText: 'API Mode'),
+          items: const [
+            DropdownMenuItem(
+              value: 'chat_completions',
+              child: Text('chat_completions'),
+            ),
+            DropdownMenuItem(
+              value: 'responses',
+              child: Text('responses'),
+            ),
+          ],
+          onChanged: (value) {
+            if (_isPatching || value == null) return;
+            final chatPathField = _formKey.currentState?.fields['chatPath'];
+            final current = (chatPathField?.value as String? ?? '').trim();
+            if (current.isEmpty) {
+              _isPatching = true;
+              _formKey.currentState?.patchValue({
+                'chatPath': _defaultChatPathForApiMode(value),
+              });
+              _isPatching = false;
+            }
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildModelSection(AppConfig config) {
+    final models = config.availableModels ?? const <ModelInfo>[];
+
+    return AppSection(
+      title: '当前模型',
+      subtitle: '可直接输入自定义模型 ID，下方能力开关将保存到该模型',
+      children: [
+        FormBuilderTextField(
+          name: 'selectedModel',
+          decoration: const InputDecoration(
+            labelText: '模型 ID',
+            hintText: '输入模型 ID',
+          ),
+          onChanged: (value) {
+            if (_isPatching) return;
+            _patchModelCapabilityFields(config, value);
+          },
+        ),
+        const SizedBox(height: 12),
+        if (models.isNotEmpty) ...[
+          InkWell(
+            borderRadius: BorderRadius.circular(12),
             onTap: () {
-              final text = controller.text;
-              controller.closeView(null);
-              if (text.isNotEmpty && !_isSyncing) {
-                ref.read(configControllerProvider).updateSelectedModel(text);
-              }
+              setState(() {
+                _isModelListExpanded = !_isModelListExpanded;
+              });
             },
+            child: InputDecorator(
+              decoration: const InputDecoration(
+                labelText: '已同步模型快捷选择',
+                border: OutlineInputBorder(),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _isModelListExpanded ? '点击收起模型列表' : '点击展开模型列表',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ),
+                  Icon(
+                    _isModelListExpanded
+                        ? Icons.expand_less
+                        : Icons.expand_more,
+                  ),
+                ],
+              ),
+            ),
           ),
-        ];
-      },
-    );
-  }
-
-  Widget _buildModelChips(AppConfig config) {
-    final selectedId = config.selectedModel;
-    if (selectedId == null || selectedId.trim().isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    final model = (config.availableModels ?? const [])
-        .where((m) => m.id == selectedId)
-        .firstOrNull;
-    if (model == null) {
-      return const SizedBox.shrink();
-    }
-
-    final chips = <Widget>[];
-    if (model.supportsVision == true) {
-      chips.add(
-        const Chip(
-          avatar: Icon(Icons.image_outlined, size: 16),
-          label: Text('Vision'),
-          visualDensity: VisualDensity.compact,
+          if (_isModelListExpanded) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: models.map((model) {
+                final label = (model.name ?? '').trim().isNotEmpty
+                    ? '${model.name} (${model.id})'
+                    : model.id;
+                return ActionChip(
+                  label: Text(label),
+                  onPressed: () {
+                    _isPatching = true;
+                    _formKey.currentState?.patchValue({
+                      'selectedModel': model.id,
+                    });
+                    _isPatching = false;
+                    _patchModelCapabilityFields(config, model.id);
+                    setState(() {
+                      _isModelListExpanded = false;
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+          ],
+          const SizedBox(height: 12),
+        ],
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton(
+            onPressed: _refreshModels,
+            child: const Text('同步模型'),
+          ),
         ),
-      );
-    }
-    if (model.supportsReasoning == true) {
-      chips.add(
-        const Chip(
-          avatar: Icon(Icons.psychology_alt_outlined, size: 16),
-          label: Text('Reasoning'),
-          visualDensity: VisualDensity.compact,
+        const SizedBox(height: 16),
+        FormBuilderSwitch(
+          name: 'overrideSupportsReasoning',
+          title: const Text('该模型启用思考'),
         ),
-      );
-    }
-    if (chips.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: chips,
-      ),
+        FormBuilderSwitch(
+          name: 'overrideSupportsVision',
+          title: const Text('该模型允许图片输入'),
+        ),
+      ],
     );
-  }
-
-  String _getSelectedModelDisplayText(
-    List<ModelInfo> models,
-    String? selectedId,
-  ) {
-    if (selectedId == null || selectedId.trim().isEmpty) return '请选择模型';
-    for (final m in models) {
-      if (m.id == selectedId) {
-        return (m.name ?? '').trim().isNotEmpty ? m.name! : m.id;
-      }
-    }
-    return selectedId;
   }
 
   Future<void> _refreshModels() async {
-    final configAsync = ref.read(configProvider);
-    final config = configAsync.valueOrNull;
-    if (config == null) return;
-
     try {
-      await ref.read(configControllerProvider).saveAndRefreshModels(config);
+      await ref.read(configControllerProvider).refreshModels();
       await AppToast.show('模型列表已同步');
     } catch (e) {
       await AppToast.show('同步模型失败：$e');
@@ -411,7 +435,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Future<void> _confirmRestoreDefaults() async {
-    final colorScheme = Theme.of(context).colorScheme;
     final confirmed = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
@@ -424,10 +447,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
               FilledButton(
                 onPressed: () => Navigator.of(ctx).pop(true),
-                style: FilledButton.styleFrom(
-                  backgroundColor: colorScheme.error,
-                  foregroundColor: colorScheme.onError,
-                ),
                 child: const Text('恢复默认'),
               ),
             ],
@@ -437,13 +456,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     if (!confirmed) return;
 
-    try {
-      await ref
-          .read(configControllerProvider)
-          .saveFullConfig(AppConfig.defaultConfig());
-    } catch (e) {
-      await AppToast.show('恢复默认失败：$e');
-    }
+    await ref.read(configControllerProvider).saveFullConfig(AppConfig.defaultConfig());
   }
 
   Future<void> _showCreateProfileDialog() async {
@@ -530,8 +543,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         false;
 
     if (!confirmed) return;
-    await ref
-        .read(configProfilesControllerProvider)
-        .deleteProfile(profile.id);
+    await ref.read(configProfilesControllerProvider).deleteProfile(profile.id);
   }
 }

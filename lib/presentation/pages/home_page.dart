@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../core/utils/time_format_utils.dart';
 import '../../domain/models/session_list_item.dart';
+import '../providers/config_notifier.dart';
 import '../providers/session_list_notifier.dart';
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/input_bar.dart';
@@ -85,6 +86,14 @@ class HomePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final sessionsAsync = ref.watch(sessionListProvider);
     final controller = ref.read(sessionListControllerProvider);
+    final configAsync = ref.watch(configProvider);
+
+    final currentConfig = configAsync.valueOrNull;
+    final selectedModelId = currentConfig?.selectedModel;
+    final selectedModel = currentConfig?.availableModels
+        ?.where((m) => m.id == selectedModelId)
+        .firstOrNull;
+    final allowImages = selectedModel?.supportsVision == true;
 
     return AppPageScaffold(
       appBar: AppBar(
@@ -142,6 +151,7 @@ class HomePage extends ConsumerWidget {
           ),
           InputBar(
             hintText: '发送消息',
+            allowImages: allowImages,
             onSend: (content, attachments) async {
               final newFileName = await controller.createSession('新对话');
               if (context.mounted) {

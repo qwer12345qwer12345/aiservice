@@ -12,6 +12,7 @@ class InputBar extends ConsumerStatefulWidget {
   final bool isStreaming;
   final bool enabled;
   final String hintText;
+  final bool allowImages;
 
   const InputBar({
     super.key,
@@ -20,6 +21,7 @@ class InputBar extends ConsumerStatefulWidget {
     this.isStreaming = false,
     this.enabled = true,
     this.hintText = '输入消息...',
+    this.allowImages = false,
   });
 
   @override
@@ -79,8 +81,6 @@ class _InputBarState extends ConsumerState<InputBar> {
       setState(() {});
     }
   }
-
-
 
   bool _isImageFile(String name) {
     final lower = name.toLowerCase();
@@ -180,14 +180,15 @@ class _InputBarState extends ConsumerState<InputBar> {
                   await _pickFileAttachment();
                 },
               ),
-              ListTile(
-                leading: const Icon(Icons.photo_library_outlined),
-                title: const Text('相册'),
-                onTap: () async {
-                  Navigator.of(context).pop();
-                  await _pickImageFromGallery();
-                },
-              ),
+              if (widget.allowImages)
+                ListTile(
+                  leading: const Icon(Icons.photo_library_outlined),
+                  title: const Text('相册'),
+                  onTap: () async {
+                    Navigator.of(context).pop();
+                    await _pickImageFromGallery();
+                  },
+                ),
             ],
           ),
         );
