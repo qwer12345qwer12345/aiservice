@@ -23,10 +23,8 @@ TreeNode _$TreeNodeFromJson(Map<String, dynamic> json) {
 mixin _$TreeNode {
   String get id => throw _privateConstructorUsedError;
   String? get parentId => throw _privateConstructorUsedError;
-  ChatRound get round => throw _privateConstructorUsedError;
   List<TreeNode> get children => throw _privateConstructorUsedError;
   int get depth => throw _privateConstructorUsedError;
-  String? get preview => throw _privateConstructorUsedError;
 
   /// Serializes this TreeNode to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -43,16 +41,7 @@ abstract class $TreeNodeCopyWith<$Res> {
   factory $TreeNodeCopyWith(TreeNode value, $Res Function(TreeNode) then) =
       _$TreeNodeCopyWithImpl<$Res, TreeNode>;
   @useResult
-  $Res call({
-    String id,
-    String? parentId,
-    ChatRound round,
-    List<TreeNode> children,
-    int depth,
-    String? preview,
-  });
-
-  $ChatRoundCopyWith<$Res> get round;
+  $Res call({String id, String? parentId, List<TreeNode> children, int depth});
 }
 
 /// @nodoc
@@ -72,10 +61,8 @@ class _$TreeNodeCopyWithImpl<$Res, $Val extends TreeNode>
   $Res call({
     Object? id = null,
     Object? parentId = freezed,
-    Object? round = null,
     Object? children = null,
     Object? depth = null,
-    Object? preview = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -87,10 +74,6 @@ class _$TreeNodeCopyWithImpl<$Res, $Val extends TreeNode>
                 ? _value.parentId
                 : parentId // ignore: cast_nullable_to_non_nullable
                       as String?,
-            round: null == round
-                ? _value.round
-                : round // ignore: cast_nullable_to_non_nullable
-                      as ChatRound,
             children: null == children
                 ? _value.children
                 : children // ignore: cast_nullable_to_non_nullable
@@ -99,23 +82,9 @@ class _$TreeNodeCopyWithImpl<$Res, $Val extends TreeNode>
                 ? _value.depth
                 : depth // ignore: cast_nullable_to_non_nullable
                       as int,
-            preview: freezed == preview
-                ? _value.preview
-                : preview // ignore: cast_nullable_to_non_nullable
-                      as String?,
           )
           as $Val,
     );
-  }
-
-  /// Create a copy of TreeNode
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @pragma('vm:prefer-inline')
-  $ChatRoundCopyWith<$Res> get round {
-    return $ChatRoundCopyWith<$Res>(_value.round, (value) {
-      return _then(_value.copyWith(round: value) as $Val);
-    });
   }
 }
 
@@ -128,17 +97,7 @@ abstract class _$$TreeNodeImplCopyWith<$Res>
   ) = __$$TreeNodeImplCopyWithImpl<$Res>;
   @override
   @useResult
-  $Res call({
-    String id,
-    String? parentId,
-    ChatRound round,
-    List<TreeNode> children,
-    int depth,
-    String? preview,
-  });
-
-  @override
-  $ChatRoundCopyWith<$Res> get round;
+  $Res call({String id, String? parentId, List<TreeNode> children, int depth});
 }
 
 /// @nodoc
@@ -157,10 +116,8 @@ class __$$TreeNodeImplCopyWithImpl<$Res>
   $Res call({
     Object? id = null,
     Object? parentId = freezed,
-    Object? round = null,
     Object? children = null,
     Object? depth = null,
-    Object? preview = freezed,
   }) {
     return _then(
       _$TreeNodeImpl(
@@ -172,10 +129,6 @@ class __$$TreeNodeImplCopyWithImpl<$Res>
             ? _value.parentId
             : parentId // ignore: cast_nullable_to_non_nullable
                   as String?,
-        round: null == round
-            ? _value.round
-            : round // ignore: cast_nullable_to_non_nullable
-                  as ChatRound,
         children: null == children
             ? _value._children
             : children // ignore: cast_nullable_to_non_nullable
@@ -184,10 +137,6 @@ class __$$TreeNodeImplCopyWithImpl<$Res>
             ? _value.depth
             : depth // ignore: cast_nullable_to_non_nullable
                   as int,
-        preview: freezed == preview
-            ? _value.preview
-            : preview // ignore: cast_nullable_to_non_nullable
-                  as String?,
       ),
     );
   }
@@ -199,10 +148,8 @@ class _$TreeNodeImpl implements _TreeNode {
   const _$TreeNodeImpl({
     required this.id,
     this.parentId,
-    required this.round,
     required final List<TreeNode> children,
     required this.depth,
-    this.preview,
   }) : _children = children;
 
   factory _$TreeNodeImpl.fromJson(Map<String, dynamic> json) =>
@@ -212,8 +159,6 @@ class _$TreeNodeImpl implements _TreeNode {
   final String id;
   @override
   final String? parentId;
-  @override
-  final ChatRound round;
   final List<TreeNode> _children;
   @override
   List<TreeNode> get children {
@@ -224,12 +169,10 @@ class _$TreeNodeImpl implements _TreeNode {
 
   @override
   final int depth;
-  @override
-  final String? preview;
 
   @override
   String toString() {
-    return 'TreeNode(id: $id, parentId: $parentId, round: $round, children: $children, depth: $depth, preview: $preview)';
+    return 'TreeNode(id: $id, parentId: $parentId, children: $children, depth: $depth)';
   }
 
   @override
@@ -240,10 +183,8 @@ class _$TreeNodeImpl implements _TreeNode {
             (identical(other.id, id) || other.id == id) &&
             (identical(other.parentId, parentId) ||
                 other.parentId == parentId) &&
-            (identical(other.round, round) || other.round == round) &&
             const DeepCollectionEquality().equals(other._children, _children) &&
-            (identical(other.depth, depth) || other.depth == depth) &&
-            (identical(other.preview, preview) || other.preview == preview));
+            (identical(other.depth, depth) || other.depth == depth));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -252,10 +193,8 @@ class _$TreeNodeImpl implements _TreeNode {
     runtimeType,
     id,
     parentId,
-    round,
     const DeepCollectionEquality().hash(_children),
     depth,
-    preview,
   );
 
   /// Create a copy of TreeNode
@@ -276,10 +215,8 @@ abstract class _TreeNode implements TreeNode {
   const factory _TreeNode({
     required final String id,
     final String? parentId,
-    required final ChatRound round,
     required final List<TreeNode> children,
     required final int depth,
-    final String? preview,
   }) = _$TreeNodeImpl;
 
   factory _TreeNode.fromJson(Map<String, dynamic> json) =
@@ -290,13 +227,9 @@ abstract class _TreeNode implements TreeNode {
   @override
   String? get parentId;
   @override
-  ChatRound get round;
-  @override
   List<TreeNode> get children;
   @override
   int get depth;
-  @override
-  String? get preview;
 
   /// Create a copy of TreeNode
   /// with the given fields replaced by the non-null parameter values.

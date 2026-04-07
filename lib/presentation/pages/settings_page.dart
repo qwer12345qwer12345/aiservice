@@ -1,3 +1,4 @@
+import 'package:aiservice/di/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -132,7 +133,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       availableModels: models,
     );
 
-    await ref.read(configControllerProvider).saveFullConfig(updatedConfig);
+    await ref.read(configServiceProvider).saveConfig(updatedConfig);
     await AppToast.show('设置已保存');
   }
 
@@ -230,7 +231,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               .toList(),
           onChanged: (value) async {
             if (value == null) return;
-            await ref.read(configProfilesControllerProvider).switchProfile(value);
+            await ref.read(configServiceProvider).switchProfile(value);
           },
         ),
         const SizedBox(height: 12),
@@ -427,7 +428,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Future<void> _refreshModels() async {
     try {
-      await ref.read(configControllerProvider).refreshModels();
+      await ref.read(configServiceProvider).refreshModels();
       await AppToast.show('模型列表已同步');
     } catch (e) {
       await AppToast.show('同步模型失败：$e');
@@ -456,7 +457,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     if (!confirmed) return;
 
-    await ref.read(configControllerProvider).saveFullConfig(AppConfig.defaultConfig());
+    await ref.read(configServiceProvider).saveConfig(AppConfig.defaultConfig());
   }
 
   Future<void> _showCreateProfileDialog() async {
@@ -484,7 +485,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
 
     if (result == null || result.isEmpty) return;
-    await ref.read(configProfilesControllerProvider).createProfile(result);
+    await ref.read(configServiceProvider).createProfile(result);
   }
 
   Future<void> _showRenameProfileDialog(ConfigProfile profile) async {
@@ -513,7 +514,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     if (result == null || result.isEmpty) return;
     await ref
-        .read(configProfilesControllerProvider)
+        .read(configServiceProvider)
         .renameProfile(profile.id, result);
   }
 
@@ -543,6 +544,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         false;
 
     if (!confirmed) return;
-    await ref.read(configProfilesControllerProvider).deleteProfile(profile.id);
+    await ref.read(configServiceProvider).deleteProfile(profile.id);
   }
 }

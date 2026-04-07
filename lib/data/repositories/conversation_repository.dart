@@ -59,24 +59,6 @@ class ConversationRepository {
       );
     });
   }
-
-  Stream<Session?> watchSession(String fileName) {
-    final sessionId = _getId(fileName);
-    final query = _db.select(_db.dbSessions).join([
-      leftOuterJoin(
-        _db.dbChatRounds,
-        _db.dbChatRounds.sessionId.equalsExp(_db.dbSessions.id),
-      ),
-      leftOuterJoin(
-        _db.dbAttachments,
-        _db.dbAttachments.roundId.equalsExp(_db.dbChatRounds.id),
-      ),
-    ])
-      ..where(_db.dbSessions.id.equals(sessionId))
-      ..orderBy([OrderingTerm.asc(_db.dbChatRounds.createdAt)]);
-    return query.watch().map(_mapSessionFromJoinedRows);
-  }
-
   // ========== 细粒度监听（新增） ==========
 
   /// 仅监听会话的拓扑结构（ID 与父子关系）
@@ -122,100 +104,74 @@ class ConversationRepository {
     });
   }
 
-  /// 一次性读取某 round 对应的完整上下文链（从根到该 round）
   Future<List<ChatRound>> getContextRounds(String fileName, String roundId) async {
-    final sessionId = _getId(fileName);
-    final query = _db.select(_db.dbChatRounds).join([
-      leftOuterJoin(
-        _db.dbAttachments,
-        _db.dbAttachments.roundId.equalsExp(_db.dbChatRounds.id),
-      ),
-    ])
-      ..where(_db.dbChatRounds.sessionId.equals(sessionId))
-      ..orderBy([OrderingTerm.asc(_db.dbChatRounds.createdAt)]);
+    // 1. 使用递归 CTE 直接查询从目标节点到根的路径（数据库层按时间正序返回）
+    final roundsQuery = _db.customSelect(
+      '''
+      WITH RECURSIVE ctx_chain AS (
+        -- 基础情况：目标节点
+        SELECT id, session_id, parent_id, created_at, user_content,
+              assistant_thinking, assistant_content, is_incomplete, has_unseen_update
+        FROM db_chat_rounds WHERE id = :roundId
+        UNION ALL
+        -- 递归情况：向上查找父节点
+        SELECT r.id, r.session_id, r.parent_id, r.created_at, r.user_content,
+              r.assistant_thinking, r.assistant_content, r.is_incomplete, r.has_unseen_update
+        FROM db_chat_rounds r
+        INNER JOIN ctx_chain c ON r.id = c.parent_id
+      )
+      SELECT * FROM ctx_chain ORDER BY created_at ASC
+      ''',
+      readsFrom: {_db.dbChatRounds},
+      variables: [Variable.withString(roundId)],
+    );
 
-    final rows = await query.get();
+    final dbRounds = await roundsQuery.map((row) {
+      return DbChatRound(
+        id: row.read<String>('id'),
+        sessionId: row.read<String>('session_id'),
+        parentId: row.read<String?>('parent_id'),
+        createdAt: row.read<int>('created_at'),
+        userContent: row.read<String>('user_content'),
+        assistantThinking: row.read<String?>('assistant_thinking'),
+        assistantContent: row.read<String?>('assistant_content'),
+        isIncomplete: row.read<bool>('is_incomplete'),
+        hasUnseenUpdate: row.read<bool>('has_unseen_update'),
+      );
+    }).get();
 
-    final roundMap = <String, DbChatRound>{};
+    if (dbRounds.isEmpty) return [];
+
+    // 2. 批量查询链路上所有轮次的附件
+    final roundIds = dbRounds.map((r) => r.id).toList();
+    final dbAttachments = await (_db.select(_db.dbAttachments)
+          ..where((t) => t.roundId.isIn(roundIds)))
+        .get();
+
+    // 3. 按 roundId 分组附件
     final attachmentMap = <String, List<Attachment>>{};
-
-    for (final row in rows) {
-      final roundRow = row.readTable(_db.dbChatRounds);
-      roundMap.putIfAbsent(roundRow.id, () => roundRow);
-
-      final attachmentRow = row.readTableOrNull(_db.dbAttachments);
-      if (attachmentRow != null) {
-        attachmentMap.putIfAbsent(roundRow.id, () => []).add(
-          Attachment(
-            id: attachmentRow.id,
-            name: attachmentRow.name,
-            relativePath: attachmentRow.relativePath,
-            isImage: attachmentRow.isImage,
-            mimeType: attachmentRow.mimeType,
-          ),
-        );
-      }
-    }
-
-    final path = <ChatRound>[];
-    String? currentId = roundId;
-
-    while (currentId != null && roundMap.containsKey(currentId)) {
-      final roundRow = roundMap[currentId]!;
-      path.add(
-        _mapToChatRound(
-          roundRow,
-          attachmentMap[currentId] ?? const <Attachment>[],
+    for (final att in dbAttachments) {
+      attachmentMap.putIfAbsent(att.roundId, () => []).add(
+        Attachment(
+          id: att.id,
+          name: att.name,
+          relativePath: att.relativePath,
+          isImage: att.isImage,
+          mimeType: att.mimeType,
         ),
       );
-      currentId = roundRow.parentId;
     }
 
-    return path.reversed.toList();
+    // 4. 组装返回（CTE 已按 created_at ASC 排序，无需 reversed）
+    return dbRounds.map((round) => _mapToChatRound(round, attachmentMap[round.id] ?? [])).toList();
   }
 
-  // ========== 私有辅助方法 ==========
-
-  Session? _mapSessionFromJoinedRows(List<TypedResult> rows) {
-    if (rows.isEmpty) return null;
-    final sessionRow = rows.first.readTable(_db.dbSessions);
-    final roundMap = <String, DbChatRound>{};
-    final attachmentMap = <String, List<Attachment>>{};
-
-    for (final row in rows) {
-      final roundRow = row.readTableOrNull(_db.dbChatRounds);
-      if (roundRow == null) continue;
-      roundMap.putIfAbsent(roundRow.id, () => roundRow);
-      final attachmentRow = row.readTableOrNull(_db.dbAttachments);
-      if (attachmentRow != null) {
-        attachmentMap.putIfAbsent(roundRow.id, () => []).add(
-          Attachment(
-            id: attachmentRow.id,
-            name: attachmentRow.name,
-            relativePath: attachmentRow.relativePath,
-            isImage: attachmentRow.isImage,
-            mimeType: attachmentRow.mimeType,
-          ),
-        );
-      }
-    }
-
-    final rounds = roundMap.values
-        .map((roundRow) => _mapToChatRound(
-              roundRow,
-              attachmentMap[roundRow.id] ?? const <Attachment>[],
-            ))
-        .toList();
-
-    return Session(
-      id: sessionRow.id,
-      title: sessionRow.title,
-      createdAt: sessionRow.createdAt,
-      updatedAt: sessionRow.updatedAt,
-      config: sessionRow.config,
-      hasUnseenUpdate: sessionRow.hasUnseenUpdate,
-      rounds: rounds,
-    );
+  Stream<String?> watchSessionTitle(String fileName) {
+    final sessionId = _getId(fileName);
+    return (_db.select(_db.dbSessions)
+          ..where((t) => t.id.equals(sessionId)))
+        .map((row) => row.title)
+        .watchSingleOrNull();
   }
 
   ChatRound _mapToChatRound(DbChatRound row, List<Attachment> attachments) {
@@ -232,26 +188,21 @@ class ConversationRepository {
     );
   }
 
-  // ========== 附件清理逻辑 (简化版) ==========
-
-  /// 检查数据库中是否仍存在该附件的引用
-  Future<bool> _hasAttachmentReference(String relativePath) async {
-    final row = await (_db.select(_db.dbAttachments)
-          ..where((t) => t.relativePath.equals(relativePath))
-          ..limit(1))
-        .getSingleOrNull();
-    return row != null;
-  }
-
-  /// 统一清理孤儿附件：检查引用，无引用则删除物理文件
   Future<void> _cleanupOrphanAttachments(Iterable<String> relativePaths) async {
-    for (final path in relativePaths.toSet()) {
-      if (!await _hasAttachmentReference(path)) {
-        try {
-          await _fileService.deleteAttachment(path);
-        } catch (_) {
-          // 忽略删除失败，避免阻塞流程
-        }
+    final uniquePaths = relativePaths.toSet();
+    if (uniquePaths.isEmpty) return;
+
+    final referencedPaths = await (_db.select(_db.dbAttachments)
+          ..where((t) => t.relativePath.isIn(uniquePaths)))
+        .map((t) => t.relativePath)
+        .get();
+
+    final orphanPaths = uniquePaths.difference(referencedPaths.toSet());
+
+    for (final path in orphanPaths) {
+      try {
+        await _fileService.deleteAttachment(path);
+      } catch (_) {
       }
     }
   }

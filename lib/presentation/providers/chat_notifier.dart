@@ -1,15 +1,14 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/chat_round.dart';
-import '../../core/models/session.dart';
 import '../../core/utils/id_generator.dart';
 import '../../di/providers.dart';
 import '../../domain/services/attachment_preparer.dart';
 import '../../domain/services/chat_context_builder.dart';
-import '../../domain/services/chat_stream_accumulator.dart';
 
-final chatSessionProvider = StreamProvider.family<Session?, String>((ref, fileName) {
-  return ref.watch(conversationRepositoryProvider).watchSession(fileName);
+final sessionTitleProvider = StreamProvider.family<String, String>((ref, fileName) {
+  return ref.watch(conversationRepositoryProvider).watchSessionTitle(fileName)
+      .map((title) => title ?? '对话');
 });
 
 final chatTopologyProvider =
@@ -73,7 +72,8 @@ class ChatController {
 
     () async {
       final apiSource = ref.read(remoteApiSourceProvider);
-      final accumulator = ChatStreamAccumulator();
+      final contentBuffer = StringBuffer();
+      final reasoningBuffer = StringBuffer();
       String? error;
       DateTime? lastDbUpdateTime;
       const updateInterval = Duration(seconds: 1);
@@ -109,7 +109,8 @@ class ChatController {
           }
           if (chunk.isDone) break;
 
-          accumulator.add(chunk);
+          if (chunk.content != null) contentBuffer.write(chunk.content);
+          if (chunk.reasoningContent != null) reasoningBuffer.write(chunk.reasoningContent);
 
           final now = DateTime.now();
           if (lastDbUpdateTime == null ||
@@ -118,8 +119,8 @@ class ChatController {
               fileName,
               newRound.id,
               newRound.copyWith(
-                assistantContent: accumulator.content,
-                assistantThinking: accumulator.reasoning,
+                assistantContent: contentBuffer.toString(),
+                assistantThinking: reasoningBuffer.toString(),
               ),
             );
             lastDbUpdateTime = now;
@@ -128,7 +129,8 @@ class ChatController {
       } catch (e) {
         error = e.toString();
       } finally {
-        String finalContent = accumulator.content;
+
+        String finalContent = contentBuffer.toString();
         if (error != null) {
           finalContent += '\n\n[错误]\n$error';
         } else if (_stoppingRoundIds.contains(newRound.id)) {
@@ -140,9 +142,9 @@ class ChatController {
           newRound.id,
           newRound.copyWith(
             assistantContent: finalContent.trim().isEmpty ? null : finalContent,
-            assistantThinking: accumulator.reasoning.trim().isEmpty
+            assistantThinking: reasoningBuffer.toString().trim().isEmpty
                 ? null
-                : accumulator.reasoning,
+                : reasoningBuffer.toString(),
             isIncomplete: false,
             hasUnseenUpdate: true,
           ),

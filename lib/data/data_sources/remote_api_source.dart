@@ -290,7 +290,6 @@ class RemoteApiSource implements IRemoteApiSource {
     required List<ApiMessage> context,
     bool enableReasoning = false,
   }) async* {
-    _cancelledTasks.remove(taskId);
     final client = http.Client();
     _activeClients[taskId] = client;
 

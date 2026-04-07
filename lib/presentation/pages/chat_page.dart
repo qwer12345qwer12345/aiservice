@@ -13,7 +13,6 @@ import '../widgets/thought_bubble.dart';
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_toast.dart';
 import 'branch_tree_page.dart';
-import '../utils/page_utils.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   final String fileName;
@@ -99,9 +98,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
-    final sessionTitle = ref.watch(
-      chatSessionProvider(widget.fileName).select((s) => s.valueOrNull?.title ?? '对话'),
-    );
+    final sessionTitle = ref.watch(sessionTitleProvider(widget.fileName)).valueOrNull ?? '未加载';
     final currentRoundAsync = ref.watch(roundDetailProvider(_currentRoundId ?? ''));
     final isStreaming = currentRoundAsync.valueOrNull?.isIncomplete ?? false;
     final configAsync = ref.watch(configProvider);
@@ -449,6 +446,9 @@ class _PaginationBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final displayPage = currentIndex + 1;
+    final progress = totalPages == 0 ? 0.0 : displayPage.clamp(1, totalPages) / totalPages;
+    final pageText = totalPages == 0 ? '0 / 0' : '$displayPage / $totalPages';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -464,13 +464,11 @@ class _PaginationBar extends StatelessWidget {
             child: Column(
               children: [
                 Text(
-                  PageUtils.formatSimple(currentIndex, totalPages),
+                  pageText,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 4),
-                LinearProgressIndicator(
-                  value: PageUtils.calculateProgress(currentIndex, totalPages),
-                ),
+                LinearProgressIndicator(value: progress),
               ],
             ),
           ),

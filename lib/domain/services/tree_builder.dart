@@ -1,24 +1,23 @@
-import '../../core/models/chat_round.dart';
 import '../models/tree_node.dart';
 
 class TreeBuilder {
-  static List<TreeNode> buildTree(List<ChatRound> rounds) {
-    if (rounds.isEmpty) return [];
+  /// ✅ 接收纯拓扑数据，构建 TreeNode 树
+  static List<TreeNode> buildTree(List<({String id, String? parentId})> topology) {
+    if (topology.isEmpty) return [];
 
     final nodeMap = <String, TreeNode>{
-      for (final round in rounds) 
-        round.id: TreeNode.fromRound(round: round, depth: 0),
+      for (final t in topology)
+        t.id: TreeNode(id: t.id, parentId: t.parentId, children: const [], depth: 0),
     };
 
     final childrenMap = <String, List<String>>{};
     final rootIds = <String>[];
 
-    for (final round in rounds) {
-      final parentId = round.parentId;
-      if (parentId == null) {
-        rootIds.add(round.id);
+    for (final t in topology) {
+      if (t.parentId == null) {
+        rootIds.add(t.id);
       } else {
-        childrenMap.putIfAbsent(parentId, () => []).add(round.id);
+        childrenMap.putIfAbsent(t.parentId!, () => []).add(t.id);
       }
     }
 
@@ -26,82 +25,46 @@ class TreeBuilder {
     for (final rootId in rootIds) {
       final root = nodeMap[rootId];
       if (root != null) {
-        roots.add(_buildSubtree(root, childrenMap, nodeMap, 0));
+        roots.add(_buildSubtreeIterative(root, childrenMap, nodeMap));
       }
     }
-
     return roots;
   }
 
-  static TreeNode _buildSubtree(
-    TreeNode node,
+  static TreeNode _buildSubtreeIterative(
+    TreeNode root,
     Map<String, List<String>> childrenMap,
     Map<String, TreeNode> nodeMap,
-    int depth,
   ) {
-    final childIds = childrenMap[node.id] ?? [];
-    final children = <TreeNode>[];
-
-    for (final childId in childIds) {
-      final child = nodeMap[childId];
-      if (child != null) {
-        children.add(_buildSubtree(child, childrenMap, nodeMap, depth + 1));
+    // 1. 显式栈获取后序遍历序列（子节点先于父节点）
+    final postOrder = <TreeNode>[];
+    final stack = <TreeNode>[root];
+    while (stack.isNotEmpty) {
+      final node = stack.removeLast();
+      postOrder.add(node);
+      for (final cid in childrenMap[node.id] ?? []) {
+        final child = nodeMap[cid];
+        if (child != null) stack.add(child);
       }
     }
 
-    // 🗑️ 删除原排序：children.sort(...)
-    // ✅ 子节点 ID 按创建时间顺序追加至 childrenMap，天然有序
-    return node.copyWith(depth: depth, children: children);
-  }
-
-  // ================= 以下方法保持原样不动 =================
-
-  static TreePath? findPath(List<TreeNode> roots, String targetId) {
-    for (final root in roots) {
-      final path = _findPathRecursive(root, targetId, []);
-      if (path != null) {
-        return TreePath(nodes: path, targetNode: path.last);
+    // 2. 逆序处理（从叶子到根），逐步替换为带 children/depth 的新节点
+    final updatedMap = <String, TreeNode>{};
+    for (int i = postOrder.length - 1; i >= 0; i--) {
+      final original = postOrder[i];
+      final childIds = childrenMap[original.id] ?? [];
+      final builtChildren = <TreeNode>[];
+      int maxChildDepth = -1;
+      for (final cid in childIds) {
+        final builtChild = updatedMap[cid]!;
+        builtChildren.add(builtChild);
+        if (builtChild.depth > maxChildDepth) maxChildDepth = builtChild.depth;
       }
+      updatedMap[original.id] = original.copyWith(
+        depth: maxChildDepth + 1,
+        children: builtChildren,
+      );
     }
-    return null;
-  }
-
-  static List<TreeNode>? _findPathRecursive(
-    TreeNode node,
-    String targetId,
-    List<TreeNode> currentPath,
-  ) {
-    final newPath = [...currentPath, node];
-    if (node.id == targetId) return newPath;
-
-    for (final child in node.children) {
-      final result = _findPathRecursive(child, targetId, newPath);
-      if (result != null) return result;
-    }
-    return null;
-  }
-
-  static List<TreeNode> findLeafNodes(List<TreeNode> roots) {
-    final leaves = <TreeNode>[];
-    _findLeavesRecursive(roots, leaves);
-    return leaves;
-  }
-
-  static void _findLeavesRecursive(List<TreeNode> nodes, List<TreeNode> leaves) {
-    for (final node in nodes) {
-      if (node.children.isEmpty) {
-        leaves.add(node);
-      } else {
-        _findLeavesRecursive(node.children, leaves);
-      }
-    }
-  }
-
-  static TreeNode? findLatestLeaf(TreeNode node) {
-    if (node.children.isEmpty) return node;
-    final latestChild = node.children.reduce((a, b) {
-      return a.round.createdAt >= b.round.createdAt ? a : b;
-    });
-    return findLatestLeaf(latestChild);
+    return updatedMap[root.id]!;
   }
 }

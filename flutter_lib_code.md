@@ -1367,7 +1367,6 @@ class RemoteApiSource implements IRemoteApiSource {
     required List<ApiMessage> context,
     bool enableReasoning = false,
   }) async* {
-    _cancelledTasks.remove(taskId);
     final client = http.Client();
     _activeClients[taskId] = client;
 
@@ -5263,24 +5262,6 @@ class ConversationRepository {
       );
     });
   }
-
-  Stream<Session?> watchSession(String fileName) {
-    final sessionId = _getId(fileName);
-    final query = _db.select(_db.dbSessions).join([
-      leftOuterJoin(
-        _db.dbChatRounds,
-        _db.dbChatRounds.sessionId.equalsExp(_db.dbSessions.id),
-      ),
-      leftOuterJoin(
-        _db.dbAttachments,
-        _db.dbAttachments.roundId.equalsExp(_db.dbChatRounds.id),
-      ),
-    ])
-      ..where(_db.dbSessions.id.equals(sessionId))
-      ..orderBy([OrderingTerm.asc(_db.dbChatRounds.createdAt)]);
-    return query.watch().map(_mapSessionFromJoinedRows);
-  }
-
   // ========== 细粒度监听（新增） ==========
 
   /// 仅监听会话的拓扑结构（ID 与父子关系）
@@ -5326,100 +5307,74 @@ class ConversationRepository {
     });
   }
 
-  /// 一次性读取某 round 对应的完整上下文链（从根到该 round）
   Future<List<ChatRound>> getContextRounds(String fileName, String roundId) async {
-    final sessionId = _getId(fileName);
-    final query = _db.select(_db.dbChatRounds).join([
-      leftOuterJoin(
-        _db.dbAttachments,
-        _db.dbAttachments.roundId.equalsExp(_db.dbChatRounds.id),
-      ),
-    ])
-      ..where(_db.dbChatRounds.sessionId.equals(sessionId))
-      ..orderBy([OrderingTerm.asc(_db.dbChatRounds.createdAt)]);
+    // 1. 使用递归 CTE 直接查询从目标节点到根的路径（数据库层按时间正序返回）
+    final roundsQuery = _db.customSelect(
+      '''
+      WITH RECURSIVE ctx_chain AS (
+        -- 基础情况：目标节点
+        SELECT id, session_id, parent_id, created_at, user_content,
+              assistant_thinking, assistant_content, is_incomplete, has_unseen_update
+        FROM db_chat_rounds WHERE id = :roundId
+        UNION ALL
+        -- 递归情况：向上查找父节点
+        SELECT r.id, r.session_id, r.parent_id, r.created_at, r.user_content,
+              r.assistant_thinking, r.assistant_content, r.is_incomplete, r.has_unseen_update
+        FROM db_chat_rounds r
+        INNER JOIN ctx_chain c ON r.id = c.parent_id
+      )
+      SELECT * FROM ctx_chain ORDER BY created_at ASC
+      ''',
+      readsFrom: {_db.dbChatRounds},
+      variables: [Variable.withString(roundId)],
+    );
 
-    final rows = await query.get();
+    final dbRounds = await roundsQuery.map((row) {
+      return DbChatRound(
+        id: row.read<String>('id'),
+        sessionId: row.read<String>('session_id'),
+        parentId: row.read<String?>('parent_id'),
+        createdAt: row.read<int>('created_at'),
+        userContent: row.read<String>('user_content'),
+        assistantThinking: row.read<String?>('assistant_thinking'),
+        assistantContent: row.read<String?>('assistant_content'),
+        isIncomplete: row.read<bool>('is_incomplete'),
+        hasUnseenUpdate: row.read<bool>('has_unseen_update'),
+      );
+    }).get();
 
-    final roundMap = <String, DbChatRound>{};
+    if (dbRounds.isEmpty) return [];
+
+    // 2. 批量查询链路上所有轮次的附件
+    final roundIds = dbRounds.map((r) => r.id).toList();
+    final dbAttachments = await (_db.select(_db.dbAttachments)
+          ..where((t) => t.roundId.isIn(roundIds)))
+        .get();
+
+    // 3. 按 roundId 分组附件
     final attachmentMap = <String, List<Attachment>>{};
-
-    for (final row in rows) {
-      final roundRow = row.readTable(_db.dbChatRounds);
-      roundMap.putIfAbsent(roundRow.id, () => roundRow);
-
-      final attachmentRow = row.readTableOrNull(_db.dbAttachments);
-      if (attachmentRow != null) {
-        attachmentMap.putIfAbsent(roundRow.id, () => []).add(
-          Attachment(
-            id: attachmentRow.id,
-            name: attachmentRow.name,
-            relativePath: attachmentRow.relativePath,
-            isImage: attachmentRow.isImage,
-            mimeType: attachmentRow.mimeType,
-          ),
-        );
-      }
-    }
-
-    final path = <ChatRound>[];
-    String? currentId = roundId;
-
-    while (currentId != null && roundMap.containsKey(currentId)) {
-      final roundRow = roundMap[currentId]!;
-      path.add(
-        _mapToChatRound(
-          roundRow,
-          attachmentMap[currentId] ?? const <Attachment>[],
+    for (final att in dbAttachments) {
+      attachmentMap.putIfAbsent(att.roundId, () => []).add(
+        Attachment(
+          id: att.id,
+          name: att.name,
+          relativePath: att.relativePath,
+          isImage: att.isImage,
+          mimeType: att.mimeType,
         ),
       );
-      currentId = roundRow.parentId;
     }
 
-    return path.reversed.toList();
+    // 4. 组装返回（CTE 已按 created_at ASC 排序，无需 reversed）
+    return dbRounds.map((round) => _mapToChatRound(round, attachmentMap[round.id] ?? [])).toList();
   }
 
-  // ========== 私有辅助方法 ==========
-
-  Session? _mapSessionFromJoinedRows(List<TypedResult> rows) {
-    if (rows.isEmpty) return null;
-    final sessionRow = rows.first.readTable(_db.dbSessions);
-    final roundMap = <String, DbChatRound>{};
-    final attachmentMap = <String, List<Attachment>>{};
-
-    for (final row in rows) {
-      final roundRow = row.readTableOrNull(_db.dbChatRounds);
-      if (roundRow == null) continue;
-      roundMap.putIfAbsent(roundRow.id, () => roundRow);
-      final attachmentRow = row.readTableOrNull(_db.dbAttachments);
-      if (attachmentRow != null) {
-        attachmentMap.putIfAbsent(roundRow.id, () => []).add(
-          Attachment(
-            id: attachmentRow.id,
-            name: attachmentRow.name,
-            relativePath: attachmentRow.relativePath,
-            isImage: attachmentRow.isImage,
-            mimeType: attachmentRow.mimeType,
-          ),
-        );
-      }
-    }
-
-    final rounds = roundMap.values
-        .map((roundRow) => _mapToChatRound(
-              roundRow,
-              attachmentMap[roundRow.id] ?? const <Attachment>[],
-            ))
-        .toList();
-
-    return Session(
-      id: sessionRow.id,
-      title: sessionRow.title,
-      createdAt: sessionRow.createdAt,
-      updatedAt: sessionRow.updatedAt,
-      config: sessionRow.config,
-      hasUnseenUpdate: sessionRow.hasUnseenUpdate,
-      rounds: rounds,
-    );
+  Stream<String?> watchSessionTitle(String fileName) {
+    final sessionId = _getId(fileName);
+    return (_db.select(_db.dbSessions)
+          ..where((t) => t.id.equals(sessionId)))
+        .map((row) => row.title)
+        .watchSingleOrNull();
   }
 
   ChatRound _mapToChatRound(DbChatRound row, List<Attachment> attachments) {
@@ -5436,26 +5391,21 @@ class ConversationRepository {
     );
   }
 
-  // ========== 附件清理逻辑 (简化版) ==========
-
-  /// 检查数据库中是否仍存在该附件的引用
-  Future<bool> _hasAttachmentReference(String relativePath) async {
-    final row = await (_db.select(_db.dbAttachments)
-          ..where((t) => t.relativePath.equals(relativePath))
-          ..limit(1))
-        .getSingleOrNull();
-    return row != null;
-  }
-
-  /// 统一清理孤儿附件：检查引用，无引用则删除物理文件
   Future<void> _cleanupOrphanAttachments(Iterable<String> relativePaths) async {
-    for (final path in relativePaths.toSet()) {
-      if (!await _hasAttachmentReference(path)) {
-        try {
-          await _fileService.deleteAttachment(path);
-        } catch (_) {
-          // 忽略删除失败，避免阻塞流程
-        }
+    final uniquePaths = relativePaths.toSet();
+    if (uniquePaths.isEmpty) return;
+
+    final referencedPaths = await (_db.select(_db.dbAttachments)
+          ..where((t) => t.relativePath.isIn(uniquePaths)))
+        .map((t) => t.relativePath)
+        .get();
+
+    final orphanPaths = uniquePaths.difference(referencedPaths.toSet());
+
+    for (final path in orphanPaths) {
+      try {
+        await _fileService.deleteAttachment(path);
+      } catch (_) {
       }
     }
   }
@@ -6131,9 +6081,7 @@ class SessionListItem {
 
 ## File: domain/models/tree_node.dart
 ```dart
-// lib/domain/models/tree_node.dart
 import 'package:freezed_annotation/freezed_annotation.dart';
-import '../../core/models/chat_round.dart';
 
 part 'tree_node.freezed.dart';
 part 'tree_node.g.dart';
@@ -6143,34 +6091,12 @@ class TreeNode with _$TreeNode {
   const factory TreeNode({
     required String id,
     String? parentId,
-    required ChatRound round,
     required List<TreeNode> children,
     required int depth,
-    String? preview,
   }) = _TreeNode;
-  
+
   factory TreeNode.fromJson(Map<String, dynamic> json) =>
       _$TreeNodeFromJson(json);
-  
-  factory TreeNode.fromRound({
-    required ChatRound round,
-    required int depth,
-  }) {
-    final userText = round.userContent.trim();
-    final aiText = round.assistantContent?.trim() ?? '（等待回复）';
-    final userPreview =
-        userText.length > 20 ? '${userText.substring(0, 20)}...' : userText;
-    final aiPreview =
-        aiText.length > 20 ? '${aiText.substring(0, 20)}...' : aiText;
-    return TreeNode(
-      id: round.id,
-      parentId: round.parentId,
-      round: round,
-      children: const [],
-      depth: depth,
-      preview: 'YOU: $userPreview\nAI: $aiPreview',
-    );
-  }
 }
 
 @freezed
@@ -6179,7 +6105,7 @@ class TreePath with _$TreePath {
     required List<TreeNode> nodes,
     required TreeNode targetNode,
   }) = _TreePath;
-  
+
   factory TreePath.fromJson(Map<String, dynamic> json) =>
       _$TreePathFromJson(json);
 }
@@ -6199,22 +6125,18 @@ _$TreeNodeImpl _$$TreeNodeImplFromJson(Map<String, dynamic> json) =>
     _$TreeNodeImpl(
       id: json['id'] as String,
       parentId: json['parentId'] as String?,
-      round: ChatRound.fromJson(json['round'] as Map<String, dynamic>),
       children: (json['children'] as List<dynamic>)
           .map((e) => TreeNode.fromJson(e as Map<String, dynamic>))
           .toList(),
       depth: (json['depth'] as num).toInt(),
-      preview: json['preview'] as String?,
     );
 
 Map<String, dynamic> _$$TreeNodeImplToJson(_$TreeNodeImpl instance) =>
     <String, dynamic>{
       'id': instance.id,
       'parentId': instance.parentId,
-      'round': instance.round,
       'children': instance.children,
       'depth': instance.depth,
-      'preview': instance.preview,
     };
 
 _$TreePathImpl _$$TreePathImplFromJson(Map<String, dynamic> json) =>
@@ -6768,27 +6690,26 @@ class _ModelRule {
 
 ## File: domain/services/tree_builder.dart
 ```dart
-import '../../core/models/chat_round.dart';
 import '../models/tree_node.dart';
 
 class TreeBuilder {
-  static List<TreeNode> buildTree(List<ChatRound> rounds) {
-    if (rounds.isEmpty) return [];
+  /// ✅ 接收纯拓扑数据，构建 TreeNode 树
+  static List<TreeNode> buildTree(List<({String id, String? parentId})> topology) {
+    if (topology.isEmpty) return [];
 
     final nodeMap = <String, TreeNode>{
-      for (final round in rounds) 
-        round.id: TreeNode.fromRound(round: round, depth: 0),
+      for (final t in topology)
+        t.id: TreeNode(id: t.id, parentId: t.parentId, children: const [], depth: 0),
     };
 
     final childrenMap = <String, List<String>>{};
     final rootIds = <String>[];
 
-    for (final round in rounds) {
-      final parentId = round.parentId;
-      if (parentId == null) {
-        rootIds.add(round.id);
+    for (final t in topology) {
+      if (t.parentId == null) {
+        rootIds.add(t.id);
       } else {
-        childrenMap.putIfAbsent(parentId, () => []).add(round.id);
+        childrenMap.putIfAbsent(t.parentId!, () => []).add(t.id);
       }
     }
 
@@ -6796,83 +6717,47 @@ class TreeBuilder {
     for (final rootId in rootIds) {
       final root = nodeMap[rootId];
       if (root != null) {
-        roots.add(_buildSubtree(root, childrenMap, nodeMap, 0));
+        roots.add(_buildSubtreeIterative(root, childrenMap, nodeMap));
       }
     }
-
     return roots;
   }
 
-  static TreeNode _buildSubtree(
-    TreeNode node,
+  static TreeNode _buildSubtreeIterative(
+    TreeNode root,
     Map<String, List<String>> childrenMap,
     Map<String, TreeNode> nodeMap,
-    int depth,
   ) {
-    final childIds = childrenMap[node.id] ?? [];
-    final children = <TreeNode>[];
-
-    for (final childId in childIds) {
-      final child = nodeMap[childId];
-      if (child != null) {
-        children.add(_buildSubtree(child, childrenMap, nodeMap, depth + 1));
+    // 1. 显式栈获取后序遍历序列（子节点先于父节点）
+    final postOrder = <TreeNode>[];
+    final stack = <TreeNode>[root];
+    while (stack.isNotEmpty) {
+      final node = stack.removeLast();
+      postOrder.add(node);
+      for (final cid in childrenMap[node.id] ?? []) {
+        final child = nodeMap[cid];
+        if (child != null) stack.add(child);
       }
     }
 
-    // 🗑️ 删除原排序：children.sort(...)
-    // ✅ 子节点 ID 按创建时间顺序追加至 childrenMap，天然有序
-    return node.copyWith(depth: depth, children: children);
-  }
-
-  // ================= 以下方法保持原样不动 =================
-
-  static TreePath? findPath(List<TreeNode> roots, String targetId) {
-    for (final root in roots) {
-      final path = _findPathRecursive(root, targetId, []);
-      if (path != null) {
-        return TreePath(nodes: path, targetNode: path.last);
+    // 2. 逆序处理（从叶子到根），逐步替换为带 children/depth 的新节点
+    final updatedMap = <String, TreeNode>{};
+    for (int i = postOrder.length - 1; i >= 0; i--) {
+      final original = postOrder[i];
+      final childIds = childrenMap[original.id] ?? [];
+      final builtChildren = <TreeNode>[];
+      int maxChildDepth = -1;
+      for (final cid in childIds) {
+        final builtChild = updatedMap[cid]!;
+        builtChildren.add(builtChild);
+        if (builtChild.depth > maxChildDepth) maxChildDepth = builtChild.depth;
       }
+      updatedMap[original.id] = original.copyWith(
+        depth: maxChildDepth + 1,
+        children: builtChildren,
+      );
     }
-    return null;
-  }
-
-  static List<TreeNode>? _findPathRecursive(
-    TreeNode node,
-    String targetId,
-    List<TreeNode> currentPath,
-  ) {
-    final newPath = [...currentPath, node];
-    if (node.id == targetId) return newPath;
-
-    for (final child in node.children) {
-      final result = _findPathRecursive(child, targetId, newPath);
-      if (result != null) return result;
-    }
-    return null;
-  }
-
-  static List<TreeNode> findLeafNodes(List<TreeNode> roots) {
-    final leaves = <TreeNode>[];
-    _findLeavesRecursive(roots, leaves);
-    return leaves;
-  }
-
-  static void _findLeavesRecursive(List<TreeNode> nodes, List<TreeNode> leaves) {
-    for (final node in nodes) {
-      if (node.children.isEmpty) {
-        leaves.add(node);
-      } else {
-        _findLeavesRecursive(node.children, leaves);
-      }
-    }
-  }
-
-  static TreeNode? findLatestLeaf(TreeNode node) {
-    if (node.children.isEmpty) return node;
-    final latestChild = node.children.reduce((a, b) {
-      return a.round.createdAt >= b.round.createdAt ? a : b;
-    });
-    return findLatestLeaf(latestChild);
+    return updatedMap[root.id]!;
   }
 }
 ```
@@ -6994,62 +6879,22 @@ class PendingAttachment {
 
 ## File: presentation/pages/branch_tree_page.dart
 ```dart
-// presentation/pages/branch_tree_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:graphview/GraphView.dart';
-import '../../core/models/chat_round.dart';
 import '../../core/utils/time_format_utils.dart';
-import '../../di/providers.dart';
 import '../../domain/models/tree_node.dart';
 import '../../domain/services/tree_builder.dart';
-import '../providers/chat_notifier.dart' show chatSessionProvider, chatTopologyProvider, roundDetailProvider;
+import '../providers/chat_notifier.dart' show chatTopologyProvider, roundDetailProvider;
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_toast.dart';
-
-// ==========================================
-// 🟢 第一层：结构层 Provider
-// ==========================================
-
-/// 1. 拓扑数据提取器：
-/// 将无关内容的字段剔除，使得 AI 回复文本时，该 Provider 产出的 List 完全一样（利用 Freezed 相等性）。
-/// 从而切断流式更新向下游的传递。
-final _sessionTopologyProvider = Provider.family<List<ChatRound>, String>((ref, fileName) {
-  final topology = ref.watch(chatTopologyProvider(fileName)).valueOrNull ?? [];
-  return topology.map((t) => ChatRound(
-    id: t.id,
-    parentId: t.parentId,
-    createdAt: 0,
-    userContent: '',
-    assistantContent: null,
-    assistantThinking: null,
-    userAttachments: const [],
-    isIncomplete: false,
-    hasUnseenUpdate: false,
-  )).toList();
-});
-
-/// 2. 结构树 Provider：
-/// 仅依赖干净的拓扑数据。只要新增、删除分支，才会重建整棵树。
-final branchTreeStructureProvider = Provider.family<List<TreeNode>, String>((ref, fileName) {
-  final topologyRounds = ref.watch(_sessionTopologyProvider(fileName));
-  if (topologyRounds.isEmpty) return const [];
-  return TreeBuilder.buildTree(topologyRounds);
-});
-
-// ==========================================
-// 📄 页面主结构
-// ==========================================
+import '../../di/providers.dart';
 
 class BranchTreePage extends ConsumerStatefulWidget {
   final String fileName;
   final String initialFocusRoundId;
 
-  const BranchTreePage({
-    super.key,
-    required this.fileName,
-    required this.initialFocusRoundId,
-  });
+  const BranchTreePage({super.key, required this.fileName, required this.initialFocusRoundId});
 
   @override
   ConsumerState<BranchTreePage> createState() => _BranchTreePageState();
@@ -7100,7 +6945,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     if (_hasFocused || _targetNodeKey == null) return;
     final targetContext = _targetNodeKey!.currentContext;
     final viewerContext = _viewerKey.currentContext;
-    
+
     if (targetContext == null || viewerContext == null) {
       _retryFocus();
       return;
@@ -7108,7 +6953,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
 
     final targetBox = targetContext.findRenderObject() as RenderBox?;
     final viewerBox = viewerContext.findRenderObject() as RenderBox?;
-    
+
     if (targetBox == null || viewerBox == null || !targetBox.hasSize || !viewerBox.hasSize) {
       _retryFocus();
       return;
@@ -7145,47 +6990,42 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     });
   }
 
-  Set<String> _collectSubtreeIds(TreeNode node) {
-    final ids = <String>{node.id};
-    for (final child in node.children) {
-      ids.addAll(_collectSubtreeIds(child));
+  Set<String> _collectSubtreeIds(TreeNode root) {
+    final ids = <String>{};
+    final stack = <TreeNode>[root];
+    
+    while (stack.isNotEmpty) {
+      final node = stack.removeLast();
+      ids.add(node.id);
+      // 将子节点压入栈中，继续向下遍历
+      stack.addAll(node.children);
     }
+    
     return ids;
   }
 
-  TreeNode? _findTreeNodeById(List<TreeNode> roots, String nodeId) {
-    for (final root in roots) {
-      final result = _findTreeNodeByIdRecursive(root, nodeId);
-      if (result != null) return result;
-    }
-    return null;
-  }
-
-  TreeNode? _findTreeNodeByIdRecursive(TreeNode node, String nodeId) {
-    if (node.id == nodeId) return node;
-    for (final child in node.children) {
-      final result = _findTreeNodeByIdRecursive(child, nodeId);
-      if (result != null) return result;
+  TreeNode? _findIterative(List<TreeNode> roots, String targetId) {
+    final stack = [...roots];
+    while (stack.isNotEmpty) {
+      final node = stack.removeLast();
+      if (node.id == targetId) return node;
+      stack.addAll(node.children);
     }
     return null;
   }
 
   Future<void> _deleteNode(String nodeId) async {
-    final roots = ref.read(branchTreeStructureProvider(widget.fileName));
-    final targetNode = _findTreeNodeById(roots, nodeId);
-    if (targetNode == null) throw Exception('未找到要删除的节点');
+    final topology = ref.read(chatTopologyProvider(widget.fileName)).valueOrNull ?? [];
+    final roots = TreeBuilder.buildTree(topology);
+    final target = _findIterative(roots, nodeId);
+    if (target == null) return;
 
-    final idsToDelete = _collectSubtreeIds(targetNode).toList();
-    final repository = ref.read(conversationRepositoryProvider);
-    
+    final ids = _collectSubtreeIds(target).toList();
     try {
-      await repository.deleteRoundsAndCleanupOrphanAttachments(
-        widget.fileName,
-        idsToDelete,
-      );
+      await ref.read(conversationRepositoryProvider)
+          .deleteRoundsAndCleanupOrphanAttachments(widget.fileName, ids);
     } catch (e) {
       await AppToast.show('删除失败：$e');
-      rethrow;
     }
   }
 
@@ -7205,47 +7045,20 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
 
   @override
   Widget build(BuildContext context) {
-    // 基础状态监听：标题、加载状态（这些几乎不会频繁改变）
-    final sessionTitle = ref.watch(chatSessionProvider(widget.fileName).select((s) => s.valueOrNull?.title ?? '分支树'));
-    final hasError = ref.watch(chatSessionProvider(widget.fileName).select((s) => s.hasError));
+    // ✅ 第一条：复用聊天页框架 Provider，构建整体树框架
+    final topology = ref.watch(chatTopologyProvider(widget.fileName)).valueOrNull ?? [];
+    final roots = TreeBuilder.buildTree(topology);
+    final structKey = roots.length.toString();
 
-    if (hasError) {
-      return AppPageScaffold(
-        appBar: AppBar(title: Text(sessionTitle)),
-        body: const Center(child: Text('加载失败')),
-      );
-    }
-
-    final topologyRounds = ref.watch(_sessionTopologyProvider(widget.fileName));
-    final roots = ref.watch(branchTreeStructureProvider(widget.fileName));
-    
-    final structKey = topologyRounds.length.toString();
-
-    if (!_hasFocused && roots.isNotEmpty) {
-      _scheduleFocusToTarget();
-    }
+    if (!_hasFocused && roots.isNotEmpty) _scheduleFocusToTarget();
 
     return AppPageScaffold(
-      appBar: AppBar(
-        title: Text(sessionTitle, overflow: TextOverflow.ellipsis),
-      ),
+      appBar: AppBar(title: const Text('分支树')),
       body: roots.isEmpty
           ? _buildEmptyState(context)
           : Column(
               children: [
-                _GraphToolbar(
-                  onZoomIn: () {
-                    final current = _transformationController.value.clone();
-                    current.scale(1.1);
-                    _transformationController.value = current;
-                  },
-                  onZoomOut: () {
-                    final current = _transformationController.value.clone();
-                    current.scale(0.9);
-                    _transformationController.value = current;
-                  },
-                  onReset: _resetViewport,
-                ),
+                _GraphToolbar(onZoomIn: () {}, onZoomOut: () {}, onReset: _resetViewport),
                 Expanded(
                   child: InteractiveViewer(
                     key: _viewerKey,
@@ -7257,27 +7070,17 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
                     child: Padding(
                       padding: const EdgeInsets.all(20),
                       child: Wrap(
-                        spacing: 40,
-                        runSpacing: 40,
+                        spacing: 40, runSpacing: 40,
                         crossAxisAlignment: WrapCrossAlignment.start,
                         children: roots.map((root) => _RootTreeGroup(
-                          key: ValueKey('root-tree-${root.id}-$structKey'), // 锁定算法
+                          key: ValueKey('root-${root.id}-$structKey'),
                           root: root,
-                          fileName: widget.fileName,
                           graphSignature: structKey,
                           builderConfig: _builder,
                           targetNodeId: widget.initialFocusRoundId,
                           targetNodeKey: _targetNodeKey,
-                          onSwitch: (roundId) => Navigator.of(context).pop(roundId),
-                          onDelete: (roundId) async {
-                            if (await _confirmDelete()) {
-                              try {
-                                await _deleteNode(roundId);
-                              } catch (e) {
-                                await AppToast.show('删除失败：$e');
-                              }
-                            }
-                          },
+                          onSwitch: (id) => Navigator.of(context).pop(id),
+                          onDelete: (id) async { if (await _confirmDelete()) await _deleteNode(id); },
                         )).toList(),
                       ),
                     ),
@@ -7288,105 +7091,70 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     );
   }
 
-  Widget _buildEmptyState(BuildContext context) {
-    return Center(
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 360),
-            child: const Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.account_tree_outlined, size: 40),
-                SizedBox(height: 16),
-                Text('暂无分支结构', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
-                SizedBox(height: 8),
-                Text('当你对历史轮次重新生成回复时，这里会显示完整的分支关系。', textAlign: TextAlign.center),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  Widget _buildEmptyState(BuildContext context) => const Center(child: Text('暂无分支结构'));
 }
 
 // ==========================================
-// 🎨 Graph 布局层
+// 🎨 布局层
 // ==========================================
-
 class _RootTreeGroup extends StatelessWidget {
   final TreeNode root;
-  final String fileName;
   final String graphSignature;
   final BuchheimWalkerConfiguration builderConfig;
-  final Function(String roundId) onSwitch;
-  final Function(String roundId) onDelete;
+  final Function(String) onSwitch;
+  final Function(String) onDelete;
   final String? targetNodeId;
   final GlobalKey? targetNodeKey;
 
   const _RootTreeGroup({
-    super.key,
-    required this.root,
-    required this.fileName,
-    required this.graphSignature,
-    required this.builderConfig,
-    required this.onSwitch,
-    required this.onDelete,
-    this.targetNodeId,
-    this.targetNodeKey,
+    super.key, required this.root, required this.graphSignature,
+    required this.builderConfig, required this.onSwitch, required this.onDelete,
+    this.targetNodeId, this.targetNodeKey,
   });
 
   @override
   Widget build(BuildContext context) {
     final graph = Graph()..isTree = true;
     final nodeMap = <String, Node>{};
-    final graphNodeToTreeNodeMap = <Node, TreeNode>{};
+    final graphToTree = <Node, TreeNode>{};
 
-    void addTree(TreeNode treeNode, TreeNode? parent) {
-      final currentNode = Node.Id('${root.id}-${treeNode.id}-$graphSignature');
-      nodeMap[treeNode.id] = currentNode;
-      graphNodeToTreeNodeMap[currentNode] = treeNode;
-      graph.addNode(currentNode);
-
-      if (parent != null) {
-        final parentNode = nodeMap[parent.id];
-        if (parentNode != null) {
-          graph.addEdge(parentNode, currentNode);
-        }
+    // 替换为显式栈遍历
+    final stack = <TreeNode>[root];
+    while (stack.isNotEmpty) {
+      final node = stack.removeLast();
+      
+      final gNode = Node.Id('${root.id}-${node.id}-$graphSignature');
+      nodeMap[node.id] = gNode;
+      graphToTree[gNode] = node;
+      graph.addNode(gNode);
+      
+      if (node.parentId != null) {
+        final p = nodeMap[node.parentId!];
+        if (p != null) graph.addEdge(p, gNode);
       }
-
-      for (final child in treeNode.children) {
-        addTree(child, treeNode);
-      }
+      
+      // 逆序入栈，保持与原递归一致的从左到右渲染顺序
+      stack.addAll(node.children.reversed);
     }
 
-    addTree(root, null);
-
     return GraphView(
-      key: ValueKey('graph-${root.id}-$graphSignature'), // 图布局器不再因节点文本变化而销毁重建
+      key: ValueKey('graph-${root.id}-$graphSignature'),
       graph: graph,
       animated: false,
       algorithm: BuchheimWalkerAlgorithm(builderConfig, TreeEdgeRenderer(builderConfig)),
-      paint: Paint()
-        ..color = Theme.of(context).dividerColor
-        ..strokeWidth = 1.6
-        ..style = PaintingStyle.stroke,
+      paint: Paint()..color = Theme.of(context).dividerColor..strokeWidth = 1.6..style = PaintingStyle.stroke,
       builder: (Node node) {
-        final treeNode = graphNodeToTreeNodeMap[node];
-        if (treeNode == null) return const SizedBox.shrink();
+        final tree = graphToTree[node];
+        if (tree == null) return const SizedBox.shrink();
+        final isTarget = targetNodeId != null && tree.id == targetNodeId;
 
-        final isTarget = targetNodeId != null && treeNode.id == targetNodeId;
-
-        // 向下传递必需的关键参数，不再传递可能变化的完整 TreeNode
+        // ✅ 第二条：复用每页 Provider，构建每个卡片的文字
         return _GraphNodeCard(
-          key: isTarget ? targetNodeKey : ValueKey('${treeNode.id}-$graphSignature'),
-          fileName: fileName,
-          roundId: treeNode.id,
-          depth: treeNode.depth,
-          onSwitch: () => onSwitch(treeNode.id),
-          onDelete: () => onDelete(treeNode.id),
+          key: isTarget ? targetNodeKey : ValueKey('${tree.id}-$graphSignature'),
+          roundId: tree.id,
+          depth: tree.depth,
+          onSwitch: () => onSwitch(tree.id),
+          onDelete: () => onDelete(tree.id),
         );
       },
     );
@@ -7394,43 +7162,25 @@ class _RootTreeGroup extends StatelessWidget {
 }
 
 // ==========================================
-// 🔵 第二层：卡片内容层（精细化监听重绘点）
+// 🔵 内容层
 // ==========================================
-
 class _GraphNodeCard extends ConsumerWidget {
-  final String fileName;
   final String roundId;
   final int depth;
   final VoidCallback onSwitch;
   final VoidCallback onDelete;
 
   const _GraphNodeCard({
-    super.key,
-    required this.fileName,
-    required this.roundId,
-    required this.depth,
-    required this.onSwitch,
-    required this.onDelete,
+    super.key, required this.roundId, required this.depth,
+    required this.onSwitch, required this.onDelete,
   });
-
-  Widget _buildChip(String label, {IconData? icon}) {
-    return Chip(
-      avatar: icon == null ? null : Icon(icon, size: 16),
-      label: Text(label),
-      visualDensity: VisualDensity.compact,
-    );
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final round = ref.watch(roundDetailProvider(roundId)).valueOrNull;
     if (round == null) return const SizedBox.shrink();
 
-    final isIncomplete = round.isIncomplete;
-    final hasUnseenUpdate = round.hasUnseenUpdate;
-    final aiContent = (round.assistantContent ?? '').trim().isEmpty
-        ? '（等待回复）'
-        : round.assistantContent!;
+    final aiText = (round.assistantContent ?? '').trim().isEmpty ? '（等待回复）' : round.assistantContent!;
 
     return Card(
       child: SizedBox(
@@ -7440,44 +7190,18 @@ class _GraphNodeCard extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _buildChip('深度 ${depth + 1}', icon: Icons.layers_outlined),
-                  if (isIncomplete) _buildChip('未完成', icon: Icons.hourglass_empty_outlined),
-                  if (hasUnseenUpdate) _buildChip('未查看', icon: Icons.mark_chat_unread_outlined),
-                ],
-              ),
+              Chip(label: Text('深度 ${depth + 1}'), visualDensity: VisualDensity.compact),
               const SizedBox(height: 10),
-              Text(
-                TimeFormatUtils.formatTimestamp(round.createdAt),
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
+              Text(TimeFormatUtils.formatTimestamp(round.createdAt), style: Theme.of(context).textTheme.bodySmall),
               const SizedBox(height: 12),
-              _PreviewBlock(
-                label: 'YOU',
-                content: round.userContent.trim().isEmpty ? '（空输入）' : round.userContent,
-              ),
+              _PreviewBlock(label: 'YOU', content: round.userContent),
               const SizedBox(height: 8),
-              _PreviewBlock(
-                label: 'AI',
-                content: aiContent,
-              ),
+              _PreviewBlock(label: 'AI', content: aiText),
               const SizedBox(height: 14),
               Row(
                 children: [
-                  Expanded(
-                    child: FilledButton.tonal(
-                      onPressed: onSwitch,
-                      child: const Text('切换到此分支'),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: '删除',
-                    onPressed: onDelete,
-                    icon: const Icon(Icons.delete_outline),
-                  ),
+                  Expanded(child: FilledButton.tonal(onPressed: onSwitch, child: const Text('切换到此分支'))),
+                  IconButton(onPressed: onDelete, icon: const Icon(Icons.delete_outline)),
                 ],
               ),
             ],
@@ -7489,11 +7213,8 @@ class _GraphNodeCard extends ConsumerWidget {
 }
 
 class _PreviewBlock extends StatelessWidget {
-  final String label;
-  final String content;
-
+  final String label, content;
   const _PreviewBlock({required this.label, required this.content});
-
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -7503,15 +7224,8 @@ class _PreviewBlock extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('$label  ', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700)),
-            Expanded(
-              child: Text(
-                content,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ),
+            Text('$label ', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700)),
+            Expanded(child: Text(content, maxLines: 3, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall)),
           ],
         ),
       ),
@@ -7520,16 +7234,8 @@ class _PreviewBlock extends StatelessWidget {
 }
 
 class _GraphToolbar extends StatelessWidget {
-  final VoidCallback onZoomIn;
-  final VoidCallback onZoomOut;
-  final VoidCallback onReset;
-
-  const _GraphToolbar({
-    required this.onZoomIn,
-    required this.onZoomOut,
-    required this.onReset,
-  });
-
+  final VoidCallback onZoomIn, onZoomOut, onReset;
+  const _GraphToolbar({required this.onZoomIn, required this.onZoomOut, required this.onReset});
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -7541,8 +7247,8 @@ class _GraphToolbar extends StatelessWidget {
             const Icon(Icons.tune_outlined, size: 18),
             const SizedBox(width: 8),
             const Expanded(child: Text('缩放、拖拽查看对话分支结构')),
-            IconButton(tooltip: '缩小', onPressed: onZoomOut, icon: const Icon(Icons.remove_rounded)),
-            IconButton(tooltip: '放大', onPressed: onZoomIn, icon: const Icon(Icons.add_rounded)),
+            IconButton(onPressed: onZoomOut, icon: const Icon(Icons.remove_rounded)),
+            IconButton(onPressed: onZoomIn, icon: const Icon(Icons.add_rounded)),
             TextButton.icon(onPressed: onReset, icon: const Icon(Icons.center_focus_strong_outlined, size: 18), label: const Text('重置')),
           ],
         ),
@@ -7655,9 +7361,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
-    final sessionTitle = ref.watch(
-      chatSessionProvider(widget.fileName).select((s) => s.valueOrNull?.title ?? '对话'),
-    );
+    final sessionTitle = ref.watch(sessionTitleProvider(widget.fileName)).valueOrNull ?? '未加载';
     final currentRoundAsync = ref.watch(roundDetailProvider(_currentRoundId ?? ''));
     final isStreaming = currentRoundAsync.valueOrNull?.isIncomplete ?? false;
     final configAsync = ref.watch(configProvider);
@@ -9175,15 +8879,15 @@ final attachmentBytesProvider =
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/chat_round.dart';
-import '../../core/models/session.dart';
 import '../../core/utils/id_generator.dart';
 import '../../di/providers.dart';
 import '../../domain/services/attachment_preparer.dart';
 import '../../domain/services/chat_context_builder.dart';
 import '../../domain/services/chat_stream_accumulator.dart';
 
-final chatSessionProvider = StreamProvider.family<Session?, String>((ref, fileName) {
-  return ref.watch(conversationRepositoryProvider).watchSession(fileName);
+final sessionTitleProvider = StreamProvider.family<String, String>((ref, fileName) {
+  return ref.watch(conversationRepositoryProvider).watchSessionTitle(fileName)
+      .map((title) => title ?? '对话');
 });
 
 final chatTopologyProvider =
@@ -9252,6 +8956,13 @@ class ChatController {
       DateTime? lastDbUpdateTime;
       const updateInterval = Duration(seconds: 1);
 
+      final existenceSubscription = repository.watchSingleRound(newRound.id).listen((round) {
+        if (round == null) {
+          // 记录已从数据库消失，立即切断底层 HTTP 连接
+          apiSource.cancelRequest(newRound.id);
+        }
+      });
+
       try {
         final contextRounds = await repository.getContextRounds(
           fileName,
@@ -9302,6 +9013,8 @@ class ChatController {
       } catch (e) {
         error = e.toString();
       } finally {
+        await existenceSubscription.cancel();
+        
         String finalContent = accumulator.content;
         if (error != null) {
           finalContent += '\n\n[错误]\n$error';
