@@ -62,16 +62,18 @@ data/database/database.g.dart
 data/repositories/conversation_repository.dart
 data/services/config_service.dart
 di/providers.dart
+domain/models/session_card_meta.dart
+domain/models/session_list_item.dart
 domain/models/tree_node.dart
 domain/models/tree_node.g.dart
 domain/services/attachment_preparer.dart
 domain/services/chat_context_builder.dart
+domain/services/chat_round_factory.dart
+domain/services/model_capability_registry.dart
 domain/services/tree_builder.dart
 domain/states/chat_state.dart
 main.dart
 presentation/models/pending_attachment.dart
-presentation/models/session_card_meta.dart
-presentation/models/session_list_item.dart
 presentation/pages/branch_tree_page.dart
 presentation/pages/chat_page.dart
 presentation/pages/home_page.dart
@@ -5031,9 +5033,9 @@ import '../data_sources/local_file_source.dart';
 import '../../core/models/attachment.dart';
 import '../../core/models/chat_round.dart';
 import '../../core/models/session.dart';
-import '../../presentation/models/session_list_item.dart';
+import '../../domain/models/session_list_item.dart';
 import '../database/database.dart';
-import '../../presentation/models/session_card_meta.dart';
+import '../../domain/models/session_card_meta.dart';
 
 class ConversationRepository {
   final AppDatabase _db;
@@ -5732,6 +5734,42 @@ final conversationRepositoryProvider = Provider<ConversationRepository>((ref) {
 });
 ```
 
+## File: domain/models/session_card_meta.dart
+```dart
+class SessionCardMeta {
+  final int roundCount;
+  final String? previewRoundId;
+  final String userPreview;
+  final String aiPreview;
+  final bool hasUnseen;
+  final bool isStreaming;
+
+  const SessionCardMeta({
+    required this.roundCount,
+    required this.previewRoundId,
+    required this.userPreview,
+    required this.aiPreview,
+    required this.hasUnseen,
+    required this.isStreaming,
+  });
+}
+```
+
+## File: domain/models/session_list_item.dart
+```dart
+class SessionListItem {
+  final String id;
+  final String title;
+  final int updatedAt;
+
+  const SessionListItem({
+    required this.id,
+    required this.title,
+    required this.updatedAt,
+  });
+}
+```
+
 ## File: domain/models/tree_node.dart
 ```dart
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -5814,30 +5852,28 @@ import '../../core/models/attachment.dart';
 import '../../data/repositories/conversation_repository.dart';
 import '../../presentation/models/pending_attachment.dart';
 
-class AttachmentPreparer {
-  static Future<List<Attachment>> savePendingAttachments(
-    ConversationRepository repository,
-    List<PendingAttachment> pending,
-  ) async {
-    final result = <Attachment>[];
+Future<List<Attachment>> savePendingAttachments(
+  ConversationRepository repository,
+  List<PendingAttachment> pending,
+) async {
+  final result = <Attachment>[];
 
-    for (final item in pending) {
-      final bytes = await File(item.path).readAsBytes();
-      final relativePath = await repository.saveAttachment(bytes, item.name);
+  for (final item in pending) {
+    final bytes = await File(item.path).readAsBytes();
+    final relativePath = await repository.saveAttachment(bytes, item.name);
 
-      result.add(
-        Attachment(
-          id: item.id,
-          name: item.name,
-          relativePath: relativePath,
-          isImage: item.isImage,
-          mimeType: item.mimeType,
-        ),
-      );
-    }
-
-    return result;
+    result.add(
+      Attachment(
+        id: item.id,
+        name: item.name,
+        relativePath: relativePath,
+        isImage: item.isImage,
+        mimeType: item.mimeType,
+      ),
+    );
   }
+
+  return result;
 }
 ```
 
@@ -5848,136 +5884,409 @@ import '../../core/models/api_message.dart';
 import '../../core/models/chat_round.dart';
 import '../../data/repositories/conversation_repository.dart';
 
-class ChatContextBuilder {
-  static Future<List<ApiMessage>> buildFromRounds(
-    List<ChatRound> rounds,
-    ConversationRepository repository,
-  ) async {
-    final result = <ApiMessage>[];
+Future<List<ApiMessage>> buildApiContextFromRounds(
+  List<ChatRound> rounds,
+  ConversationRepository repository,
+) async {
+  final result = <ApiMessage>[];
 
-    for (final round in rounds) {
-      final userMessage = await _buildUserMessage(round, repository);
-      result.add(userMessage);
+  for (final round in rounds) {
+    final userMessage = await _buildUserMessage(round, repository);
+    result.add(userMessage);
 
-      final assistantMessage = _buildAssistantMessage(round);
-      if (assistantMessage != null) {
-        result.add(assistantMessage);
+    final assistantMessage = _buildAssistantMessage(round);
+    if (assistantMessage != null) {
+      result.add(assistantMessage);
+    }
+  }
+
+  return result;
+}
+
+ApiMessage? _buildAssistantMessage(ChatRound round) {
+  final thinking = round.assistantThinking?.trim() ?? '';
+  final content = round.assistantContent?.trim() ?? '';
+
+  if (thinking.isEmpty && content.isEmpty) return null;
+
+  return ApiMessage(
+    role: 'assistant',
+    content: content.isEmpty ? null : content,
+    reasoning: thinking.isEmpty ? null : thinking,
+  );
+}
+
+Future<ApiMessage> _buildUserMessage(
+  ChatRound round,
+  ConversationRepository repository,
+) async {
+  final parts = <ApiMessageContentPart>[];
+
+  if (round.userContent.trim().isNotEmpty) {
+    parts.add(ApiMessageContentPart.text(text: round.userContent.trim()));
+  }
+
+  for (final attachment in round.userAttachments) {
+    final attachmentParts = await _buildAttachmentParts(attachment, repository);
+    parts.addAll(attachmentParts);
+  }
+
+  if (parts.isEmpty) {
+    return const ApiMessage(role: 'user', content: '');
+  }
+
+  if (_isOnlySingleTextPart(parts)) {
+    final text = parts.first.maybeWhen(
+      text: (_, text) => text,
+      orElse: () => '',
+    );
+    return ApiMessage(role: 'user', content: text);
+  }
+
+  return ApiMessage(role: 'user', parts: parts);
+}
+
+bool _isOnlySingleTextPart(List<ApiMessageContentPart> parts) {
+  if (parts.length != 1) return false;
+  return parts.first.maybeWhen(
+    text: (_, text) => true,
+    orElse: () => false,
+  );
+}
+
+Future<List<ApiMessageContentPart>> _buildAttachmentParts(
+  dynamic attachment,
+  ConversationRepository repository,
+) async {
+  final lowerName = attachment.name.toLowerCase();
+  final mime = (attachment.mimeType ?? '').toLowerCase();
+
+  final isTextFile = mime.startsWith('text/') ||
+      mime == 'application/json' ||
+      lowerName.endsWith('.md') ||
+      lowerName.endsWith('.txt') ||
+      lowerName.endsWith('.json') ||
+      lowerName.endsWith('.dart') ||
+      lowerName.endsWith('.yaml') ||
+      lowerName.endsWith('.yml');
+
+  if (attachment.isImage) {
+    final bytes = await repository.getAttachment(attachment.relativePath);
+    final mimeType = attachment.mimeType ?? 'image/png';
+    final base64Data = base64Encode(bytes);
+    return [ApiMessageContentPart.imageUrl(imageUrl: ApiImageUrl(url: 'data:$mimeType;base64,$base64Data'))];
+  }
+
+  if (isTextFile) {
+    final bytes = await repository.getAttachment(attachment.relativePath);
+    return [ApiMessageContentPart.text(text: utf8.decode(bytes, allowMalformed: true))];
+  }
+
+  return [ApiMessageContentPart.text(text: '[附件: ${attachment.name}]')];
+}
+```
+
+## File: domain/services/chat_round_factory.dart
+```dart
+import '../../core/models/attachment.dart';
+import '../../core/models/chat_round.dart';
+import 'package:uuid/uuid.dart';
+
+class ChatRoundFactory {
+  static ChatRound createUserRound({
+    required String content,
+    required String? parentId,
+    required List<Attachment> attachments,
+  }) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return ChatRound(
+      id: const Uuid().v4(),
+      parentId: parentId,
+      createdAt: now,
+      userContent: content,
+      userAttachments: attachments,
+      isIncomplete: true,
+    );
+  }
+
+  static ChatRound createRetryRound({
+    required ChatRound sourceRound,
+  }) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return ChatRound(
+      id: const Uuid().v4(),
+      parentId: sourceRound.parentId,
+      createdAt: now,
+      userContent: sourceRound.userContent,
+      userAttachments: sourceRound.userAttachments,
+      isIncomplete: true,
+    );
+  }
+
+  static ChatRound createEditedRetryRound({
+    required ChatRound sourceRound,
+    required String newContent,
+    required List<Attachment> attachments,
+  }) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return ChatRound(
+      id: const Uuid().v4(),
+      parentId: sourceRound.parentId,
+      createdAt: now,
+      userContent: newContent,
+      userAttachments: attachments,
+      isIncomplete: true,
+    );
+  }
+}
+```
+
+## File: domain/services/model_capability_registry.dart
+```dart
+import '../../core/models/model_info.dart';
+
+class ModelCapabilityRegistry {
+  static final List<_ModelRule> _rules = [
+    _ModelRule(
+      patterns: ['gpt', '4', 'o'],
+      supportsVision: true,
+      supportsReasoning: false,
+      priority: 100,
+    ),
+    _ModelRule(
+      patterns: ['gpt', '4', '1'],
+      supportsVision: true,
+      supportsReasoning: false,
+      priority: 100,
+    ),
+    _ModelRule(
+      patterns: ['o'],
+      numberAfter: true,
+      supportsVision: true,
+      supportsReasoning: true,
+      priority: 200,
+    ),
+    _ModelRule(
+      patterns: ['gpt', '5'],
+      supportsVision: true,
+      supportsReasoning: true,
+      priority: 150,
+    ),
+    _ModelRule(
+      patterns: ['gemini', '2', '5'],
+      supportsVision: true,
+      supportsReasoning: true,
+      priority: 150,
+    ),
+    _ModelRule(
+      patterns: ['gemini', '3'],
+      supportsVision: true,
+      supportsReasoning: true,
+      priority: 150,
+    ),
+    _ModelRule(
+      patterns: ['gemini', 'flash', 'latest'],
+      supportsVision: true,
+      supportsReasoning: true,
+      priority: 140,
+    ),
+    _ModelRule(
+      patterns: ['gemini', 'pro', 'latest'],
+      supportsVision: true,
+      supportsReasoning: true,
+      priority: 140,
+    ),
+    _ModelRule(
+      patterns: ['claude'],
+      supportsVision: true,
+      supportsReasoning: true,
+      priority: 120,
+    ),
+    _ModelRule(
+      patterns: ['deepseek', 'r', '1'],
+      supportsVision: false,
+      supportsReasoning: true,
+      priority: 160,
+    ),
+    _ModelRule(
+      patterns: ['deepseek', 'reasoner'],
+      supportsVision: false,
+      supportsReasoning: true,
+      priority: 160,
+    ),
+    _ModelRule(
+      patterns: ['deepseek', 'v', '3'],
+      supportsVision: false,
+      supportsReasoning: false,
+      priority: 120,
+    ),
+    _ModelRule(
+      patterns: ['deepseek', 'chat'],
+      supportsVision: false,
+      supportsReasoning: false,
+      priority: 120,
+    ),
+    _ModelRule(
+      patterns: ['qwen', '3', '5'],
+      supportsVision: true,
+      supportsReasoning: true,
+      priority: 150,
+    ),
+    _ModelRule(
+      patterns: ['qwen', '3'],
+      supportsVision: false,
+      supportsReasoning: true,
+      priority: 120,
+    ),
+    _ModelRule(
+      patterns: ['kimi', 'k', '2', '5'],
+      supportsVision: true,
+      supportsReasoning: true,
+      priority: 150,
+    ),
+    _ModelRule(
+      patterns: ['kimi', 'k', '2'],
+      supportsVision: false,
+      supportsReasoning: true,
+      priority: 120,
+    ),
+    _ModelRule(
+      patterns: ['glm', '4', '5'],
+      supportsVision: false,
+      supportsReasoning: true,
+      priority: 150,
+    ),
+    _ModelRule(
+      patterns: ['glm', '4', '6'],
+      supportsVision: false,
+      supportsReasoning: true,
+      priority: 150,
+    ),
+    _ModelRule(
+      patterns: ['glm', '4', '7'],
+      supportsVision: false,
+      supportsReasoning: true,
+      priority: 150,
+    ),
+    _ModelRule(
+      patterns: ['glm', '5'],
+      supportsVision: false,
+      supportsReasoning: true,
+      priority: 150,
+    ),
+    _ModelRule(
+      patterns: ['grok', '4'],
+      supportsVision: true,
+      supportsReasoning: true,
+      priority: 140,
+    ),
+    _ModelRule(
+      patterns: ['doubao', '1', '6'],
+      supportsVision: true,
+      supportsReasoning: true,
+      priority: 130,
+    ),
+    _ModelRule(
+      patterns: ['doubao', '1', '8'],
+      supportsVision: true,
+      supportsReasoning: true,
+      priority: 130,
+    ),
+  ];
+
+  static ModelInfo enhance(ModelInfo model) {
+    final tokens = _tokenize(model.id);
+    _ModelRule? best;
+
+    for (final rule in _rules) {
+      if (rule.matches(tokens)) {
+        if (best == null || rule.priority > best.priority) {
+          best = rule;
+        }
       }
     }
 
-    return result;
-  }
+    final detectedVision = best?.supportsVision;
+    final detectedReasoning = best?.supportsReasoning;
 
-  static ApiMessage? _buildAssistantMessage(ChatRound round) {
-    final thinking = round.assistantThinking?.trim() ?? '';
-    final content = round.assistantContent?.trim() ?? '';
-
-    if (thinking.isEmpty && content.isEmpty) {
-      return null;
-    }
-
-    return ApiMessage(
-      role: 'assistant',
-      content: content.isEmpty ? null : content,
-      reasoning: thinking.isEmpty ? null : thinking,
+    return model.copyWith(
+      supportsVision: model.overrideSupportsVision ?? detectedVision ?? model.supportsVision,
+      supportsReasoning: model.overrideSupportsReasoning ??
+          detectedReasoning ??
+          model.supportsReasoning,
     );
   }
 
-  static Future<ApiMessage> _buildUserMessage(
-    ChatRound round,
-    ConversationRepository repository,
-  ) async {
-    final parts = <ApiMessageContentPart>[];
+  static List<String> _tokenize(String input) {
+    final lower = input.toLowerCase();
+    final tokens = <String>[];
+    final buffer = StringBuffer();
 
-    if (round.userContent.trim().isNotEmpty) {
-      parts.add(
-        ApiMessageContentPart.text(
-          text: round.userContent.trim(),
-        ),
-      );
+    bool? lastIsDigit;
+
+    void flush() {
+      if (buffer.isNotEmpty) {
+        tokens.add(buffer.toString());
+        buffer.clear();
+      }
     }
 
-    for (final attachment in round.userAttachments) {
-      final attachmentParts =
-          await _buildAttachmentParts(attachment, repository);
-      parts.addAll(attachmentParts);
+    for (final rune in lower.runes) {
+      final ch = String.fromCharCode(rune);
+      final isLetter = RegExp(r'[a-z]').hasMatch(ch);
+      final isDigit = RegExp(r'[0-9]').hasMatch(ch);
+
+      if (isLetter || isDigit) {
+        final currentIsDigit = isDigit;
+        if (lastIsDigit != null && lastIsDigit != currentIsDigit) {
+          flush();
+        }
+        buffer.write(ch);
+        lastIsDigit = currentIsDigit;
+      } else {
+        flush();
+        lastIsDigit = null;
+      }
     }
 
-    if (parts.isEmpty) {
-      return const ApiMessage(
-        role: 'user',
-        content: '',
-      );
-    }
-
-    if (_isOnlySingleTextPart(parts)) {
-      final text = parts.first.maybeWhen(
-        text: (_, text) => text,
-        orElse: () => '',
-      );
-      return ApiMessage(
-        role: 'user',
-        content: text,
-      );
-    }
-
-    return ApiMessage(
-      role: 'user',
-      parts: parts,
-    );
+    flush();
+    return tokens;
   }
+}
 
-  static bool _isOnlySingleTextPart(List<ApiMessageContentPart> parts) {
-    if (parts.length != 1) return false;
-    return parts.first.maybeWhen(
-      text: (_, text) => true,
-      orElse: () => false,
-    );
-  }
+class _ModelRule {
+  final List<String> patterns;
+  final bool supportsVision;
+  final bool supportsReasoning;
+  final int priority;
+  final bool numberAfter;
 
-  static Future<List<ApiMessageContentPart>> _buildAttachmentParts(
-    dynamic attachment,
-    ConversationRepository repository,
-  ) async {
-    final lowerName = attachment.name.toLowerCase();
-    final mime = (attachment.mimeType ?? '').toLowerCase();
+  const _ModelRule({
+    required this.patterns,
+    required this.supportsVision,
+    required this.supportsReasoning,
+    required this.priority,
+    this.numberAfter = false,
+  });
 
-    final isTextFile = mime.startsWith('text/') ||
-        mime == 'application/json' ||
-        lowerName.endsWith('.md') ||
-        lowerName.endsWith('.txt') ||
-        lowerName.endsWith('.json') ||
-        lowerName.endsWith('.dart') ||
-        lowerName.endsWith('.yaml') ||
-        lowerName.endsWith('.yml');
-
-    if (attachment.isImage) {
-      final bytes = await repository.getAttachment(attachment.relativePath);
-      final mimeType = attachment.mimeType ?? 'image/png';
-      final base64Data = base64Encode(bytes);
-      final dataUrl = 'data:$mimeType;base64,$base64Data';
-      return [
-        ApiMessageContentPart.imageUrl(
-          imageUrl: ApiImageUrl(url: dataUrl),
-        ),
-      ];
+  bool matches(List<String> tokens) {
+    if (numberAfter && patterns.length == 1 && patterns.first == 'o') {
+      for (int i = 0; i < tokens.length - 1; i++) {
+        if (tokens[i] == 'o' && RegExp(r'^\d+$').hasMatch(tokens[i + 1])) {
+          return true;
+        }
+      }
+      return false;
     }
 
-    if (isTextFile) {
-      final bytes = await repository.getAttachment(attachment.relativePath);
-      final text = utf8.decode(bytes, allowMalformed: true);
-      return [
-        ApiMessageContentPart.text(
-          text: text,
-        ),
-      ];
+    int index = 0;
+    for (final token in tokens) {
+      if (token == patterns[index]) {
+        index++;
+        if (index == patterns.length) return true;
+      }
     }
-
-    return [
-      ApiMessageContentPart.text(
-        text: '[附件: ${attachment.name}]',
-      ),
-    ];
+    return false;
   }
 }
 ```
@@ -5986,73 +6295,68 @@ class ChatContextBuilder {
 ```dart
 import '../models/tree_node.dart';
 
-class TreeBuilder {
-  /// ✅ 接收纯拓扑数据，构建 TreeNode 树
-  static List<TreeNode> buildTree(List<({String id, String? parentId})> topology) {
-    if (topology.isEmpty) return [];
+List<TreeNode> buildTree(List<({String id, String? parentId})> topology) {
+  if (topology.isEmpty) return [];
 
-    final nodeMap = <String, TreeNode>{
-      for (final t in topology)
-        t.id: TreeNode(id: t.id, parentId: t.parentId, children: const [], depth: 0),
-    };
+  final nodeMap = <String, TreeNode>{
+    for (final t in topology)
+      t.id: TreeNode(id: t.id, parentId: t.parentId, children: const [], depth: 0),
+  };
 
-    final childrenMap = <String, List<String>>{};
-    final rootIds = <String>[];
+  final childrenMap = <String, List<String>>{};
+  final rootIds = <String>[];
 
-    for (final t in topology) {
-      if (t.parentId == null) {
-        rootIds.add(t.id);
-      } else {
-        childrenMap.putIfAbsent(t.parentId!, () => []).add(t.id);
-      }
+  for (final t in topology) {
+    if (t.parentId == null) {
+      rootIds.add(t.id);
+    } else {
+      childrenMap.putIfAbsent(t.parentId!, () => []).add(t.id);
     }
-
-    final roots = <TreeNode>[];
-    for (final rootId in rootIds) {
-      final root = nodeMap[rootId];
-      if (root != null) {
-        roots.add(_buildSubtreeIterative(root, childrenMap, nodeMap));
-      }
-    }
-    return roots;
   }
 
-  static TreeNode _buildSubtreeIterative(
-    TreeNode root,
-    Map<String, List<String>> childrenMap,
-    Map<String, TreeNode> nodeMap,
-  ) {
-    // 1. 显式栈获取后序遍历序列（子节点先于父节点）
-    final postOrder = <TreeNode>[];
-    final stack = <TreeNode>[root];
-    while (stack.isNotEmpty) {
-      final node = stack.removeLast();
-      postOrder.add(node);
-      for (final cid in childrenMap[node.id] ?? []) {
-        final child = nodeMap[cid];
-        if (child != null) stack.add(child);
-      }
+  final roots = <TreeNode>[];
+  for (final rootId in rootIds) {
+    final root = nodeMap[rootId];
+    if (root != null) {
+      roots.add(_buildSubtreeIterative(root, childrenMap, nodeMap));
     }
-
-    // 2. 逆序处理（从叶子到根），逐步替换为带 children/depth 的新节点
-    final updatedMap = <String, TreeNode>{};
-    for (int i = postOrder.length - 1; i >= 0; i--) {
-      final original = postOrder[i];
-      final childIds = childrenMap[original.id] ?? [];
-      final builtChildren = <TreeNode>[];
-      int maxChildDepth = -1;
-      for (final cid in childIds) {
-        final builtChild = updatedMap[cid]!;
-        builtChildren.add(builtChild);
-        if (builtChild.depth > maxChildDepth) maxChildDepth = builtChild.depth;
-      }
-      updatedMap[original.id] = original.copyWith(
-        depth: maxChildDepth + 1,
-        children: builtChildren,
-      );
-    }
-    return updatedMap[root.id]!;
   }
+  return roots;
+}
+
+TreeNode _buildSubtreeIterative(
+  TreeNode root,
+  Map<String, List<String>> childrenMap,
+  Map<String, TreeNode> nodeMap,
+) {
+  final postOrder = <TreeNode>[];
+  final stack = <TreeNode>[root];
+  while (stack.isNotEmpty) {
+    final node = stack.removeLast();
+    postOrder.add(node);
+    for (final cid in childrenMap[node.id] ?? []) {
+      final child = nodeMap[cid];
+      if (child != null) stack.add(child);
+    }
+  }
+
+  final updatedMap = <String, TreeNode>{};
+  for (int i = postOrder.length - 1; i >= 0; i--) {
+    final original = postOrder[i];
+    final childIds = childrenMap[original.id] ?? [];
+    final builtChildren = <TreeNode>[];
+    int maxChildDepth = -1;
+    for (final cid in childIds) {
+      final builtChild = updatedMap[cid]!;
+      builtChildren.add(builtChild);
+      if (builtChild.depth > maxChildDepth) maxChildDepth = builtChild.depth;
+    }
+    updatedMap[original.id] = original.copyWith(
+      depth: maxChildDepth + 1,
+      children: builtChildren,
+    );
+  }
+  return updatedMap[root.id]!;
 }
 ```
 
@@ -6168,60 +6472,29 @@ class PendingAttachment {
 }
 ```
 
-## File: presentation/models/session_card_meta.dart
-```dart
-class SessionCardMeta {
-  final int roundCount;
-  final String? previewRoundId;
-  final String userPreview;
-  final String aiPreview;
-  final bool hasUnseen;
-  final bool isStreaming;
-
-  const SessionCardMeta({
-    required this.roundCount,
-    required this.previewRoundId,
-    required this.userPreview,
-    required this.aiPreview,
-    required this.hasUnseen,
-    required this.isStreaming,
-  });
-}
-```
-
-## File: presentation/models/session_list_item.dart
-```dart
-class SessionListItem {
-  final String id;
-  final String title;
-  final int updatedAt;
-
-  const SessionListItem({
-    required this.id,
-    required this.title,
-    required this.updatedAt,
-  });
-}
-```
-
 ## File: presentation/pages/branch_tree_page.dart
 ```dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:graphview/GraphView.dart';
 import 'package:intl/intl.dart';
+
+import '../../di/providers.dart';
 import '../../domain/models/tree_node.dart';
 import '../../domain/services/tree_builder.dart';
 import '../providers/chat_notifier.dart' show chatTopologyProvider, roundDetailProvider;
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_toast.dart';
-import '../../di/providers.dart';
 
 class BranchTreePage extends ConsumerStatefulWidget {
   final String fileName;
   final String initialFocusRoundId;
 
-  const BranchTreePage({super.key, required this.fileName, required this.initialFocusRoundId});
+  const BranchTreePage({
+    super.key,
+    required this.fileName,
+    required this.initialFocusRoundId,
+  });
 
   @override
   ConsumerState<BranchTreePage> createState() => _BranchTreePageState();
@@ -6229,22 +6502,23 @@ class BranchTreePage extends ConsumerStatefulWidget {
 
 class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   final GlobalKey _viewerKey = GlobalKey();
+  final GlobalKey _targetNodeKey = GlobalKey();
   final TransformationController _transformationController = TransformationController();
-  final BuchheimWalkerConfiguration _builder = BuchheimWalkerConfiguration();
+  
+  final BuchheimWalkerConfiguration _builder = BuchheimWalkerConfiguration()
+    ..siblingSeparation = 40
+    ..levelSeparation = 78
+    ..subtreeSeparation = 50
+    ..orientation = BuchheimWalkerConfiguration.ORIENTATION_TOP_BOTTOM;
 
-  GlobalKey? _targetNodeKey;
   bool _hasFocused = false;
-  int _focusRetryCount = 0;
 
   @override
-  void initState() {
-    super.initState();
-    _builder
-      ..siblingSeparation = 40
-      ..levelSeparation = 78
-      ..subtreeSeparation = 50
-      ..orientation = BuchheimWalkerConfiguration.ORIENTATION_TOP_BOTTOM;
-    _targetNodeKey = GlobalKey();
+  void didUpdateWidget(covariant BranchTreePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.fileName != widget.fileName || oldWidget.initialFocusRoundId != widget.initialFocusRoundId) {
+      _hasFocused = false; // 切换文件/目标时重置聚焦状态
+    }
   }
 
   @override
@@ -6253,97 +6527,36 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     super.dispose();
   }
 
-  void _resetViewport() {
-    _transformationController.value = Matrix4.identity();
-    _hasFocused = false;
-    _focusRetryCount = 0;
-    _scheduleFocusToTarget();
+  String _buildGraphSignature(List<({String id, String? parentId})> topology) {
+    if (topology.isEmpty) return 'empty';
+    return topology.map((t) => '${t.id}:${t.parentId ?? 'root'}').join('|');
   }
 
-  void _scheduleFocusToTarget() {
-    if (_hasFocused || _targetNodeKey == null) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _focusOnTargetNode();
-    });
-  }
+  // 🔑 核心：目标节点完成布局后触发。仅计算一次偏移并 setState 完成最终测量
+  void _onTargetLaidOut() {
+    if (_hasFocused) return;
+    
+    final targetCtx = _targetNodeKey.currentContext;
+    final viewerCtx = _viewerKey.currentContext;
+    if (targetCtx == null || viewerCtx == null) return;
 
-  void _focusOnTargetNode() {
-    if (_hasFocused || _targetNodeKey == null) return;
-    final targetContext = _targetNodeKey!.currentContext;
-    final viewerContext = _viewerKey.currentContext;
+    final targetBox = targetCtx.findRenderObject() as RenderBox?;
+    final viewerBox = viewerCtx.findRenderObject() as RenderBox?;
+    if (targetBox == null || viewerBox == null || !targetBox.hasSize || !viewerBox.hasSize) return;
 
-    if (targetContext == null || viewerContext == null) {
-      _retryFocus();
-      return;
-    }
-
-    final targetBox = targetContext.findRenderObject() as RenderBox?;
-    final viewerBox = viewerContext.findRenderObject() as RenderBox?;
-
-    if (targetBox == null || viewerBox == null || !targetBox.hasSize || !viewerBox.hasSize) {
-      _retryFocus();
-      return;
-    }
-
-    final targetTopLeft = targetBox.localToGlobal(Offset.zero, ancestor: viewerBox);
-    final targetSize = targetBox.size;
-    final viewerSize = viewerBox.size;
-
-    final targetCenter = Offset(
-      targetTopLeft.dx + targetSize.width / 2,
-      targetTopLeft.dy + targetSize.height / 2,
-    );
-    final viewerCenter = Offset(
-      viewerSize.width / 2,
-      viewerSize.height / 2,
-    );
-
-    final dx = viewerCenter.dx - targetCenter.dx;
-    final dy = viewerCenter.dy - targetCenter.dy;
+    final targetCenter = targetBox.localToGlobal(targetBox.size.center(Offset.zero), ancestor: viewerBox);
+    final viewerCenter = viewerBox.size.center(Offset.zero);
 
     _transformationController.value = Matrix4.identity()
-      ..translate(dx, dy)
-      ..scale(1.0);
+      ..translate(viewerCenter.dx - targetCenter.dx, viewerCenter.dy - targetCenter.dy);
 
     _hasFocused = true;
-  }
-
-  void _retryFocus() {
-    if (_hasFocused || _focusRetryCount >= 8) return;
-    _focusRetryCount++;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _focusOnTargetNode();
-    });
-  }
-
-  Set<String> _collectSubtreeIds(TreeNode root) {
-    final ids = <String>{};
-    final stack = <TreeNode>[root];
-    
-    while (stack.isNotEmpty) {
-      final node = stack.removeLast();
-      ids.add(node.id);
-      // 将子节点压入栈中，继续向下遍历
-      stack.addAll(node.children);
-    }
-    
-    return ids;
-  }
-
-  TreeNode? _findIterative(List<TreeNode> roots, String targetId) {
-    final stack = [...roots];
-    while (stack.isNotEmpty) {
-      final node = stack.removeLast();
-      if (node.id == targetId) return node;
-      stack.addAll(node.children);
-    }
-    return null;
+    setState(() {}); // 必需：触发 GraphView 二次布局，解决 constrained:false 下的测量缺陷
   }
 
   Future<void> _deleteNode(String nodeId) async {
     final topology = ref.read(chatTopologyProvider(widget.fileName)).valueOrNull ?? [];
-    final roots = TreeBuilder.buildTree(topology);
+    final roots = buildTree(topology);
     final target = _findIterative(roots, nodeId);
     if (target == null) return;
 
@@ -6352,7 +6565,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
       await ref.read(conversationRepositoryProvider)
           .deleteRoundsAndCleanupOrphanAttachments(widget.fileName, ids);
     } catch (e) {
-      await AppToast.show('删除失败：$e');
+      if (mounted) AppToast.show('删除失败：$e');
     }
   }
 
@@ -6370,73 +6583,93 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
         ) ?? false;
   }
 
+  Set<String> _collectSubtreeIds(TreeNode root) {
+    final ids = <String>{};
+    final stack = <TreeNode>[root];
+    while (stack.isNotEmpty) {
+      final node = stack.removeLast();
+      ids.add(node.id);
+      stack.addAll(node.children);
+    }
+    return ids;
+  }
+
+  TreeNode? _findIterative(List<TreeNode> roots, String targetId) {
+    final stack = [...roots];
+    while (stack.isNotEmpty) {
+      final node = stack.removeLast();
+      if (node.id == targetId) return node;
+      stack.addAll(node.children);
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
-    // ✅ 第一条：复用聊天页框架 Provider，构建整体树框架
     final topology = ref.watch(chatTopologyProvider(widget.fileName)).valueOrNull ?? [];
-    final roots = TreeBuilder.buildTree(topology);
-    final structKey = roots.length.toString();
-
-    if (!_hasFocused && roots.isNotEmpty) _scheduleFocusToTarget();
+    final roots = buildTree(topology);
+    final graphSignature = _buildGraphSignature(topology);
+    final targetId = widget.initialFocusRoundId;
 
     return AppPageScaffold(
       appBar: AppBar(title: const Text('分支树')),
       body: roots.isEmpty
-          ? _buildEmptyState(context)
-          : Column(
-              children: [
-                _GraphToolbar(onZoomIn: () {}, onZoomOut: () {}, onReset: _resetViewport),
-                Expanded(
-                  child: InteractiveViewer(
-                    key: _viewerKey,
-                    constrained: false,
-                    boundaryMargin: const EdgeInsets.all(double.infinity),
-                    minScale: 0.1,
-                    maxScale: 3.0,
-                    transformationController: _transformationController,
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Wrap(
-                        spacing: 40, runSpacing: 40,
-                        crossAxisAlignment: WrapCrossAlignment.start,
-                        children: roots.map((root) => _RootTreeGroup(
-                          key: ValueKey('root-${root.id}-$structKey'),
-                          root: root,
-                          graphSignature: structKey,
-                          builderConfig: _builder,
-                          targetNodeId: widget.initialFocusRoundId,
-                          targetNodeKey: _targetNodeKey,
-                          onSwitch: (id) => Navigator.of(context).pop(id),
-                          onDelete: (id) async { if (await _confirmDelete()) await _deleteNode(id); },
-                        )).toList(),
-                      ),
-                    ),
+          ? const Center(child: Text('暂无分支结构'))
+          : InteractiveViewer(
+              key: _viewerKey,
+              constrained: false,
+              boundaryMargin: const EdgeInsets.all(100), // 适度边界替代无限边界，防止手势漂移
+              minScale: 0.1,
+              maxScale: 3.0,
+              transformationController: _transformationController,
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: RepaintBoundary( // 🔑 隔离 setState 重建，保护 InteractiveViewer 手势状态
+                  child: Wrap(
+                    spacing: 40,
+                    runSpacing: 40,
+                    crossAxisAlignment: WrapCrossAlignment.start,
+                    children: roots.map((root) => _RootTreeGroup(
+                      key: ValueKey('root-${root.id}-$graphSignature'),
+                      root: root,
+                      graphSignature: graphSignature,
+                      builderConfig: _builder,
+                      targetNodeId: targetId,
+                      targetNodeKey: _targetNodeKey,
+                      onTargetLaidOut: _onTargetLaidOut,
+                      onSwitch: (id) => Navigator.of(context).pop(id),
+                      onDelete: (id) async {
+                        if (await _confirmDelete()) await _deleteNode(id);
+                      },
+                    )).toList(),
                   ),
                 ),
-              ],
+              ),
             ),
     );
   }
-
-  Widget _buildEmptyState(BuildContext context) => const Center(child: Text('暂无分支结构'));
 }
 
-// ==========================================
-// 🎨 布局层
-// ==========================================
 class _RootTreeGroup extends StatelessWidget {
   final TreeNode root;
   final String graphSignature;
   final BuchheimWalkerConfiguration builderConfig;
-  final Function(String) onSwitch;
-  final Function(String) onDelete;
+  final void Function(String id) onSwitch;
+  final void Function(String id) onDelete;
   final String? targetNodeId;
   final GlobalKey? targetNodeKey;
+  final VoidCallback? onTargetLaidOut;
 
   const _RootTreeGroup({
-    super.key, required this.root, required this.graphSignature,
-    required this.builderConfig, required this.onSwitch, required this.onDelete,
-    this.targetNodeId, this.targetNodeKey,
+    super.key,
+    required this.root,
+    required this.graphSignature,
+    required this.builderConfig,
+    required this.onSwitch,
+    required this.onDelete,
+    this.targetNodeId,
+    this.targetNodeKey,
+    this.onTargetLaidOut,
   });
 
   @override
@@ -6444,23 +6677,18 @@ class _RootTreeGroup extends StatelessWidget {
     final graph = Graph()..isTree = true;
     final nodeMap = <String, Node>{};
     final graphToTree = <Node, TreeNode>{};
-
-    // 替换为显式栈遍历
     final stack = <TreeNode>[root];
+
     while (stack.isNotEmpty) {
       final node = stack.removeLast();
-      
       final gNode = Node.Id('${root.id}-${node.id}-$graphSignature');
       nodeMap[node.id] = gNode;
       graphToTree[gNode] = node;
       graph.addNode(gNode);
-      
       if (node.parentId != null) {
-        final p = nodeMap[node.parentId!];
-        if (p != null) graph.addEdge(p, gNode);
+        final parent = nodeMap[node.parentId!];
+        if (parent != null) graph.addEdge(parent, gNode);
       }
-      
-      // 逆序入栈，保持与原递归一致的从左到右渲染顺序
       stack.addAll(node.children.reversed);
     }
 
@@ -6469,47 +6697,70 @@ class _RootTreeGroup extends StatelessWidget {
       graph: graph,
       animated: false,
       algorithm: BuchheimWalkerAlgorithm(builderConfig, TreeEdgeRenderer(builderConfig)),
-      paint: Paint()..color = Theme.of(context).dividerColor..strokeWidth = 1.6..style = PaintingStyle.stroke,
+      paint: Paint()
+        ..color = Theme.of(context).dividerColor
+        ..strokeWidth = 1.6
+        ..style = PaintingStyle.stroke,
       builder: (Node node) {
         final tree = graphToTree[node];
         if (tree == null) return const SizedBox.shrink();
-        final isTarget = targetNodeId != null && tree.id == targetNodeId;
 
-        // ✅ 第二条：复用每页 Provider，构建每个卡片的文字
-        return _GraphNodeCard(
-          key: isTarget ? targetNodeKey : ValueKey('${tree.id}-$graphSignature'),
+        final isTarget = targetNodeId != null && tree.id == targetNodeId;
+        final child = _GraphNodeShell(
           roundId: tree.id,
-          depth: tree.depth,
           onSwitch: () => onSwitch(tree.id),
           onDelete: () => onDelete(tree.id),
         );
+
+        return isTarget
+            ? _NodeAnchor(key: targetNodeKey, onLaidOut: onTargetLaidOut, child: child)
+            : child;
       },
     );
   }
 }
 
-// ==========================================
-// 🔵 内容层
-// ==========================================
-class _GraphNodeCard extends ConsumerWidget {
+class _NodeAnchor extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onLaidOut;
+  const _NodeAnchor({super.key, required this.child, this.onLaidOut});
+
+  @override
+  State<_NodeAnchor> createState() => _NodeAnchorState();
+}
+
+class _NodeAnchorState extends State<_NodeAnchor> {
+  Size? _lastSize;
+  @override
+  Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || widget.onLaidOut == null) return;
+      final box = context.findRenderObject() as RenderBox?;
+      if (box == null || !box.hasSize || box.size.isEmpty) return;
+      if (_lastSize == box.size) return;
+      _lastSize = box.size;
+      widget.onLaidOut!();
+    });
+    return widget.child;
+  }
+}
+
+class _GraphNodeShell extends ConsumerWidget {
   final String roundId;
-  final int depth;
   final VoidCallback onSwitch;
   final VoidCallback onDelete;
 
-  const _GraphNodeCard({
-    super.key, required this.roundId, required this.depth,
-    required this.onSwitch, required this.onDelete,
-  });
+  const _GraphNodeShell({required this.roundId, required this.onSwitch, required this.onDelete});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final round = ref.watch(roundDetailProvider(roundId)).valueOrNull;
-    if (round == null) return const SizedBox.shrink();
-
-    final aiText = (round.assistantContent ?? '').trim().isEmpty ? '（等待回复）' : round.assistantContent!;
+    final dateText = round == null ? null : DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(round.createdAt));
+    final userText = round?.userContent;
+    final aiText = round == null ? null : ((round.assistantContent ?? '').trim().isEmpty ? '（等待回复）' : round.assistantContent!);
 
     return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: SizedBox(
         width: 290,
         child: Padding(
@@ -6517,13 +6768,16 @@ class _GraphNodeCard extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Chip(label: Text('深度 ${depth + 1}'), visualDensity: VisualDensity.compact),
-              const SizedBox(height: 10),
-              Text(DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(round.createdAt)), style: Theme.of(context).textTheme.bodySmall),
+              SizedBox(
+                height: 20,
+                child: dateText == null
+                    ? const _SkeletonBar(width: 160, height: 14)
+                    : Align(alignment: Alignment.centerLeft, child: Text(dateText, style: Theme.of(context).textTheme.bodySmall)),
+              ),
               const SizedBox(height: 12),
-              _PreviewBlock(label: 'YOU', content: round.userContent),
+              _PreviewSlot(label: 'YOU', content: userText, loading: round == null),
               const SizedBox(height: 8),
-              _PreviewBlock(label: 'AI', content: aiText),
+              _PreviewSlot(label: 'AI', content: aiText, loading: round == null),
               const SizedBox(height: 14),
               Row(
                 children: [
@@ -6539,48 +6793,60 @@ class _GraphNodeCard extends ConsumerWidget {
   }
 }
 
-class _PreviewBlock extends StatelessWidget {
-  final String label, content;
-  const _PreviewBlock({required this.label, required this.content});
+class _PreviewSlot extends StatelessWidget {
+  final String label;
+  final String? content;
+  final bool loading;
+  const _PreviewSlot({required this.label, required this.content, required this.loading});
+
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('$label ', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700)),
-            Expanded(child: Text(content, maxLines: 3, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall)),
-          ],
+    final textTheme = Theme.of(context).textTheme;
+    return SizedBox(
+      height: 78,
+      child: Card(
+        margin: EdgeInsets.zero,
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(width: 34, child: Text('$label ', style: textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700))),
+              Expanded(
+                child: loading
+                    ? const _PreviewSkeleton()
+                    : Text((content == null || content!.trim().isEmpty) ? '（空）' : content!, maxLines: 3, overflow: TextOverflow.ellipsis, style: textTheme.bodySmall),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _GraphToolbar extends StatelessWidget {
-  final VoidCallback onZoomIn, onZoomOut, onReset;
-  const _GraphToolbar({required this.onZoomIn, required this.onZoomOut, required this.onReset});
+class _PreviewSkeleton extends StatelessWidget {
+  const _PreviewSkeleton();
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          children: [
-            const Icon(Icons.tune_outlined, size: 18),
-            const SizedBox(width: 8),
-            const Expanded(child: Text('缩放、拖拽查看对话分支结构')),
-            IconButton(onPressed: onZoomOut, icon: const Icon(Icons.remove_rounded)),
-            IconButton(onPressed: onZoomIn, icon: const Icon(Icons.add_rounded)),
-            TextButton.icon(onPressed: onReset, icon: const Icon(Icons.center_focus_strong_outlined, size: 18), label: const Text('重置')),
-          ],
-        ),
-      ),
-    );
+    return const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _SkeletonBar(widthFactor: 0.92), SizedBox(height: 8), _SkeletonBar(widthFactor: 0.76), SizedBox(height: 8), _SkeletonBar(widthFactor: 0.58),
+    ]);
+  }
+}
+
+class _SkeletonBar extends StatelessWidget {
+  final double? width;
+  final double height;
+  final double? widthFactor;
+  const _SkeletonBar({this.width, this.height = 12, this.widthFactor});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.surfaceContainerHighest;
+    Widget child = Container(width: width, height: height, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(6)));
+    if (widthFactor != null) child = FractionallySizedBox(widthFactor: widthFactor, alignment: Alignment.centerLeft, child: child);
+    return child;
   }
 }
 ```
@@ -8258,7 +8524,7 @@ class ChatController {
     List<dynamic>? attachments,
   }) async {
     final repository = ref.read(conversationRepositoryProvider);
-    final saved = await AttachmentPreparer.savePendingAttachments(
+    final saved = await savePendingAttachments(
       repository,
       attachments?.cast() ?? [],
     );
@@ -8288,7 +8554,7 @@ class ChatController {
           fileName,
           newRound.id,
         );
-        final apiContext = await ChatContextBuilder.buildFromRounds(
+        final apiContext = await buildApiContextFromRounds(
           contextRounds,
           repository,
         );
@@ -9448,7 +9714,7 @@ class MessageBubble extends StatelessWidget {
 ```dart
 import 'package:flutter/material.dart';
 
-class ThoughtBubble extends StatelessWidget {
+class ThoughtBubble extends StatefulWidget {
   final String content;
 
   const ThoughtBubble({
@@ -9457,8 +9723,16 @@ class ThoughtBubble extends StatelessWidget {
   });
 
   @override
+  State<ThoughtBubble> createState() => _ThoughtBubbleState();
+}
+
+class _ThoughtBubbleState extends State<ThoughtBubble> {
+  // 默认折叠
+  bool _isExpanded = false;
+
+  @override
   Widget build(BuildContext context) {
-    final text = content.trim();
+    final text = widget.content.trim();
     if (text.isEmpty) return const SizedBox.shrink();
 
     final colorScheme = Theme.of(context).colorScheme;
@@ -9473,30 +9747,55 @@ class ThoughtBubble extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.psychology_alt_outlined,
-                  size: 16,
-                  color: colorScheme.primary,
+            // 可点击的标题栏
+            InkWell(
+              onTap: () => setState(() => _isExpanded = !_isExpanded),
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.psychology_alt_outlined,
+                      size: 16,
+                      color: colorScheme.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '推理过程',
+                      style: textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                    const Spacer(),
+                    Icon(
+                      _isExpanded ? Icons.expand_less : Icons.expand_more,
+                      size: 18,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 6),
-                Text(
-                  '推理过程',
+              ),
+            ),
+            // 内容折叠/展开动画
+            AnimatedCrossFade(
+              firstChild: const SizedBox.shrink(),
+              secondChild: Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Text(
+                  text,
                   style: textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: colorScheme.primary,
+                    fontSize: 13,
+                    height: 1.65,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              text,
-              style: textTheme.bodySmall?.copyWith(
-                fontSize: 13,
-                height: 1.65,
               ),
+              crossFadeState: _isExpanded
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
+              duration: const Duration(milliseconds: 200),
+              sizeCurve: Curves.easeInOut,
             ),
           ],
         ),

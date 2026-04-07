@@ -2,18 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:graphview/GraphView.dart';
 import 'package:intl/intl.dart';
+
+import '../../di/providers.dart';
 import '../../domain/models/tree_node.dart';
 import '../../domain/services/tree_builder.dart';
 import '../providers/chat_notifier.dart' show chatTopologyProvider, roundDetailProvider;
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_toast.dart';
-import '../../di/providers.dart';
 
 class BranchTreePage extends ConsumerStatefulWidget {
   final String fileName;
   final String initialFocusRoundId;
 
-  const BranchTreePage({super.key, required this.fileName, required this.initialFocusRoundId});
+  const BranchTreePage({
+    super.key,
+    required this.fileName,
+    required this.initialFocusRoundId,
+  });
 
   @override
   ConsumerState<BranchTreePage> createState() => _BranchTreePageState();
@@ -21,22 +26,23 @@ class BranchTreePage extends ConsumerStatefulWidget {
 
 class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   final GlobalKey _viewerKey = GlobalKey();
+  final GlobalKey _targetNodeKey = GlobalKey();
   final TransformationController _transformationController = TransformationController();
-  final BuchheimWalkerConfiguration _builder = BuchheimWalkerConfiguration();
+  
+  final BuchheimWalkerConfiguration _builder = BuchheimWalkerConfiguration()
+    ..siblingSeparation = 40
+    ..levelSeparation = 78
+    ..subtreeSeparation = 50
+    ..orientation = BuchheimWalkerConfiguration.ORIENTATION_TOP_BOTTOM;
 
-  GlobalKey? _targetNodeKey;
   bool _hasFocused = false;
-  int _focusRetryCount = 0;
 
   @override
-  void initState() {
-    super.initState();
-    _builder
-      ..siblingSeparation = 40
-      ..levelSeparation = 78
-      ..subtreeSeparation = 50
-      ..orientation = BuchheimWalkerConfiguration.ORIENTATION_TOP_BOTTOM;
-    _targetNodeKey = GlobalKey();
+  void didUpdateWidget(covariant BranchTreePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.fileName != widget.fileName || oldWidget.initialFocusRoundId != widget.initialFocusRoundId) {
+      _hasFocused = false; // 切换文件/目标时重置聚焦状态
+    }
   }
 
   @override
@@ -45,92 +51,31 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     super.dispose();
   }
 
-  void _resetViewport() {
-    _transformationController.value = Matrix4.identity();
-    _hasFocused = false;
-    _focusRetryCount = 0;
-    _scheduleFocusToTarget();
+  String _buildGraphSignature(List<({String id, String? parentId})> topology) {
+    if (topology.isEmpty) return 'empty';
+    return topology.map((t) => '${t.id}:${t.parentId ?? 'root'}').join('|');
   }
 
-  void _scheduleFocusToTarget() {
-    if (_hasFocused || _targetNodeKey == null) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _focusOnTargetNode();
-    });
-  }
+  // 🔑 核心：目标节点完成布局后触发。仅计算一次偏移并 setState 完成最终测量
+  void _onTargetLaidOut() {
+    if (_hasFocused) return;
+    
+    final targetCtx = _targetNodeKey.currentContext;
+    final viewerCtx = _viewerKey.currentContext;
+    if (targetCtx == null || viewerCtx == null) return;
 
-  void _focusOnTargetNode() {
-    if (_hasFocused || _targetNodeKey == null) return;
-    final targetContext = _targetNodeKey!.currentContext;
-    final viewerContext = _viewerKey.currentContext;
+    final targetBox = targetCtx.findRenderObject() as RenderBox?;
+    final viewerBox = viewerCtx.findRenderObject() as RenderBox?;
+    if (targetBox == null || viewerBox == null || !targetBox.hasSize || !viewerBox.hasSize) return;
 
-    if (targetContext == null || viewerContext == null) {
-      _retryFocus();
-      return;
-    }
-
-    final targetBox = targetContext.findRenderObject() as RenderBox?;
-    final viewerBox = viewerContext.findRenderObject() as RenderBox?;
-
-    if (targetBox == null || viewerBox == null || !targetBox.hasSize || !viewerBox.hasSize) {
-      _retryFocus();
-      return;
-    }
-
-    final targetTopLeft = targetBox.localToGlobal(Offset.zero, ancestor: viewerBox);
-    final targetSize = targetBox.size;
-    final viewerSize = viewerBox.size;
-
-    final targetCenter = Offset(
-      targetTopLeft.dx + targetSize.width / 2,
-      targetTopLeft.dy + targetSize.height / 2,
-    );
-    final viewerCenter = Offset(
-      viewerSize.width / 2,
-      viewerSize.height / 2,
-    );
-
-    final dx = viewerCenter.dx - targetCenter.dx;
-    final dy = viewerCenter.dy - targetCenter.dy;
+    final targetCenter = targetBox.localToGlobal(targetBox.size.center(Offset.zero), ancestor: viewerBox);
+    final viewerCenter = viewerBox.size.center(Offset.zero);
 
     _transformationController.value = Matrix4.identity()
-      ..translate(dx, dy)
-      ..scale(1.0);
+      ..translate(viewerCenter.dx - targetCenter.dx, viewerCenter.dy - targetCenter.dy);
 
     _hasFocused = true;
-  }
-
-  void _retryFocus() {
-    if (_hasFocused || _focusRetryCount >= 8) return;
-    _focusRetryCount++;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _focusOnTargetNode();
-    });
-  }
-
-  Set<String> _collectSubtreeIds(TreeNode root) {
-    final ids = <String>{};
-    final stack = <TreeNode>[root];
-    
-    while (stack.isNotEmpty) {
-      final node = stack.removeLast();
-      ids.add(node.id);
-      // 将子节点压入栈中，继续向下遍历
-      stack.addAll(node.children);
-    }
-    
-    return ids;
-  }
-
-  TreeNode? _findIterative(List<TreeNode> roots, String targetId) {
-    final stack = [...roots];
-    while (stack.isNotEmpty) {
-      final node = stack.removeLast();
-      if (node.id == targetId) return node;
-      stack.addAll(node.children);
-    }
-    return null;
+    setState(() {}); // 必需：触发 GraphView 二次布局，解决 constrained:false 下的测量缺陷
   }
 
   Future<void> _deleteNode(String nodeId) async {
@@ -144,7 +89,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
       await ref.read(conversationRepositoryProvider)
           .deleteRoundsAndCleanupOrphanAttachments(widget.fileName, ids);
     } catch (e) {
-      await AppToast.show('删除失败：$e');
+      if (mounted) AppToast.show('删除失败：$e');
     }
   }
 
@@ -162,73 +107,93 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
         ) ?? false;
   }
 
+  Set<String> _collectSubtreeIds(TreeNode root) {
+    final ids = <String>{};
+    final stack = <TreeNode>[root];
+    while (stack.isNotEmpty) {
+      final node = stack.removeLast();
+      ids.add(node.id);
+      stack.addAll(node.children);
+    }
+    return ids;
+  }
+
+  TreeNode? _findIterative(List<TreeNode> roots, String targetId) {
+    final stack = [...roots];
+    while (stack.isNotEmpty) {
+      final node = stack.removeLast();
+      if (node.id == targetId) return node;
+      stack.addAll(node.children);
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
-    // ✅ 第一条：复用聊天页框架 Provider，构建整体树框架
     final topology = ref.watch(chatTopologyProvider(widget.fileName)).valueOrNull ?? [];
     final roots = buildTree(topology);
-    final structKey = roots.length.toString();
-
-    if (!_hasFocused && roots.isNotEmpty) _scheduleFocusToTarget();
+    final graphSignature = _buildGraphSignature(topology);
+    final targetId = widget.initialFocusRoundId;
 
     return AppPageScaffold(
       appBar: AppBar(title: const Text('分支树')),
       body: roots.isEmpty
-          ? _buildEmptyState(context)
-          : Column(
-              children: [
-                _GraphToolbar(onZoomIn: () {}, onZoomOut: () {}, onReset: _resetViewport),
-                Expanded(
-                  child: InteractiveViewer(
-                    key: _viewerKey,
-                    constrained: false,
-                    boundaryMargin: const EdgeInsets.all(double.infinity),
-                    minScale: 0.1,
-                    maxScale: 3.0,
-                    transformationController: _transformationController,
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Wrap(
-                        spacing: 40, runSpacing: 40,
-                        crossAxisAlignment: WrapCrossAlignment.start,
-                        children: roots.map((root) => _RootTreeGroup(
-                          key: ValueKey('root-${root.id}-$structKey'),
-                          root: root,
-                          graphSignature: structKey,
-                          builderConfig: _builder,
-                          targetNodeId: widget.initialFocusRoundId,
-                          targetNodeKey: _targetNodeKey,
-                          onSwitch: (id) => Navigator.of(context).pop(id),
-                          onDelete: (id) async { if (await _confirmDelete()) await _deleteNode(id); },
-                        )).toList(),
-                      ),
-                    ),
+          ? const Center(child: Text('暂无分支结构'))
+          : InteractiveViewer(
+              key: _viewerKey,
+              constrained: false,
+              boundaryMargin: const EdgeInsets.all(100), // 适度边界替代无限边界，防止手势漂移
+              minScale: 0.1,
+              maxScale: 3.0,
+              transformationController: _transformationController,
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: RepaintBoundary( // 🔑 隔离 setState 重建，保护 InteractiveViewer 手势状态
+                  child: Wrap(
+                    spacing: 40,
+                    runSpacing: 40,
+                    crossAxisAlignment: WrapCrossAlignment.start,
+                    children: roots.map((root) => _RootTreeGroup(
+                      key: ValueKey('root-${root.id}-$graphSignature'),
+                      root: root,
+                      graphSignature: graphSignature,
+                      builderConfig: _builder,
+                      targetNodeId: targetId,
+                      targetNodeKey: _targetNodeKey,
+                      onTargetLaidOut: _onTargetLaidOut,
+                      onSwitch: (id) => Navigator.of(context).pop(id),
+                      onDelete: (id) async {
+                        if (await _confirmDelete()) await _deleteNode(id);
+                      },
+                    )).toList(),
                   ),
                 ),
-              ],
+              ),
             ),
     );
   }
-
-  Widget _buildEmptyState(BuildContext context) => const Center(child: Text('暂无分支结构'));
 }
 
-// ==========================================
-// 🎨 布局层
-// ==========================================
 class _RootTreeGroup extends StatelessWidget {
   final TreeNode root;
   final String graphSignature;
   final BuchheimWalkerConfiguration builderConfig;
-  final Function(String) onSwitch;
-  final Function(String) onDelete;
+  final void Function(String id) onSwitch;
+  final void Function(String id) onDelete;
   final String? targetNodeId;
   final GlobalKey? targetNodeKey;
+  final VoidCallback? onTargetLaidOut;
 
   const _RootTreeGroup({
-    super.key, required this.root, required this.graphSignature,
-    required this.builderConfig, required this.onSwitch, required this.onDelete,
-    this.targetNodeId, this.targetNodeKey,
+    super.key,
+    required this.root,
+    required this.graphSignature,
+    required this.builderConfig,
+    required this.onSwitch,
+    required this.onDelete,
+    this.targetNodeId,
+    this.targetNodeKey,
+    this.onTargetLaidOut,
   });
 
   @override
@@ -236,23 +201,18 @@ class _RootTreeGroup extends StatelessWidget {
     final graph = Graph()..isTree = true;
     final nodeMap = <String, Node>{};
     final graphToTree = <Node, TreeNode>{};
-
-    // 替换为显式栈遍历
     final stack = <TreeNode>[root];
+
     while (stack.isNotEmpty) {
       final node = stack.removeLast();
-      
       final gNode = Node.Id('${root.id}-${node.id}-$graphSignature');
       nodeMap[node.id] = gNode;
       graphToTree[gNode] = node;
       graph.addNode(gNode);
-      
       if (node.parentId != null) {
-        final p = nodeMap[node.parentId!];
-        if (p != null) graph.addEdge(p, gNode);
+        final parent = nodeMap[node.parentId!];
+        if (parent != null) graph.addEdge(parent, gNode);
       }
-      
-      // 逆序入栈，保持与原递归一致的从左到右渲染顺序
       stack.addAll(node.children.reversed);
     }
 
@@ -261,47 +221,70 @@ class _RootTreeGroup extends StatelessWidget {
       graph: graph,
       animated: false,
       algorithm: BuchheimWalkerAlgorithm(builderConfig, TreeEdgeRenderer(builderConfig)),
-      paint: Paint()..color = Theme.of(context).dividerColor..strokeWidth = 1.6..style = PaintingStyle.stroke,
+      paint: Paint()
+        ..color = Theme.of(context).dividerColor
+        ..strokeWidth = 1.6
+        ..style = PaintingStyle.stroke,
       builder: (Node node) {
         final tree = graphToTree[node];
         if (tree == null) return const SizedBox.shrink();
-        final isTarget = targetNodeId != null && tree.id == targetNodeId;
 
-        // ✅ 第二条：复用每页 Provider，构建每个卡片的文字
-        return _GraphNodeCard(
-          key: isTarget ? targetNodeKey : ValueKey('${tree.id}-$graphSignature'),
+        final isTarget = targetNodeId != null && tree.id == targetNodeId;
+        final child = _GraphNodeShell(
           roundId: tree.id,
-          depth: tree.depth,
           onSwitch: () => onSwitch(tree.id),
           onDelete: () => onDelete(tree.id),
         );
+
+        return isTarget
+            ? _NodeAnchor(key: targetNodeKey, onLaidOut: onTargetLaidOut, child: child)
+            : child;
       },
     );
   }
 }
 
-// ==========================================
-// 🔵 内容层
-// ==========================================
-class _GraphNodeCard extends ConsumerWidget {
+class _NodeAnchor extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onLaidOut;
+  const _NodeAnchor({super.key, required this.child, this.onLaidOut});
+
+  @override
+  State<_NodeAnchor> createState() => _NodeAnchorState();
+}
+
+class _NodeAnchorState extends State<_NodeAnchor> {
+  Size? _lastSize;
+  @override
+  Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || widget.onLaidOut == null) return;
+      final box = context.findRenderObject() as RenderBox?;
+      if (box == null || !box.hasSize || box.size.isEmpty) return;
+      if (_lastSize == box.size) return;
+      _lastSize = box.size;
+      widget.onLaidOut!();
+    });
+    return widget.child;
+  }
+}
+
+class _GraphNodeShell extends ConsumerWidget {
   final String roundId;
-  final int depth;
   final VoidCallback onSwitch;
   final VoidCallback onDelete;
 
-  const _GraphNodeCard({
-    super.key, required this.roundId, required this.depth,
-    required this.onSwitch, required this.onDelete,
-  });
+  const _GraphNodeShell({required this.roundId, required this.onSwitch, required this.onDelete});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final round = ref.watch(roundDetailProvider(roundId)).valueOrNull;
-    if (round == null) return const SizedBox.shrink();
-
-    final aiText = (round.assistantContent ?? '').trim().isEmpty ? '（等待回复）' : round.assistantContent!;
+    final dateText = round == null ? null : DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(round.createdAt));
+    final userText = round?.userContent;
+    final aiText = round == null ? null : ((round.assistantContent ?? '').trim().isEmpty ? '（等待回复）' : round.assistantContent!);
 
     return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: SizedBox(
         width: 290,
         child: Padding(
@@ -309,13 +292,16 @@ class _GraphNodeCard extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Chip(label: Text('深度 ${depth + 1}'), visualDensity: VisualDensity.compact),
-              const SizedBox(height: 10),
-              Text(DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(round.createdAt)), style: Theme.of(context).textTheme.bodySmall),
+              SizedBox(
+                height: 20,
+                child: dateText == null
+                    ? const _SkeletonBar(width: 160, height: 14)
+                    : Align(alignment: Alignment.centerLeft, child: Text(dateText, style: Theme.of(context).textTheme.bodySmall)),
+              ),
               const SizedBox(height: 12),
-              _PreviewBlock(label: 'YOU', content: round.userContent),
+              _PreviewSlot(label: 'YOU', content: userText, loading: round == null),
               const SizedBox(height: 8),
-              _PreviewBlock(label: 'AI', content: aiText),
+              _PreviewSlot(label: 'AI', content: aiText, loading: round == null),
               const SizedBox(height: 14),
               Row(
                 children: [
@@ -331,47 +317,59 @@ class _GraphNodeCard extends ConsumerWidget {
   }
 }
 
-class _PreviewBlock extends StatelessWidget {
-  final String label, content;
-  const _PreviewBlock({required this.label, required this.content});
+class _PreviewSlot extends StatelessWidget {
+  final String label;
+  final String? content;
+  final bool loading;
+  const _PreviewSlot({required this.label, required this.content, required this.loading});
+
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('$label ', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700)),
-            Expanded(child: Text(content, maxLines: 3, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall)),
-          ],
+    final textTheme = Theme.of(context).textTheme;
+    return SizedBox(
+      height: 78,
+      child: Card(
+        margin: EdgeInsets.zero,
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(width: 34, child: Text('$label ', style: textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700))),
+              Expanded(
+                child: loading
+                    ? const _PreviewSkeleton()
+                    : Text((content == null || content!.trim().isEmpty) ? '（空）' : content!, maxLines: 3, overflow: TextOverflow.ellipsis, style: textTheme.bodySmall),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _GraphToolbar extends StatelessWidget {
-  final VoidCallback onZoomIn, onZoomOut, onReset;
-  const _GraphToolbar({required this.onZoomIn, required this.onZoomOut, required this.onReset});
+class _PreviewSkeleton extends StatelessWidget {
+  const _PreviewSkeleton();
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          children: [
-            const Icon(Icons.tune_outlined, size: 18),
-            const SizedBox(width: 8),
-            const Expanded(child: Text('缩放、拖拽查看对话分支结构')),
-            IconButton(onPressed: onZoomOut, icon: const Icon(Icons.remove_rounded)),
-            IconButton(onPressed: onZoomIn, icon: const Icon(Icons.add_rounded)),
-            TextButton.icon(onPressed: onReset, icon: const Icon(Icons.center_focus_strong_outlined, size: 18), label: const Text('重置')),
-          ],
-        ),
-      ),
-    );
+    return const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _SkeletonBar(widthFactor: 0.92), SizedBox(height: 8), _SkeletonBar(widthFactor: 0.76), SizedBox(height: 8), _SkeletonBar(widthFactor: 0.58),
+    ]);
+  }
+}
+
+class _SkeletonBar extends StatelessWidget {
+  final double? width;
+  final double height;
+  final double? widthFactor;
+  const _SkeletonBar({this.width, this.height = 12, this.widthFactor});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.surfaceContainerHighest;
+    Widget child = Container(width: width, height: height, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(6)));
+    if (widthFactor != null) child = FractionallySizedBox(widthFactor: widthFactor, alignment: Alignment.centerLeft, child: child);
+    return child;
   }
 }

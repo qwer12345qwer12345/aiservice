@@ -5,9 +5,9 @@ import '../data_sources/local_file_source.dart';
 import '../../core/models/attachment.dart';
 import '../../core/models/chat_round.dart';
 import '../../core/models/session.dart';
-import '../../presentation/models/session_list_item.dart';
+import '../../domain/models/session_list_item.dart';
 import '../database/database.dart';
-import '../../presentation/models/session_card_meta.dart';
+import '../../domain/models/session_card_meta.dart';
 
 class ConversationRepository {
   final AppDatabase _db;
