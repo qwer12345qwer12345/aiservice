@@ -1,8 +1,8 @@
-import 'package:aiservice/core/utils/id_generator.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../di/providers.dart';
 import '../../domain/models/session_list_item.dart';
 import '../../domain/models/session_card_meta.dart';
+import 'package:uuid/uuid.dart';
 
 final sessionListProvider = StreamProvider<List<SessionListItem>>((ref) {
   final repository = ref.watch(conversationRepositoryProvider);
@@ -35,7 +35,7 @@ class SessionListController {
   Future<String> createSession(String title) async {
     final repository = ref.read(conversationRepositoryProvider);
 
-    final fileName = '${IdGenerator.generate()}.json';
+    final fileName = '${const Uuid().v4()}.json';
 
     await repository.createSession(fileName: fileName, title: '新对话');
     return fileName;

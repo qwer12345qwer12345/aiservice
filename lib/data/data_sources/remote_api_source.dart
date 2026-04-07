@@ -1,32 +1,13 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../../core/errors/exceptions.dart';
 import '../../core/models/model_info.dart';
 import '../../core/models/api_message.dart';
 import '../../core/models/app_config.dart';
 import '../../core/models/chat_chunk.dart';
 import '../../core/utils/sse_parser.dart';
-import '../../domain/services/model_capability_registry.dart';
 import 'sse_event_decoder.dart';
 
-abstract class IRemoteApiSource {
-  Future<List<ModelInfo>> fetchModels({
-    required String baseUrl,
-    required String apiKey,
-    required String modelsPath,
-  });
-
-  Stream<ChatChunk> chatStream({
-    required String taskId,
-    required Future<AppConfig> Function() loadConfig,
-    required List<ApiMessage> context,
-    bool enableReasoning = false,
-  });
-
-  void cancelRequest(String taskId);
-}
-
-class RemoteApiSource implements IRemoteApiSource {
+class RemoteApiSource{
   final Map<String, http.Client> _activeClients = {};
   final Set<String> _cancelledTasks = {};
 
@@ -52,30 +33,15 @@ class RemoteApiSource implements IRemoteApiSource {
   }
 
   ModelInfo _parseModelInfo(Map<String, dynamic> json) {
-    final raw = ModelInfo(
+    return ModelInfo(
       id: (json['id'] ?? '').toString(),
       name: json['name']?.toString(),
-      supportsReasoning: _readBool(json, [
-        'supportsReasoning',
-        'supports_reasoning',
-      ]),
-      supportsVision: _readBool(json, [
-        'supportsVision',
-        'supports_vision',
-        'vision',
-        'supportsImageInput',
-        'supports_image_input',
-      ]),
-      overrideSupportsReasoning: _readBool(json, [
-        'overrideSupportsReasoning',
-        'override_supports_reasoning',
-      ]),
-      overrideSupportsVision: _readBool(json, [
-        'overrideSupportsVision',
-        'override_supports_vision',
-      ]),
+      supportsReasoning: _readBool(json, ['supportsReasoning', 'supports_reasoning']),
+      supportsVision: _readBool(json, ['supportsVision', 'supports_vision', 'vision', 'supportsImageInput', 'supports_image_input']),
+      overrideSupportsReasoning: _readBool(json, ['overrideSupportsReasoning', 'override_supports_reasoning']),
+      overrideSupportsVision: _readBool(json, ['overrideSupportsVision', 'override_supports_vision']),
     );
-    return ModelCapabilityRegistry.enhance(raw);
+    // 说明：初始拉取阶段仅保留 API 原始返回值与本地覆盖值，最终生效值由 UI/配置层按需计算
   }
 
   bool _isOnlySingleTextPart(ApiMessage message) {
@@ -150,7 +116,7 @@ class RemoteApiSource implements IRemoteApiSource {
       return {
         'role': message.role,
         'content': message.content ?? '',
-      };
+       };
     }
 
     if (_isOnlySingleTextPart(message)) {
@@ -190,7 +156,7 @@ class RemoteApiSource implements IRemoteApiSource {
         'summary': [
           {
             'type': 'summary_text',
-            'text': message.reasoning,
+             'text': message.reasoning,
           }
         ],
       });
@@ -199,7 +165,7 @@ class RemoteApiSource implements IRemoteApiSource {
     if ((message.content ?? '').trim().isNotEmpty) {
       items.add({
         'role': 'assistant',
-        'content': message.content,
+         'content': message.content,
       });
     }
 
@@ -230,7 +196,7 @@ class RemoteApiSource implements IRemoteApiSource {
       return {
         'model': model,
         'input': _buildResponsesInput(context),
-        'stream': true,
+         'stream': true,
         'store': false,
         if (enableReasoning)
           'reasoning': {
@@ -247,7 +213,6 @@ class RemoteApiSource implements IRemoteApiSource {
     };
   }
 
-  @override
   Future<List<ModelInfo>> fetchModels({
     required String baseUrl,
     required String apiKey,
@@ -264,11 +229,8 @@ class RemoteApiSource implements IRemoteApiSource {
       );
 
       if (response.statusCode != 200) {
-        throw ApiException(
-          '获取模型列表失败：${response.statusCode}',
-          code: 'MODEL_FETCH_ERROR',
-        );
-      }
+        throw Exception('获取模型列表失败：${response.statusCode}');
+      } 
 
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       final data = json['data'] as List<dynamic>;
@@ -276,14 +238,11 @@ class RemoteApiSource implements IRemoteApiSource {
       return data
           .map((e) => _parseModelInfo(e as Map<String, dynamic>))
           .toList();
-    } on ApiException {
-      rethrow;
     } catch (e) {
-      throw ApiException('获取模型列表失败：$e', code: 'MODEL_FETCH_ERROR');
+      throw Exception('获取模型列表失败：$e');
     }
   }
 
-  @override
   Stream<ChatChunk> chatStream({
     required String taskId,
     required Future<AppConfig> Function() loadConfig,
@@ -306,7 +265,7 @@ class RemoteApiSource implements IRemoteApiSource {
         yield const ChatChunk(isDone: true, error: 'Base URL 为空');
         return;
       }
-
+ 
       if (apiKey.isEmpty) {
         yield const ChatChunk(isDone: true, error: 'API Key 为空');
         return;
@@ -322,12 +281,12 @@ class RemoteApiSource implements IRemoteApiSource {
         return;
       }
 
-      final url = Uri.parse(_buildUrl(baseUrl, chatPath));
+       final url = Uri.parse(_buildUrl(baseUrl, chatPath));
       final requestBody = _buildRequestBody(
         apiMode: apiMode,
         model: model,
         context: context,
-        enableReasoning: enableReasoning,
+         enableReasoning: enableReasoning,
       );
       final body = jsonEncode(requestBody);
 
@@ -342,13 +301,10 @@ class RemoteApiSource implements IRemoteApiSource {
 
       final streamedResponse = await client.send(request);
 
-      if (streamedResponse.statusCode < 200 ||
-          streamedResponse.statusCode >= 300) {
+      if (streamedResponse.statusCode  < 200 ||
+          streamedResponse.statusCode  >= 300) {
         final errorBody = await streamedResponse.stream.bytesToString();
-        throw ApiException(
-          '流式请求失败：${streamedResponse.statusCode} $errorBody',
-          code: 'CHAT_STREAM_ERROR',
-        );
+        throw Exception('流式请求失败：${streamedResponse.statusCode} $errorBody');
       }
 
       final parser = SseParser();
@@ -366,7 +322,7 @@ class RemoteApiSource implements IRemoteApiSource {
           if (_cancelledTasks.contains(taskId)) {
             yield const ChatChunk(isDone: true);
             return;
-          }
+           }
 
           try {
             final decoded = SseEventDecoder.decode(
@@ -381,9 +337,9 @@ class RemoteApiSource implements IRemoteApiSource {
             if (decoded.isDone) {
               return;
             }
-          } catch (e) {
+          } catch (_) {
             // 单条 SSE 解析失败不让整个流中断
-          }
+          } 
         }
       }
 
@@ -404,8 +360,6 @@ class RemoteApiSource implements IRemoteApiSource {
       }
 
       yield const ChatChunk(isDone: true);
-    } on ApiException {
-      rethrow;
     } catch (e) {
       if (_cancelledTasks.contains(taskId)) {
         yield const ChatChunk(isDone: true);
@@ -419,10 +373,9 @@ class RemoteApiSource implements IRemoteApiSource {
     }
   }
 
-  @override
   void cancelRequest(String taskId) {
     _cancelledTasks.add(taskId);
-    _activeClients[taskId]?.close();
+     _activeClients[taskId]?.close();
     _activeClients.remove(taskId);
   }
 }

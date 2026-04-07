@@ -36,8 +36,6 @@ The content is organized as follows:
 # Directory Structure
 ```
 core/constants/app_constants.dart
-core/errors/exceptions.dart
-core/interfaces/config_service.dart
 core/models/api_message.dart
 core/models/api_message.g.dart
 core/models/app_config_store.dart
@@ -55,9 +53,7 @@ core/models/session.dart
 core/models/session.g.dart
 core/models/sse_event.dart
 core/utils/app_route_observer.dart
-core/utils/id_generator.dart
 core/utils/sse_parser.dart
-core/utils/time_format_utils.dart
 data/data_sources/local_file_source.dart
 data/data_sources/remote_api_source.dart
 data/data_sources/sse_event_decoder.dart
@@ -66,21 +62,16 @@ data/database/database.g.dart
 data/repositories/conversation_repository.dart
 data/services/config_service.dart
 di/providers.dart
-domain/models/chat_page.dart
-domain/models/session_card_meta.dart
-domain/models/session_list_item.dart
 domain/models/tree_node.dart
 domain/models/tree_node.g.dart
 domain/services/attachment_preparer.dart
 domain/services/chat_context_builder.dart
-domain/services/chat_round_factory.dart
-domain/services/chat_stream_accumulator.dart
-domain/services/message_paginator.dart
-domain/services/model_capability_registry.dart
 domain/services/tree_builder.dart
 domain/states/chat_state.dart
 main.dart
 presentation/models/pending_attachment.dart
+presentation/models/session_card_meta.dart
+presentation/models/session_list_item.dart
 presentation/pages/branch_tree_page.dart
 presentation/pages/chat_page.dart
 presentation/pages/home_page.dart
@@ -93,7 +84,6 @@ presentation/providers/input_draft_provider.dart
 presentation/providers/session_list_notifier.dart
 presentation/themes/app_theme.dart
 presentation/themes/app_tokens.dart
-presentation/utils/page_utils.dart
 presentation/widgets/attachment_list.dart
 presentation/widgets/common/app_card.dart
 presentation/widgets/common/app_page_scaffold.dart
@@ -101,7 +91,6 @@ presentation/widgets/common/app_section.dart
 presentation/widgets/common/app_toast.dart
 presentation/widgets/input_bar.dart
 presentation/widgets/message_bubble.dart
-presentation/widgets/page_indicator.dart
 presentation/widgets/thought_bubble.dart
 ```
 
@@ -129,72 +118,6 @@ abstract class AppConstants {
 
   // 文件扩展名
   static const String extJson = '.json';
-}
-```
-
-## File: core/errors/exceptions.dart
-```dart
-/// 基础应用异常
-class AppException implements Exception {
-  final String message;
-  final String? code;
-
-  const AppException(this.message, {this.code});
-
-  @override
-  String toString() => 'AppException: $message (Code: $code)';
-}
-
-/// 文件操作异常
-class FileException extends AppException {
-  const FileException(super.message, {super.code});
-}
-
-/// 网络/API 异常
-class ApiException extends AppException {
-  const ApiException(super.message, {super.code});
-}
-
-/// 配置异常
-class ConfigException extends AppException {
-  const ConfigException(super.message, {super.code});
-}
-
-/// 数据解析异常
-class ParseException extends AppException {
-  const ParseException(super.message, {super.code});
-}
-```
-
-## File: core/interfaces/config_service.dart
-```dart
-// core/interfaces/config_service.dart
-
-import '../models/app_config.dart';
-import '../models/app_config_store.dart';
-
-abstract class IConfigService {
-  // 现有的同步方法
-  Future<AppConfigStore> loadConfigStore();
-  Future<AppConfig> loadConfig();
-  Future<void> saveConfig(AppConfig config);
-
-  Future<void> refreshModels();
-
-  Future<List<ConfigProfile>> getProfiles();
-  Future<String> getActiveProfileId();
-  Future<void> switchProfile(String profileId);
-  Future<void> createProfile(String name);
-  Future<void> renameProfile(String profileId, String name);
-  Future<void> deleteProfile(String profileId);
-
-  // ========== 新增：watch 方法 ==========
-  
-  /// 监听配置Store的变更
-  Stream<AppConfigStore> watchConfigStore();
-  
-  /// 监听当前配置
-  Stream<AppConfig> watchConfig();
 }
 ```
 
@@ -800,19 +723,6 @@ final RouteObserver<ModalRoute<void>> appRouteObserver =
     RouteObserver<ModalRoute<void>>();
 ```
 
-## File: core/utils/id_generator.dart
-```dart
-import 'package:uuid/uuid.dart';
-
-abstract class IdGenerator {
-  static final _uuid = const Uuid();
-
-  static String generate() {
-    return _uuid.v4();
-  }
-}
-```
-
 ## File: core/utils/sse_parser.dart
 ```dart
 import '../models/sse_event.dart';
@@ -923,20 +833,6 @@ class SseParser {
 }
 ```
 
-## File: core/utils/time_format_utils.dart
-```dart
-import 'package:intl/intl.dart';
-
-abstract class TimeFormatUtils {
-  static final DateFormat _dateTimeFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
-
-  static String formatTimestamp(int timestamp) {
-    final dateTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
-    return _dateTimeFormat.format(dateTime);
-  }
-}
-```
-
 ## File: data/data_sources/local_file_source.dart
 ```dart
 import 'dart:io';
@@ -944,51 +840,35 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as path;
 import '../../core/constants/app_constants.dart';
-import '../../core/errors/exceptions.dart';
 
-abstract class ILocalFileSource {
-  Future<String> get basePath;
-  Future<void> initDirectories();
-  Future<String> readTextFile(String relativePath);
-  Future<void> writeTextFile(String relativePath, String content);
-  Future<void> deleteAttachment(String relativePath);
-  Future<List<String>> listFiles(String directory);
-  Future<String> saveAttachment(Uint8List data, String fileName);
-  Future<Uint8List> readAttachment(String relativePath);
-}
-
-class LocalFileSource implements ILocalFileSource {
+class LocalFileSource{
   final String _baseDir;
   final Directory _directory;
 
   LocalFileSource(this._baseDir) : _directory = Directory(_baseDir);
 
-  @override
   Future<String> get basePath async => _baseDir;
 
-  @override
   Future<void> initDirectories() async {
     await _directory.create(recursive: true);
     await Directory(path.join(_baseDir, AppConstants.dirConversations))
         .create(recursive: true);
-    await Directory(path.join(_baseDir, AppConstants.dirAttachments))
+     await Directory(path.join(_baseDir, AppConstants.dirAttachments))
         .create(recursive: true);
   }
 
-  @override
   Future<String> readTextFile(String relativePath) async {
     try {
       final file = File(path.join(_baseDir, relativePath));
       if (!await file.exists()) {
-        throw const FileException('文件不存在', code: 'FILE_NOT_FOUND');
+        throw Exception('文件不存在');
       }
       return await file.readAsString();
     } on FileSystemException catch (e) {
-      throw FileException('读取文件失败：${e.message}', code: 'READ_ERROR');
+      throw Exception('读取文件失败：${e.message}');
     }
   }
 
-  @override
   Future<void> writeTextFile(String relativePath, String content) async {
     try {
       final file = File(path.join(_baseDir, relativePath));
@@ -998,23 +878,21 @@ class LocalFileSource implements ILocalFileSource {
       }
       await file.writeAsString(content, flush: true);
     } on FileSystemException catch (e) {
-      throw FileException('写入文件失败：${e.message}', code: 'WRITE_ERROR');
+      throw Exception('写入文件失败：${e.message}');
     }
   }
 
-  @override
   Future<void> deleteAttachment(String relativePath) async {
     try {
       final file = File(path.join(_baseDir, relativePath));
       if (await file.exists()) {
         await file.delete();
-      }
+       }
     } on FileSystemException catch (e) {
-      throw FileException('删除文件失败：${e.message}', code: 'DELETE_ERROR');
+      throw Exception('删除文件失败：${e.message}');
     }
   }
 
-  @override
   Future<List<String>> listFiles(String directory) async {
     try {
       final dir = Directory(path.join(_baseDir, directory));
@@ -1028,19 +906,18 @@ class LocalFileSource implements ILocalFileSource {
           .map((f) => path.basename(f.path))
           .toList();
     } on FileSystemException catch (e) {
-      throw FileException('列出文件失败：${e.message}', code: 'LIST_ERROR');
+      throw Exception('列出文件失败：${e.message}');
     }
   }
 
-  @override
   Future<String> saveAttachment(Uint8List data, String fileName) async {
     try {
       final ext = path.extension(fileName).toLowerCase();
       final hash = sha256.convert(data).toString();
-      final hashedFileName = '$hash$ext';
+       final hashedFileName = '$hash$ext';
       final relativePath = '${AppConstants.dirAttachments}/$hashedFileName';
       final filePath = path.join(_baseDir, relativePath);
-      final file = File(filePath);
+       final file = File(filePath);
 
       if (!await file.exists()) {
         await file.writeAsBytes(data, flush: true);
@@ -1048,26 +925,19 @@ class LocalFileSource implements ILocalFileSource {
 
       return relativePath;
     } on FileSystemException catch (e) {
-      throw FileException(
-        '保存附件失败：${e.message}',
-        code: 'ATTACHMENT_SAVE_ERROR',
-      );
+      throw Exception('保存附件失败：${e.message}');
     }
   }
 
-  @override
   Future<Uint8List> readAttachment(String relativePath) async {
     try {
       final file = File(path.join(_baseDir, relativePath));
       if (!await file.exists()) {
-        throw const FileException('附件不存在', code: 'ATTACHMENT_NOT_FOUND');
+        throw Exception('附件不存在');
       }
       return await file.readAsBytes();
     } on FileSystemException catch (e) {
-      throw FileException(
-        '读取附件失败：${e.message}',
-        code: 'ATTACHMENT_READ_ERROR',
-      );
+      throw Exception('读取附件失败：${e.message}');
     }
   }
 }
@@ -1077,33 +947,14 @@ class LocalFileSource implements ILocalFileSource {
 ```dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../../core/errors/exceptions.dart';
 import '../../core/models/model_info.dart';
 import '../../core/models/api_message.dart';
 import '../../core/models/app_config.dart';
 import '../../core/models/chat_chunk.dart';
 import '../../core/utils/sse_parser.dart';
-import '../../domain/services/model_capability_registry.dart';
 import 'sse_event_decoder.dart';
 
-abstract class IRemoteApiSource {
-  Future<List<ModelInfo>> fetchModels({
-    required String baseUrl,
-    required String apiKey,
-    required String modelsPath,
-  });
-
-  Stream<ChatChunk> chatStream({
-    required String taskId,
-    required Future<AppConfig> Function() loadConfig,
-    required List<ApiMessage> context,
-    bool enableReasoning = false,
-  });
-
-  void cancelRequest(String taskId);
-}
-
-class RemoteApiSource implements IRemoteApiSource {
+class RemoteApiSource{
   final Map<String, http.Client> _activeClients = {};
   final Set<String> _cancelledTasks = {};
 
@@ -1129,30 +980,15 @@ class RemoteApiSource implements IRemoteApiSource {
   }
 
   ModelInfo _parseModelInfo(Map<String, dynamic> json) {
-    final raw = ModelInfo(
+    return ModelInfo(
       id: (json['id'] ?? '').toString(),
       name: json['name']?.toString(),
-      supportsReasoning: _readBool(json, [
-        'supportsReasoning',
-        'supports_reasoning',
-      ]),
-      supportsVision: _readBool(json, [
-        'supportsVision',
-        'supports_vision',
-        'vision',
-        'supportsImageInput',
-        'supports_image_input',
-      ]),
-      overrideSupportsReasoning: _readBool(json, [
-        'overrideSupportsReasoning',
-        'override_supports_reasoning',
-      ]),
-      overrideSupportsVision: _readBool(json, [
-        'overrideSupportsVision',
-        'override_supports_vision',
-      ]),
+      supportsReasoning: _readBool(json, ['supportsReasoning', 'supports_reasoning']),
+      supportsVision: _readBool(json, ['supportsVision', 'supports_vision', 'vision', 'supportsImageInput', 'supports_image_input']),
+      overrideSupportsReasoning: _readBool(json, ['overrideSupportsReasoning', 'override_supports_reasoning']),
+      overrideSupportsVision: _readBool(json, ['overrideSupportsVision', 'override_supports_vision']),
     );
-    return ModelCapabilityRegistry.enhance(raw);
+    // 说明：初始拉取阶段仅保留 API 原始返回值与本地覆盖值，最终生效值由 UI/配置层按需计算
   }
 
   bool _isOnlySingleTextPart(ApiMessage message) {
@@ -1227,7 +1063,7 @@ class RemoteApiSource implements IRemoteApiSource {
       return {
         'role': message.role,
         'content': message.content ?? '',
-      };
+       };
     }
 
     if (_isOnlySingleTextPart(message)) {
@@ -1267,7 +1103,7 @@ class RemoteApiSource implements IRemoteApiSource {
         'summary': [
           {
             'type': 'summary_text',
-            'text': message.reasoning,
+             'text': message.reasoning,
           }
         ],
       });
@@ -1276,7 +1112,7 @@ class RemoteApiSource implements IRemoteApiSource {
     if ((message.content ?? '').trim().isNotEmpty) {
       items.add({
         'role': 'assistant',
-        'content': message.content,
+         'content': message.content,
       });
     }
 
@@ -1307,7 +1143,7 @@ class RemoteApiSource implements IRemoteApiSource {
       return {
         'model': model,
         'input': _buildResponsesInput(context),
-        'stream': true,
+         'stream': true,
         'store': false,
         if (enableReasoning)
           'reasoning': {
@@ -1324,7 +1160,6 @@ class RemoteApiSource implements IRemoteApiSource {
     };
   }
 
-  @override
   Future<List<ModelInfo>> fetchModels({
     required String baseUrl,
     required String apiKey,
@@ -1341,11 +1176,8 @@ class RemoteApiSource implements IRemoteApiSource {
       );
 
       if (response.statusCode != 200) {
-        throw ApiException(
-          '获取模型列表失败：${response.statusCode}',
-          code: 'MODEL_FETCH_ERROR',
-        );
-      }
+        throw Exception('获取模型列表失败：${response.statusCode}');
+      } 
 
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       final data = json['data'] as List<dynamic>;
@@ -1353,14 +1185,11 @@ class RemoteApiSource implements IRemoteApiSource {
       return data
           .map((e) => _parseModelInfo(e as Map<String, dynamic>))
           .toList();
-    } on ApiException {
-      rethrow;
     } catch (e) {
-      throw ApiException('获取模型列表失败：$e', code: 'MODEL_FETCH_ERROR');
+      throw Exception('获取模型列表失败：$e');
     }
   }
 
-  @override
   Stream<ChatChunk> chatStream({
     required String taskId,
     required Future<AppConfig> Function() loadConfig,
@@ -1383,7 +1212,7 @@ class RemoteApiSource implements IRemoteApiSource {
         yield const ChatChunk(isDone: true, error: 'Base URL 为空');
         return;
       }
-
+ 
       if (apiKey.isEmpty) {
         yield const ChatChunk(isDone: true, error: 'API Key 为空');
         return;
@@ -1399,12 +1228,12 @@ class RemoteApiSource implements IRemoteApiSource {
         return;
       }
 
-      final url = Uri.parse(_buildUrl(baseUrl, chatPath));
+       final url = Uri.parse(_buildUrl(baseUrl, chatPath));
       final requestBody = _buildRequestBody(
         apiMode: apiMode,
         model: model,
         context: context,
-        enableReasoning: enableReasoning,
+         enableReasoning: enableReasoning,
       );
       final body = jsonEncode(requestBody);
 
@@ -1419,13 +1248,10 @@ class RemoteApiSource implements IRemoteApiSource {
 
       final streamedResponse = await client.send(request);
 
-      if (streamedResponse.statusCode < 200 ||
-          streamedResponse.statusCode >= 300) {
+      if (streamedResponse.statusCode  < 200 ||
+          streamedResponse.statusCode  >= 300) {
         final errorBody = await streamedResponse.stream.bytesToString();
-        throw ApiException(
-          '流式请求失败：${streamedResponse.statusCode} $errorBody',
-          code: 'CHAT_STREAM_ERROR',
-        );
+        throw Exception('流式请求失败：${streamedResponse.statusCode} $errorBody');
       }
 
       final parser = SseParser();
@@ -1443,7 +1269,7 @@ class RemoteApiSource implements IRemoteApiSource {
           if (_cancelledTasks.contains(taskId)) {
             yield const ChatChunk(isDone: true);
             return;
-          }
+           }
 
           try {
             final decoded = SseEventDecoder.decode(
@@ -1458,9 +1284,9 @@ class RemoteApiSource implements IRemoteApiSource {
             if (decoded.isDone) {
               return;
             }
-          } catch (e) {
+          } catch (_) {
             // 单条 SSE 解析失败不让整个流中断
-          }
+          } 
         }
       }
 
@@ -1481,8 +1307,6 @@ class RemoteApiSource implements IRemoteApiSource {
       }
 
       yield const ChatChunk(isDone: true);
-    } on ApiException {
-      rethrow;
     } catch (e) {
       if (_cancelledTasks.contains(taskId)) {
         yield const ChatChunk(isDone: true);
@@ -1496,10 +1320,9 @@ class RemoteApiSource implements IRemoteApiSource {
     }
   }
 
-  @override
   void cancelRequest(String taskId) {
     _cancelledTasks.add(taskId);
-    _activeClients[taskId]?.close();
+     _activeClients[taskId]?.close();
     _activeClients.remove(taskId);
   }
 }
@@ -5208,13 +5031,13 @@ import '../data_sources/local_file_source.dart';
 import '../../core/models/attachment.dart';
 import '../../core/models/chat_round.dart';
 import '../../core/models/session.dart';
-import '../../domain/models/session_list_item.dart';
+import '../../presentation/models/session_list_item.dart';
 import '../database/database.dart';
-import '../../domain/models/session_card_meta.dart';
+import '../../presentation/models/session_card_meta.dart';
 
 class ConversationRepository {
   final AppDatabase _db;
-  final ILocalFileSource _fileService;
+  final LocalFileSource _fileService;
   ConversationRepository(this._db, this._fileService);
 
   String _getId(String fileName) => fileName.replaceAll('.json', '');
@@ -5585,18 +5408,16 @@ class ConversationRepository {
 ```dart
 import 'dart:async';
 import 'package:drift/drift.dart';
-import '../../core/interfaces/config_service.dart';
 import '../../core/models/app_config.dart';
 import '../../core/models/app_config_store.dart';
 import '../../core/models/model_info.dart';
-import '../../core/utils/id_generator.dart';
 import '../../data/data_sources/remote_api_source.dart';
-import '../../domain/services/model_capability_registry.dart';
 import '../database/database.dart';
+import 'package:uuid/uuid.dart';
 
-class ConfigService implements IConfigService {
+class ConfigService{
   final AppDatabase _db;
-  final IRemoteApiSource _apiSource;
+  final RemoteApiSource _apiSource;
 
   ConfigService(this._db, this._apiSource);
 
@@ -5651,12 +5472,10 @@ class ConfigService implements IConfigService {
     return AppConfigStore(activeProfileId: activeId, profiles: profiles);
   }
 
-  @override
   Future<AppConfigStore> loadConfigStore() async {
     return await _ensureInitialized();
   }
 
-  @override
   Future<AppConfig> loadConfig() async {
     final store = await loadConfigStore();
     return store.profiles.firstWhere(
@@ -5665,14 +5484,12 @@ class ConfigService implements IConfigService {
     ).config;
   }
 
-  @override
   Future<void> saveConfig(AppConfig config) async {
     final activeId = await getActiveProfileId();
     await (_db.update(_db.dbConfigProfiles)..where((t) => t.id.equals(activeId)))
         .write(DbConfigProfilesCompanion(config: Value(config)));
   }
 
-  @override
   Future<void> refreshModels() async {
     final activeConfig = await loadConfig();
 
@@ -5692,7 +5509,10 @@ class ConfigService implements IConfigService {
         overrideSupportsReasoning: old?.overrideSupportsReasoning,
         overrideSupportsVision: old?.overrideSupportsVision,
       );
-      return ModelCapabilityRegistry.enhance(merged);
+      return merged.copyWith(
+        supportsVision: merged.overrideSupportsVision ?? merged.supportsVision,
+        supportsReasoning: merged.overrideSupportsReasoning ?? merged.supportsReasoning,
+      );
     }).toList();
 
     final customOnlyModels = oldModels
@@ -5700,7 +5520,10 @@ class ConfigService implements IConfigService {
         .where((old) =>
             old.overrideSupportsReasoning != null ||
             old.overrideSupportsVision != null)
-        .map(ModelCapabilityRegistry.enhance)
+        .map((model) => model.copyWith(
+          supportsVision: model.overrideSupportsVision ?? model.supportsVision,
+          supportsReasoning: model.overrideSupportsReasoning ?? model.supportsReasoning,
+        ))
         .toList();
 
     final updatedConfig = activeConfig.copyWith(
@@ -5713,13 +5536,11 @@ class ConfigService implements IConfigService {
     await saveConfig(updatedConfig);
   }
 
-  @override
   Future<List<ConfigProfile>> getProfiles() async {
     final store = await loadConfigStore();
     return store.profiles;
   }
 
-  @override
   Future<String> getActiveProfileId() async {
     final storeRow = await _db.select(_db.dbConfigStore).getSingleOrNull();
     var activeId = storeRow?.activeProfileId ?? 'default';
@@ -5738,7 +5559,6 @@ class ConfigService implements IConfigService {
     return activeId;
   }
 
-  @override
   Future<void> switchProfile(String profileId) async {
     await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
       DbConfigStoreCompanion(
@@ -5748,10 +5568,9 @@ class ConfigService implements IConfigService {
     );
   }
 
-  @override
   Future<void> createProfile(String name) async {
     final activeConfig = await loadConfig();
-    final newId = IdGenerator.generate();
+    final newId = const Uuid().v4();
     final cleanName = name.trim().isEmpty ? '新配置' : name.trim();
 
     await _db.into(_db.dbConfigProfiles).insert(
@@ -5764,7 +5583,6 @@ class ConfigService implements IConfigService {
     await switchProfile(newId);
   }
 
-  @override
   Future<void> renameProfile(String profileId, String name) async {
     if (name.trim().isEmpty) return;
     await (_db.update(_db.dbConfigProfiles)
@@ -5772,7 +5590,6 @@ class ConfigService implements IConfigService {
         .write(DbConfigProfilesCompanion(name: Value(name.trim())));
   }
 
-  @override
   Future<void> deleteProfile(String profileId) async {
     final store = await loadConfigStore();
 
@@ -5790,7 +5607,6 @@ class ConfigService implements IConfigService {
         .go();
   }
 
-  @override
   Stream<AppConfigStore> watchConfigStore() {
     _ensureInitialized();
 
@@ -5858,7 +5674,6 @@ class ConfigService implements IConfigService {
     return outputController.stream;
   }
 
-  @override
   Stream<AppConfig> watchConfig() {
     return watchConfigStore().map((store) {
       return store.profiles.firstWhere(
@@ -5880,203 +5695,41 @@ import '../data/data_sources/remote_api_source.dart';
 import '../data/database/database.dart';
 import '../data/services/config_service.dart';
 import '../data/repositories/conversation_repository.dart';
-import '../core/interfaces/config_service.dart';
 
-enum InitStatus { idle, loading, success, error }
+/// 1. 环境初始化 Provider
+final localFileSourceProvider = FutureProvider<LocalFileSource>((ref) async {
+  final appDir = await getApplicationDocumentsDirectory();
+  final fileSource = LocalFileSource(appDir.path);
+  await fileSource.initDirectories();
+  return fileSource;
+});
 
-class InitState {
-  final InitStatus status;
-  final String? errorMessage;
-  final AppDatabase? appDatabase;
-  final ILocalFileSource? fileSource;
-  final IRemoteApiSource? remoteApiSource;
-  final IConfigService? configService;
-  final ConversationRepository? conversationRepository;
+/// 2. 数据库 Provider
+final appDatabaseProvider = Provider<AppDatabase>((ref) {
+  ref.watch(localFileSourceProvider); // 触发依赖追踪
+  return AppDatabase();
+});
 
-  InitState({
-    this.status = InitStatus.idle,
-    this.errorMessage,
-    this.appDatabase,
-    this.fileSource,
-    this.remoteApiSource,
-    this.configService,
-    this.conversationRepository,
-  });
+/// 3. 远程 API 数据源
+final remoteApiSourceProvider = Provider<RemoteApiSource>((ref) {
+  return RemoteApiSource();
+});
 
-  InitState copyWith({
-    InitStatus? status,
-    String? errorMessage,
-    AppDatabase? appDatabase,
-    ILocalFileSource? fileSource,
-    IRemoteApiSource? remoteApiSource,
-    IConfigService? configService,
-    ConversationRepository? conversationRepository,
-  }) {
-    return InitState(
-      status: status ?? this.status,
-      errorMessage: errorMessage ?? this.errorMessage,
-      appDatabase: appDatabase ?? this.appDatabase,
-      fileSource: fileSource ?? this.fileSource,
-      remoteApiSource: remoteApiSource ?? this.remoteApiSource,
-      configService: configService ?? this.configService,
-      conversationRepository: conversationRepository ?? this.conversationRepository,
-    );
-  }
-}
+/// 4. 配置服务
+final configServiceProvider = Provider<ConfigService>((ref) {
+  return ConfigService(
+    ref.watch(appDatabaseProvider),
+    ref.watch(remoteApiSourceProvider),
+  );
+});
 
-class InitNotifier extends StateNotifier<InitState> {
-  InitNotifier() : super(InitState());
-
-  Future<void> initialize() async {
-    state = state.copyWith(status: InitStatus.loading);
-    try {
-      // 1. 初始化文件目录
-      final appDir = await getApplicationDocumentsDirectory();
-      final basePath = appDir.path;
-      final fileSource = LocalFileSource(basePath);
-      await fileSource.initDirectories();
-      
-      // 2. 初始化数据库
-      final appDatabase = AppDatabase();
-
-      // 3. 构建服务与 Repositories
-      final remoteApiSource = RemoteApiSource();
-      final configService = ConfigService(appDatabase, remoteApiSource);
-      final conversationRepository = ConversationRepository(appDatabase, fileSource);
-
-      state = state.copyWith(
-        status: InitStatus.success,
-        appDatabase: appDatabase,
-        fileSource: fileSource,
-        remoteApiSource: remoteApiSource,
-        configService: configService,
-        conversationRepository: conversationRepository,
-      );
-    } catch (e) {
-      state = state.copyWith(
-        status: InitStatus.error,
-        errorMessage: e.toString(),
-      );
-    }
-  }
-}
-
-final initProvider = StateNotifierProvider<InitNotifier, InitState>((ref) => InitNotifier());
-
+/// 5. 会话仓库
 final conversationRepositoryProvider = Provider<ConversationRepository>((ref) {
-  final initState = ref.watch(initProvider);
-  if (initState.conversationRepository == null) throw StateError('应用未初始化');
-  return initState.conversationRepository!;
+  return ConversationRepository(
+    ref.watch(appDatabaseProvider),
+    ref.watch(localFileSourceProvider).requireValue, // main() 已阻塞等待，此处必定就绪
+  );
 });
-
-final configServiceProvider = Provider<IConfigService>((ref) {
-  final initState = ref.watch(initProvider);
-  if (initState.configService == null) throw StateError('应用未初始化');
-  return initState.configService!;
-});
-
-final remoteApiSourceProvider = Provider<IRemoteApiSource>((ref) {
-  final initState = ref.watch(initProvider);
-  if (initState.remoteApiSource == null) throw StateError('应用未初始化');
-  return initState.remoteApiSource!;
-});
-```
-
-## File: domain/models/chat_page.dart
-```dart
-import 'package:freezed_annotation/freezed_annotation.dart';
-import '../../core/models/chat_round.dart';
-
-part 'chat_page.freezed.dart';
-
-@freezed
-class ChatPage with _$ChatPage {
-  const factory ChatPage({
-    // ✅ 移除 pageIndex - 索引由列表位置决定
-    required ChatRound round,
-  }) = _ChatPage;
-}
-
-@freezed
-class ChatPageList with _$ChatPageList {
-  const factory ChatPageList({
-    required List<ChatPage> pages,
-    required int currentPageIndex,  // ✅ UI 状态的单一事实来源 (0-based)
-    required int totalPages,
-  }) = _ChatPageList;
-
-  factory ChatPageList.fromPages(List<ChatPage> pages, int currentIndex) {
-    return ChatPageList(
-      pages: pages,
-      currentPageIndex: pages.isEmpty ? 0 : currentIndex.clamp(0, pages.length - 1),
-      totalPages: pages.length,
-    );
-  }
-}
-
-// ✅ 将 getter 移到 extension 中（Freezed 要求）
-extension ChatPageListX on ChatPageList {
-  /// 通过 roundId 查找页索引
-  int? findPageIndexByRoundId(String roundId) {
-    return pages.indexWhere((page) => page.round.id == roundId);
-  }
-
-  /// 获取当前页
-  ChatPage? get currentPage {
-    if (pages.isEmpty || currentPageIndex < 0 || currentPageIndex >= pages.length) {
-      return null;
-    }
-    return pages[currentPageIndex];
-  }
-
-  /// 获取上一页索引
-  int? get prevPageIndex {
-    if (currentPageIndex <= 0) return null;
-    return currentPageIndex - 1;
-  }
-
-  /// 获取下一页索引
-  int? get nextPageIndex {
-    if (currentPageIndex >= pages.length - 1) return null;
-    return currentPageIndex + 1;
-  }
-}
-```
-
-## File: domain/models/session_card_meta.dart
-```dart
-class SessionCardMeta {
-  final int roundCount;
-  final String? previewRoundId;
-  final String userPreview;
-  final String aiPreview;
-  final bool hasUnseen;
-  final bool isStreaming;
-
-  const SessionCardMeta({
-    required this.roundCount,
-    required this.previewRoundId,
-    required this.userPreview,
-    required this.aiPreview,
-    required this.hasUnseen,
-    required this.isStreaming,
-  });
-}
-```
-
-## File: domain/models/session_list_item.dart
-```dart
-class SessionListItem {
-  final String id;
-  final String title;
-  final int updatedAt;
-
-  const SessionListItem({
-    required this.id,
-    required this.title,
-    required this.updatedAt,
-  });
-}
 ```
 
 ## File: domain/models/tree_node.dart
@@ -6329,365 +5982,6 @@ class ChatContextBuilder {
 }
 ```
 
-## File: domain/services/chat_round_factory.dart
-```dart
-import '../../core/models/attachment.dart';
-import '../../core/models/chat_round.dart';
-import '../../core/utils/id_generator.dart';
-
-class ChatRoundFactory {
-  static ChatRound createUserRound({
-    required String content,
-    required String? parentId,
-    required List<Attachment> attachments,
-  }) {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    return ChatRound(
-      id: IdGenerator.generate(),
-      parentId: parentId,
-      createdAt: now,
-      userContent: content,
-      userAttachments: attachments,
-      isIncomplete: true,
-    );
-  }
-
-  static ChatRound createRetryRound({
-    required ChatRound sourceRound,
-  }) {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    return ChatRound(
-      id: IdGenerator.generate(),
-      parentId: sourceRound.parentId,
-      createdAt: now,
-      userContent: sourceRound.userContent,
-      userAttachments: sourceRound.userAttachments,
-      isIncomplete: true,
-    );
-  }
-
-  static ChatRound createEditedRetryRound({
-    required ChatRound sourceRound,
-    required String newContent,
-    required List<Attachment> attachments,
-  }) {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    return ChatRound(
-      id: IdGenerator.generate(),
-      parentId: sourceRound.parentId,
-      createdAt: now,
-      userContent: newContent,
-      userAttachments: attachments,
-      isIncomplete: true,
-    );
-  }
-}
-```
-
-## File: domain/services/chat_stream_accumulator.dart
-```dart
-import '../../core/models/chat_chunk.dart';
-
-class ChatStreamAccumulator {
-  final StringBuffer _content = StringBuffer();
-  final StringBuffer _reasoning = StringBuffer();
-
-  String get content => _content.toString();
-  String get reasoning => _reasoning.toString();
-
-  void add(ChatChunk chunk) {
-    if (chunk.content != null) {
-      _content.write(chunk.content);
-    }
-    if (chunk.reasoningContent != null) {
-      _reasoning.write(chunk.reasoningContent);
-    }
-  }
-}
-```
-
-## File: domain/services/message_paginator.dart
-```dart
-import '../../core/models/chat_round.dart';
-import '../models/chat_page.dart';
-
-class MessagePaginator {
-  static ChatPageList paginate(List<ChatRound> rounds, int currentPageIndex) {
-    if (rounds.isEmpty) {
-      return ChatPageList.fromPages([], 0);
-    }
-
-    // ✅ 移除 pageIndex 设置，索引由列表位置决定
-    final pages = rounds.map((round) => ChatPage(round: round)).toList();
-    
-    final validIndex = currentPageIndex.clamp(0, pages.length - 1);
-    return ChatPageList.fromPages(pages, validIndex);
-  }
-
-  static ChatPage? getPage(List<ChatRound> rounds, int pageIndex) {
-    if (rounds.isEmpty || pageIndex < 0 || pageIndex >= rounds.length) {
-      return null;
-    }
-    // ✅ 直接通过索引获取
-    return ChatPage(round: rounds[pageIndex]);
-  }
-
-  static int getTotalPages(List<ChatRound> rounds) {
-    return rounds.length;
-  }
-}
-```
-
-## File: domain/services/model_capability_registry.dart
-```dart
-import '../../core/models/model_info.dart';
-
-class ModelCapabilityRegistry {
-  static final List<_ModelRule> _rules = [
-    _ModelRule(
-      patterns: ['gpt', '4', 'o'],
-      supportsVision: true,
-      supportsReasoning: false,
-      priority: 100,
-    ),
-    _ModelRule(
-      patterns: ['gpt', '4', '1'],
-      supportsVision: true,
-      supportsReasoning: false,
-      priority: 100,
-    ),
-    _ModelRule(
-      patterns: ['o'],
-      numberAfter: true,
-      supportsVision: true,
-      supportsReasoning: true,
-      priority: 200,
-    ),
-    _ModelRule(
-      patterns: ['gpt', '5'],
-      supportsVision: true,
-      supportsReasoning: true,
-      priority: 150,
-    ),
-    _ModelRule(
-      patterns: ['gemini', '2', '5'],
-      supportsVision: true,
-      supportsReasoning: true,
-      priority: 150,
-    ),
-    _ModelRule(
-      patterns: ['gemini', '3'],
-      supportsVision: true,
-      supportsReasoning: true,
-      priority: 150,
-    ),
-    _ModelRule(
-      patterns: ['gemini', 'flash', 'latest'],
-      supportsVision: true,
-      supportsReasoning: true,
-      priority: 140,
-    ),
-    _ModelRule(
-      patterns: ['gemini', 'pro', 'latest'],
-      supportsVision: true,
-      supportsReasoning: true,
-      priority: 140,
-    ),
-    _ModelRule(
-      patterns: ['claude'],
-      supportsVision: true,
-      supportsReasoning: true,
-      priority: 120,
-    ),
-    _ModelRule(
-      patterns: ['deepseek', 'r', '1'],
-      supportsVision: false,
-      supportsReasoning: true,
-      priority: 160,
-    ),
-    _ModelRule(
-      patterns: ['deepseek', 'reasoner'],
-      supportsVision: false,
-      supportsReasoning: true,
-      priority: 160,
-    ),
-    _ModelRule(
-      patterns: ['deepseek', 'v', '3'],
-      supportsVision: false,
-      supportsReasoning: false,
-      priority: 120,
-    ),
-    _ModelRule(
-      patterns: ['deepseek', 'chat'],
-      supportsVision: false,
-      supportsReasoning: false,
-      priority: 120,
-    ),
-    _ModelRule(
-      patterns: ['qwen', '3', '5'],
-      supportsVision: true,
-      supportsReasoning: true,
-      priority: 150,
-    ),
-    _ModelRule(
-      patterns: ['qwen', '3'],
-      supportsVision: false,
-      supportsReasoning: true,
-      priority: 120,
-    ),
-    _ModelRule(
-      patterns: ['kimi', 'k', '2', '5'],
-      supportsVision: true,
-      supportsReasoning: true,
-      priority: 150,
-    ),
-    _ModelRule(
-      patterns: ['kimi', 'k', '2'],
-      supportsVision: false,
-      supportsReasoning: true,
-      priority: 120,
-    ),
-    _ModelRule(
-      patterns: ['glm', '4', '5'],
-      supportsVision: false,
-      supportsReasoning: true,
-      priority: 150,
-    ),
-    _ModelRule(
-      patterns: ['glm', '4', '6'],
-      supportsVision: false,
-      supportsReasoning: true,
-      priority: 150,
-    ),
-    _ModelRule(
-      patterns: ['glm', '4', '7'],
-      supportsVision: false,
-      supportsReasoning: true,
-      priority: 150,
-    ),
-    _ModelRule(
-      patterns: ['glm', '5'],
-      supportsVision: false,
-      supportsReasoning: true,
-      priority: 150,
-    ),
-    _ModelRule(
-      patterns: ['grok', '4'],
-      supportsVision: true,
-      supportsReasoning: true,
-      priority: 140,
-    ),
-    _ModelRule(
-      patterns: ['doubao', '1', '6'],
-      supportsVision: true,
-      supportsReasoning: true,
-      priority: 130,
-    ),
-    _ModelRule(
-      patterns: ['doubao', '1', '8'],
-      supportsVision: true,
-      supportsReasoning: true,
-      priority: 130,
-    ),
-  ];
-
-  static ModelInfo enhance(ModelInfo model) {
-    final tokens = _tokenize(model.id);
-    _ModelRule? best;
-
-    for (final rule in _rules) {
-      if (rule.matches(tokens)) {
-        if (best == null || rule.priority > best.priority) {
-          best = rule;
-        }
-      }
-    }
-
-    final detectedVision = best?.supportsVision;
-    final detectedReasoning = best?.supportsReasoning;
-
-    return model.copyWith(
-      supportsVision: model.overrideSupportsVision ?? detectedVision ?? model.supportsVision,
-      supportsReasoning: model.overrideSupportsReasoning ??
-          detectedReasoning ??
-          model.supportsReasoning,
-    );
-  }
-
-  static List<String> _tokenize(String input) {
-    final lower = input.toLowerCase();
-    final tokens = <String>[];
-    final buffer = StringBuffer();
-
-    bool? lastIsDigit;
-
-    void flush() {
-      if (buffer.isNotEmpty) {
-        tokens.add(buffer.toString());
-        buffer.clear();
-      }
-    }
-
-    for (final rune in lower.runes) {
-      final ch = String.fromCharCode(rune);
-      final isLetter = RegExp(r'[a-z]').hasMatch(ch);
-      final isDigit = RegExp(r'[0-9]').hasMatch(ch);
-
-      if (isLetter || isDigit) {
-        final currentIsDigit = isDigit;
-        if (lastIsDigit != null && lastIsDigit != currentIsDigit) {
-          flush();
-        }
-        buffer.write(ch);
-        lastIsDigit = currentIsDigit;
-      } else {
-        flush();
-        lastIsDigit = null;
-      }
-    }
-
-    flush();
-    return tokens;
-  }
-}
-
-class _ModelRule {
-  final List<String> patterns;
-  final bool supportsVision;
-  final bool supportsReasoning;
-  final int priority;
-  final bool numberAfter;
-
-  const _ModelRule({
-    required this.patterns,
-    required this.supportsVision,
-    required this.supportsReasoning,
-    required this.priority,
-    this.numberAfter = false,
-  });
-
-  bool matches(List<String> tokens) {
-    if (numberAfter && patterns.length == 1 && patterns.first == 'o') {
-      for (int i = 0; i < tokens.length - 1; i++) {
-        if (tokens[i] == 'o' && RegExp(r'^\d+$').hasMatch(tokens[i + 1])) {
-          return true;
-        }
-      }
-      return false;
-    }
-
-    int index = 0;
-    for (final token in tokens) {
-      if (token == patterns[index]) {
-        index++;
-        if (index == patterns.length) return true;
-      }
-    }
-    return false;
-  }
-}
-```
-
 ## File: domain/services/tree_builder.dart
 ```dart
 import '../models/tree_node.dart';
@@ -6819,7 +6113,7 @@ extension ChatStateX on ChatState {
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/utils/app_route_observer.dart';
-import 'di/providers.dart';
+import 'di/providers.dart'; // 仅导入 providers
 import 'presentation/pages/home_page.dart';
 import 'presentation/themes/app_theme.dart';
 
@@ -6827,11 +6121,8 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final container = ProviderContainer();
-  await container.read(initProvider.notifier).initialize();
-  final initState = container.read(initProvider);
-  if (initState.status != InitStatus.success) {
-    throw Exception('应用初始化失败：${initState.errorMessage}');
-  }
+  // ✅ 等待核心环境初始化完成（目录创建、依赖图预热）
+  await container.read(localFileSourceProvider.future);
 
   runApp(
     UncontrolledProviderScope(
@@ -6877,12 +6168,48 @@ class PendingAttachment {
 }
 ```
 
+## File: presentation/models/session_card_meta.dart
+```dart
+class SessionCardMeta {
+  final int roundCount;
+  final String? previewRoundId;
+  final String userPreview;
+  final String aiPreview;
+  final bool hasUnseen;
+  final bool isStreaming;
+
+  const SessionCardMeta({
+    required this.roundCount,
+    required this.previewRoundId,
+    required this.userPreview,
+    required this.aiPreview,
+    required this.hasUnseen,
+    required this.isStreaming,
+  });
+}
+```
+
+## File: presentation/models/session_list_item.dart
+```dart
+class SessionListItem {
+  final String id;
+  final String title;
+  final int updatedAt;
+
+  const SessionListItem({
+    required this.id,
+    required this.title,
+    required this.updatedAt,
+  });
+}
+```
+
 ## File: presentation/pages/branch_tree_page.dart
 ```dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:graphview/GraphView.dart';
-import '../../core/utils/time_format_utils.dart';
+import 'package:intl/intl.dart';
 import '../../domain/models/tree_node.dart';
 import '../../domain/services/tree_builder.dart';
 import '../providers/chat_notifier.dart' show chatTopologyProvider, roundDetailProvider;
@@ -7192,7 +6519,7 @@ class _GraphNodeCard extends ConsumerWidget {
             children: [
               Chip(label: Text('深度 ${depth + 1}'), visualDensity: VisualDensity.compact),
               const SizedBox(height: 10),
-              Text(TimeFormatUtils.formatTimestamp(round.createdAt), style: Theme.of(context).textTheme.bodySmall),
+              Text(DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(round.createdAt)), style: Theme.of(context).textTheme.bodySmall),
               const SizedBox(height: 12),
               _PreviewBlock(label: 'YOU', content: round.userContent),
               const SizedBox(height: 8),
@@ -7264,7 +6591,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/utils/app_route_observer.dart';
-import '../../core/utils/time_format_utils.dart';
+import 'package:intl/intl.dart';
 import '../providers/chat_notifier.dart';
 import '../providers/config_notifier.dart';
 import '../providers/input_draft_provider.dart';
@@ -7275,7 +6602,6 @@ import '../widgets/thought_bubble.dart';
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_toast.dart';
 import 'branch_tree_page.dart';
-import '../utils/page_utils.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   final String fileName;
@@ -7612,7 +6938,7 @@ class _UserSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Chip(label: Text(TimeFormatUtils.formatTimestamp(round.time))),
+        Chip(label: Text(DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(round.time)))),
         const SizedBox(height: 12),
         MessageBubble(
           content: round.content,
@@ -7709,6 +7035,9 @@ class _PaginationBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final displayPage = currentIndex + 1;
+    final progress = totalPages == 0 ? 0.0 : displayPage.clamp(1, totalPages) / totalPages;
+    final pageText = totalPages == 0 ? '0 / 0' : '$displayPage / $totalPages';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -7724,13 +7053,11 @@ class _PaginationBar extends StatelessWidget {
             child: Column(
               children: [
                 Text(
-                  PageUtils.formatSimple(currentIndex, totalPages),
+                  pageText,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 4),
-                LinearProgressIndicator(
-                  value: PageUtils.calculateProgress(currentIndex, totalPages),
-                ),
+                LinearProgressIndicator(value: progress),
               ],
             ),
           ),
@@ -7747,7 +7074,7 @@ class _PaginationBar extends StatelessWidget {
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
-import '../../core/utils/time_format_utils.dart';
+import 'package:intl/intl.dart';
 import '../../domain/models/session_list_item.dart';
 import '../providers/config_notifier.dart';
 import '../providers/session_list_notifier.dart';
@@ -8029,7 +7356,7 @@ class _SessionCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final fileName = '${item.id}.json';
-    final updatedAt = TimeFormatUtils.formatTimestamp(item.updatedAt);
+    final updatedAt = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(item.updatedAt));
     final metaAsync = ref.watch(sessionCardMetaProvider(item.id));
 
     return metaAsync.when(
@@ -8245,6 +7572,7 @@ class _PreviewLine extends StatelessWidget {
 
 ## File: presentation/pages/settings_page.dart
 ```dart
+import 'package:aiservice/di/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8252,7 +7580,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/app_config.dart';
 import '../../core/models/app_config_store.dart';
 import '../../core/models/model_info.dart';
-import '../../domain/services/model_capability_registry.dart';
 import '../providers/config_notifier.dart';
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_section.dart';
@@ -8349,11 +7676,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       final baseModel =
           index >= 0 ? models[index] : ModelInfo(id: selectedModelId);
 
-      final updatedModel = ModelCapabilityRegistry.enhance(
-        baseModel.copyWith(
-          overrideSupportsReasoning: overrideSupportsReasoning,
-          overrideSupportsVision: overrideSupportsVision,
-        ),
+      final updatedModel = baseModel.copyWith(
+        overrideSupportsReasoning: overrideSupportsReasoning,
+        overrideSupportsVision: overrideSupportsVision,
+        supportsVision: overrideSupportsVision,
+        supportsReasoning: overrideSupportsReasoning,
       );
 
       if (index >= 0) {
@@ -8379,7 +7706,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       availableModels: models,
     );
 
-    await ref.read(configControllerProvider).saveFullConfig(updatedConfig);
+    await ref.read(configServiceProvider).saveConfig(updatedConfig);
     await AppToast.show('设置已保存');
   }
 
@@ -8477,7 +7804,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               .toList(),
           onChanged: (value) async {
             if (value == null) return;
-            await ref.read(configProfilesControllerProvider).switchProfile(value);
+            await ref.read(configServiceProvider).switchProfile(value);
           },
         ),
         const SizedBox(height: 12),
@@ -8674,7 +8001,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Future<void> _refreshModels() async {
     try {
-      await ref.read(configControllerProvider).refreshModels();
+      await ref.read(configServiceProvider).refreshModels();
       await AppToast.show('模型列表已同步');
     } catch (e) {
       await AppToast.show('同步模型失败：$e');
@@ -8703,7 +8030,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     if (!confirmed) return;
 
-    await ref.read(configControllerProvider).saveFullConfig(AppConfig.defaultConfig());
+    await ref.read(configServiceProvider).saveConfig(AppConfig.defaultConfig());
   }
 
   Future<void> _showCreateProfileDialog() async {
@@ -8731,7 +8058,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
 
     if (result == null || result.isEmpty) return;
-    await ref.read(configProfilesControllerProvider).createProfile(result);
+    await ref.read(configServiceProvider).createProfile(result);
   }
 
   Future<void> _showRenameProfileDialog(ConfigProfile profile) async {
@@ -8760,7 +8087,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     if (result == null || result.isEmpty) return;
     await ref
-        .read(configProfilesControllerProvider)
+        .read(configServiceProvider)
         .renameProfile(profile.id, result);
   }
 
@@ -8790,7 +8117,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         false;
 
     if (!confirmed) return;
-    await ref.read(configProfilesControllerProvider).deleteProfile(profile.id);
+    await ref.read(configServiceProvider).deleteProfile(profile.id);
   }
 }
 ```
@@ -8879,11 +8206,10 @@ final attachmentBytesProvider =
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/chat_round.dart';
-import '../../core/utils/id_generator.dart';
 import '../../di/providers.dart';
 import '../../domain/services/attachment_preparer.dart';
 import '../../domain/services/chat_context_builder.dart';
-import '../../domain/services/chat_stream_accumulator.dart';
+import 'package:uuid/uuid.dart';
 
 final sessionTitleProvider = StreamProvider.family<String, String>((ref, fileName) {
   return ref.watch(conversationRepositoryProvider).watchSessionTitle(fileName)
@@ -8938,7 +8264,7 @@ class ChatController {
     );
 
     final newRound = ChatRound(
-      id: IdGenerator.generate(),
+      id: const Uuid().v4(),
       parentId: parentRoundId,
       createdAt: DateTime.now().millisecondsSinceEpoch,
       userContent: content,
@@ -8951,17 +8277,11 @@ class ChatController {
 
     () async {
       final apiSource = ref.read(remoteApiSourceProvider);
-      final accumulator = ChatStreamAccumulator();
+      final contentBuffer = StringBuffer();
+      final reasoningBuffer = StringBuffer();
       String? error;
       DateTime? lastDbUpdateTime;
       const updateInterval = Duration(seconds: 1);
-
-      final existenceSubscription = repository.watchSingleRound(newRound.id).listen((round) {
-        if (round == null) {
-          // 记录已从数据库消失，立即切断底层 HTTP 连接
-          apiSource.cancelRequest(newRound.id);
-        }
-      });
 
       try {
         final contextRounds = await repository.getContextRounds(
@@ -8994,7 +8314,8 @@ class ChatController {
           }
           if (chunk.isDone) break;
 
-          accumulator.add(chunk);
+          if (chunk.content != null) contentBuffer.write(chunk.content);
+          if (chunk.reasoningContent != null) reasoningBuffer.write(chunk.reasoningContent);
 
           final now = DateTime.now();
           if (lastDbUpdateTime == null ||
@@ -9003,8 +8324,8 @@ class ChatController {
               fileName,
               newRound.id,
               newRound.copyWith(
-                assistantContent: accumulator.content,
-                assistantThinking: accumulator.reasoning,
+                assistantContent: contentBuffer.toString(),
+                assistantThinking: reasoningBuffer.toString(),
               ),
             );
             lastDbUpdateTime = now;
@@ -9013,9 +8334,8 @@ class ChatController {
       } catch (e) {
         error = e.toString();
       } finally {
-        await existenceSubscription.cancel();
-        
-        String finalContent = accumulator.content;
+
+        String finalContent = contentBuffer.toString();
         if (error != null) {
           finalContent += '\n\n[错误]\n$error';
         } else if (_stoppingRoundIds.contains(newRound.id)) {
@@ -9027,9 +8347,9 @@ class ChatController {
           newRound.id,
           newRound.copyWith(
             assistantContent: finalContent.trim().isEmpty ? null : finalContent,
-            assistantThinking: accumulator.reasoning.trim().isEmpty
+            assistantThinking: reasoningBuffer.toString().trim().isEmpty
                 ? null
-                : accumulator.reasoning,
+                : reasoningBuffer.toString(),
             isIncomplete: false,
             hasUnseenUpdate: true,
           ),
@@ -9087,107 +8407,19 @@ final chatControllerProvider =
 
 ## File: presentation/providers/config_notifier.dart
 ```dart
-// presentation/providers/config_notifier.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/app_config.dart';
 import '../../core/models/app_config_store.dart';
-import '../../di/providers.dart'; // 👈 确保导入
+import '../../di/providers.dart';
 
+/// 监听当前激活的配置（响应式）
 final configProvider = StreamProvider<AppConfig>((ref) {
   return ref.read(configServiceProvider).watchConfig();
 });
 
+/// 监听配置存档列表（响应式）
 final configProfilesProvider = StreamProvider<AppConfigStore>((ref) {
   return ref.read(configServiceProvider).watchConfigStore();
-});
-
-class ConfigController {
-  final Ref ref;
-  ConfigController(this.ref);
-
-  // 内部辅助：获取当前配置
-  Future<AppConfig> _getCurrentConfig() async =>
-      ref.read(configServiceProvider).loadConfig();
-
-  // ✅ 内联原 Repository 的 updateXxx 便捷方法
-  Future<void> updateBaseUrl(String baseUrl) async {
-    final config = await _getCurrentConfig();
-    await ref.read(configServiceProvider).saveConfig(config.copyWith(baseUrl: baseUrl));
-  }
-
-  Future<void> updateApiKey(String apiKey) async {
-    final config = await _getCurrentConfig();
-    await ref.read(configServiceProvider).saveConfig(config.copyWith(apiKey: apiKey));
-  }
-
-  Future<void> updateModelsPath(String modelsPath) async {
-    final config = await _getCurrentConfig();
-    await ref.read(configServiceProvider).saveConfig(config.copyWith(modelsPath: modelsPath));
-  }
-
-  Future<void> updateChatPath(String chatPath) async {
-    final config = await _getCurrentConfig();
-    await ref.read(configServiceProvider).saveConfig(config.copyWith(chatPath: chatPath));
-  }
-
-  Future<void> updateApiMode(String apiMode) async {
-    final config = await _getCurrentConfig();
-    await ref.read(configServiceProvider).saveConfig(config.copyWith(apiMode: apiMode));
-  }
-
-  Future<void> updateSelectedModel(String? model) async {
-    final config = await _getCurrentConfig();
-    await ref.read(configServiceProvider).saveConfig(config.copyWith(selectedModel: model));
-  }
-
-  // ✅ 合并 saveFullConfig 逻辑（直接调用 saveConfig 即可）
-  Future<void> saveFullConfig(AppConfig config) async {
-    await ref.read(configServiceProvider).saveConfig(config);
-  }
-
-  // ✅ 合并 saveAndRefreshModels 逻辑
-  Future<void> saveAndRefreshModels(AppConfig config) async {
-    final service = ref.read(configServiceProvider);
-    await service.saveConfig(config.copyWith(availableModels: []));
-    await service.refreshModels();
-  }
-
-  // ✅ 合并 getAvailableModelIds 逻辑
-  Future<List<String>> getAvailableModelIds() async {
-    final config = await _getCurrentConfig();
-    return config.availableModels?.map((m) => m.id).toList() ?? [];
-  }
-
-  Future<void> refreshModels() async {
-    await ref.read(configServiceProvider).refreshModels();
-  }
-}
-
-final configControllerProvider = Provider<ConfigController>((ref) {
-  return ConfigController(ref);
-});
-
-// 👇 ConfigProfilesController 同样替换依赖源
-class ConfigProfilesController {
-  final Ref ref;
-  ConfigProfilesController(this.ref);
-
-  Future<void> switchProfile(String profileId) async {
-    await ref.read(configServiceProvider).switchProfile(profileId);
-  }
-  Future<void> createProfile(String name) async {
-    await ref.read(configServiceProvider).createProfile(name);
-  }
-  Future<void> renameProfile(String profileId, String name) async {
-    await ref.read(configServiceProvider).renameProfile(profileId, name);
-  }
-  Future<void> deleteProfile(String profileId) async {
-    await ref.read(configServiceProvider).deleteProfile(profileId);
-  }
-}
-
-final configProfilesControllerProvider = Provider<ConfigProfilesController>((ref) {
-  return ConfigProfilesController(ref);
 });
 ```
 
@@ -9207,11 +8439,11 @@ final globalEditSourceRoundIdProvider =
 
 ## File: presentation/providers/session_list_notifier.dart
 ```dart
-import 'package:aiservice/core/utils/id_generator.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../di/providers.dart';
 import '../../domain/models/session_list_item.dart';
 import '../../domain/models/session_card_meta.dart';
+import 'package:uuid/uuid.dart';
 
 final sessionListProvider = StreamProvider<List<SessionListItem>>((ref) {
   final repository = ref.watch(conversationRepositoryProvider);
@@ -9244,7 +8476,7 @@ class SessionListController {
   Future<String> createSession(String title) async {
     final repository = ref.read(conversationRepositoryProvider);
 
-    final fileName = '${IdGenerator.generate()}.json';
+    final fileName = '${const Uuid().v4()}.json';
 
     await repository.createSession(fileName: fileName, title: '新对话');
     return fileName;
@@ -9352,51 +8584,6 @@ abstract class AppTokens {
   static const double spaceMd = 12;
   static const double spaceLg = 16;
   static const double spaceXl = 24;
-}
-```
-
-## File: presentation/utils/page_utils.dart
-```dart
-/// 页码工具类 - 统一处理索引转换逻辑
-/// 
-/// 遵循 Flutter 规范：
-/// - 内部逻辑使用 0-based 索引
-/// - UI 展示使用 1-based 页码
-abstract class PageUtils {
-  /// 将 0-based 索引转换为 UI 展示的 1-based 页码
-  static int toDisplayPage(int zeroBasedIndex) => zeroBasedIndex + 1;
-
-  /// 将 UI 页码转换为 0-based 索引
-  static int toInternalIndex(int displayPage) => displayPage - 1;
-
-  /// 格式化页码显示："X / Y"
-  static String formatSimple(int currentPageIndex, int totalPages) {
-    if (totalPages == 0) return '0 / 0';
-    return '${toDisplayPage(currentPageIndex)} / $totalPages';
-  }
-
-  /// 格式化页码显示："第 X 页 / 共 Y 页"
-  static String format(int currentPageIndex, int totalPages) {
-    if (totalPages == 0) return '第 0 页 / 共 0 页';
-    return '第 ${toDisplayPage(currentPageIndex)} 页 / 共 $totalPages 页';
-  }
-
-  /// 计算进度条进度 (0.0 - 1.0)
-  static double calculateProgress(int currentPageIndex, int totalPages) {
-    if (totalPages == 0) return 0.0;
-    return toDisplayPage(currentPageIndex).clamp(1, totalPages) / totalPages;
-  }
-
-  /// 验证页索引是否有效
-  static bool isValidIndex(int index, int totalPages) {
-    return index >= 0 && index < totalPages;
-  }
-
-  /// 安全获取页索引（越界时返回边界值）
-  static int clampIndex(int index, int totalPages) {
-    if (totalPages == 0) return 0;
-    return index.clamp(0, totalPages - 1);
-  }
 }
 ```
 
@@ -9807,7 +8994,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../core/utils/id_generator.dart';
+import 'package:uuid/uuid.dart';
 import '../models/pending_attachment.dart';
 import '../providers/input_draft_provider.dart';
 
@@ -9932,7 +9119,7 @@ class _InputBarState extends ConsumerState<InputBar> {
     final mimeType = _guessMimeType(file.name);
     final isImage = _isImageFile(file.name);
     final attachment = PendingAttachment(
-      id: IdGenerator.generate(),
+      id: const Uuid().v4(),
       name: file.name,
       path: filePath,
       isImage: isImage,
@@ -9951,7 +9138,7 @@ class _InputBarState extends ConsumerState<InputBar> {
     if (file == null) return;
     final name = file.name;
     final attachment = PendingAttachment(
-      id: IdGenerator.generate(),
+      id: const Uuid().v4(),
       name: name,
       path: file.path,
       isImage: true,
@@ -10251,40 +9438,6 @@ class MessageBubble extends StatelessWidget {
             ],
           ],
         ),
-      ),
-    );
-  }
-}
-```
-
-## File: presentation/widgets/page_indicator.dart
-```dart
-import 'package:flutter/material.dart';
-import '../utils/page_utils.dart';
-
-class PageIndicator extends StatelessWidget {
-  final int currentPage;    // ✅ 0-based 索引
-  final int totalPages;
-
-  const PageIndicator({
-    super.key,
-    required this.currentPage,
-    required this.totalPages,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            // ✅ 使用统一工具类
-            PageUtils.formatSimple(currentPage, totalPages),
-            style: const TextStyle(fontSize: 14, color: Colors.grey),
-          ),
-        ],
       ),
     );
   }

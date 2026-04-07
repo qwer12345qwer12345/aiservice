@@ -5,13 +5,13 @@ import '../data_sources/local_file_source.dart';
 import '../../core/models/attachment.dart';
 import '../../core/models/chat_round.dart';
 import '../../core/models/session.dart';
-import '../../domain/models/session_list_item.dart';
+import '../../presentation/models/session_list_item.dart';
 import '../database/database.dart';
-import '../../domain/models/session_card_meta.dart';
+import '../../presentation/models/session_card_meta.dart';
 
 class ConversationRepository {
   final AppDatabase _db;
-  final ILocalFileSource _fileService;
+  final LocalFileSource _fileService;
   ConversationRepository(this._db, this._fileService);
 
   String _getId(String fileName) => fileName.replaceAll('.json', '');

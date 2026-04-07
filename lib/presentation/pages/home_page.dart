@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
-import '../../core/utils/time_format_utils.dart';
+import 'package:intl/intl.dart';
 import '../../domain/models/session_list_item.dart';
 import '../providers/config_notifier.dart';
 import '../providers/session_list_notifier.dart';
@@ -283,7 +283,7 @@ class _SessionCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final fileName = '${item.id}.json';
-    final updatedAt = TimeFormatUtils.formatTimestamp(item.updatedAt);
+    final updatedAt = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(item.updatedAt));
     final metaAsync = ref.watch(sessionCardMetaProvider(item.id));
 
     return metaAsync.when(

@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/chat_round.dart';
-import '../../core/utils/id_generator.dart';
 import '../../di/providers.dart';
 import '../../domain/services/attachment_preparer.dart';
 import '../../domain/services/chat_context_builder.dart';
+import 'package:uuid/uuid.dart';
 
 final sessionTitleProvider = StreamProvider.family<String, String>((ref, fileName) {
   return ref.watch(conversationRepositoryProvider).watchSessionTitle(fileName)
@@ -53,13 +53,13 @@ class ChatController {
     List<dynamic>? attachments,
   }) async {
     final repository = ref.read(conversationRepositoryProvider);
-    final saved = await AttachmentPreparer.savePendingAttachments(
+    final saved = await savePendingAttachments(
       repository,
       attachments?.cast() ?? [],
     );
 
     final newRound = ChatRound(
-      id: IdGenerator.generate(),
+      id: const Uuid().v4(),
       parentId: parentRoundId,
       createdAt: DateTime.now().millisecondsSinceEpoch,
       userContent: content,
@@ -83,7 +83,7 @@ class ChatController {
           fileName,
           newRound.id,
         );
-        final apiContext = await ChatContextBuilder.buildFromRounds(
+        final apiContext = await buildApiContextFromRounds(
           contextRounds,
           repository,
         );

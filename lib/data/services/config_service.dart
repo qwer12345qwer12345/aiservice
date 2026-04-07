@@ -1,17 +1,15 @@
 import 'dart:async';
 import 'package:drift/drift.dart';
-import '../../core/interfaces/config_service.dart';
 import '../../core/models/app_config.dart';
 import '../../core/models/app_config_store.dart';
 import '../../core/models/model_info.dart';
-import '../../core/utils/id_generator.dart';
 import '../../data/data_sources/remote_api_source.dart';
-import '../../domain/services/model_capability_registry.dart';
 import '../database/database.dart';
+import 'package:uuid/uuid.dart';
 
-class ConfigService implements IConfigService {
+class ConfigService{
   final AppDatabase _db;
-  final IRemoteApiSource _apiSource;
+  final RemoteApiSource _apiSource;
 
   ConfigService(this._db, this._apiSource);
 
@@ -66,12 +64,10 @@ class ConfigService implements IConfigService {
     return AppConfigStore(activeProfileId: activeId, profiles: profiles);
   }
 
-  @override
   Future<AppConfigStore> loadConfigStore() async {
     return await _ensureInitialized();
   }
 
-  @override
   Future<AppConfig> loadConfig() async {
     final store = await loadConfigStore();
     return store.profiles.firstWhere(
@@ -80,14 +76,12 @@ class ConfigService implements IConfigService {
     ).config;
   }
 
-  @override
   Future<void> saveConfig(AppConfig config) async {
     final activeId = await getActiveProfileId();
     await (_db.update(_db.dbConfigProfiles)..where((t) => t.id.equals(activeId)))
         .write(DbConfigProfilesCompanion(config: Value(config)));
   }
 
-  @override
   Future<void> refreshModels() async {
     final activeConfig = await loadConfig();
 
@@ -107,7 +101,10 @@ class ConfigService implements IConfigService {
         overrideSupportsReasoning: old?.overrideSupportsReasoning,
         overrideSupportsVision: old?.overrideSupportsVision,
       );
-      return ModelCapabilityRegistry.enhance(merged);
+      return merged.copyWith(
+        supportsVision: merged.overrideSupportsVision ?? merged.supportsVision,
+        supportsReasoning: merged.overrideSupportsReasoning ?? merged.supportsReasoning,
+      );
     }).toList();
 
     final customOnlyModels = oldModels
@@ -115,7 +112,10 @@ class ConfigService implements IConfigService {
         .where((old) =>
             old.overrideSupportsReasoning != null ||
             old.overrideSupportsVision != null)
-        .map(ModelCapabilityRegistry.enhance)
+        .map((model) => model.copyWith(
+          supportsVision: model.overrideSupportsVision ?? model.supportsVision,
+          supportsReasoning: model.overrideSupportsReasoning ?? model.supportsReasoning,
+        ))
         .toList();
 
     final updatedConfig = activeConfig.copyWith(
@@ -128,13 +128,11 @@ class ConfigService implements IConfigService {
     await saveConfig(updatedConfig);
   }
 
-  @override
   Future<List<ConfigProfile>> getProfiles() async {
     final store = await loadConfigStore();
     return store.profiles;
   }
 
-  @override
   Future<String> getActiveProfileId() async {
     final storeRow = await _db.select(_db.dbConfigStore).getSingleOrNull();
     var activeId = storeRow?.activeProfileId ?? 'default';
@@ -153,7 +151,6 @@ class ConfigService implements IConfigService {
     return activeId;
   }
 
-  @override
   Future<void> switchProfile(String profileId) async {
     await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
       DbConfigStoreCompanion(
@@ -163,10 +160,9 @@ class ConfigService implements IConfigService {
     );
   }
 
-  @override
   Future<void> createProfile(String name) async {
     final activeConfig = await loadConfig();
-    final newId = IdGenerator.generate();
+    final newId = const Uuid().v4();
     final cleanName = name.trim().isEmpty ? '新配置' : name.trim();
 
     await _db.into(_db.dbConfigProfiles).insert(
@@ -179,7 +175,6 @@ class ConfigService implements IConfigService {
     await switchProfile(newId);
   }
 
-  @override
   Future<void> renameProfile(String profileId, String name) async {
     if (name.trim().isEmpty) return;
     await (_db.update(_db.dbConfigProfiles)
@@ -187,7 +182,6 @@ class ConfigService implements IConfigService {
         .write(DbConfigProfilesCompanion(name: Value(name.trim())));
   }
 
-  @override
   Future<void> deleteProfile(String profileId) async {
     final store = await loadConfigStore();
 
@@ -205,7 +199,6 @@ class ConfigService implements IConfigService {
         .go();
   }
 
-  @override
   Stream<AppConfigStore> watchConfigStore() {
     _ensureInitialized();
 
@@ -273,7 +266,6 @@ class ConfigService implements IConfigService {
     return outputController.stream;
   }
 
-  @override
   Stream<AppConfig> watchConfig() {
     return watchConfigStore().map((store) {
       return store.profiles.firstWhere(

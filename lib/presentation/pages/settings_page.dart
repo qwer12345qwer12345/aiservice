@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/app_config.dart';
 import '../../core/models/app_config_store.dart';
 import '../../core/models/model_info.dart';
-import '../../domain/services/model_capability_registry.dart';
 import '../providers/config_notifier.dart';
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_section.dart';
@@ -103,11 +102,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       final baseModel =
           index >= 0 ? models[index] : ModelInfo(id: selectedModelId);
 
-      final updatedModel = ModelCapabilityRegistry.enhance(
-        baseModel.copyWith(
-          overrideSupportsReasoning: overrideSupportsReasoning,
-          overrideSupportsVision: overrideSupportsVision,
-        ),
+      final updatedModel = baseModel.copyWith(
+        overrideSupportsReasoning: overrideSupportsReasoning,
+        overrideSupportsVision: overrideSupportsVision,
+        supportsVision: overrideSupportsVision,
+        supportsReasoning: overrideSupportsReasoning,
       );
 
       if (index >= 0) {

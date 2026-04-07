@@ -6,103 +6,38 @@ import '../data/data_sources/remote_api_source.dart';
 import '../data/database/database.dart';
 import '../data/services/config_service.dart';
 import '../data/repositories/conversation_repository.dart';
-import '../core/interfaces/config_service.dart';
 
-enum InitStatus { idle, loading, success, error }
+/// 1. 环境初始化 Provider
+final localFileSourceProvider = FutureProvider<LocalFileSource>((ref) async {
+  final appDir = await getApplicationDocumentsDirectory();
+  final fileSource = LocalFileSource(appDir.path);
+  await fileSource.initDirectories();
+  return fileSource;
+});
 
-class InitState {
-  final InitStatus status;
-  final String? errorMessage;
-  final AppDatabase? appDatabase;
-  final ILocalFileSource? fileSource;
-  final IRemoteApiSource? remoteApiSource;
-  final IConfigService? configService;
-  final ConversationRepository? conversationRepository;
+/// 2. 数据库 Provider
+final appDatabaseProvider = Provider<AppDatabase>((ref) {
+  ref.watch(localFileSourceProvider); // 触发依赖追踪
+  return AppDatabase();
+});
 
-  InitState({
-    this.status = InitStatus.idle,
-    this.errorMessage,
-    this.appDatabase,
-    this.fileSource,
-    this.remoteApiSource,
-    this.configService,
-    this.conversationRepository,
-  });
+/// 3. 远程 API 数据源
+final remoteApiSourceProvider = Provider<RemoteApiSource>((ref) {
+  return RemoteApiSource();
+});
 
-  InitState copyWith({
-    InitStatus? status,
-    String? errorMessage,
-    AppDatabase? appDatabase,
-    ILocalFileSource? fileSource,
-    IRemoteApiSource? remoteApiSource,
-    IConfigService? configService,
-    ConversationRepository? conversationRepository,
-  }) {
-    return InitState(
-      status: status ?? this.status,
-      errorMessage: errorMessage ?? this.errorMessage,
-      appDatabase: appDatabase ?? this.appDatabase,
-      fileSource: fileSource ?? this.fileSource,
-      remoteApiSource: remoteApiSource ?? this.remoteApiSource,
-      configService: configService ?? this.configService,
-      conversationRepository: conversationRepository ?? this.conversationRepository,
-    );
-  }
-}
+/// 4. 配置服务
+final configServiceProvider = Provider<ConfigService>((ref) {
+  return ConfigService(
+    ref.watch(appDatabaseProvider),
+    ref.watch(remoteApiSourceProvider),
+  );
+});
 
-class InitNotifier extends StateNotifier<InitState> {
-  InitNotifier() : super(InitState());
-
-  Future<void> initialize() async {
-    state = state.copyWith(status: InitStatus.loading);
-    try {
-      // 1. 初始化文件目录
-      final appDir = await getApplicationDocumentsDirectory();
-      final basePath = appDir.path;
-      final fileSource = LocalFileSource(basePath);
-      await fileSource.initDirectories();
-      
-      // 2. 初始化数据库
-      final appDatabase = AppDatabase();
-
-      // 3. 构建服务与 Repositories
-      final remoteApiSource = RemoteApiSource();
-      final configService = ConfigService(appDatabase, remoteApiSource);
-      final conversationRepository = ConversationRepository(appDatabase, fileSource);
-
-      state = state.copyWith(
-        status: InitStatus.success,
-        appDatabase: appDatabase,
-        fileSource: fileSource,
-        remoteApiSource: remoteApiSource,
-        configService: configService,
-        conversationRepository: conversationRepository,
-      );
-    } catch (e) {
-      state = state.copyWith(
-        status: InitStatus.error,
-        errorMessage: e.toString(),
-      );
-    }
-  }
-}
-
-final initProvider = StateNotifierProvider<InitNotifier, InitState>((ref) => InitNotifier());
-
+/// 5. 会话仓库
 final conversationRepositoryProvider = Provider<ConversationRepository>((ref) {
-  final initState = ref.watch(initProvider);
-  if (initState.conversationRepository == null) throw StateError('应用未初始化');
-  return initState.conversationRepository!;
-});
-
-final configServiceProvider = Provider<IConfigService>((ref) {
-  final initState = ref.watch(initProvider);
-  if (initState.configService == null) throw StateError('应用未初始化');
-  return initState.configService!;
-});
-
-final remoteApiSourceProvider = Provider<IRemoteApiSource>((ref) {
-  final initState = ref.watch(initProvider);
-  if (initState.remoteApiSource == null) throw StateError('应用未初始化');
-  return initState.remoteApiSource!;
+  return ConversationRepository(
+    ref.watch(appDatabaseProvider),
+    ref.watch(localFileSourceProvider).requireValue, // main() 已阻塞等待，此处必定就绪
+  );
 });

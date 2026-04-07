@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:graphview/GraphView.dart';
-import '../../core/utils/time_format_utils.dart';
+import 'package:intl/intl.dart';
 import '../../domain/models/tree_node.dart';
 import '../../domain/services/tree_builder.dart';
 import '../providers/chat_notifier.dart' show chatTopologyProvider, roundDetailProvider;
@@ -135,7 +135,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
 
   Future<void> _deleteNode(String nodeId) async {
     final topology = ref.read(chatTopologyProvider(widget.fileName)).valueOrNull ?? [];
-    final roots = TreeBuilder.buildTree(topology);
+    final roots = buildTree(topology);
     final target = _findIterative(roots, nodeId);
     if (target == null) return;
 
@@ -166,7 +166,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   Widget build(BuildContext context) {
     // ✅ 第一条：复用聊天页框架 Provider，构建整体树框架
     final topology = ref.watch(chatTopologyProvider(widget.fileName)).valueOrNull ?? [];
-    final roots = TreeBuilder.buildTree(topology);
+    final roots = buildTree(topology);
     final structKey = roots.length.toString();
 
     if (!_hasFocused && roots.isNotEmpty) _scheduleFocusToTarget();
@@ -311,7 +311,7 @@ class _GraphNodeCard extends ConsumerWidget {
             children: [
               Chip(label: Text('深度 ${depth + 1}'), visualDensity: VisualDensity.compact),
               const SizedBox(height: 10),
-              Text(TimeFormatUtils.formatTimestamp(round.createdAt), style: Theme.of(context).textTheme.bodySmall),
+              Text(DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(round.createdAt)), style: Theme.of(context).textTheme.bodySmall),
               const SizedBox(height: 12),
               _PreviewBlock(label: 'YOU', content: round.userContent),
               const SizedBox(height: 8),

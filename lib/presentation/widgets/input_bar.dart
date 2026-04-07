@@ -2,7 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../core/utils/id_generator.dart';
+import 'package:uuid/uuid.dart';
 import '../models/pending_attachment.dart';
 import '../providers/input_draft_provider.dart';
 
@@ -127,7 +127,7 @@ class _InputBarState extends ConsumerState<InputBar> {
     final mimeType = _guessMimeType(file.name);
     final isImage = _isImageFile(file.name);
     final attachment = PendingAttachment(
-      id: IdGenerator.generate(),
+      id: const Uuid().v4(),
       name: file.name,
       path: filePath,
       isImage: isImage,
@@ -146,7 +146,7 @@ class _InputBarState extends ConsumerState<InputBar> {
     if (file == null) return;
     final name = file.name;
     final attachment = PendingAttachment(
-      id: IdGenerator.generate(),
+      id: const Uuid().v4(),
       name: name,
       path: file.path,
       isImage: true,

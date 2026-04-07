@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/utils/app_route_observer.dart';
-import '../../core/utils/time_format_utils.dart';
+import 'package:intl/intl.dart';
 import '../providers/chat_notifier.dart';
 import '../providers/config_notifier.dart';
 import '../providers/input_draft_provider.dart';
@@ -349,7 +349,7 @@ class _UserSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Chip(label: Text(TimeFormatUtils.formatTimestamp(round.time))),
+        Chip(label: Text(DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(round.time)))),
         const SizedBox(height: 12),
         MessageBubble(
           content: round.content,
