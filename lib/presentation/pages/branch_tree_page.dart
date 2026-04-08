@@ -79,7 +79,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   }
 
   Future<void> _deleteNode(String nodeId) async {
-    final topology = ref.read(chatTopologyProvider(widget.fileName)).valueOrNull ?? [];
+    final topology = await ref.read(chatTopologyProvider(widget.fileName).future);
     final roots = buildTree(topology);
     final target = _findIterative(roots, nodeId);
     if (target == null) return;

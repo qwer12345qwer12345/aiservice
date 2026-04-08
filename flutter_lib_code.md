@@ -6555,7 +6555,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   }
 
   Future<void> _deleteNode(String nodeId) async {
-    final topology = ref.read(chatTopologyProvider(widget.fileName)).valueOrNull ?? [];
+    final topology = await ref.read(chatTopologyProvider(widget.fileName).future);
     final roots = buildTree(topology);
     final target = _findIterative(roots, nodeId);
     if (target == null) return;
@@ -6955,7 +6955,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
   Widget build(BuildContext context) {
     final sessionTitle = ref.watch(sessionTitleProvider(widget.fileName)).valueOrNull ?? '未加载';
     final currentRoundAsync = ref.watch(roundDetailProvider(_currentRoundId ?? ''));
-    final isStreaming = currentRoundAsync.valueOrNull?.isIncomplete ?? false;
+    final isIncomplete = currentRoundAsync.valueOrNull?.isIncomplete ?? false;
     final configAsync = ref.watch(configProvider);
     final editSourceRoundId = ref.watch(globalEditSourceRoundIdProvider);
     final isEditMode = editSourceRoundId != null;
@@ -6981,16 +6981,15 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     )));
 
     int currentIndex = visibleRoundIds.indexOf(_currentRoundId ?? '');
-    if (currentIndex == -1 && visibleRoundIds.isNotEmpty) {
-      currentIndex = visibleRoundIds.length - 1;
-    }
 
-    if (visibleRoundIds.isNotEmpty) {
+    if (currentIndex != -1) {
       _pageController ??= PageController(initialPage: currentIndex);
       if (_pageController!.hasClients &&
           _pageController!.page?.round() != currentIndex) {
         _pageController!.jumpToPage(currentIndex);
       }
+    } else {
+      _pageController ??= PageController(initialPage: 0);
     }
 
     return AppPageScaffold(
@@ -7048,7 +7047,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
             ),
           Expanded(
             child: visibleRoundIds.isEmpty
-                ? const Center(child: Text('新对话'))
+                ? const Center(child: Text('加载中'))
                 : PageView.builder(
                     controller: _pageController,
                     physics: isEditMode
@@ -7072,7 +7071,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
           InputBar(
             hintText: isEditMode ? '编辑并重试' : '发送消息',
             allowImages: allowImages,
-            isStreaming: isStreaming,
+            isIncomplete: isIncomplete,
             onStop: () => ref
                 .read(chatControllerProvider(widget.fileName))
                 .stopGeneration(_currentRoundId!),
@@ -9265,9 +9264,9 @@ import '../models/pending_attachment.dart';
 import '../providers/input_draft_provider.dart';
 
 class InputBar extends ConsumerStatefulWidget {
-  final void Function(String text, List<PendingAttachment> attachments) onSend;
+  final Future<void> Function(String text, List<PendingAttachment> attachments) onSend;
   final VoidCallback? onStop;
-  final bool isStreaming;
+  final bool isIncomplete;
   final bool enabled;
   final String hintText;
   final bool allowImages;
@@ -9276,7 +9275,7 @@ class InputBar extends ConsumerStatefulWidget {
     super.key,
     required this.onSend,
     this.onStop,
-    this.isStreaming = false,
+    this.isIncomplete = false,
     this.enabled = true,
     this.hintText = '输入消息...',
     this.allowImages = false,
@@ -9454,15 +9453,19 @@ class _InputBarState extends ConsumerState<InputBar> {
     );
   }
 
-  void _handleSend() {
+  Future<void> _handleSend() async {
     if (!widget.enabled) return;
     final content = _controller.text.trim();
     final attachments = ref.read(globalAttachmentDraftProvider);
     if (content.isEmpty && attachments.isEmpty) return;
 
-    widget.onSend(content, attachments);
-    ref.invalidate(globalInputDraftProvider);
-    ref.invalidate(globalAttachmentDraftProvider);
+    try {
+      await widget.onSend(content, attachments); // ✅ 等待落盘完成
+      ref.invalidate(globalInputDraftProvider);
+      ref.invalidate(globalAttachmentDraftProvider);
+    } catch (e) {
+      // 发送失败，保持输入内容和附件不变
+    }
   }
 
   @override
@@ -9471,7 +9474,7 @@ class _InputBarState extends ConsumerState<InputBar> {
     final hasText = _controller.text.trim().isNotEmpty;
     final hasAttachments = attachments.isNotEmpty;
     final canSend = (hasText || hasAttachments) && widget.enabled;
-    final showStopButton = widget.isStreaming && widget.onStop != null;
+    final showStopButton = widget.isIncomplete && widget.onStop != null;
 
     return SafeArea(
       top: false,

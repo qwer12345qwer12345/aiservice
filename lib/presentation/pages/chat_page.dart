@@ -100,7 +100,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
   Widget build(BuildContext context) {
     final sessionTitle = ref.watch(sessionTitleProvider(widget.fileName)).valueOrNull ?? '未加载';
     final currentRoundAsync = ref.watch(roundDetailProvider(_currentRoundId ?? ''));
-    final isStreaming = currentRoundAsync.valueOrNull?.isIncomplete ?? false;
+    final isIncomplete = currentRoundAsync.valueOrNull?.isIncomplete ?? false;
     final configAsync = ref.watch(configProvider);
     final editSourceRoundId = ref.watch(globalEditSourceRoundIdProvider);
     final isEditMode = editSourceRoundId != null;
@@ -126,16 +126,15 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     )));
 
     int currentIndex = visibleRoundIds.indexOf(_currentRoundId ?? '');
-    if (currentIndex == -1 && visibleRoundIds.isNotEmpty) {
-      currentIndex = visibleRoundIds.length - 1;
-    }
 
-    if (visibleRoundIds.isNotEmpty) {
+    if (currentIndex != -1) {
       _pageController ??= PageController(initialPage: currentIndex);
       if (_pageController!.hasClients &&
           _pageController!.page?.round() != currentIndex) {
         _pageController!.jumpToPage(currentIndex);
       }
+    } else {
+      _pageController ??= PageController(initialPage: 0);
     }
 
     return AppPageScaffold(
@@ -193,7 +192,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
             ),
           Expanded(
             child: visibleRoundIds.isEmpty
-                ? const Center(child: Text('新对话'))
+                ? const Center(child: Text('加载中'))
                 : PageView.builder(
                     controller: _pageController,
                     physics: isEditMode
@@ -217,7 +216,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
           InputBar(
             hintText: isEditMode ? '编辑并重试' : '发送消息',
             allowImages: allowImages,
-            isStreaming: isStreaming,
+            isIncomplete: isIncomplete,
             onStop: () => ref
                 .read(chatControllerProvider(widget.fileName))
                 .stopGeneration(_currentRoundId!),

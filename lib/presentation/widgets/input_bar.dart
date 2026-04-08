@@ -7,9 +7,9 @@ import '../models/pending_attachment.dart';
 import '../providers/input_draft_provider.dart';
 
 class InputBar extends ConsumerStatefulWidget {
-  final void Function(String text, List<PendingAttachment> attachments) onSend;
+  final Future<void> Function(String text, List<PendingAttachment> attachments) onSend;
   final VoidCallback? onStop;
-  final bool isStreaming;
+  final bool isIncomplete;
   final bool enabled;
   final String hintText;
   final bool allowImages;
@@ -18,7 +18,7 @@ class InputBar extends ConsumerStatefulWidget {
     super.key,
     required this.onSend,
     this.onStop,
-    this.isStreaming = false,
+    this.isIncomplete = false,
     this.enabled = true,
     this.hintText = '输入消息...',
     this.allowImages = false,
@@ -196,15 +196,19 @@ class _InputBarState extends ConsumerState<InputBar> {
     );
   }
 
-  void _handleSend() {
+  Future<void> _handleSend() async {
     if (!widget.enabled) return;
     final content = _controller.text.trim();
     final attachments = ref.read(globalAttachmentDraftProvider);
     if (content.isEmpty && attachments.isEmpty) return;
 
-    widget.onSend(content, attachments);
-    ref.invalidate(globalInputDraftProvider);
-    ref.invalidate(globalAttachmentDraftProvider);
+    try {
+      await widget.onSend(content, attachments); // ✅ 等待落盘完成
+      ref.invalidate(globalInputDraftProvider);
+      ref.invalidate(globalAttachmentDraftProvider);
+    } catch (e) {
+      // 发送失败，保持输入内容和附件不变
+    }
   }
 
   @override
@@ -213,7 +217,7 @@ class _InputBarState extends ConsumerState<InputBar> {
     final hasText = _controller.text.trim().isNotEmpty;
     final hasAttachments = attachments.isNotEmpty;
     final canSend = (hasText || hasAttachments) && widget.enabled;
-    final showStopButton = widget.isStreaming && widget.onStop != null;
+    final showStopButton = widget.isIncomplete && widget.onStop != null;
 
     return SafeArea(
       top: false,
