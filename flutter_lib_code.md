@@ -73,6 +73,7 @@ domain/services/model_capability_registry.dart
 domain/services/tree_builder.dart
 domain/states/chat_state.dart
 main.dart
+presentation/models/input_state.dart
 presentation/models/pending_attachment.dart
 presentation/pages/branch_tree_page.dart
 presentation/pages/chat_page.dart
@@ -82,7 +83,7 @@ presentation/pages/text_attachment_viewer_page.dart
 presentation/providers/attachment_bytes_provider.dart
 presentation/providers/chat_notifier.dart
 presentation/providers/config_notifier.dart
-presentation/providers/input_draft_provider.dart
+presentation/providers/input_notifier.dart
 presentation/providers/session_list_notifier.dart
 presentation/themes/app_theme.dart
 presentation/themes/app_tokens.dart
@@ -6022,22 +6023,6 @@ class ChatRoundFactory {
       isIncomplete: true,
     );
   }
-
-  static ChatRound createEditedRetryRound({
-    required ChatRound sourceRound,
-    required String newContent,
-    required List<Attachment> attachments,
-  }) {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    return ChatRound(
-      id: const Uuid().v4(),
-      parentId: sourceRound.parentId,
-      createdAt: now,
-      userContent: newContent,
-      userAttachments: attachments,
-      isIncomplete: true,
-    );
-  }
 }
 ```
 
@@ -6453,6 +6438,30 @@ class MyApp extends StatelessWidget {
 }
 ```
 
+## File: presentation/models/input_state.dart
+```dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+import 'pending_attachment.dart';
+
+part 'input_state.freezed.dart';
+
+@freezed
+class InputState with _$InputState {
+  const factory InputState({
+    /// 输入框文本
+    @Default('') String text,
+
+    /// 附件列表
+    @Default([]) List<PendingAttachment> attachments,
+  }) = _InputState;
+}
+
+/// 扩展方法：计算是否允许发送
+extension InputStateX on InputState {
+  bool get canSend => text.trim().isNotEmpty || attachments.isNotEmpty;
+}
+```
+
 ## File: presentation/models/pending_attachment.dart
 ```dart
 class PendingAttachment {
@@ -6860,7 +6869,7 @@ import '../../core/utils/app_route_observer.dart';
 import 'package:intl/intl.dart';
 import '../providers/chat_notifier.dart';
 import '../providers/config_notifier.dart';
-import '../providers/input_draft_provider.dart';
+import '../providers/input_notifier.dart'; // ✅ 导入新的 Provider
 import '../widgets/attachment_list.dart';
 import '../widgets/input_bar.dart';
 import '../widgets/message_bubble.dart';
@@ -6953,12 +6962,15 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
-    final sessionTitle = ref.watch(sessionTitleProvider(widget.fileName)).valueOrNull ?? '未加载';
+    final sessionTitle =
+        ref.watch(sessionTitleProvider(widget.fileName)).valueOrNull ?? '未加载';
     final currentRoundAsync = ref.watch(roundDetailProvider(_currentRoundId ?? ''));
     final isIncomplete = currentRoundAsync.valueOrNull?.isIncomplete ?? false;
     final configAsync = ref.watch(configProvider);
-    final editSourceRoundId = ref.watch(globalEditSourceRoundIdProvider);
-    final isEditMode = editSourceRoundId != null;
+
+    // ✅ 移除编辑模式相关状态
+    // final editSourceRoundId = ref.watch(globalEditSourceRoundIdProvider);
+    // final isEditMode = editSourceRoundId != null;
 
     final currentConfig = configAsync.valueOrNull;
     final selectedModelId = currentConfig?.selectedModel;
@@ -6968,7 +6980,8 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     final allowImages = selectedModel?.supportsVision == true;
 
     if (_branchLeafId == null) {
-      final topology = ref.watch(chatTopologyProvider(widget.fileName)).valueOrNull;
+      final topology =
+          ref.watch(chatTopologyProvider(widget.fileName)).valueOrNull;
       if (topology != null && topology.isNotEmpty) {
         _branchLeafId = topology.last.id;
         _currentRoundId = _branchLeafId;
@@ -6998,7 +7011,8 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
         actions: [
           IconButton(
             icon: const Icon(Icons.account_tree_outlined),
-            onPressed: (isEditMode || _currentRoundId == null)
+            // ✅ 移除 isEditMode 判断
+            onPressed: (_currentRoundId == null)
                 ? null
                 : () async {
                     final selectedId =
@@ -7021,38 +7035,31 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
             _PaginationBar(
               currentIndex: currentIndex,
               totalPages: visibleRoundIds.length,
-              onPrev: (currentIndex > 0 && !isEditMode)
+              // ✅ 移除 isEditMode 判断
+              onPrev: (currentIndex > 0)
                   ? () => _pageController?.previousPage(
                         duration: const Duration(milliseconds: 250),
                         curve: Curves.easeOutCubic,
                       )
                   : null,
-              onNext: (currentIndex < visibleRoundIds.length - 1 && !isEditMode)
+              onNext: (currentIndex < visibleRoundIds.length - 1)
                   ? () => _pageController?.nextPage(
                         duration: const Duration(milliseconds: 250),
                         curve: Curves.easeOutCubic,
                       )
                   : null,
-              isEditMode: isEditMode,
+              // isEditMode: isEditMode, // ✅ 移除参数
             ),
-          if (isEditMode)
-            MaterialBanner(
-              content: const Text('正在编辑，发送前不可切换页面'),
-              actions: [
-                TextButton(
-                  onPressed: () => _setEditMode(null, ''),
-                  child: const Text('取消'),
-                ),
-              ],
-            ),
+          // ✅ 移除编辑模式 Banner
+          // if (isEditMode)
+          //   MaterialBanner(...),
           Expanded(
             child: visibleRoundIds.isEmpty
                 ? const Center(child: Text('加载中'))
                 : PageView.builder(
                     controller: _pageController,
-                    physics: isEditMode
-                        ? const NeverScrollableScrollPhysics()
-                        : const PageScrollPhysics(),
+                    // ✅ 移除 isEditMode 对 physics 的影响
+                    physics: const PageScrollPhysics(),
                     itemCount: visibleRoundIds.length,
                     onPageChanged: (index) {
                       final targetId = visibleRoundIds[index];
@@ -7064,32 +7071,32 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
                       fileName: widget.fileName,
                       roundId: visibleRoundIds[index],
                       onRetryReply: () => _retry(visibleRoundIds[index]),
-                      onEdit: (text) => _setEditMode(visibleRoundIds[index], text),
+                      // ✅ 移除 onEdit 回调
+                      // onEdit: (text) => _setEditMode(visibleRoundIds[index], text),
                     ),
                   ),
           ),
           InputBar(
-            hintText: isEditMode ? '编辑并重试' : '发送消息',
+            // ✅ 移除 hintText 动态切换
+            hintText: '发送消息',
             allowImages: allowImages,
             isIncomplete: isIncomplete,
             onStop: () => ref
                 .read(chatControllerProvider(widget.fileName))
                 .stopGeneration(_currentRoundId!),
             onSend: (text, attachments) async {
-              final controller = ref.read(chatControllerProvider(widget.fileName));
-              final newId = isEditMode
-                  ? await controller.editAndResendFromRound(
-                      editSourceRoundId,
-                      text,
-                      attachments: attachments,
-                    )
-                  : await controller.sendMessage(
-                      content: text,
-                      parentRoundId: _currentRoundId,
-                      attachments: attachments,
-                    );
+              final controller =
+                  ref.read(chatControllerProvider(widget.fileName));
+              // ✅ 移除 isEditMode 分支，统一调用 sendMessage
+              final newId = await controller.sendMessage(
+                content: text,
+                parentRoundId: _currentRoundId,
+                attachments: attachments,
+              );
               _updateBranch(newId);
-              _setEditMode(null, '');
+              // ✅ 发送成功后清空输入状态
+              ref.read(inputStateProvider.notifier).clear();
+              // ✅ 移除 _setEditMode(null, '')
             },
           ),
         ],
@@ -7100,22 +7107,21 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
   void _markAsSeen(String roundId) {
     if (!_isRouteVisible) return;
     final roundAsync = ref.read(roundDetailProvider(roundId));
-    final round = roundAsync.valueOrNull;  
+    final round = roundAsync.valueOrNull;
     if (round?.hasUnseenUpdate == true) {
       ref.read(chatControllerProvider(widget.fileName)).markRoundSeen(round!);
     }
   }
 
   void _retry(String roundId) async {
+    // ✅ 重试直接调用 retryFromRound，不复用输入框状态
     final newId =
         await ref.read(chatControllerProvider(widget.fileName)).retryFromRound(roundId);
     _updateBranch(newId);
   }
 
-  void _setEditMode(String? roundId, String text) {
-    ref.read(globalEditSourceRoundIdProvider.notifier).state = roundId;
-    ref.read(globalInputDraftProvider.notifier).state = text;
-  }
+  // ✅ 移除 _setEditMode 方法
+  // void _setEditMode(String? roundId, String text) { ... }
 
   @override
   void didPush() => _isRouteVisible = true;
@@ -7134,14 +7140,15 @@ class _ChatRoundPage extends StatelessWidget {
   final String fileName;
   final String roundId;
   final VoidCallback onRetryReply;
-  final Function(String) onEdit;
+  // ✅ 移除 onEdit 参数
+  // final Function(String) onEdit;
 
   const _ChatRoundPage({
     super.key,
     required this.fileName,
     required this.roundId,
     required this.onRetryReply,
-    required this.onEdit,
+    // required this.onEdit,
   });
 
   @override
@@ -7157,7 +7164,8 @@ class _ChatRoundPage extends StatelessWidget {
               children: [
                 _UserSection(
                   roundId: roundId,
-                  onEdit: onEdit,
+                  // ✅ 移除 onEdit 传递
+                  // onEdit: onEdit,
                   onRetryReply: onRetryReply,
                 ),
                 _ThinkingSection(roundId: roundId),
@@ -7176,12 +7184,13 @@ class _ChatRoundPage extends StatelessWidget {
 
 class _UserSection extends ConsumerWidget {
   final String roundId;
-  final Function(String) onEdit;
+  // ✅ 移除 onEdit 参数
+  // final Function(String) onEdit;
   final VoidCallback onRetryReply;
 
   const _UserSection({
     required this.roundId,
-    required this.onEdit,
+    // required this.onEdit,
     required this.onRetryReply,
   });
 
@@ -7208,7 +7217,8 @@ class _UserSection extends ConsumerWidget {
         MessageBubble(
           content: round.content,
           isUser: true,
-          onEdit: round.inc ? null : () => onEdit(round.content),
+          // ✅ 移除 onEdit 按钮
+          onEdit: null, // round.inc ? null : () => onEdit(round.content),
           onCopy: () => Clipboard.setData(ClipboardData(text: round.content)),
         ),
         if (round.attach.isNotEmpty) ...[
@@ -7288,14 +7298,15 @@ class _AiReplySection extends ConsumerWidget {
 class _PaginationBar extends StatelessWidget {
   final int currentIndex, totalPages;
   final VoidCallback? onPrev, onNext;
-  final bool isEditMode;
+  // ✅ 移除 isEditMode 参数
+  // final bool isEditMode;
 
   const _PaginationBar({
     required this.currentIndex,
     required this.totalPages,
     this.onPrev,
     this.onNext,
-    required this.isEditMode,
+    // required this.isEditMode,
   });
 
   @override
@@ -8633,20 +8644,7 @@ class ChatController {
     return sendMessage(
       content: source.userContent,
       parentRoundId: source.parentId,
-    );
-  }
-
-  Future<String> editAndResendFromRound(
-    String roundId,
-    String content, {
-    List<dynamic>? attachments,
-  }) async {
-    final source = await ref.read(roundDetailProvider(roundId).future);
-    if (source == null) throw Exception('找不到对应的对话轮次');
-    return sendMessage(
-      content: content,
-      parentRoundId: source.parentId,
-      attachments: attachments,
+      attachments: source.userAttachments,
     );
   }
 
@@ -8688,18 +8686,55 @@ final configProfilesProvider = StreamProvider<AppConfigStore>((ref) {
 });
 ```
 
-## File: presentation/providers/input_draft_provider.dart
+## File: presentation/providers/input_notifier.dart
 ```dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/input_state.dart';
 import '../models/pending_attachment.dart';
 
-final globalInputDraftProvider = StateProvider<String>((ref) => '');
+/// 输入状态 Notifier
+///
+/// 职责：
+/// - 管理输入框文本和附件列表
+/// - 提供状态变更方法
+/// - 不包含发送逻辑、不包含编辑模式、不包含 isSending 状态
+class InputNotifier extends Notifier<InputState> {
+  @override
+  InputState build() => const InputState();
 
-final globalAttachmentDraftProvider =
-    StateProvider<List<PendingAttachment>>((ref) => []);
+  /// 更新输入文本
+  void updateText(String text) {
+    state = state.copyWith(text: text);
+  }
 
-final globalEditSourceRoundIdProvider =
-    StateProvider<String?>((ref) => null);
+  /// 添加附件
+  void addAttachment(PendingAttachment attachment) {
+    state = state.copyWith(
+      attachments: [...state.attachments, attachment],
+    );
+  }
+
+  /// 移除指定 ID 的附件
+  void removeAttachment(String id) {
+    state = state.copyWith(
+      attachments: state.attachments.where((a) => a.id != id).toList(),
+    );
+  }
+
+  /// 清空输入状态（文本和附件）
+  void clear() {
+    state = const InputState();
+  }
+}
+
+/// 全局输入状态 Provider
+///
+/// 特点：
+/// - 全局单例：所有会话共享同一份输入草稿
+/// - 无 family：不按 fileName 隔离
+/// - 自动保留：切换会话时草稿不会丢失
+final inputStateProvider =
+    NotifierProvider<InputNotifier, InputState>(InputNotifier.new);
 ```
 
 ## File: presentation/providers/session_list_notifier.dart
@@ -9255,19 +9290,21 @@ abstract class AppToast {
 
 ## File: presentation/widgets/input_bar.dart
 ```dart
+import 'package:aiservice/presentation/models/input_state.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
+
 import '../models/pending_attachment.dart';
-import '../providers/input_draft_provider.dart';
+import '../providers/input_notifier.dart'; // ✅ 导入新的 Provider
 
 class InputBar extends ConsumerStatefulWidget {
-  final Future<void> Function(String text, List<PendingAttachment> attachments) onSend;
+  final Future<void> Function(String text, List<PendingAttachment> attachments)
+      onSend;
   final VoidCallback? onStop;
   final bool isIncomplete;
-  final bool enabled;
   final String hintText;
   final bool allowImages;
 
@@ -9276,7 +9313,6 @@ class InputBar extends ConsumerStatefulWidget {
     required this.onSend,
     this.onStop,
     this.isIncomplete = false,
-    this.enabled = true,
     this.hintText = '输入消息...',
     this.allowImages = false,
   });
@@ -9287,58 +9323,22 @@ class InputBar extends ConsumerStatefulWidget {
 
 class _InputBarState extends ConsumerState<InputBar> {
   late final TextEditingController _controller;
-  late final ProviderSubscription<String> _draftSubscription;
   final ImagePicker _imagePicker = ImagePicker();
-  bool _isSyncingText = false;
 
   @override
   void initState() {
     super.initState();
-    final draft = ref.read(globalInputDraftProvider);
-    _controller = TextEditingController(text: draft);
-    _controller.addListener(_handleControllerChanged);
-    _draftSubscription = ref.listenManual<String>(
-      globalInputDraftProvider,
-      (previous, next) {
-        if (_controller.text == next) return;
-        _syncControllerText(next);
-      },
-    );
+    // ✅ 仅初始化 Controller，不读取旧 Draft
+    _controller = TextEditingController();
   }
 
   @override
   void dispose() {
-    _draftSubscription.close();
-    _controller.removeListener(_handleControllerChanged);
     _controller.dispose();
     super.dispose();
   }
 
-  void _handleControllerChanged() {
-    if (_isSyncingText) return;
-    final text = _controller.text;
-    final notifier = ref.read(globalInputDraftProvider.notifier);
-    if (notifier.state != text) {
-      notifier.state = text;
-    }
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  void _syncControllerText(String text) {
-    _isSyncingText = true;
-    _controller.value = TextEditingValue(
-      text: text,
-      selection: TextSelection.collapsed(offset: text.length),
-      composing: TextRange.empty,
-    );
-    _isSyncingText = false;
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
+  // ✅ 辅助方法：判断是否为图片文件
   bool _isImageFile(String name) {
     final lower = name.toLowerCase();
     return lower.endsWith('.png') ||
@@ -9349,12 +9349,11 @@ class _InputBarState extends ConsumerState<InputBar> {
         lower.endsWith('.bmp');
   }
 
+  // ✅ 辅助方法：猜测 MIME 类型
   String? _guessMimeType(String name) {
     final lower = name.toLowerCase();
     if (lower.endsWith('.png')) return 'image/png';
-    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
-      return 'image/jpeg';
-    }
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
     if (lower.endsWith('.gif')) return 'image/gif';
     if (lower.endsWith('.webp')) return 'image/webp';
     if (lower.endsWith('.bmp')) return 'image/bmp';
@@ -9363,14 +9362,12 @@ class _InputBarState extends ConsumerState<InputBar> {
     if (lower.endsWith('.json')) return 'application/json';
     if (lower.endsWith('.pdf')) return 'application/pdf';
     if (lower.endsWith('.dart')) return 'text/plain';
-    if (lower.endsWith('.yaml') || lower.endsWith('.yml')) {
-      return 'text/yaml';
-    }
+    if (lower.endsWith('.yaml') || lower.endsWith('.yml')) return 'text/yaml';
     return null;
   }
 
+  // ✅ 添加文件附件
   Future<void> _pickFileAttachment() async {
-    if (!widget.enabled) return;
     final result = await FilePicker.platform.pickFiles(
       allowMultiple: false,
       withData: false,
@@ -9390,12 +9387,12 @@ class _InputBarState extends ConsumerState<InputBar> {
       isImage: isImage,
       mimeType: mimeType,
     );
-    final notifier = ref.read(globalAttachmentDraftProvider.notifier);
-    notifier.state = [...notifier.state, attachment];
+    // ✅ 调用 Notifier 添加附件
+    ref.read(inputStateProvider.notifier).addAttachment(attachment);
   }
 
+  // ✅ 添加图片附件
   Future<void> _pickImageFromGallery() async {
-    if (!widget.enabled) return;
     final file = await _imagePicker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 100,
@@ -9409,18 +9406,17 @@ class _InputBarState extends ConsumerState<InputBar> {
       isImage: true,
       mimeType: _guessMimeType(name) ?? 'image/*',
     );
-    final notifier = ref.read(globalAttachmentDraftProvider.notifier);
-    notifier.state = [...notifier.state, attachment];
+    // ✅ 调用 Notifier 添加附件
+    ref.read(inputStateProvider.notifier).addAttachment(attachment);
   }
 
+  // ✅ 移除附件
   void _removeAttachment(String id) {
-    final notifier = ref.read(globalAttachmentDraftProvider.notifier);
-    notifier.state = notifier.state.where((item) => item.id != id).toList();
+    ref.read(inputStateProvider.notifier).removeAttachment(id);
   }
 
+  // ✅ 显示附件选择菜单
   Future<void> _showAddAttachmentSheet() async {
-    if (!widget.enabled) return;
-
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -9453,16 +9449,16 @@ class _InputBarState extends ConsumerState<InputBar> {
     );
   }
 
+  // ✅ 处理发送
   Future<void> _handleSend() async {
-    if (!widget.enabled) return;
-    final content = _controller.text.trim();
-    final attachments = ref.read(globalAttachmentDraftProvider);
-    if (content.isEmpty && attachments.isEmpty) return;
+    // ✅ 从 Provider 读取状态
+    final state = ref.read(inputStateProvider);
+    if (!state.canSend) return;
 
     try {
-      await widget.onSend(content, attachments); // ✅ 等待落盘完成
-      ref.invalidate(globalInputDraftProvider);
-      ref.invalidate(globalAttachmentDraftProvider);
+      await widget.onSend(state.text, state.attachments);
+      // ✅ 发送成功后清空状态
+      ref.read(inputStateProvider.notifier).clear();
     } catch (e) {
       // 发送失败，保持输入内容和附件不变
     }
@@ -9470,11 +9466,26 @@ class _InputBarState extends ConsumerState<InputBar> {
 
   @override
   Widget build(BuildContext context) {
-    final attachments = ref.watch(globalAttachmentDraftProvider);
-    final hasText = _controller.text.trim().isNotEmpty;
-    final hasAttachments = attachments.isNotEmpty;
-    final canSend = (hasText || hasAttachments) && widget.enabled;
-    final showStopButton = widget.isIncomplete && widget.onStop != null;
+    // ✅ 监听文本变化，单向同步到 Controller
+    ref.listen<String>(
+      inputStateProvider.select((s) => s.text),
+      (previous, next) {
+        // 避免不必要的更新和光标跳动
+        if (next != _controller.text) {
+          _controller.value = TextEditingValue(
+            text: next,
+            selection: TextSelection.collapsed(offset: next.length),
+            composing: TextRange.empty,
+          );
+        }
+      },
+    );
+
+    // ✅ 读取状态
+    final inputState = ref.watch(inputStateProvider);
+    final attachments = inputState.attachments;
+    final canSend = inputState.canSend;
+    final showStopButton = widget.isIncomplete;
 
     return SafeArea(
       top: false,
@@ -9519,7 +9530,7 @@ class _InputBarState extends ConsumerState<InputBar> {
                 children: [
                   IconButton(
                     tooltip: '添加附件',
-                    onPressed: widget.enabled ? _showAddAttachmentSheet : null,
+                    onPressed: _showAddAttachmentSheet, // ✅ 始终可点击
                     icon: const Icon(Icons.add),
                   ),
                   const SizedBox(width: 8),
@@ -9528,26 +9539,31 @@ class _InputBarState extends ConsumerState<InputBar> {
                       controller: _controller,
                       minLines: 1,
                       maxLines: 6,
-                      enabled: widget.enabled,
                       keyboardType: TextInputType.multiline,
                       textInputAction: TextInputAction.newline,
                       decoration: InputDecoration(
                         hintText: widget.hintText,
                         isDense: true,
                       ),
+                      // ✅ 用户输入时更新 Provider
+                      onChanged: (value) {
+                        ref
+                            .read(inputStateProvider.notifier)
+                            .updateText(value);
+                      },
                     ),
                   ),
                   const SizedBox(width: 8),
                   if (showStopButton)
                     IconButton.filledTonal(
                       tooltip: '停止生成',
-                      onPressed: widget.enabled ? widget.onStop : null,
+                      onPressed: widget.onStop, // ✅ 停止按钮
                       icon: const Icon(Icons.stop_rounded),
                     )
                   else
                     IconButton.filled(
                       tooltip: '发送',
-                      onPressed: canSend ? _handleSend : null,
+                      onPressed: canSend ? _handleSend : null, // ✅ 发送按钮
                       icon: const Icon(Icons.arrow_upward_rounded),
                     ),
                 ],
