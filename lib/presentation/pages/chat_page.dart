@@ -5,7 +5,7 @@ import '../../core/utils/app_route_observer.dart';
 import 'package:intl/intl.dart';
 import '../providers/chat_notifier.dart';
 import '../providers/config_notifier.dart';
-import '../providers/input_draft_provider.dart';
+import '../providers/input_notifier.dart'; // ✅ 导入新的 Provider
 import '../widgets/attachment_list.dart';
 import '../widgets/input_bar.dart';
 import '../widgets/message_bubble.dart';
@@ -98,12 +98,15 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
-    final sessionTitle = ref.watch(sessionTitleProvider(widget.fileName)).valueOrNull ?? '未加载';
+    final sessionTitle =
+        ref.watch(sessionTitleProvider(widget.fileName)).valueOrNull ?? '未加载';
     final currentRoundAsync = ref.watch(roundDetailProvider(_currentRoundId ?? ''));
     final isIncomplete = currentRoundAsync.valueOrNull?.isIncomplete ?? false;
     final configAsync = ref.watch(configProvider);
-    final editSourceRoundId = ref.watch(globalEditSourceRoundIdProvider);
-    final isEditMode = editSourceRoundId != null;
+
+    // ✅ 移除编辑模式相关状态
+    // final editSourceRoundId = ref.watch(globalEditSourceRoundIdProvider);
+    // final isEditMode = editSourceRoundId != null;
 
     final currentConfig = configAsync.valueOrNull;
     final selectedModelId = currentConfig?.selectedModel;
@@ -113,7 +116,8 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     final allowImages = selectedModel?.supportsVision == true;
 
     if (_branchLeafId == null) {
-      final topology = ref.watch(chatTopologyProvider(widget.fileName)).valueOrNull;
+      final topology =
+          ref.watch(chatTopologyProvider(widget.fileName)).valueOrNull;
       if (topology != null && topology.isNotEmpty) {
         _branchLeafId = topology.last.id;
         _currentRoundId = _branchLeafId;
@@ -143,7 +147,8 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
         actions: [
           IconButton(
             icon: const Icon(Icons.account_tree_outlined),
-            onPressed: (isEditMode || _currentRoundId == null)
+            // ✅ 移除 isEditMode 判断
+            onPressed: (_currentRoundId == null)
                 ? null
                 : () async {
                     final selectedId =
@@ -166,38 +171,31 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
             _PaginationBar(
               currentIndex: currentIndex,
               totalPages: visibleRoundIds.length,
-              onPrev: (currentIndex > 0 && !isEditMode)
+              // ✅ 移除 isEditMode 判断
+              onPrev: (currentIndex > 0)
                   ? () => _pageController?.previousPage(
                         duration: const Duration(milliseconds: 250),
                         curve: Curves.easeOutCubic,
                       )
                   : null,
-              onNext: (currentIndex < visibleRoundIds.length - 1 && !isEditMode)
+              onNext: (currentIndex < visibleRoundIds.length - 1)
                   ? () => _pageController?.nextPage(
                         duration: const Duration(milliseconds: 250),
                         curve: Curves.easeOutCubic,
                       )
                   : null,
-              isEditMode: isEditMode,
+              // isEditMode: isEditMode, // ✅ 移除参数
             ),
-          if (isEditMode)
-            MaterialBanner(
-              content: const Text('正在编辑，发送前不可切换页面'),
-              actions: [
-                TextButton(
-                  onPressed: () => _setEditMode(null, ''),
-                  child: const Text('取消'),
-                ),
-              ],
-            ),
+          // ✅ 移除编辑模式 Banner
+          // if (isEditMode)
+          //   MaterialBanner(...),
           Expanded(
             child: visibleRoundIds.isEmpty
                 ? const Center(child: Text('加载中'))
                 : PageView.builder(
                     controller: _pageController,
-                    physics: isEditMode
-                        ? const NeverScrollableScrollPhysics()
-                        : const PageScrollPhysics(),
+                    // ✅ 移除 isEditMode 对 physics 的影响
+                    physics: const PageScrollPhysics(),
                     itemCount: visibleRoundIds.length,
                     onPageChanged: (index) {
                       final targetId = visibleRoundIds[index];
@@ -209,32 +207,32 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
                       fileName: widget.fileName,
                       roundId: visibleRoundIds[index],
                       onRetryReply: () => _retry(visibleRoundIds[index]),
-                      onEdit: (text) => _setEditMode(visibleRoundIds[index], text),
+                      // ✅ 移除 onEdit 回调
+                      // onEdit: (text) => _setEditMode(visibleRoundIds[index], text),
                     ),
                   ),
           ),
           InputBar(
-            hintText: isEditMode ? '编辑并重试' : '发送消息',
+            // ✅ 移除 hintText 动态切换
+            hintText: '发送消息',
             allowImages: allowImages,
             isIncomplete: isIncomplete,
             onStop: () => ref
                 .read(chatControllerProvider(widget.fileName))
                 .stopGeneration(_currentRoundId!),
             onSend: (text, attachments) async {
-              final controller = ref.read(chatControllerProvider(widget.fileName));
-              final newId = isEditMode
-                  ? await controller.editAndResendFromRound(
-                      editSourceRoundId,
-                      text,
-                      attachments: attachments,
-                    )
-                  : await controller.sendMessage(
-                      content: text,
-                      parentRoundId: _currentRoundId,
-                      attachments: attachments,
-                    );
+              final controller =
+                  ref.read(chatControllerProvider(widget.fileName));
+              // ✅ 移除 isEditMode 分支，统一调用 sendMessage
+              final newId = await controller.sendMessage(
+                content: text,
+                parentRoundId: _currentRoundId,
+                attachments: attachments,
+              );
               _updateBranch(newId);
-              _setEditMode(null, '');
+              // ✅ 发送成功后清空输入状态
+              ref.read(inputStateProvider.notifier).clear();
+              // ✅ 移除 _setEditMode(null, '')
             },
           ),
         ],
@@ -245,22 +243,21 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
   void _markAsSeen(String roundId) {
     if (!_isRouteVisible) return;
     final roundAsync = ref.read(roundDetailProvider(roundId));
-    final round = roundAsync.valueOrNull;  
+    final round = roundAsync.valueOrNull;
     if (round?.hasUnseenUpdate == true) {
       ref.read(chatControllerProvider(widget.fileName)).markRoundSeen(round!);
     }
   }
 
   void _retry(String roundId) async {
+    // ✅ 重试直接调用 retryFromRound，不复用输入框状态
     final newId =
         await ref.read(chatControllerProvider(widget.fileName)).retryFromRound(roundId);
     _updateBranch(newId);
   }
 
-  void _setEditMode(String? roundId, String text) {
-    ref.read(globalEditSourceRoundIdProvider.notifier).state = roundId;
-    ref.read(globalInputDraftProvider.notifier).state = text;
-  }
+  // ✅ 移除 _setEditMode 方法
+  // void _setEditMode(String? roundId, String text) { ... }
 
   @override
   void didPush() => _isRouteVisible = true;
@@ -279,14 +276,15 @@ class _ChatRoundPage extends StatelessWidget {
   final String fileName;
   final String roundId;
   final VoidCallback onRetryReply;
-  final Function(String) onEdit;
+  // ✅ 移除 onEdit 参数
+  // final Function(String) onEdit;
 
   const _ChatRoundPage({
     super.key,
     required this.fileName,
     required this.roundId,
     required this.onRetryReply,
-    required this.onEdit,
+    // required this.onEdit,
   });
 
   @override
@@ -302,7 +300,8 @@ class _ChatRoundPage extends StatelessWidget {
               children: [
                 _UserSection(
                   roundId: roundId,
-                  onEdit: onEdit,
+                  // ✅ 移除 onEdit 传递
+                  // onEdit: onEdit,
                   onRetryReply: onRetryReply,
                 ),
                 _ThinkingSection(roundId: roundId),
@@ -321,12 +320,13 @@ class _ChatRoundPage extends StatelessWidget {
 
 class _UserSection extends ConsumerWidget {
   final String roundId;
-  final Function(String) onEdit;
+  // ✅ 移除 onEdit 参数
+  // final Function(String) onEdit;
   final VoidCallback onRetryReply;
 
   const _UserSection({
     required this.roundId,
-    required this.onEdit,
+    // required this.onEdit,
     required this.onRetryReply,
   });
 
@@ -353,7 +353,8 @@ class _UserSection extends ConsumerWidget {
         MessageBubble(
           content: round.content,
           isUser: true,
-          onEdit: round.inc ? null : () => onEdit(round.content),
+          // ✅ 移除 onEdit 按钮
+          onEdit: null, // round.inc ? null : () => onEdit(round.content),
           onCopy: () => Clipboard.setData(ClipboardData(text: round.content)),
         ),
         if (round.attach.isNotEmpty) ...[
@@ -433,14 +434,15 @@ class _AiReplySection extends ConsumerWidget {
 class _PaginationBar extends StatelessWidget {
   final int currentIndex, totalPages;
   final VoidCallback? onPrev, onNext;
-  final bool isEditMode;
+  // ✅ 移除 isEditMode 参数
+  // final bool isEditMode;
 
   const _PaginationBar({
     required this.currentIndex,
     required this.totalPages,
     this.onPrev,
     this.onNext,
-    required this.isEditMode,
+    // required this.isEditMode,
   });
 
   @override

@@ -163,20 +163,7 @@ class ChatController {
     return sendMessage(
       content: source.userContent,
       parentRoundId: source.parentId,
-    );
-  }
-
-  Future<String> editAndResendFromRound(
-    String roundId,
-    String content, {
-    List<dynamic>? attachments,
-  }) async {
-    final source = await ref.read(roundDetailProvider(roundId).future);
-    if (source == null) throw Exception('找不到对应的对话轮次');
-    return sendMessage(
-      content: content,
-      parentRoundId: source.parentId,
-      attachments: attachments,
+      attachments: source.userAttachments,
     );
   }
 

@@ -32,20 +32,4 @@ class ChatRoundFactory {
       isIncomplete: true,
     );
   }
-
-  static ChatRound createEditedRetryRound({
-    required ChatRound sourceRound,
-    required String newContent,
-    required List<Attachment> attachments,
-  }) {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    return ChatRound(
-      id: const Uuid().v4(),
-      parentId: sourceRound.parentId,
-      createdAt: now,
-      userContent: newContent,
-      userAttachments: attachments,
-      isIncomplete: true,
-    );
-  }
 }

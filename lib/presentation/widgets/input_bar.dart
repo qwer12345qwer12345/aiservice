@@ -1,16 +1,18 @@
+import 'package:aiservice/presentation/models/input_state.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
+
 import '../models/pending_attachment.dart';
-import '../providers/input_draft_provider.dart';
+import '../providers/input_notifier.dart'; // ✅ 导入新的 Provider
 
 class InputBar extends ConsumerStatefulWidget {
-  final Future<void> Function(String text, List<PendingAttachment> attachments) onSend;
+  final Future<void> Function(String text, List<PendingAttachment> attachments)
+      onSend;
   final VoidCallback? onStop;
   final bool isIncomplete;
-  final bool enabled;
   final String hintText;
   final bool allowImages;
 
@@ -19,7 +21,6 @@ class InputBar extends ConsumerStatefulWidget {
     required this.onSend,
     this.onStop,
     this.isIncomplete = false,
-    this.enabled = true,
     this.hintText = '输入消息...',
     this.allowImages = false,
   });
@@ -30,58 +31,22 @@ class InputBar extends ConsumerStatefulWidget {
 
 class _InputBarState extends ConsumerState<InputBar> {
   late final TextEditingController _controller;
-  late final ProviderSubscription<String> _draftSubscription;
   final ImagePicker _imagePicker = ImagePicker();
-  bool _isSyncingText = false;
 
   @override
   void initState() {
     super.initState();
-    final draft = ref.read(globalInputDraftProvider);
-    _controller = TextEditingController(text: draft);
-    _controller.addListener(_handleControllerChanged);
-    _draftSubscription = ref.listenManual<String>(
-      globalInputDraftProvider,
-      (previous, next) {
-        if (_controller.text == next) return;
-        _syncControllerText(next);
-      },
-    );
+    // ✅ 仅初始化 Controller，不读取旧 Draft
+    _controller = TextEditingController();
   }
 
   @override
   void dispose() {
-    _draftSubscription.close();
-    _controller.removeListener(_handleControllerChanged);
     _controller.dispose();
     super.dispose();
   }
 
-  void _handleControllerChanged() {
-    if (_isSyncingText) return;
-    final text = _controller.text;
-    final notifier = ref.read(globalInputDraftProvider.notifier);
-    if (notifier.state != text) {
-      notifier.state = text;
-    }
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  void _syncControllerText(String text) {
-    _isSyncingText = true;
-    _controller.value = TextEditingValue(
-      text: text,
-      selection: TextSelection.collapsed(offset: text.length),
-      composing: TextRange.empty,
-    );
-    _isSyncingText = false;
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
+  // ✅ 辅助方法：判断是否为图片文件
   bool _isImageFile(String name) {
     final lower = name.toLowerCase();
     return lower.endsWith('.png') ||
@@ -92,12 +57,11 @@ class _InputBarState extends ConsumerState<InputBar> {
         lower.endsWith('.bmp');
   }
 
+  // ✅ 辅助方法：猜测 MIME 类型
   String? _guessMimeType(String name) {
     final lower = name.toLowerCase();
     if (lower.endsWith('.png')) return 'image/png';
-    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
-      return 'image/jpeg';
-    }
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
     if (lower.endsWith('.gif')) return 'image/gif';
     if (lower.endsWith('.webp')) return 'image/webp';
     if (lower.endsWith('.bmp')) return 'image/bmp';
@@ -106,14 +70,12 @@ class _InputBarState extends ConsumerState<InputBar> {
     if (lower.endsWith('.json')) return 'application/json';
     if (lower.endsWith('.pdf')) return 'application/pdf';
     if (lower.endsWith('.dart')) return 'text/plain';
-    if (lower.endsWith('.yaml') || lower.endsWith('.yml')) {
-      return 'text/yaml';
-    }
+    if (lower.endsWith('.yaml') || lower.endsWith('.yml')) return 'text/yaml';
     return null;
   }
 
+  // ✅ 添加文件附件
   Future<void> _pickFileAttachment() async {
-    if (!widget.enabled) return;
     final result = await FilePicker.platform.pickFiles(
       allowMultiple: false,
       withData: false,
@@ -133,12 +95,12 @@ class _InputBarState extends ConsumerState<InputBar> {
       isImage: isImage,
       mimeType: mimeType,
     );
-    final notifier = ref.read(globalAttachmentDraftProvider.notifier);
-    notifier.state = [...notifier.state, attachment];
+    // ✅ 调用 Notifier 添加附件
+    ref.read(inputStateProvider.notifier).addAttachment(attachment);
   }
 
+  // ✅ 添加图片附件
   Future<void> _pickImageFromGallery() async {
-    if (!widget.enabled) return;
     final file = await _imagePicker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 100,
@@ -152,18 +114,17 @@ class _InputBarState extends ConsumerState<InputBar> {
       isImage: true,
       mimeType: _guessMimeType(name) ?? 'image/*',
     );
-    final notifier = ref.read(globalAttachmentDraftProvider.notifier);
-    notifier.state = [...notifier.state, attachment];
+    // ✅ 调用 Notifier 添加附件
+    ref.read(inputStateProvider.notifier).addAttachment(attachment);
   }
 
+  // ✅ 移除附件
   void _removeAttachment(String id) {
-    final notifier = ref.read(globalAttachmentDraftProvider.notifier);
-    notifier.state = notifier.state.where((item) => item.id != id).toList();
+    ref.read(inputStateProvider.notifier).removeAttachment(id);
   }
 
+  // ✅ 显示附件选择菜单
   Future<void> _showAddAttachmentSheet() async {
-    if (!widget.enabled) return;
-
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -196,16 +157,16 @@ class _InputBarState extends ConsumerState<InputBar> {
     );
   }
 
+  // ✅ 处理发送
   Future<void> _handleSend() async {
-    if (!widget.enabled) return;
-    final content = _controller.text.trim();
-    final attachments = ref.read(globalAttachmentDraftProvider);
-    if (content.isEmpty && attachments.isEmpty) return;
+    // ✅ 从 Provider 读取状态
+    final state = ref.read(inputStateProvider);
+    if (!state.canSend) return;
 
     try {
-      await widget.onSend(content, attachments); // ✅ 等待落盘完成
-      ref.invalidate(globalInputDraftProvider);
-      ref.invalidate(globalAttachmentDraftProvider);
+      await widget.onSend(state.text, state.attachments);
+      // ✅ 发送成功后清空状态
+      ref.read(inputStateProvider.notifier).clear();
     } catch (e) {
       // 发送失败，保持输入内容和附件不变
     }
@@ -213,11 +174,26 @@ class _InputBarState extends ConsumerState<InputBar> {
 
   @override
   Widget build(BuildContext context) {
-    final attachments = ref.watch(globalAttachmentDraftProvider);
-    final hasText = _controller.text.trim().isNotEmpty;
-    final hasAttachments = attachments.isNotEmpty;
-    final canSend = (hasText || hasAttachments) && widget.enabled;
-    final showStopButton = widget.isIncomplete && widget.onStop != null;
+    // ✅ 监听文本变化，单向同步到 Controller
+    ref.listen<String>(
+      inputStateProvider.select((s) => s.text),
+      (previous, next) {
+        // 避免不必要的更新和光标跳动
+        if (next != _controller.text) {
+          _controller.value = TextEditingValue(
+            text: next,
+            selection: TextSelection.collapsed(offset: next.length),
+            composing: TextRange.empty,
+          );
+        }
+      },
+    );
+
+    // ✅ 读取状态
+    final inputState = ref.watch(inputStateProvider);
+    final attachments = inputState.attachments;
+    final canSend = inputState.canSend;
+    final showStopButton = widget.isIncomplete;
 
     return SafeArea(
       top: false,
@@ -262,7 +238,7 @@ class _InputBarState extends ConsumerState<InputBar> {
                 children: [
                   IconButton(
                     tooltip: '添加附件',
-                    onPressed: widget.enabled ? _showAddAttachmentSheet : null,
+                    onPressed: _showAddAttachmentSheet, // ✅ 始终可点击
                     icon: const Icon(Icons.add),
                   ),
                   const SizedBox(width: 8),
@@ -271,26 +247,31 @@ class _InputBarState extends ConsumerState<InputBar> {
                       controller: _controller,
                       minLines: 1,
                       maxLines: 6,
-                      enabled: widget.enabled,
                       keyboardType: TextInputType.multiline,
                       textInputAction: TextInputAction.newline,
                       decoration: InputDecoration(
                         hintText: widget.hintText,
                         isDense: true,
                       ),
+                      // ✅ 用户输入时更新 Provider
+                      onChanged: (value) {
+                        ref
+                            .read(inputStateProvider.notifier)
+                            .updateText(value);
+                      },
                     ),
                   ),
                   const SizedBox(width: 8),
                   if (showStopButton)
                     IconButton.filledTonal(
                       tooltip: '停止生成',
-                      onPressed: widget.enabled ? widget.onStop : null,
+                      onPressed: widget.onStop, // ✅ 停止按钮
                       icon: const Icon(Icons.stop_rounded),
                     )
                   else
                     IconButton.filled(
                       tooltip: '发送',
-                      onPressed: canSend ? _handleSend : null,
+                      onPressed: canSend ? _handleSend : null, // ✅ 发送按钮
                       icon: const Icon(Icons.arrow_upward_rounded),
                     ),
                 ],
