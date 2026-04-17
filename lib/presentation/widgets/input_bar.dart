@@ -125,6 +125,8 @@ class _InputBarState extends ConsumerState<InputBar> {
 
   // ✅ 显示附件选择菜单
   Future<void> _showAddAttachmentSheet() async {
+    FocusScope.of(context).unfocus();
+    
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -157,15 +159,14 @@ class _InputBarState extends ConsumerState<InputBar> {
     );
   }
 
-  // ✅ 处理发送
   Future<void> _handleSend() async {
-    // ✅ 从 Provider 读取状态
+    FocusScope.of(context).unfocus();
+
     final state = ref.read(inputStateProvider);
     if (!state.canSend) return;
 
     try {
       await widget.onSend(state.text, state.attachments);
-      // ✅ 发送成功后清空状态
       ref.read(inputStateProvider.notifier).clear();
     } catch (e) {
       // 发送失败，保持输入内容和附件不变

@@ -22,8 +22,6 @@ class MessageBubble extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final bubbleColor =
         isUser ? colorScheme.secondaryContainer : colorScheme.surfaceContainerHigh;
-    final textColor =
-        isUser ? colorScheme.onSecondaryContainer : colorScheme.onSurface;
 
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -35,82 +33,17 @@ class MessageBubble extends StatelessWidget {
         child: Column(
           crossAxisAlignment:
               isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            Card(
-              color: bubbleColor,
-              elevation: 0,
-              margin: EdgeInsets.zero,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
+          children: [ 
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: bubbleColor,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: SelectionArea(
                 child: MarkdownBody(
                   data: content,
                   selectable: true,
-                  styleSheet: MarkdownStyleSheet(
-                    p: TextStyle(
-                      fontSize: 14,
-                      height: 1.7,
-                      color: textColor,
-                    ),
-                    h1: TextStyle(
-                      fontSize: 22,
-                      height: 1.35,
-                      fontWeight: FontWeight.w700,
-                      color: textColor,
-                    ),
-                    h2: TextStyle(
-                      fontSize: 18,
-                      height: 1.4,
-                      fontWeight: FontWeight.w700,
-                      color: textColor,
-                    ),
-                    h3: TextStyle(
-                      fontSize: 16,
-                      height: 1.45,
-                      fontWeight: FontWeight.w700,
-                      color: textColor,
-                    ),
-                    code: TextStyle(
-                      fontSize: 13,
-                      fontFamily: 'monospace',
-                      color: textColor,
-                    ),
-                    codeblockPadding: const EdgeInsets.all(12),
-                    codeblockDecoration: BoxDecoration(
-                      color: colorScheme.surface,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    blockSpacing: 10,
-                    listBullet: TextStyle(color: textColor),
-                    strong: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: textColor,
-                    ),
-                    em: TextStyle(
-                      fontStyle: FontStyle.italic,
-                      color: textColor,
-                    ),
-                    a: TextStyle(
-                      color: colorScheme.primary,
-                      decoration: TextDecoration.underline,
-                    ),
-                    blockquote: TextStyle(
-                      color: textColor.withValues(alpha: 0.85),
-                      height: 1.6,
-                    ),
-                    blockquoteDecoration: BoxDecoration(
-                      color: colorScheme.surface,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border(
-                        left: BorderSide(
-                          color: colorScheme.outline,
-                          width: 3,
-                        ),
-                      ),
-                    ),
-                  ),
                 ),
               ),
             ),

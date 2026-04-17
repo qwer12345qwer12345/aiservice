@@ -10,6 +10,13 @@ import '../providers/chat_notifier.dart' show chatTopologyProvider, roundDetailP
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_toast.dart';
 
+extension SpacedIterable on Iterable<Widget> {
+  List<Widget> spaced(double spacing) {
+    if (isEmpty) return [];
+    return expand((widget) => [widget, SizedBox(width: spacing)]).toList()..removeLast();
+  }
+}
+
 class BranchTreePage extends ConsumerStatefulWidget {
   final String fileName;
   final String initialFocusRoundId;
@@ -56,7 +63,6 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     return topology.map((t) => '${t.id}:${t.parentId ?? 'root'}').join('|');
   }
 
-  // 🔑 核心：目标节点完成布局后触发。仅计算一次偏移并 setState 完成最终测量
   void _onTargetLaidOut() {
     if (_hasFocused) return;
     
@@ -75,7 +81,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
       ..translate(viewerCenter.dx - targetCenter.dx, viewerCenter.dy - targetCenter.dy);
 
     _hasFocused = true;
-    setState(() {}); // 必需：触发 GraphView 二次布局，解决 constrained:false 下的测量缺陷
+    setState(() {});
   }
 
   Future<void> _deleteNode(String nodeId) async {
@@ -142,17 +148,16 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
           : InteractiveViewer(
               key: _viewerKey,
               constrained: false,
-              boundaryMargin: const EdgeInsets.all(100), // 适度边界替代无限边界，防止手势漂移
+              boundaryMargin: const EdgeInsets.all(1000),
               minScale: 0.1,
               maxScale: 3.0,
               transformationController: _transformationController,
               child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: RepaintBoundary( // 🔑 隔离 setState 重建，保护 InteractiveViewer 手势状态
-                  child: Wrap(
-                    spacing: 40,
-                    runSpacing: 40,
-                    crossAxisAlignment: WrapCrossAlignment.start,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: roots.map((root) => _RootTreeGroup(
                       key: ValueKey('root-${root.id}-$graphSignature'),
                       root: root,
@@ -165,7 +170,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
                       onDelete: (id) async {
                         if (await _confirmDelete()) await _deleteNode(id);
                       },
-                    )).toList(),
+                    )).spaced(40),
                   ),
                 ),
               ),

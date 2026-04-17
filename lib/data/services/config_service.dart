@@ -93,9 +93,8 @@ class ConfigService{
 
     final oldModels = activeConfig.availableModels ?? const <ModelInfo>[];
     final oldById = {for (final model in oldModels) model.id: model};
-    final remoteIds = remoteModels.map((e) => e.id).toSet();
 
-    final mergedRemoteModels = remoteModels.map((remote) {
+    final updatedModels = remoteModels.map((remote) {
       final old = oldById[remote.id];
       final merged = remote.copyWith(
         overrideSupportsReasoning: old?.overrideSupportsReasoning,
@@ -107,22 +106,8 @@ class ConfigService{
       );
     }).toList();
 
-    final customOnlyModels = oldModels
-        .where((old) => !remoteIds.contains(old.id))
-        .where((old) =>
-            old.overrideSupportsReasoning != null ||
-            old.overrideSupportsVision != null)
-        .map((model) => model.copyWith(
-          supportsVision: model.overrideSupportsVision ?? model.supportsVision,
-          supportsReasoning: model.overrideSupportsReasoning ?? model.supportsReasoning,
-        ))
-        .toList();
-
     final updatedConfig = activeConfig.copyWith(
-      availableModels: [
-        ...mergedRemoteModels,
-        ...customOnlyModels,
-      ],
+      availableModels: updatedModels,
     );
 
     await saveConfig(updatedConfig);

@@ -133,7 +133,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
 
     await ref.read(configServiceProvider).saveConfig(updatedConfig);
-    await AppToast.show('设置已保存');
   }
 
   @override
@@ -196,7 +195,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: FilledButton(
-                            onPressed: () => _save(config),
+                            onPressed: () async {
+                              final config = configAsync.valueOrNull;
+                              if (config == null) return;
+                              
+                              await _save(config);
+                              if (mounted) await AppToast.show('设置已保存');
+                            },
                             child: const Text('保存'),
                           ),
                         ),
@@ -426,6 +431,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Future<void> _refreshModels() async {
+    final currentConfig = ref.read(configProvider).valueOrNull;
+    if (currentConfig == null) return;
+    await _save(currentConfig);
     try {
       await ref.read(configServiceProvider).refreshModels();
       await AppToast.show('模型列表已同步');

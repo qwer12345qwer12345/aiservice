@@ -5,7 +5,6 @@ import '../../core/utils/app_route_observer.dart';
 import 'package:intl/intl.dart';
 import '../providers/chat_notifier.dart';
 import '../providers/config_notifier.dart';
-import '../providers/input_notifier.dart'; // ✅ 导入新的 Provider
 import '../widgets/attachment_list.dart';
 import '../widgets/input_bar.dart';
 import '../widgets/message_bubble.dart';
@@ -218,7 +217,6 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
                 attachments: attachments,
               );
               _updateBranch(newId);
-              ref.read(inputStateProvider.notifier).clear();
             },
           ),
         ],
