@@ -18,9 +18,74 @@ class SseEventDecoder {
     switch (apiMode) {
       case 'responses':
         return _decodeResponses(event);
+      case 'google':
+        return _decodeGoogle(event);
       case 'chat_completions':
       default:
         return _decodeChatCompletions(event);
+    }
+  }
+
+  static ChatChunk? _decodeGoogle(SseEvent event) {
+    try {
+      final json = jsonDecode(event.data) as Map<String, dynamic>;
+
+      // 检查错误
+      if (json['error'] != null) {
+        return ChatChunk(
+          isDone: true,
+          error: _extractErrorMessage(json['error']),
+        );
+      }
+
+      // 检查 promptFeedback 拦截
+      final promptFeedback = json['promptFeedback'] as Map<String, dynamic>?;
+      if (promptFeedback != null && promptFeedback['blockReason'] != null) {
+        return ChatChunk(
+          isDone: true,
+          error: 'Prompt blocked: ${promptFeedback['blockReason']}',
+        );
+      }
+
+      final candidates = json['candidates'] as List<dynamic>?;
+      if (candidates == null || candidates.isEmpty) {
+        // 某些块可能只包含 usageMetadata，忽略
+        return null;
+      }
+
+      final candidate = candidates.first as Map<String, dynamic>;
+      final content = candidate['content'] as Map<String, dynamic>?;
+      final finishReason = candidate['finishReason'] as String?;
+
+      String text = '';
+
+      if (content != null) {
+        final parts = content['parts'] as List<dynamic>?;
+        if (parts != null) {
+          for (final part in parts) {
+            if (part is Map<String, dynamic>) {
+              text += part['text'] as String? ?? '';
+            }
+          }
+        }
+      }
+
+      // 如果有 finishReason，表示结束
+      if (finishReason != null) {
+        return ChatChunk(
+          content: text.isEmpty ? null : text,
+          isDone: true,
+        );
+      }
+
+      if (text.isEmpty) return null;
+
+      return ChatChunk(
+        content: text,
+        isDone: false,
+      );
+    } catch (e) {
+      return null;
     }
   }
 

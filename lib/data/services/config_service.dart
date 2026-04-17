@@ -89,6 +89,7 @@ class ConfigService{
       baseUrl: activeConfig.baseUrl,
       apiKey: activeConfig.apiKey,
       modelsPath: activeConfig.modelsPath,
+      apiMode: activeConfig.apiMode,
     );
 
     final oldModels = activeConfig.availableModels ?? const <ModelInfo>[];

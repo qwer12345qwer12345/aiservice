@@ -25,8 +25,27 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   bool _isPatching = false;
   bool _isModelListExpanded = false;
 
+  String _defaultModelsPathForApiMode(String apiMode) {
+    switch (apiMode) {
+      case 'google':
+        return 'v1beta/models';
+      case 'responses':
+      case 'chat_completions':
+      default:
+        return 'v1/models';
+    }
+  }
+
   String _defaultChatPathForApiMode(String apiMode) {
-    return apiMode == 'responses' ? 'v1/responses' : 'v1/chat/completions';
+    switch (apiMode) {
+      case 'google':
+        return 'v1beta/models/{model}:streamGenerateContent';
+      case 'responses':
+        return 'v1/responses';
+      case 'chat_completions':
+      default:
+        return 'v1/chat/completions';
+    }
   }
 
   ModelInfo? _findModel(AppConfig config, String? modelId) {
@@ -315,18 +334,19 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               value: 'responses',
               child: Text('responses'),
             ),
+            DropdownMenuItem(
+              value: 'google',
+              child: Text('google'),
+            ),
           ],
           onChanged: (value) {
             if (_isPatching || value == null) return;
-            final chatPathField = _formKey.currentState?.fields['chatPath'];
-            final current = (chatPathField?.value as String? ?? '').trim();
-            if (current.isEmpty) {
-              _isPatching = true;
-              _formKey.currentState?.patchValue({
-                'chatPath': _defaultChatPathForApiMode(value),
-              });
-              _isPatching = false;
-            }
+            _isPatching = true;
+            _formKey.currentState?.patchValue({
+              'modelsPath': _defaultModelsPathForApiMode(value),
+              'chatPath': _defaultChatPathForApiMode(value),
+            });
+            _isPatching = false;
           },
         ),
       ],
