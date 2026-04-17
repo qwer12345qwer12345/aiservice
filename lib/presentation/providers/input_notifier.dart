@@ -41,7 +41,6 @@ class InputNotifier extends Notifier<InputState> {
 ///
 /// 特点：
 /// - 全局单例：所有会话共享同一份输入草稿
-/// - 无 family：不按 fileName 隔离
 /// - 自动保留：切换会话时草稿不会丢失
 final inputStateProvider =
     NotifierProvider<InputNotifier, InputState>(InputNotifier.new);

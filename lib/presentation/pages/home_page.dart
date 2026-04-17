@@ -44,7 +44,7 @@ class HomePage extends ConsumerWidget {
       ),
     );
     if (result != null && result.isNotEmpty && result != item.title) {
-      await controller.updateSessionTitle('${item.id}.json', result);
+      await controller.updateSessionTitle(item.id, result);
     }
   }
 
@@ -78,7 +78,7 @@ class HomePage extends ConsumerWidget {
         false;
 
     if (confirmed == true) {
-      await controller.deleteSession('${item.id}.json');
+      await controller.deleteSession(item.id);
     }
   }
 
@@ -153,13 +153,13 @@ class HomePage extends ConsumerWidget {
             hintText: '发送消息',
             allowImages: allowImages,
             onSend: (content, attachments) async {
-              final newFileName = await controller.createSession('新对话');
+              final sessionId = await controller.createSession('新对话');
               if (context.mounted) {
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => ChatPage(
-                      fileName: newFileName,
+                      sessionId: sessionId,
                       initialMessage: content,
                       initialAttachments: attachments,
                     ),
@@ -282,7 +282,7 @@ class _SessionCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final fileName = '${item.id}.json';
+    final sessionId = item.id;
     final updatedAt = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(item.updatedAt));
     final metaAsync = ref.watch(sessionCardMetaProvider(item.id));
 
@@ -294,7 +294,7 @@ class _SessionCard extends ConsumerWidget {
               await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => ChatPage(fileName: fileName),
+                  builder: (_) => ChatPage(sessionId: sessionId),
                 ),
               );
             },
@@ -332,7 +332,7 @@ class _SessionCard extends ConsumerWidget {
               await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => ChatPage(fileName: fileName),
+                  builder: (_) => ChatPage(sessionId: sessionId),
                 ),
               );
             },
@@ -365,7 +365,7 @@ class _SessionCard extends ConsumerWidget {
       },
       data: (meta) {
         return Slidable(
-          key: ValueKey(fileName),
+          key: ValueKey(sessionId),
           endActionPane: ActionPane(
             motion: const DrawerMotion(),
             extentRatio: 0.34,
@@ -395,7 +395,7 @@ class _SessionCard extends ConsumerWidget {
                   context,
                   MaterialPageRoute(
                     builder: (_) => ChatPage(
-                      fileName: fileName,
+                      sessionId: sessionId,
                       initialRoundId: meta.previewRoundId,
                     ),
                   ),

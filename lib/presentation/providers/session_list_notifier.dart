@@ -20,25 +20,25 @@ class SessionListController {
 
   SessionListController(this.ref);
 
-  Future<void> deleteSession(String fileName) async {
+  Future<void> deleteSession(String sessionId) async {
     final repository = ref.read(conversationRepositoryProvider);
-    await repository.deleteSession(fileName);
+    await repository.deleteSession(sessionId);
   }
 
-  Future<void> updateSessionTitle(String fileName, String newTitle) async {
+  Future<void> updateSessionTitle(String sessionId, String newTitle) async {
     final repository = ref.read(conversationRepositoryProvider);
     final cleanTitle = newTitle.trim();
     if (cleanTitle.isEmpty) return;
-    await repository.updateSessionTitle(fileName, cleanTitle);
+    await repository.updateSessionTitle(sessionId, cleanTitle);
   }
 
   Future<String> createSession(String title) async {
     final repository = ref.read(conversationRepositoryProvider);
 
-    final fileName = '${const Uuid().v4()}.json';
+    final sessionId = const Uuid().v4();
 
-    await repository.createSession(fileName: fileName, title: '新对话');
-    return fileName;
+    await repository.createSession(sessionId: sessionId, title: '新对话');
+    return sessionId;
   }
 }
 

@@ -14,35 +14,8 @@ class LocalFileSource{
 
   Future<void> initDirectories() async {
     await _directory.create(recursive: true);
-    await Directory(path.join(_baseDir, AppConstants.dirConversations))
-        .create(recursive: true);
-     await Directory(path.join(_baseDir, AppConstants.dirAttachments))
-        .create(recursive: true);
-  }
-
-  Future<String> readTextFile(String relativePath) async {
-    try {
-      final file = File(path.join(_baseDir, relativePath));
-      if (!await file.exists()) {
-        throw Exception('文件不存在');
-      }
-      return await file.readAsString();
-    } on FileSystemException catch (e) {
-      throw Exception('读取文件失败：${e.message}');
-    }
-  }
-
-  Future<void> writeTextFile(String relativePath, String content) async {
-    try {
-      final file = File(path.join(_baseDir, relativePath));
-      final dir = file.parent;
-      if (!await dir.exists()) {
-        await dir.create(recursive: true);
-      }
-      await file.writeAsString(content, flush: true);
-    } on FileSystemException catch (e) {
-      throw Exception('写入文件失败：${e.message}');
-    }
+    await Directory(path.join(_baseDir, AppConstants.dirAttachments))
+      .create(recursive: true);
   }
 
   Future<void> deleteAttachment(String relativePath) async {
@@ -53,23 +26,6 @@ class LocalFileSource{
        }
     } on FileSystemException catch (e) {
       throw Exception('删除文件失败：${e.message}');
-    }
-  }
-
-  Future<List<String>> listFiles(String directory) async {
-    try {
-      final dir = Directory(path.join(_baseDir, directory));
-      if (!await dir.exists()) {
-        return [];
-      }
-      final entities = await dir.list().toList();
-      return entities
-          .whereType<File>()
-          .where((f) => f.path.endsWith(AppConstants.extJson))
-          .map((f) => path.basename(f.path))
-          .toList();
-    } on FileSystemException catch (e) {
-      throw Exception('列出文件失败：${e.message}');
     }
   }
 

@@ -18,12 +18,12 @@ extension SpacedIterable on Iterable<Widget> {
 }
 
 class BranchTreePage extends ConsumerStatefulWidget {
-  final String fileName;
+  final String sessionId;
   final String initialFocusRoundId;
 
   const BranchTreePage({
     super.key,
-    required this.fileName,
+    required this.sessionId,
     required this.initialFocusRoundId,
   });
 
@@ -47,7 +47,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   @override
   void didUpdateWidget(covariant BranchTreePage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.fileName != widget.fileName || oldWidget.initialFocusRoundId != widget.initialFocusRoundId) {
+    if (oldWidget.sessionId != widget.sessionId || oldWidget.initialFocusRoundId != widget.initialFocusRoundId) {
       _hasFocused = false; // 切换文件/目标时重置聚焦状态
     }
   }
@@ -85,7 +85,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   }
 
   Future<void> _deleteNode(String nodeId) async {
-    final topology = await ref.read(chatTopologyProvider(widget.fileName).future);
+    final topology = await ref.read(chatTopologyProvider(widget.sessionId).future);
     final roots = buildTree(topology);
     final target = _findIterative(roots, nodeId);
     if (target == null) return;
@@ -93,7 +93,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     final ids = _collectSubtreeIds(target).toList();
     try {
       await ref.read(conversationRepositoryProvider)
-          .deleteRoundsAndCleanupOrphanAttachments(widget.fileName, ids);
+          .deleteRoundsAndCleanupOrphanAttachments(widget.sessionId, ids);
     } catch (e) {
       if (mounted) AppToast.show('删除失败：$e');
     }
@@ -136,7 +136,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
 
   @override
   Widget build(BuildContext context) {
-    final topology = ref.watch(chatTopologyProvider(widget.fileName)).valueOrNull ?? [];
+    final topology = ref.watch(chatTopologyProvider(widget.sessionId)).valueOrNull ?? [];
     final roots = buildTree(topology);
     final graphSignature = _buildGraphSignature(topology);
     final targetId = widget.initialFocusRoundId;

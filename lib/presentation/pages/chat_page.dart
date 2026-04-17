@@ -14,14 +14,14 @@ import '../widgets/common/app_toast.dart';
 import 'branch_tree_page.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
-  final String fileName;
+  final String sessionId;
   final String? initialRoundId;
   final String? initialMessage;
   final List<dynamic>? initialAttachments;
 
   const ChatPage({
     super.key,
-    required this.fileName,
+    required this.sessionId,
     this.initialRoundId,
     this.initialMessage,
     this.initialAttachments,
@@ -60,7 +60,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
 
     try {
       final newId =
-          await ref.read(chatControllerProvider(widget.fileName)).sendMessage(
+          await ref.read(chatControllerProvider(widget.sessionId)).sendMessage(
                 content: widget.initialMessage!,
                 parentRoundId: _currentRoundId,
                 attachments: widget.initialAttachments?.cast() ?? [],
@@ -98,7 +98,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
   @override
   Widget build(BuildContext context) {
     final sessionTitle =
-        ref.watch(sessionTitleProvider(widget.fileName)).valueOrNull ?? '未加载';
+        ref.watch(sessionTitleProvider(widget.sessionId)).valueOrNull ?? '未加载';
     final currentRoundAsync = ref.watch(roundDetailProvider(_currentRoundId ?? ''));
     final isIncomplete = currentRoundAsync.valueOrNull?.isIncomplete ?? false;
     final configAsync = ref.watch(configProvider);
@@ -116,7 +116,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
 
     if (_branchLeafId == null) {
       final topology =
-          ref.watch(chatTopologyProvider(widget.fileName)).valueOrNull;
+          ref.watch(chatTopologyProvider(widget.sessionId)).valueOrNull;
       if (topology != null && topology.isNotEmpty) {
         _branchLeafId = topology.last.id;
         _currentRoundId = _branchLeafId;
@@ -124,7 +124,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     }
 
     final visibleRoundIds = ref.watch(visibleRoundIdsProvider((
-      fileName: widget.fileName,
+      sessionId: widget.sessionId,
       roundId: _branchLeafId,
     )));
 
@@ -152,7 +152,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
                         await Navigator.of(context).push<String>(
                       MaterialPageRoute(
                         builder: (_) => BranchTreePage(
-                          fileName: widget.fileName,
+                          sessionId: widget.sessionId,
                           initialFocusRoundId: _currentRoundId!,
                         ),
                       ),
@@ -195,7 +195,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
                     },
                     itemBuilder: (_, index) => _ChatRoundPage(
                       key: ValueKey(visibleRoundIds[index]),
-                      fileName: widget.fileName,
+                      sessionId: widget.sessionId,
                       roundId: visibleRoundIds[index],
                       onRetryReply: () => _retry(visibleRoundIds[index]),
                     ),
@@ -206,11 +206,11 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
             allowImages: allowImages,
             isIncomplete: isIncomplete,
             onStop: () => ref
-                .read(chatControllerProvider(widget.fileName))
+                .read(chatControllerProvider(widget.sessionId))
                 .stopGeneration(_currentRoundId!),
             onSend: (text, attachments) async {
               final controller =
-                  ref.read(chatControllerProvider(widget.fileName));
+                  ref.read(chatControllerProvider(widget.sessionId));
               final newId = await controller.sendMessage(
                 content: text,
                 parentRoundId: _currentRoundId,
@@ -229,13 +229,13 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     final roundAsync = ref.read(roundDetailProvider(roundId));
     final round = roundAsync.valueOrNull;
     if (round?.hasUnseenUpdate == true) {
-      ref.read(chatControllerProvider(widget.fileName)).markRoundSeen(round!);
+      ref.read(chatControllerProvider(widget.sessionId)).markRoundSeen(round!);
     }
   }
 
   void _retry(String roundId) async {
     final newId =
-        await ref.read(chatControllerProvider(widget.fileName)).retryFromRound(roundId);
+        await ref.read(chatControllerProvider(widget.sessionId)).retryFromRound(roundId);
     _updateBranch(newId);
   }
 
@@ -253,13 +253,13 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
 }
 
 class _ChatRoundPage extends StatelessWidget {
-  final String fileName;
+  final String sessionId;
   final String roundId;
   final VoidCallback onRetryReply;
 
   const _ChatRoundPage({
     super.key,
-    required this.fileName,
+    required this.sessionId,
     required this.roundId,
     required this.onRetryReply,
   });

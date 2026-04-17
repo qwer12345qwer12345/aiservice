@@ -6,15 +6,15 @@ import '../../domain/services/attachment_preparer.dart';
 import '../../domain/services/chat_context_builder.dart';
 import 'package:uuid/uuid.dart';
 
-final sessionTitleProvider = StreamProvider.family<String, String>((ref, fileName) {
-  return ref.watch(conversationRepositoryProvider).watchSessionTitle(fileName)
+final sessionTitleProvider = StreamProvider.family<String, String>((ref, sessionId) {
+  return ref.watch(conversationRepositoryProvider).watchSessionTitle(sessionId)
       .map((title) => title ?? '对话');
 });
 
 final chatTopologyProvider =
     StreamProvider.family<List<({String id, String? parentId})>, String>(
-  (ref, fileName) {
-    return ref.watch(conversationRepositoryProvider).watchSessionTopology(fileName);
+  (ref, sessionId) {
+    return ref.watch(conversationRepositoryProvider).watchSessionTopology(sessionId);
   },
 );
 
@@ -23,9 +23,9 @@ final roundDetailProvider = StreamProvider.family<ChatRound?, String>((ref, roun
 });
 
 final visibleRoundIdsProvider =
-    Provider.family<List<String>, ({String fileName, String? roundId})>(
+    Provider.family<List<String>, ({String sessionId, String? roundId})>(
   (ref, args) {
-    final topology = ref.watch(chatTopologyProvider(args.fileName)).valueOrNull ?? [];
+    final topology = ref.watch(chatTopologyProvider(args.sessionId)).valueOrNull ?? [];
     if (args.roundId == null) return const [];
 
     final idToParent = {for (var t in topology) t.id: t.parentId};
@@ -42,10 +42,10 @@ final visibleRoundIdsProvider =
 
 class ChatController {
   final Ref ref;
-  final String fileName;
+  final String sessionId;
   final Set<String> _stoppingRoundIds = {};
 
-  ChatController(this.ref, this.fileName);
+  ChatController(this.ref, this.sessionId);
 
   Future<String> sendMessage({
     required String content,
@@ -68,7 +68,7 @@ class ChatController {
       hasUnseenUpdate: false,
     );
 
-    await repository.appendRound(fileName, newRound);
+    await repository.appendRound(sessionId, newRound);
 
     () async {
       final apiSource = ref.read(remoteApiSourceProvider);
@@ -80,7 +80,6 @@ class ChatController {
 
       try {
         final contextRounds = await repository.getContextRounds(
-          fileName,
           newRound.id,
         );
         final apiContext = await buildApiContextFromRounds(
@@ -116,7 +115,7 @@ class ChatController {
           if (lastDbUpdateTime == null ||
               now.difference(lastDbUpdateTime) >= updateInterval) {
             await repository.updateRound(
-              fileName,
+              sessionId,
               newRound.id,
               newRound.copyWith(
                 assistantContent: contentBuffer.toString(),
@@ -138,7 +137,7 @@ class ChatController {
         }
 
         await repository.updateRound(
-          fileName,
+          sessionId,
           newRound.id,
           newRound.copyWith(
             assistantContent: finalContent.trim().isEmpty ? null : finalContent,
@@ -174,7 +173,7 @@ class ChatController {
 
   Future<void> markRoundSeen(ChatRound round) async {
     await ref.read(conversationRepositoryProvider).updateRound(
-      fileName,
+      sessionId,
       round.id,
       round.copyWith(hasUnseenUpdate: false),
     );
@@ -182,6 +181,6 @@ class ChatController {
 }
 
 final chatControllerProvider =
-    Provider.family<ChatController, String>((ref, fileName) {
-  return ChatController(ref, fileName);
+    Provider.family<ChatController, String>((ref, sessionId) {
+  return ChatController(ref, sessionId);
 });

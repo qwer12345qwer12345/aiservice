@@ -3116,184 +3116,6 @@ class SseParser {
 }
 ```
 
-## File: lib/data/data_sources/sse_event_decoder.dart
-```dart
-import 'dart:convert';
-import '../../core/models/chat_chunk.dart';
-import '../../core/models/sse_event.dart';
-
-/// 按不同 API 协议把 SSEEvent 解释成统一的 ChatChunk
-class SseEventDecoder {
-  static ChatChunk? decode({
-    required String apiMode,
-    required SseEvent event,
-  }) {
-    final data = event.data.trim();
-    if (data.isEmpty) return null;
-
-    if (data == '[DONE]') {
-      return const ChatChunk(isDone: true);
-    }
-
-    switch (apiMode) {
-      case 'responses':
-        return _decodeResponses(event);
-      case 'google':
-        return _decodeGoogle(event);
-      case 'chat_completions':
-      default:
-        return _decodeChatCompletions(event);
-    }
-  }
-
-  static ChatChunk? _decodeGoogle(SseEvent event) {
-    try {
-      final json = jsonDecode(event.data) as Map<String, dynamic>;
-
-      // 检查错误
-      if (json['error'] != null) {
-        return ChatChunk(
-          isDone: true,
-          error: _extractErrorMessage(json['error']),
-        );
-      }
-
-      // 检查 promptFeedback 拦截
-      final promptFeedback = json['promptFeedback'] as Map<String, dynamic>?;
-      if (promptFeedback != null && promptFeedback['blockReason'] != null) {
-        return ChatChunk(
-          isDone: true,
-          error: 'Prompt blocked: ${promptFeedback['blockReason']}',
-        );
-      }
-
-      final candidates = json['candidates'] as List<dynamic>?;
-      if (candidates == null || candidates.isEmpty) {
-        // 某些块可能只包含 usageMetadata，忽略
-        return null;
-      }
-
-      final candidate = candidates.first as Map<String, dynamic>;
-      final content = candidate['content'] as Map<String, dynamic>?;
-      final finishReason = candidate['finishReason'] as String?;
-
-      String text = '';
-
-      if (content != null) {
-        final parts = content['parts'] as List<dynamic>?;
-        if (parts != null) {
-          for (final part in parts) {
-            if (part is Map<String, dynamic>) {
-              text += part['text'] as String? ?? '';
-            }
-          }
-        }
-      }
-
-      // 如果有 finishReason，表示结束
-      if (finishReason != null) {
-        return ChatChunk(
-          content: text.isEmpty ? null : text,
-          isDone: true,
-        );
-      }
-
-      if (text.isEmpty) return null;
-
-      return ChatChunk(
-        content: text,
-        isDone: false,
-      );
-    } catch (e) {
-      return null;
-    }
-  }
-
-  static ChatChunk? _decodeChatCompletions(SseEvent event) {
-    final json = jsonDecode(event.data) as Map<String, dynamic>;
-
-    if (json['error'] != null) {
-      return ChatChunk(
-        isDone: true,
-        error: _extractErrorMessage(json['error']),
-      );
-    }
-
-    final choices = json['choices'] as List<dynamic>?;
-    if (choices == null || choices.isEmpty) return null;
-
-    final choice = choices.first as Map<String, dynamic>;
-    final delta = (choice['delta'] as Map<String, dynamic>?) ??
-        (choice['message'] as Map<String, dynamic>?);
-
-    if (delta == null) return null;
-
-    final content = delta['content'] as String?;
-    final reasoning = (delta['reasoning_content'] as String?) ??
-        (delta['reasoning'] as String?);
-
-    // 某些服务会发 finish_reason 但没有内容
-    final finishReason = choice['finish_reason'];
-    if ((content == null || content.isEmpty) &&
-        (reasoning == null || reasoning.isEmpty) &&
-        finishReason != null) {
-      return const ChatChunk(isDone: false);
-    }
-
-    if (content != null || reasoning != null) {
-      return ChatChunk(
-        content: content,
-        reasoningContent: reasoning,
-        isDone: false,
-      );
-    }
-
-    return null;
-  }
-
-  static ChatChunk? _decodeResponses(SseEvent event) {
-    final json = jsonDecode(event.data) as Map<String, dynamic>;
-    final type = json['type'] as String?;
-
-    switch (type) {
-      case 'response.output_text.delta':
-        final delta = json['delta'] as String?;
-        if (delta == null || delta.isEmpty) return null;
-        return ChatChunk(content: delta, isDone: false);
-
-      case 'response.reasoning_summary_text.delta':
-      case 'response.reasoning_text.delta':
-        final delta = json['delta'] as String?;
-        if (delta == null || delta.isEmpty) return null;
-        return ChatChunk(reasoningContent: delta, isDone: false);
-
-      case 'response.completed':
-        return const ChatChunk(isDone: true);
-
-      case 'response.error':
-        return ChatChunk(
-          isDone: true,
-          error: _extractErrorMessage(json['error']),
-        );
-
-      default:
-        return null;
-    }
-  }
-
-  static String _extractErrorMessage(dynamic error) {
-    if (error == null) return '未知错误';
-    if (error is String) return error;
-    if (error is Map<String, dynamic>) {
-      if (error['message'] != null) return error['message'].toString();
-      if (error['error'] != null) return error['error'].toString();
-      return error.toString();
-    }
-    return error.toString();
-  }
-}
-```
-
 ## File: lib/data/database/database.dart
 ```dart
 import 'dart:convert';
@@ -7160,7 +6982,6 @@ class InputNotifier extends Notifier<InputState> {
 ///
 /// 特点：
 /// - 全局单例：所有会话共享同一份输入草稿
-/// - 无 family：不按 fileName 隔离
 /// - 自动保留：切换会话时草稿不会丢失
 final inputStateProvider =
     NotifierProvider<InputNotifier, InputState>(InputNotifier.new);
@@ -8285,6 +8106,184 @@ class SseEvent {
 }
 ```
 
+## File: lib/data/data_sources/sse_event_decoder.dart
+```dart
+import 'dart:convert';
+import '../../core/models/chat_chunk.dart';
+import '../../core/models/sse_event.dart';
+
+/// 按不同 API 协议把 SSEEvent 解释成统一的 ChatChunk
+class SseEventDecoder {
+  static ChatChunk? decode({
+    required String apiMode,
+    required SseEvent event,
+  }) {
+    final data = event.data.trim();
+    if (data.isEmpty) return null;
+
+    if (data == '[DONE]') {
+      return const ChatChunk(isDone: true);
+    }
+
+    switch (apiMode) {
+      case 'responses':
+        return _decodeResponses(event);
+      case 'google':
+        return _decodeGoogle(event);
+      case 'chat_completions':
+      default:
+        return _decodeChatCompletions(event);
+    }
+  }
+
+  static ChatChunk? _decodeGoogle(SseEvent event) {
+    try {
+      final json = jsonDecode(event.data) as Map<String, dynamic>;
+
+      // 检查错误
+      if (json['error'] != null) {
+        return ChatChunk(
+          isDone: true,
+          error: _extractErrorMessage(json['error']),
+        );
+      }
+
+      // 检查 promptFeedback 拦截
+      final promptFeedback = json['promptFeedback'] as Map<String, dynamic>?;
+      if (promptFeedback != null && promptFeedback['blockReason'] != null) {
+        return ChatChunk(
+          isDone: true,
+          error: 'Prompt blocked: ${promptFeedback['blockReason']}',
+        );
+      }
+
+      final candidates = json['candidates'] as List<dynamic>?;
+      if (candidates == null || candidates.isEmpty) {
+        // 某些块可能只包含 usageMetadata，忽略
+        return null;
+      }
+
+      final candidate = candidates.first as Map<String, dynamic>;
+      final content = candidate['content'] as Map<String, dynamic>?;
+      final finishReason = candidate['finishReason'] as String?;
+
+      String text = '';
+
+      if (content != null) {
+        final parts = content['parts'] as List<dynamic>?;
+        if (parts != null) {
+          for (final part in parts) {
+            if (part is Map<String, dynamic>) {
+              text += part['text'] as String? ?? '';
+            }
+          }
+        }
+      }
+
+      // 如果有 finishReason，表示结束
+      if (finishReason != null) {
+        return ChatChunk(
+          content: text.isEmpty ? null : text,
+          isDone: true,
+        );
+      }
+
+      if (text.isEmpty) return null;
+
+      return ChatChunk(
+        content: text,
+        isDone: false,
+      );
+    } catch (e) {
+      return null;
+    }
+  }
+
+  static ChatChunk? _decodeChatCompletions(SseEvent event) {
+    final json = jsonDecode(event.data) as Map<String, dynamic>;
+
+    if (json['error'] != null) {
+      return ChatChunk(
+        isDone: true,
+        error: _extractErrorMessage(json['error']),
+      );
+    }
+
+    final choices = json['choices'] as List<dynamic>?;
+    if (choices == null || choices.isEmpty) return null;
+
+    final choice = choices.first as Map<String, dynamic>;
+    final delta = (choice['delta'] as Map<String, dynamic>?) ??
+        (choice['message'] as Map<String, dynamic>?);
+
+    if (delta == null) return null;
+
+    final content = delta['content'] as String?;
+    final reasoning = (delta['reasoning_content'] as String?) ??
+        (delta['reasoning'] as String?);
+
+    // 某些服务会发 finish_reason 但没有内容
+    final finishReason = choice['finish_reason'];
+    if ((content == null || content.isEmpty) &&
+        (reasoning == null || reasoning.isEmpty) &&
+        finishReason != null) {
+      return const ChatChunk(isDone: false);
+    }
+
+    if (content != null || reasoning != null) {
+      return ChatChunk(
+        content: content,
+        reasoningContent: reasoning,
+        isDone: false,
+      );
+    }
+
+    return null;
+  }
+
+  static ChatChunk? _decodeResponses(SseEvent event) {
+    final json = jsonDecode(event.data) as Map<String, dynamic>;
+    final type = json['type'] as String?;
+
+    switch (type) {
+      case 'response.output_text.delta':
+        final delta = json['delta'] as String?;
+        if (delta == null || delta.isEmpty) return null;
+        return ChatChunk(content: delta, isDone: false);
+
+      case 'response.reasoning_summary_text.delta':
+      case 'response.reasoning_text.delta':
+        final delta = json['delta'] as String?;
+        if (delta == null || delta.isEmpty) return null;
+        return ChatChunk(reasoningContent: delta, isDone: false);
+
+      case 'response.completed':
+        return const ChatChunk(isDone: true);
+
+      case 'response.error':
+        return ChatChunk(
+          isDone: true,
+          error: _extractErrorMessage(json['error']),
+        );
+
+      default:
+        return null;
+    }
+  }
+
+  static String _extractErrorMessage(dynamic error) {
+    if (error == null) return '未知错误';
+    if (error is String) return error;
+    if (error is Map<String, dynamic>) {
+      if (error['message'] != null) return error['message'].toString();
+      if (error['error'] != null) return error['error'].toString();
+      return error.toString();
+    }
+    return error.toString();
+  }
+}
+```
+
 ## File: lib/domain/models/session_card_meta.dart
 ```dart
 class SessionCardMeta {
@@ -8721,11 +8720,7 @@ class AppSection extends StatelessWidget {
 ```dart
 abstract class AppConstants {
   // 文件夹名称
-  static const String dirConversations = 'conversations';
   static const String dirAttachments = 'attachments';
-
-  // 文件名
-  static const String fileConfig = 'config.json';
 
   // 配置键
   static const String keyBaseUrl = 'baseUrl';
@@ -8736,9 +8731,6 @@ abstract class AppConstants {
   // 默认值
   static const String defaultBaseUrl = 'https://api.openai.com';
   static const String defaultTheme = 'system';
-
-  // 文件扩展名
-  static const String extJson = '.json';
 }
 ```
 
@@ -9916,35 +9908,8 @@ class LocalFileSource{
 
   Future<void> initDirectories() async {
     await _directory.create(recursive: true);
-    await Directory(path.join(_baseDir, AppConstants.dirConversations))
-        .create(recursive: true);
-     await Directory(path.join(_baseDir, AppConstants.dirAttachments))
-        .create(recursive: true);
-  }
-
-  Future<String> readTextFile(String relativePath) async {
-    try {
-      final file = File(path.join(_baseDir, relativePath));
-      if (!await file.exists()) {
-        throw Exception('文件不存在');
-      }
-      return await file.readAsString();
-    } on FileSystemException catch (e) {
-      throw Exception('读取文件失败：${e.message}');
-    }
-  }
-
-  Future<void> writeTextFile(String relativePath, String content) async {
-    try {
-      final file = File(path.join(_baseDir, relativePath));
-      final dir = file.parent;
-      if (!await dir.exists()) {
-        await dir.create(recursive: true);
-      }
-      await file.writeAsString(content, flush: true);
-    } on FileSystemException catch (e) {
-      throw Exception('写入文件失败：${e.message}');
-    }
+    await Directory(path.join(_baseDir, AppConstants.dirAttachments))
+      .create(recursive: true);
   }
 
   Future<void> deleteAttachment(String relativePath) async {
@@ -9955,23 +9920,6 @@ class LocalFileSource{
        }
     } on FileSystemException catch (e) {
       throw Exception('删除文件失败：${e.message}');
-    }
-  }
-
-  Future<List<String>> listFiles(String directory) async {
-    try {
-      final dir = Directory(path.join(_baseDir, directory));
-      if (!await dir.exists()) {
-        return [];
-      }
-      final entities = await dir.list().toList();
-      return entities
-          .whereType<File>()
-          .where((f) => f.path.endsWith(AppConstants.extJson))
-          .map((f) => path.basename(f.path))
-          .toList();
-    } on FileSystemException catch (e) {
-      throw Exception('列出文件失败：${e.message}');
     }
   }
 
@@ -10005,6 +9953,122 @@ class LocalFileSource{
       throw Exception('读取附件失败：${e.message}');
     }
   }
+}
+```
+
+## File: lib/di/providers.dart
+```dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
+
+import '../data/data_sources/local_file_source.dart';
+import '../data/data_sources/remote_api_source.dart';
+import '../data/database/database.dart';
+import '../data/services/config_service.dart';
+import '../data/repositories/conversation_repository.dart';
+
+/// 1. 环境初始化 Provider
+final localFileSourceProvider = FutureProvider<LocalFileSource>((ref) async {
+  final appDir = await getApplicationDocumentsDirectory();
+  final fileSource = LocalFileSource(appDir.path);
+  await fileSource.initDirectories();
+  return fileSource;
+});
+
+/// 2. 数据库 Provider
+final appDatabaseProvider = Provider<AppDatabase>((ref) {
+  ref.watch(localFileSourceProvider); // 触发依赖追踪
+  return AppDatabase();
+});
+
+/// 3. 远程 API 数据源
+final remoteApiSourceProvider = Provider<RemoteApiSource>((ref) {
+  return RemoteApiSource();
+});
+
+/// 4. 配置服务
+final configServiceProvider = Provider<ConfigService>((ref) {
+  return ConfigService(
+    ref.watch(appDatabaseProvider),
+    ref.watch(remoteApiSourceProvider),
+  );
+});
+
+/// 5. 会话仓库
+final conversationRepositoryProvider = Provider<ConversationRepository>((ref) {
+  return ConversationRepository(
+    ref.watch(appDatabaseProvider),
+    ref.watch(localFileSourceProvider).requireValue, // main() 已阻塞等待，此处必定就绪
+  );
+});
+```
+
+## File: lib/domain/services/tree_builder.dart
+```dart
+import '../models/tree_node.dart';
+
+List<TreeNode> buildTree(List<({String id, String? parentId})> topology) {
+  if (topology.isEmpty) return [];
+
+  final nodeMap = <String, TreeNode>{
+    for (final t in topology)
+      t.id: TreeNode(id: t.id, parentId: t.parentId, children: const [], depth: 0),
+  };
+
+  final childrenMap = <String, List<String>>{};
+  final rootIds = <String>[];
+
+  for (final t in topology) {
+    if (t.parentId == null) {
+      rootIds.add(t.id);
+    } else {
+      childrenMap.putIfAbsent(t.parentId!, () => []).add(t.id);
+    }
+  }
+
+  final roots = <TreeNode>[];
+  for (final rootId in rootIds) {
+    final root = nodeMap[rootId];
+    if (root != null) {
+      roots.add(_buildSubtreeIterative(root, childrenMap, nodeMap));
+    }
+  }
+  return roots;
+}
+
+TreeNode _buildSubtreeIterative(
+  TreeNode root,
+  Map<String, List<String>> childrenMap,
+  Map<String, TreeNode> nodeMap,
+) {
+  final postOrder = <TreeNode>[];
+  final stack = <TreeNode>[root];
+  while (stack.isNotEmpty) {
+    final node = stack.removeLast();
+    postOrder.add(node);
+    for (final cid in childrenMap[node.id] ?? []) {
+      final child = nodeMap[cid];
+      if (child != null) stack.add(child);
+    }
+  }
+
+  final updatedMap = <String, TreeNode>{};
+  for (int i = postOrder.length - 1; i >= 0; i--) {
+    final original = postOrder[i];
+    final childIds = childrenMap[original.id] ?? [];
+    final builtChildren = <TreeNode>[];
+    int maxChildDepth = -1;
+    for (final cid in childIds) {
+      final builtChild = updatedMap[cid]!;
+      builtChildren.add(builtChild);
+      if (builtChild.depth > maxChildDepth) maxChildDepth = builtChild.depth;
+    }
+    updatedMap[original.id] = original.copyWith(
+      depth: maxChildDepth + 1,
+      children: builtChildren,
+    );
+  }
+  return updatedMap[root.id]!;
 }
 ```
 
@@ -10500,122 +10564,6 @@ class RemoteApiSource{
      _activeClients[taskId]?.close();
     _activeClients.remove(taskId);
   }
-}
-```
-
-## File: lib/di/providers.dart
-```dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
-
-import '../data/data_sources/local_file_source.dart';
-import '../data/data_sources/remote_api_source.dart';
-import '../data/database/database.dart';
-import '../data/services/config_service.dart';
-import '../data/repositories/conversation_repository.dart';
-
-/// 1. 环境初始化 Provider
-final localFileSourceProvider = FutureProvider<LocalFileSource>((ref) async {
-  final appDir = await getApplicationDocumentsDirectory();
-  final fileSource = LocalFileSource(appDir.path);
-  await fileSource.initDirectories();
-  return fileSource;
-});
-
-/// 2. 数据库 Provider
-final appDatabaseProvider = Provider<AppDatabase>((ref) {
-  ref.watch(localFileSourceProvider); // 触发依赖追踪
-  return AppDatabase();
-});
-
-/// 3. 远程 API 数据源
-final remoteApiSourceProvider = Provider<RemoteApiSource>((ref) {
-  return RemoteApiSource();
-});
-
-/// 4. 配置服务
-final configServiceProvider = Provider<ConfigService>((ref) {
-  return ConfigService(
-    ref.watch(appDatabaseProvider),
-    ref.watch(remoteApiSourceProvider),
-  );
-});
-
-/// 5. 会话仓库
-final conversationRepositoryProvider = Provider<ConversationRepository>((ref) {
-  return ConversationRepository(
-    ref.watch(appDatabaseProvider),
-    ref.watch(localFileSourceProvider).requireValue, // main() 已阻塞等待，此处必定就绪
-  );
-});
-```
-
-## File: lib/domain/services/tree_builder.dart
-```dart
-import '../models/tree_node.dart';
-
-List<TreeNode> buildTree(List<({String id, String? parentId})> topology) {
-  if (topology.isEmpty) return [];
-
-  final nodeMap = <String, TreeNode>{
-    for (final t in topology)
-      t.id: TreeNode(id: t.id, parentId: t.parentId, children: const [], depth: 0),
-  };
-
-  final childrenMap = <String, List<String>>{};
-  final rootIds = <String>[];
-
-  for (final t in topology) {
-    if (t.parentId == null) {
-      rootIds.add(t.id);
-    } else {
-      childrenMap.putIfAbsent(t.parentId!, () => []).add(t.id);
-    }
-  }
-
-  final roots = <TreeNode>[];
-  for (final rootId in rootIds) {
-    final root = nodeMap[rootId];
-    if (root != null) {
-      roots.add(_buildSubtreeIterative(root, childrenMap, nodeMap));
-    }
-  }
-  return roots;
-}
-
-TreeNode _buildSubtreeIterative(
-  TreeNode root,
-  Map<String, List<String>> childrenMap,
-  Map<String, TreeNode> nodeMap,
-) {
-  final postOrder = <TreeNode>[];
-  final stack = <TreeNode>[root];
-  while (stack.isNotEmpty) {
-    final node = stack.removeLast();
-    postOrder.add(node);
-    for (final cid in childrenMap[node.id] ?? []) {
-      final child = nodeMap[cid];
-      if (child != null) stack.add(child);
-    }
-  }
-
-  final updatedMap = <String, TreeNode>{};
-  for (int i = postOrder.length - 1; i >= 0; i--) {
-    final original = postOrder[i];
-    final childIds = childrenMap[original.id] ?? [];
-    final builtChildren = <TreeNode>[];
-    int maxChildDepth = -1;
-    for (final cid in childIds) {
-      final builtChild = updatedMap[cid]!;
-      builtChildren.add(builtChild);
-      if (builtChild.depth > maxChildDepth) maxChildDepth = builtChild.depth;
-    }
-    updatedMap[original.id] = original.copyWith(
-      depth: maxChildDepth + 1,
-      children: builtChildren,
-    );
-  }
-  return updatedMap[root.id]!;
 }
 ```
 
@@ -11558,25 +11506,25 @@ class SessionListController {
 
   SessionListController(this.ref);
 
-  Future<void> deleteSession(String fileName) async {
+  Future<void> deleteSession(String sessionId) async {
     final repository = ref.read(conversationRepositoryProvider);
-    await repository.deleteSession(fileName);
+    await repository.deleteSession(sessionId);
   }
 
-  Future<void> updateSessionTitle(String fileName, String newTitle) async {
+  Future<void> updateSessionTitle(String sessionId, String newTitle) async {
     final repository = ref.read(conversationRepositoryProvider);
     final cleanTitle = newTitle.trim();
     if (cleanTitle.isEmpty) return;
-    await repository.updateSessionTitle(fileName, cleanTitle);
+    await repository.updateSessionTitle(sessionId, cleanTitle);
   }
 
   Future<String> createSession(String title) async {
     final repository = ref.read(conversationRepositoryProvider);
 
-    final fileName = '${const Uuid().v4()}.json';
+    final sessionId = const Uuid().v4();
 
-    await repository.createSession(fileName: fileName, title: '新对话');
-    return fileName;
+    await repository.createSession(sessionId: sessionId, title: '新对话');
+    return sessionId;
   }
 }
 
@@ -12473,8 +12421,6 @@ class ConversationRepository {
   final LocalFileSource _fileService;
   ConversationRepository(this._db, this._fileService);
 
-  String _getId(String fileName) => fileName.replaceAll('.json', '');
-
   // ========== 响应式查询 ==========
 
   Stream<List<SessionListItem>> watchSessionListItems() {
@@ -12522,8 +12468,7 @@ class ConversationRepository {
 
   /// 仅监听会话的拓扑结构（ID 与父子关系）
   /// 只有在增删消息时触发，AI 说话时不触发
-  Stream<List<({String id, String? parentId})>> watchSessionTopology(String fileName) {
-    final sessionId = _getId(fileName);
+  Stream<List<({String id, String? parentId})>> watchSessionTopology(String sessionId) {
     final query = _db.selectOnly(_db.dbChatRounds)
       ..addColumns([_db.dbChatRounds.id, _db.dbChatRounds.parentId])
       ..where(_db.dbChatRounds.sessionId.equals(sessionId))
@@ -12563,7 +12508,7 @@ class ConversationRepository {
     });
   }
 
-  Future<List<ChatRound>> getContextRounds(String fileName, String roundId) async {
+  Future<List<ChatRound>> getContextRounds(String roundId) async {
     // 1. 使用递归 CTE 直接查询从目标节点到根的路径（数据库层按时间正序返回）
     final roundsQuery = _db.customSelect(
       '''
@@ -12625,8 +12570,7 @@ class ConversationRepository {
     return dbRounds.map((round) => _mapToChatRound(round, attachmentMap[round.id] ?? [])).toList();
   }
 
-  Stream<String?> watchSessionTitle(String fileName) {
-    final sessionId = _getId(fileName);
+  Stream<String?> watchSessionTitle(String sessionId) {
     return (_db.select(_db.dbSessions)
           ..where((t) => t.id.equals(sessionId)))
         .map((row) => row.title)
@@ -12669,11 +12613,10 @@ class ConversationRepository {
   // ========== 写操作 ==========
 
   Future<void> deleteRoundsAndCleanupOrphanAttachments(
-    String fileName,
+    String sessionId,
     List<String> roundIds,
   ) async {
     if (roundIds.isEmpty) return;
-    final sessionId = _getId(fileName);
 
     // 1. 收集候选附件路径
     final candidatePaths = (await (_db.select(_db.dbAttachments).join([
@@ -12705,9 +12648,7 @@ class ConversationRepository {
     await _cleanupOrphanAttachments(candidatePaths);
   }
 
-  Future<void> deleteSession(String fileName) async {
-    final sessionId = _getId(fileName);
-
+  Future<void> deleteSession(String sessionId) async {
     // 1. 收集候选附件路径
     final candidatePaths = (await (_db.select(_db.dbAttachments).join([
       innerJoin(
@@ -12721,18 +12662,16 @@ class ConversationRepository {
         .toSet();
 
     // 2. 提交数据库变更
-    await (_db.delete(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-        .go();
+    await (_db.delete(_db.dbSessions)..where((t) => t.id.equals(sessionId))).go();
 
     // 3. 基于最终态清理物理文件
     await _cleanupOrphanAttachments(candidatePaths);
   }
 
   Future<Session> createSession({
-    required String fileName,
+    required String sessionId,
     required String title,
   }) async {
-    final sessionId = _getId(fileName);
     final now = DateTime.now().millisecondsSinceEpoch;
     final session = Session(
       id: sessionId,
@@ -12752,8 +12691,7 @@ class ConversationRepository {
     return session;
   }
 
-  Future<void> updateSessionTitle(String fileName, String title) async {
-    final sessionId = _getId(fileName);
+  Future<void> updateSessionTitle(String sessionId, String title) async {
     await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
         .write(
       DbSessionsCompanion(
@@ -12763,8 +12701,7 @@ class ConversationRepository {
     );
   }
 
-  Future<void> appendRound(String fileName, ChatRound round) async {
-    final sessionId = _getId(fileName);
+  Future<void> appendRound(String sessionId, ChatRound round) async {
     await _db.transaction(() async {
       await _db.into(_db.dbChatRounds).insert(
             DbChatRoundsCompanion.insert(
@@ -12801,11 +12738,10 @@ class ConversationRepository {
   }
 
   Future<void> updateRound(
-    String fileName,
+    String sessionId,
     String roundId,
     ChatRound updatedRound,
   ) async {
-    final sessionId = _getId(fileName);
     await _db.transaction(() async {
       await (_db.update(_db.dbChatRounds)..where((t) => t.id.equals(roundId)))
           .write(
@@ -12885,7 +12821,7 @@ class HomePage extends ConsumerWidget {
       ),
     );
     if (result != null && result.isNotEmpty && result != item.title) {
-      await controller.updateSessionTitle('${item.id}.json', result);
+      await controller.updateSessionTitle(item.id, result);
     }
   }
 
@@ -12919,7 +12855,7 @@ class HomePage extends ConsumerWidget {
         false;
 
     if (confirmed == true) {
-      await controller.deleteSession('${item.id}.json');
+      await controller.deleteSession(item.id);
     }
   }
 
@@ -12994,13 +12930,13 @@ class HomePage extends ConsumerWidget {
             hintText: '发送消息',
             allowImages: allowImages,
             onSend: (content, attachments) async {
-              final newFileName = await controller.createSession('新对话');
+              final sessionId = await controller.createSession('新对话');
               if (context.mounted) {
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => ChatPage(
-                      fileName: newFileName,
+                      sessionId: sessionId,
                       initialMessage: content,
                       initialAttachments: attachments,
                     ),
@@ -13123,7 +13059,7 @@ class _SessionCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final fileName = '${item.id}.json';
+    final sessionId = item.id;
     final updatedAt = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(item.updatedAt));
     final metaAsync = ref.watch(sessionCardMetaProvider(item.id));
 
@@ -13135,7 +13071,7 @@ class _SessionCard extends ConsumerWidget {
               await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => ChatPage(fileName: fileName),
+                  builder: (_) => ChatPage(sessionId: sessionId),
                 ),
               );
             },
@@ -13173,7 +13109,7 @@ class _SessionCard extends ConsumerWidget {
               await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => ChatPage(fileName: fileName),
+                  builder: (_) => ChatPage(sessionId: sessionId),
                 ),
               );
             },
@@ -13206,7 +13142,7 @@ class _SessionCard extends ConsumerWidget {
       },
       data: (meta) {
         return Slidable(
-          key: ValueKey(fileName),
+          key: ValueKey(sessionId),
           endActionPane: ActionPane(
             motion: const DrawerMotion(),
             extentRatio: 0.34,
@@ -13236,7 +13172,7 @@ class _SessionCard extends ConsumerWidget {
                   context,
                   MaterialPageRoute(
                     builder: (_) => ChatPage(
-                      fileName: fileName,
+                      sessionId: sessionId,
                       initialRoundId: meta.previewRoundId,
                     ),
                   ),
@@ -13360,12 +13296,12 @@ extension SpacedIterable on Iterable<Widget> {
 }
 
 class BranchTreePage extends ConsumerStatefulWidget {
-  final String fileName;
+  final String sessionId;
   final String initialFocusRoundId;
 
   const BranchTreePage({
     super.key,
-    required this.fileName,
+    required this.sessionId,
     required this.initialFocusRoundId,
   });
 
@@ -13389,7 +13325,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   @override
   void didUpdateWidget(covariant BranchTreePage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.fileName != widget.fileName || oldWidget.initialFocusRoundId != widget.initialFocusRoundId) {
+    if (oldWidget.sessionId != widget.sessionId || oldWidget.initialFocusRoundId != widget.initialFocusRoundId) {
       _hasFocused = false; // 切换文件/目标时重置聚焦状态
     }
   }
@@ -13427,7 +13363,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   }
 
   Future<void> _deleteNode(String nodeId) async {
-    final topology = await ref.read(chatTopologyProvider(widget.fileName).future);
+    final topology = await ref.read(chatTopologyProvider(widget.sessionId).future);
     final roots = buildTree(topology);
     final target = _findIterative(roots, nodeId);
     if (target == null) return;
@@ -13435,7 +13371,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     final ids = _collectSubtreeIds(target).toList();
     try {
       await ref.read(conversationRepositoryProvider)
-          .deleteRoundsAndCleanupOrphanAttachments(widget.fileName, ids);
+          .deleteRoundsAndCleanupOrphanAttachments(widget.sessionId, ids);
     } catch (e) {
       if (mounted) AppToast.show('删除失败：$e');
     }
@@ -13478,7 +13414,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
 
   @override
   Widget build(BuildContext context) {
-    final topology = ref.watch(chatTopologyProvider(widget.fileName)).valueOrNull ?? [];
+    final topology = ref.watch(chatTopologyProvider(widget.sessionId)).valueOrNull ?? [];
     final roots = buildTree(topology);
     final graphSignature = _buildGraphSignature(topology);
     final targetId = widget.initialFocusRoundId;
@@ -13732,15 +13668,15 @@ import '../../domain/services/attachment_preparer.dart';
 import '../../domain/services/chat_context_builder.dart';
 import 'package:uuid/uuid.dart';
 
-final sessionTitleProvider = StreamProvider.family<String, String>((ref, fileName) {
-  return ref.watch(conversationRepositoryProvider).watchSessionTitle(fileName)
+final sessionTitleProvider = StreamProvider.family<String, String>((ref, sessionId) {
+  return ref.watch(conversationRepositoryProvider).watchSessionTitle(sessionId)
       .map((title) => title ?? '对话');
 });
 
 final chatTopologyProvider =
     StreamProvider.family<List<({String id, String? parentId})>, String>(
-  (ref, fileName) {
-    return ref.watch(conversationRepositoryProvider).watchSessionTopology(fileName);
+  (ref, sessionId) {
+    return ref.watch(conversationRepositoryProvider).watchSessionTopology(sessionId);
   },
 );
 
@@ -13749,9 +13685,9 @@ final roundDetailProvider = StreamProvider.family<ChatRound?, String>((ref, roun
 });
 
 final visibleRoundIdsProvider =
-    Provider.family<List<String>, ({String fileName, String? roundId})>(
+    Provider.family<List<String>, ({String sessionId, String? roundId})>(
   (ref, args) {
-    final topology = ref.watch(chatTopologyProvider(args.fileName)).valueOrNull ?? [];
+    final topology = ref.watch(chatTopologyProvider(args.sessionId)).valueOrNull ?? [];
     if (args.roundId == null) return const [];
 
     final idToParent = {for (var t in topology) t.id: t.parentId};
@@ -13768,10 +13704,10 @@ final visibleRoundIdsProvider =
 
 class ChatController {
   final Ref ref;
-  final String fileName;
+  final String sessionId;
   final Set<String> _stoppingRoundIds = {};
 
-  ChatController(this.ref, this.fileName);
+  ChatController(this.ref, this.sessionId);
 
   Future<String> sendMessage({
     required String content,
@@ -13794,7 +13730,7 @@ class ChatController {
       hasUnseenUpdate: false,
     );
 
-    await repository.appendRound(fileName, newRound);
+    await repository.appendRound(sessionId, newRound);
 
     () async {
       final apiSource = ref.read(remoteApiSourceProvider);
@@ -13806,7 +13742,6 @@ class ChatController {
 
       try {
         final contextRounds = await repository.getContextRounds(
-          fileName,
           newRound.id,
         );
         final apiContext = await buildApiContextFromRounds(
@@ -13842,7 +13777,7 @@ class ChatController {
           if (lastDbUpdateTime == null ||
               now.difference(lastDbUpdateTime) >= updateInterval) {
             await repository.updateRound(
-              fileName,
+              sessionId,
               newRound.id,
               newRound.copyWith(
                 assistantContent: contentBuffer.toString(),
@@ -13864,7 +13799,7 @@ class ChatController {
         }
 
         await repository.updateRound(
-          fileName,
+          sessionId,
           newRound.id,
           newRound.copyWith(
             assistantContent: finalContent.trim().isEmpty ? null : finalContent,
@@ -13900,7 +13835,7 @@ class ChatController {
 
   Future<void> markRoundSeen(ChatRound round) async {
     await ref.read(conversationRepositoryProvider).updateRound(
-      fileName,
+      sessionId,
       round.id,
       round.copyWith(hasUnseenUpdate: false),
     );
@@ -13908,8 +13843,8 @@ class ChatController {
 }
 
 final chatControllerProvider =
-    Provider.family<ChatController, String>((ref, fileName) {
-  return ChatController(ref, fileName);
+    Provider.family<ChatController, String>((ref, sessionId) {
+  return ChatController(ref, sessionId);
 });
 ```
 
@@ -13931,14 +13866,14 @@ import '../widgets/common/app_toast.dart';
 import 'branch_tree_page.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
-  final String fileName;
+  final String sessionId;
   final String? initialRoundId;
   final String? initialMessage;
   final List<dynamic>? initialAttachments;
 
   const ChatPage({
     super.key,
-    required this.fileName,
+    required this.sessionId,
     this.initialRoundId,
     this.initialMessage,
     this.initialAttachments,
@@ -13977,7 +13912,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
 
     try {
       final newId =
-          await ref.read(chatControllerProvider(widget.fileName)).sendMessage(
+          await ref.read(chatControllerProvider(widget.sessionId)).sendMessage(
                 content: widget.initialMessage!,
                 parentRoundId: _currentRoundId,
                 attachments: widget.initialAttachments?.cast() ?? [],
@@ -14015,7 +13950,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
   @override
   Widget build(BuildContext context) {
     final sessionTitle =
-        ref.watch(sessionTitleProvider(widget.fileName)).valueOrNull ?? '未加载';
+        ref.watch(sessionTitleProvider(widget.sessionId)).valueOrNull ?? '未加载';
     final currentRoundAsync = ref.watch(roundDetailProvider(_currentRoundId ?? ''));
     final isIncomplete = currentRoundAsync.valueOrNull?.isIncomplete ?? false;
     final configAsync = ref.watch(configProvider);
@@ -14033,7 +13968,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
 
     if (_branchLeafId == null) {
       final topology =
-          ref.watch(chatTopologyProvider(widget.fileName)).valueOrNull;
+          ref.watch(chatTopologyProvider(widget.sessionId)).valueOrNull;
       if (topology != null && topology.isNotEmpty) {
         _branchLeafId = topology.last.id;
         _currentRoundId = _branchLeafId;
@@ -14041,7 +13976,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     }
 
     final visibleRoundIds = ref.watch(visibleRoundIdsProvider((
-      fileName: widget.fileName,
+      sessionId: widget.sessionId,
       roundId: _branchLeafId,
     )));
 
@@ -14069,7 +14004,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
                         await Navigator.of(context).push<String>(
                       MaterialPageRoute(
                         builder: (_) => BranchTreePage(
-                          fileName: widget.fileName,
+                          sessionId: widget.sessionId,
                           initialFocusRoundId: _currentRoundId!,
                         ),
                       ),
@@ -14112,7 +14047,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
                     },
                     itemBuilder: (_, index) => _ChatRoundPage(
                       key: ValueKey(visibleRoundIds[index]),
-                      fileName: widget.fileName,
+                      sessionId: widget.sessionId,
                       roundId: visibleRoundIds[index],
                       onRetryReply: () => _retry(visibleRoundIds[index]),
                     ),
@@ -14123,11 +14058,11 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
             allowImages: allowImages,
             isIncomplete: isIncomplete,
             onStop: () => ref
-                .read(chatControllerProvider(widget.fileName))
+                .read(chatControllerProvider(widget.sessionId))
                 .stopGeneration(_currentRoundId!),
             onSend: (text, attachments) async {
               final controller =
-                  ref.read(chatControllerProvider(widget.fileName));
+                  ref.read(chatControllerProvider(widget.sessionId));
               final newId = await controller.sendMessage(
                 content: text,
                 parentRoundId: _currentRoundId,
@@ -14146,13 +14081,13 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     final roundAsync = ref.read(roundDetailProvider(roundId));
     final round = roundAsync.valueOrNull;
     if (round?.hasUnseenUpdate == true) {
-      ref.read(chatControllerProvider(widget.fileName)).markRoundSeen(round!);
+      ref.read(chatControllerProvider(widget.sessionId)).markRoundSeen(round!);
     }
   }
 
   void _retry(String roundId) async {
     final newId =
-        await ref.read(chatControllerProvider(widget.fileName)).retryFromRound(roundId);
+        await ref.read(chatControllerProvider(widget.sessionId)).retryFromRound(roundId);
     _updateBranch(newId);
   }
 
@@ -14170,13 +14105,13 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
 }
 
 class _ChatRoundPage extends StatelessWidget {
-  final String fileName;
+  final String sessionId;
   final String roundId;
   final VoidCallback onRetryReply;
 
   const _ChatRoundPage({
     super.key,
-    required this.fileName,
+    required this.sessionId,
     required this.roundId,
     required this.onRetryReply,
   });

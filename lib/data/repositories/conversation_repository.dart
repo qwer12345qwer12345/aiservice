@@ -14,8 +14,6 @@ class ConversationRepository {
   final LocalFileSource _fileService;
   ConversationRepository(this._db, this._fileService);
 
-  String _getId(String fileName) => fileName.replaceAll('.json', '');
-
   // ========== 响应式查询 ==========
 
   Stream<List<SessionListItem>> watchSessionListItems() {
@@ -63,8 +61,7 @@ class ConversationRepository {
 
   /// 仅监听会话的拓扑结构（ID 与父子关系）
   /// 只有在增删消息时触发，AI 说话时不触发
-  Stream<List<({String id, String? parentId})>> watchSessionTopology(String fileName) {
-    final sessionId = _getId(fileName);
+  Stream<List<({String id, String? parentId})>> watchSessionTopology(String sessionId) {
     final query = _db.selectOnly(_db.dbChatRounds)
       ..addColumns([_db.dbChatRounds.id, _db.dbChatRounds.parentId])
       ..where(_db.dbChatRounds.sessionId.equals(sessionId))
@@ -104,7 +101,7 @@ class ConversationRepository {
     });
   }
 
-  Future<List<ChatRound>> getContextRounds(String fileName, String roundId) async {
+  Future<List<ChatRound>> getContextRounds(String roundId) async {
     // 1. 使用递归 CTE 直接查询从目标节点到根的路径（数据库层按时间正序返回）
     final roundsQuery = _db.customSelect(
       '''
@@ -166,8 +163,7 @@ class ConversationRepository {
     return dbRounds.map((round) => _mapToChatRound(round, attachmentMap[round.id] ?? [])).toList();
   }
 
-  Stream<String?> watchSessionTitle(String fileName) {
-    final sessionId = _getId(fileName);
+  Stream<String?> watchSessionTitle(String sessionId) {
     return (_db.select(_db.dbSessions)
           ..where((t) => t.id.equals(sessionId)))
         .map((row) => row.title)
@@ -210,11 +206,10 @@ class ConversationRepository {
   // ========== 写操作 ==========
 
   Future<void> deleteRoundsAndCleanupOrphanAttachments(
-    String fileName,
+    String sessionId,
     List<String> roundIds,
   ) async {
     if (roundIds.isEmpty) return;
-    final sessionId = _getId(fileName);
 
     // 1. 收集候选附件路径
     final candidatePaths = (await (_db.select(_db.dbAttachments).join([
@@ -246,9 +241,7 @@ class ConversationRepository {
     await _cleanupOrphanAttachments(candidatePaths);
   }
 
-  Future<void> deleteSession(String fileName) async {
-    final sessionId = _getId(fileName);
-
+  Future<void> deleteSession(String sessionId) async {
     // 1. 收集候选附件路径
     final candidatePaths = (await (_db.select(_db.dbAttachments).join([
       innerJoin(
@@ -262,18 +255,16 @@ class ConversationRepository {
         .toSet();
 
     // 2. 提交数据库变更
-    await (_db.delete(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-        .go();
+    await (_db.delete(_db.dbSessions)..where((t) => t.id.equals(sessionId))).go();
 
     // 3. 基于最终态清理物理文件
     await _cleanupOrphanAttachments(candidatePaths);
   }
 
   Future<Session> createSession({
-    required String fileName,
+    required String sessionId,
     required String title,
   }) async {
-    final sessionId = _getId(fileName);
     final now = DateTime.now().millisecondsSinceEpoch;
     final session = Session(
       id: sessionId,
@@ -293,8 +284,7 @@ class ConversationRepository {
     return session;
   }
 
-  Future<void> updateSessionTitle(String fileName, String title) async {
-    final sessionId = _getId(fileName);
+  Future<void> updateSessionTitle(String sessionId, String title) async {
     await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
         .write(
       DbSessionsCompanion(
@@ -304,8 +294,7 @@ class ConversationRepository {
     );
   }
 
-  Future<void> appendRound(String fileName, ChatRound round) async {
-    final sessionId = _getId(fileName);
+  Future<void> appendRound(String sessionId, ChatRound round) async {
     await _db.transaction(() async {
       await _db.into(_db.dbChatRounds).insert(
             DbChatRoundsCompanion.insert(
@@ -342,11 +331,10 @@ class ConversationRepository {
   }
 
   Future<void> updateRound(
-    String fileName,
+    String sessionId,
     String roundId,
     ChatRound updatedRound,
   ) async {
-    final sessionId = _getId(fileName);
     await _db.transaction(() async {
       await (_db.update(_db.dbChatRounds)..where((t) => t.id.equals(roundId)))
           .write(

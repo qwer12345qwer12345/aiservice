@@ -1,10 +1,6 @@
 abstract class AppConstants {
   // 文件夹名称
-  static const String dirConversations = 'conversations';
   static const String dirAttachments = 'attachments';
-
-  // 文件名
-  static const String fileConfig = 'config.json';
 
   // 配置键
   static const String keyBaseUrl = 'baseUrl';
@@ -15,7 +11,4 @@ abstract class AppConstants {
   // 默认值
   static const String defaultBaseUrl = 'https://api.openai.com';
   static const String defaultTheme = 'system';
-
-  // 文件扩展名
-  static const String extJson = '.json';
 }
