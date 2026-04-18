@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/chat_round.dart';
 import '../../di/providers.dart';
 import '../../domain/services/attachment_preparer.dart';
-import '../../domain/services/chat_context_builder.dart';
+import 'chat_generation_provider.dart';
 import 'package:uuid/uuid.dart';
 
 final sessionTitleProvider = StreamProvider.family<String, String>((ref, sessionId) {
@@ -43,7 +43,6 @@ final visibleRoundIdsProvider =
 class ChatController {
   final Ref ref;
   final String sessionId;
-  final Set<String> _stoppingRoundIds = {};
 
   ChatController(this.ref, this.sessionId);
 
@@ -70,87 +69,10 @@ class ChatController {
 
     await repository.appendRound(sessionId, newRound);
 
-    () async {
-      final apiSource = ref.read(remoteApiSourceProvider);
-      final contentBuffer = StringBuffer();
-      final reasoningBuffer = StringBuffer();
-      String? error;
-      DateTime? lastDbUpdateTime;
-      const updateInterval = Duration(seconds: 1);
-
-      try {
-        final contextRounds = await repository.getContextRounds(
-          newRound.id,
-        );
-        final apiContext = await buildApiContextFromRounds(
-          contextRounds,
-          repository,
-        );
-
-        final currentConfig = await ref.read(configServiceProvider).loadConfig();
-        final selectedId = currentConfig.selectedModel;
-        final selectedModel = currentConfig.availableModels
-            ?.where((m) => m.id == selectedId)
-            .firstOrNull;
-        final enableReasoning = selectedModel?.overrideSupportsReasoning == true;
-
-        final stream = apiSource.chatStream(
-          taskId: newRound.id,
-          loadConfig: () async => currentConfig,
-          context: apiContext,
-          enableReasoning: enableReasoning,
-        );
-
-        await for (final chunk in stream) {
-          if (chunk.error != null) {
-            error = chunk.error;
-            break;
-          }
-          if (chunk.isDone) break;
-
-          if (chunk.content != null) contentBuffer.write(chunk.content);
-          if (chunk.reasoningContent != null) reasoningBuffer.write(chunk.reasoningContent);
-
-          final now = DateTime.now();
-          if (lastDbUpdateTime == null ||
-              now.difference(lastDbUpdateTime) >= updateInterval) {
-            await repository.updateRound(
-              sessionId,
-              newRound.id,
-              newRound.copyWith(
-                assistantContent: contentBuffer.toString(),
-                assistantThinking: reasoningBuffer.toString(),
-              ),
-            );
-            lastDbUpdateTime = now;
-          }
-        }
-      } catch (e) {
-        error = e.toString();
-      } finally {
-
-        String finalContent = contentBuffer.toString();
-        if (error != null) {
-          finalContent += '\n\n[错误]\n$error';
-        } else if (_stoppingRoundIds.contains(newRound.id)) {
-          finalContent += '\n\n[已停止]';
-        }
-
-        await repository.updateRound(
-          sessionId,
-          newRound.id,
-          newRound.copyWith(
-            assistantContent: finalContent.trim().isEmpty ? null : finalContent,
-            assistantThinking: reasoningBuffer.toString().trim().isEmpty
-                ? null
-                : reasoningBuffer.toString(),
-            isIncomplete: false,
-            hasUnseenUpdate: true,
-          ),
-        );
-        _stoppingRoundIds.remove(newRound.id);
-      }
-    }();
+    ref.listen(
+      chatGenerationProvider(newRound.id),
+      (previous, next) {},
+    );
 
     return newRound.id;
   }
@@ -167,15 +89,13 @@ class ChatController {
   }
 
   void stopGeneration(String roundId) {
-    _stoppingRoundIds.add(roundId);
     ref.read(remoteApiSourceProvider).cancelRequest(roundId);
   }
 
   Future<void> markRoundSeen(ChatRound round) async {
     await ref.read(conversationRepositoryProvider).updateRound(
-      sessionId,
-      round.id,
-      round.copyWith(hasUnseenUpdate: false),
+      roundId: round.id,
+      hasUnseenUpdate: false,
     );
   }
 }

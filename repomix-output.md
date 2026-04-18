@@ -53,6 +53,8 @@ lib/core/models/chat_chunk.freezed.dart
 lib/core/models/chat_round.dart
 lib/core/models/chat_round.freezed.dart
 lib/core/models/chat_round.g.dart
+lib/core/models/generation_event.dart
+lib/core/models/generation_event.freezed.dart
 lib/core/models/model_info.dart
 lib/core/models/model_info.freezed.dart
 lib/core/models/model_info.g.dart
@@ -78,6 +80,7 @@ lib/domain/models/tree_node.g.dart
 lib/domain/services/attachment_preparer.dart
 lib/domain/services/chat_context_builder.dart
 lib/domain/services/chat_round_factory.dart
+lib/domain/services/stream_processor.dart
 lib/domain/services/tree_builder.dart
 lib/domain/states/chat_state.dart
 lib/domain/states/chat_state.freezed.dart
@@ -91,6 +94,7 @@ lib/presentation/pages/home_page.dart
 lib/presentation/pages/settings_page.dart
 lib/presentation/pages/text_attachment_viewer_page.dart
 lib/presentation/providers/attachment_bytes_provider.dart
+lib/presentation/providers/chat_generation_provider.dart
 lib/presentation/providers/chat_notifier.dart
 lib/presentation/providers/config_notifier.dart
 lib/presentation/providers/input_notifier.dart
@@ -108,6 +112,759 @@ lib/presentation/widgets/thought_bubble.dart
 ```
 
 # Files
+
+## File: lib/core/models/generation_event.dart
+```dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'generation_event.freezed.dart';
+
+/// 生成过程中的统一事件
+@freezed
+class GenerationEvent with _$GenerationEvent {
+  const factory GenerationEvent.partial({
+    required String content,
+    required String reasoning,
+  }) = PartialGeneration;
+
+  const factory GenerationEvent.completed({
+    required String content,
+    required String reasoning,
+  }) = CompletedGeneration;
+
+  const factory GenerationEvent.failed({
+    required String error,
+  }) = FailedGeneration;
+}
+```
+
+## File: lib/core/models/generation_event.freezed.dart
+```dart
+// coverage:ignore-file
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint
+// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
+
+part of 'generation_event.dart';
+
+// **************************************************************************
+// FreezedGenerator
+// **************************************************************************
+
+T _$identity<T>(T value) => value;
+
+final _privateConstructorUsedError = UnsupportedError(
+  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
+);
+
+/// @nodoc
+mixin _$GenerationEvent {
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function(String content, String reasoning) partial,
+    required TResult Function(String content, String reasoning) completed,
+    required TResult Function(String error) failed,
+  }) => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function(String content, String reasoning)? partial,
+    TResult? Function(String content, String reasoning)? completed,
+    TResult? Function(String error)? failed,
+  }) => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function(String content, String reasoning)? partial,
+    TResult Function(String content, String reasoning)? completed,
+    TResult Function(String error)? failed,
+    required TResult orElse(),
+  }) => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(PartialGeneration value) partial,
+    required TResult Function(CompletedGeneration value) completed,
+    required TResult Function(FailedGeneration value) failed,
+  }) => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(PartialGeneration value)? partial,
+    TResult? Function(CompletedGeneration value)? completed,
+    TResult? Function(FailedGeneration value)? failed,
+  }) => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(PartialGeneration value)? partial,
+    TResult Function(CompletedGeneration value)? completed,
+    TResult Function(FailedGeneration value)? failed,
+    required TResult orElse(),
+  }) => throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $GenerationEventCopyWith<$Res> {
+  factory $GenerationEventCopyWith(
+    GenerationEvent value,
+    $Res Function(GenerationEvent) then,
+  ) = _$GenerationEventCopyWithImpl<$Res, GenerationEvent>;
+}
+
+/// @nodoc
+class _$GenerationEventCopyWithImpl<$Res, $Val extends GenerationEvent>
+    implements $GenerationEventCopyWith<$Res> {
+  _$GenerationEventCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+}
+
+/// @nodoc
+abstract class _$$PartialGenerationImplCopyWith<$Res> {
+  factory _$$PartialGenerationImplCopyWith(
+    _$PartialGenerationImpl value,
+    $Res Function(_$PartialGenerationImpl) then,
+  ) = __$$PartialGenerationImplCopyWithImpl<$Res>;
+  @useResult
+  $Res call({String content, String reasoning});
+}
+
+/// @nodoc
+class __$$PartialGenerationImplCopyWithImpl<$Res>
+    extends _$GenerationEventCopyWithImpl<$Res, _$PartialGenerationImpl>
+    implements _$$PartialGenerationImplCopyWith<$Res> {
+  __$$PartialGenerationImplCopyWithImpl(
+    _$PartialGenerationImpl _value,
+    $Res Function(_$PartialGenerationImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? content = null, Object? reasoning = null}) {
+    return _then(
+      _$PartialGenerationImpl(
+        content: null == content
+            ? _value.content
+            : content // ignore: cast_nullable_to_non_nullable
+                  as String,
+        reasoning: null == reasoning
+            ? _value.reasoning
+            : reasoning // ignore: cast_nullable_to_non_nullable
+                  as String,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+
+class _$PartialGenerationImpl implements PartialGeneration {
+  const _$PartialGenerationImpl({
+    required this.content,
+    required this.reasoning,
+  });
+
+  @override
+  final String content;
+  @override
+  final String reasoning;
+
+  @override
+  String toString() {
+    return 'GenerationEvent.partial(content: $content, reasoning: $reasoning)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$PartialGenerationImpl &&
+            (identical(other.content, content) || other.content == content) &&
+            (identical(other.reasoning, reasoning) ||
+                other.reasoning == reasoning));
+  }
+
+  @override
+  int get hashCode => Object.hash(runtimeType, content, reasoning);
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$PartialGenerationImplCopyWith<_$PartialGenerationImpl> get copyWith =>
+      __$$PartialGenerationImplCopyWithImpl<_$PartialGenerationImpl>(
+        this,
+        _$identity,
+      );
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function(String content, String reasoning) partial,
+    required TResult Function(String content, String reasoning) completed,
+    required TResult Function(String error) failed,
+  }) {
+    return partial(content, reasoning);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function(String content, String reasoning)? partial,
+    TResult? Function(String content, String reasoning)? completed,
+    TResult? Function(String error)? failed,
+  }) {
+    return partial?.call(content, reasoning);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function(String content, String reasoning)? partial,
+    TResult Function(String content, String reasoning)? completed,
+    TResult Function(String error)? failed,
+    required TResult orElse(),
+  }) {
+    if (partial != null) {
+      return partial(content, reasoning);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(PartialGeneration value) partial,
+    required TResult Function(CompletedGeneration value) completed,
+    required TResult Function(FailedGeneration value) failed,
+  }) {
+    return partial(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(PartialGeneration value)? partial,
+    TResult? Function(CompletedGeneration value)? completed,
+    TResult? Function(FailedGeneration value)? failed,
+  }) {
+    return partial?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(PartialGeneration value)? partial,
+    TResult Function(CompletedGeneration value)? completed,
+    TResult Function(FailedGeneration value)? failed,
+    required TResult orElse(),
+  }) {
+    if (partial != null) {
+      return partial(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class PartialGeneration implements GenerationEvent {
+  const factory PartialGeneration({
+    required final String content,
+    required final String reasoning,
+  }) = _$PartialGenerationImpl;
+
+  String get content;
+  String get reasoning;
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$PartialGenerationImplCopyWith<_$PartialGenerationImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class _$$CompletedGenerationImplCopyWith<$Res> {
+  factory _$$CompletedGenerationImplCopyWith(
+    _$CompletedGenerationImpl value,
+    $Res Function(_$CompletedGenerationImpl) then,
+  ) = __$$CompletedGenerationImplCopyWithImpl<$Res>;
+  @useResult
+  $Res call({String content, String reasoning});
+}
+
+/// @nodoc
+class __$$CompletedGenerationImplCopyWithImpl<$Res>
+    extends _$GenerationEventCopyWithImpl<$Res, _$CompletedGenerationImpl>
+    implements _$$CompletedGenerationImplCopyWith<$Res> {
+  __$$CompletedGenerationImplCopyWithImpl(
+    _$CompletedGenerationImpl _value,
+    $Res Function(_$CompletedGenerationImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? content = null, Object? reasoning = null}) {
+    return _then(
+      _$CompletedGenerationImpl(
+        content: null == content
+            ? _value.content
+            : content // ignore: cast_nullable_to_non_nullable
+                  as String,
+        reasoning: null == reasoning
+            ? _value.reasoning
+            : reasoning // ignore: cast_nullable_to_non_nullable
+                  as String,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+
+class _$CompletedGenerationImpl implements CompletedGeneration {
+  const _$CompletedGenerationImpl({
+    required this.content,
+    required this.reasoning,
+  });
+
+  @override
+  final String content;
+  @override
+  final String reasoning;
+
+  @override
+  String toString() {
+    return 'GenerationEvent.completed(content: $content, reasoning: $reasoning)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$CompletedGenerationImpl &&
+            (identical(other.content, content) || other.content == content) &&
+            (identical(other.reasoning, reasoning) ||
+                other.reasoning == reasoning));
+  }
+
+  @override
+  int get hashCode => Object.hash(runtimeType, content, reasoning);
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$CompletedGenerationImplCopyWith<_$CompletedGenerationImpl> get copyWith =>
+      __$$CompletedGenerationImplCopyWithImpl<_$CompletedGenerationImpl>(
+        this,
+        _$identity,
+      );
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function(String content, String reasoning) partial,
+    required TResult Function(String content, String reasoning) completed,
+    required TResult Function(String error) failed,
+  }) {
+    return completed(content, reasoning);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function(String content, String reasoning)? partial,
+    TResult? Function(String content, String reasoning)? completed,
+    TResult? Function(String error)? failed,
+  }) {
+    return completed?.call(content, reasoning);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function(String content, String reasoning)? partial,
+    TResult Function(String content, String reasoning)? completed,
+    TResult Function(String error)? failed,
+    required TResult orElse(),
+  }) {
+    if (completed != null) {
+      return completed(content, reasoning);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(PartialGeneration value) partial,
+    required TResult Function(CompletedGeneration value) completed,
+    required TResult Function(FailedGeneration value) failed,
+  }) {
+    return completed(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(PartialGeneration value)? partial,
+    TResult? Function(CompletedGeneration value)? completed,
+    TResult? Function(FailedGeneration value)? failed,
+  }) {
+    return completed?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(PartialGeneration value)? partial,
+    TResult Function(CompletedGeneration value)? completed,
+    TResult Function(FailedGeneration value)? failed,
+    required TResult orElse(),
+  }) {
+    if (completed != null) {
+      return completed(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class CompletedGeneration implements GenerationEvent {
+  const factory CompletedGeneration({
+    required final String content,
+    required final String reasoning,
+  }) = _$CompletedGenerationImpl;
+
+  String get content;
+  String get reasoning;
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$CompletedGenerationImplCopyWith<_$CompletedGenerationImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class _$$FailedGenerationImplCopyWith<$Res> {
+  factory _$$FailedGenerationImplCopyWith(
+    _$FailedGenerationImpl value,
+    $Res Function(_$FailedGenerationImpl) then,
+  ) = __$$FailedGenerationImplCopyWithImpl<$Res>;
+  @useResult
+  $Res call({String error});
+}
+
+/// @nodoc
+class __$$FailedGenerationImplCopyWithImpl<$Res>
+    extends _$GenerationEventCopyWithImpl<$Res, _$FailedGenerationImpl>
+    implements _$$FailedGenerationImplCopyWith<$Res> {
+  __$$FailedGenerationImplCopyWithImpl(
+    _$FailedGenerationImpl _value,
+    $Res Function(_$FailedGenerationImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? error = null}) {
+    return _then(
+      _$FailedGenerationImpl(
+        error: null == error
+            ? _value.error
+            : error // ignore: cast_nullable_to_non_nullable
+                  as String,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+
+class _$FailedGenerationImpl implements FailedGeneration {
+  const _$FailedGenerationImpl({required this.error});
+
+  @override
+  final String error;
+
+  @override
+  String toString() {
+    return 'GenerationEvent.failed(error: $error)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$FailedGenerationImpl &&
+            (identical(other.error, error) || other.error == error));
+  }
+
+  @override
+  int get hashCode => Object.hash(runtimeType, error);
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$FailedGenerationImplCopyWith<_$FailedGenerationImpl> get copyWith =>
+      __$$FailedGenerationImplCopyWithImpl<_$FailedGenerationImpl>(
+        this,
+        _$identity,
+      );
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function(String content, String reasoning) partial,
+    required TResult Function(String content, String reasoning) completed,
+    required TResult Function(String error) failed,
+  }) {
+    return failed(error);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function(String content, String reasoning)? partial,
+    TResult? Function(String content, String reasoning)? completed,
+    TResult? Function(String error)? failed,
+  }) {
+    return failed?.call(error);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function(String content, String reasoning)? partial,
+    TResult Function(String content, String reasoning)? completed,
+    TResult Function(String error)? failed,
+    required TResult orElse(),
+  }) {
+    if (failed != null) {
+      return failed(error);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(PartialGeneration value) partial,
+    required TResult Function(CompletedGeneration value) completed,
+    required TResult Function(FailedGeneration value) failed,
+  }) {
+    return failed(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(PartialGeneration value)? partial,
+    TResult? Function(CompletedGeneration value)? completed,
+    TResult? Function(FailedGeneration value)? failed,
+  }) {
+    return failed?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(PartialGeneration value)? partial,
+    TResult Function(CompletedGeneration value)? completed,
+    TResult Function(FailedGeneration value)? failed,
+    required TResult orElse(),
+  }) {
+    if (failed != null) {
+      return failed(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class FailedGeneration implements GenerationEvent {
+  const factory FailedGeneration({required final String error}) =
+      _$FailedGenerationImpl;
+
+  String get error;
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$FailedGenerationImplCopyWith<_$FailedGenerationImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+```
+
+## File: lib/domain/services/stream_processor.dart
+```dart
+import 'dart:async';
+import '../../core/models/chat_chunk.dart';
+import '../../core/models/generation_event.dart';
+
+/// 流处理器
+///
+/// 职责：
+/// - 累加 content 和 reasoning
+/// - 节流输出 partial 事件
+/// - 映射错误和完成状态
+/// - 纯逻辑，无副作用，易于测试
+class StreamProcessor {
+  final Duration throttleInterval;
+
+  StreamProcessor({this.throttleInterval = const Duration(seconds: 1)});
+
+  /// 处理输入流并输出生成事件流
+  Stream<GenerationEvent> process(Stream<ChatChunk> input) async* {
+    final contentBuffer = StringBuffer();
+    final reasoningBuffer = StringBuffer();
+    String? error;
+    DateTime? lastEmitTime;
+
+    // 辅助函数：检查是否需要节流输出
+    bool shouldEmit() {
+      final now = DateTime.now();
+      if (lastEmitTime == null) {
+        lastEmitTime = now;
+        return true;
+      }
+      if (now.difference(lastEmitTime!) >= throttleInterval) {
+        lastEmitTime = now;
+        return true;
+      }
+      return false;
+    }
+
+    try {
+      await for (final chunk in input) {
+        // 错误处理
+        if (chunk.error != null) {
+          error = chunk.error;
+          break;
+        }
+
+        // 累加数据
+        if (chunk.content != null) {
+          contentBuffer.write(chunk.content);
+        }
+        if (chunk.reasoningContent != null) {
+          reasoningBuffer.write(chunk.reasoningContent);
+        }
+
+        // 节流输出
+        if (shouldEmit()) {
+          yield GenerationEvent.partial(
+            content: contentBuffer.toString(),
+            reasoning: reasoningBuffer.toString(),
+          );
+        }
+
+        // 完成处理
+        if (chunk.isDone) {
+          break;
+        }
+      }
+
+      // 最终输出
+      if (error != null) {
+        yield GenerationEvent.failed(error: error);
+      } else {
+        yield GenerationEvent.completed(
+          content: contentBuffer.toString(),
+          reasoning: reasoningBuffer.toString(),
+        );
+      }
+    } catch (e) {
+      yield GenerationEvent.failed(error: e.toString());
+    }
+  }
+}
+```
+
+## File: lib/presentation/providers/chat_generation_provider.dart
+```dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/models/generation_event.dart';
+import '../../di/providers.dart';
+import '../../domain/services/chat_context_builder.dart';
+import '../../domain/services/stream_processor.dart';
+
+final chatGenerationProvider =
+  StreamProvider.family<void, String>((ref, roundId) {
+    Stream<GenerationEvent> runTask() async* {
+      final repository = ref.read(conversationRepositoryProvider);     
+      final configService = ref.read(configServiceProvider);
+      final apiSource = ref.read(remoteApiSourceProvider);
+
+      // 1. 构建上下文
+      final contextRounds = await repository.getContextRounds(roundId);
+      final apiContext = await buildApiContextFromRounds(contextRounds, repository);
+
+      // 2. 加载配置
+      final config = await configService.loadConfig();
+
+      // 3. 发起请求
+      final stream = apiSource.chatStream(
+        taskId: roundId,
+        loadConfig: () async => config,
+        context: apiContext,
+      );
+
+      // 4. 处理流
+      final processor = StreamProcessor();
+      yield* processor.process(stream);
+    }
+
+    void handleEvent(GenerationEvent event) {
+      final repository = ref.read(conversationRepositoryProvider);
+
+      event.when(
+        partial: (content, reasoning) {
+          repository.updateRound(
+            roundId: roundId,
+            assistantContent: content,
+            assistantThinking: reasoning,
+            isIncomplete: true,
+          );
+        },
+        completed: (content, reasoning) {
+          repository.updateRound(
+            roundId: roundId,
+            assistantContent: content,
+            assistantThinking: reasoning,
+            isIncomplete: false,
+            hasUnseenUpdate: true,
+          );
+        },
+        failed: (error) {
+          repository.updateRound(
+            roundId: roundId,
+            assistantContent: '[错误]\n$error',
+            assistantThinking: '',
+            isIncomplete: false,
+            hasUnseenUpdate: true,
+          );
+        },
+      );
+    }
+
+    return runTask().asyncMap((event) {
+      handleEvent(event);
+    });
+  }
+);
+```
 
 ## File: lib/core/models/api_message.dart
 ```dart
@@ -2638,307 +3395,6 @@ abstract class _ChatChunk implements ChatChunk {
   _$$ChatChunkImplCopyWith<_$ChatChunkImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }
-```
-
-## File: lib/core/models/model_info.dart
-```dart
-import 'package:freezed_annotation/freezed_annotation.dart';
-
-part 'model_info.freezed.dart';
-part 'model_info.g.dart';
-
-@freezed
-class ModelInfo with _$ModelInfo {
-  const factory ModelInfo({
-    required String id,
-    String? name,
-
-    bool? overrideSupportsReasoning,
-    bool? overrideSupportsVision,
-  }) = _ModelInfo;
-
-  factory ModelInfo.fromJson(Map<String, dynamic> json) =>
-      _$ModelInfoFromJson(json);
-}
-```
-
-## File: lib/core/models/model_info.freezed.dart
-```dart
-// coverage:ignore-file
-// GENERATED CODE - DO NOT MODIFY BY HAND
-// ignore_for_file: type=lint
-// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
-
-part of 'model_info.dart';
-
-// **************************************************************************
-// FreezedGenerator
-// **************************************************************************
-
-T _$identity<T>(T value) => value;
-
-final _privateConstructorUsedError = UnsupportedError(
-  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
-);
-
-ModelInfo _$ModelInfoFromJson(Map<String, dynamic> json) {
-  return _ModelInfo.fromJson(json);
-}
-
-/// @nodoc
-mixin _$ModelInfo {
-  String get id => throw _privateConstructorUsedError;
-  String? get name => throw _privateConstructorUsedError;
-  bool? get overrideSupportsReasoning => throw _privateConstructorUsedError;
-  bool? get overrideSupportsVision => throw _privateConstructorUsedError;
-
-  /// Serializes this ModelInfo to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-
-  /// Create a copy of ModelInfo
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $ModelInfoCopyWith<ModelInfo> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-abstract class $ModelInfoCopyWith<$Res> {
-  factory $ModelInfoCopyWith(ModelInfo value, $Res Function(ModelInfo) then) =
-      _$ModelInfoCopyWithImpl<$Res, ModelInfo>;
-  @useResult
-  $Res call({
-    String id,
-    String? name,
-    bool? overrideSupportsReasoning,
-    bool? overrideSupportsVision,
-  });
-}
-
-/// @nodoc
-class _$ModelInfoCopyWithImpl<$Res, $Val extends ModelInfo>
-    implements $ModelInfoCopyWith<$Res> {
-  _$ModelInfoCopyWithImpl(this._value, this._then);
-
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-
-  /// Create a copy of ModelInfo
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? id = null,
-    Object? name = freezed,
-    Object? overrideSupportsReasoning = freezed,
-    Object? overrideSupportsVision = freezed,
-  }) {
-    return _then(
-      _value.copyWith(
-            id: null == id
-                ? _value.id
-                : id // ignore: cast_nullable_to_non_nullable
-                      as String,
-            name: freezed == name
-                ? _value.name
-                : name // ignore: cast_nullable_to_non_nullable
-                      as String?,
-            overrideSupportsReasoning: freezed == overrideSupportsReasoning
-                ? _value.overrideSupportsReasoning
-                : overrideSupportsReasoning // ignore: cast_nullable_to_non_nullable
-                      as bool?,
-            overrideSupportsVision: freezed == overrideSupportsVision
-                ? _value.overrideSupportsVision
-                : overrideSupportsVision // ignore: cast_nullable_to_non_nullable
-                      as bool?,
-          )
-          as $Val,
-    );
-  }
-}
-
-/// @nodoc
-abstract class _$$ModelInfoImplCopyWith<$Res>
-    implements $ModelInfoCopyWith<$Res> {
-  factory _$$ModelInfoImplCopyWith(
-    _$ModelInfoImpl value,
-    $Res Function(_$ModelInfoImpl) then,
-  ) = __$$ModelInfoImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({
-    String id,
-    String? name,
-    bool? overrideSupportsReasoning,
-    bool? overrideSupportsVision,
-  });
-}
-
-/// @nodoc
-class __$$ModelInfoImplCopyWithImpl<$Res>
-    extends _$ModelInfoCopyWithImpl<$Res, _$ModelInfoImpl>
-    implements _$$ModelInfoImplCopyWith<$Res> {
-  __$$ModelInfoImplCopyWithImpl(
-    _$ModelInfoImpl _value,
-    $Res Function(_$ModelInfoImpl) _then,
-  ) : super(_value, _then);
-
-  /// Create a copy of ModelInfo
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? id = null,
-    Object? name = freezed,
-    Object? overrideSupportsReasoning = freezed,
-    Object? overrideSupportsVision = freezed,
-  }) {
-    return _then(
-      _$ModelInfoImpl(
-        id: null == id
-            ? _value.id
-            : id // ignore: cast_nullable_to_non_nullable
-                  as String,
-        name: freezed == name
-            ? _value.name
-            : name // ignore: cast_nullable_to_non_nullable
-                  as String?,
-        overrideSupportsReasoning: freezed == overrideSupportsReasoning
-            ? _value.overrideSupportsReasoning
-            : overrideSupportsReasoning // ignore: cast_nullable_to_non_nullable
-                  as bool?,
-        overrideSupportsVision: freezed == overrideSupportsVision
-            ? _value.overrideSupportsVision
-            : overrideSupportsVision // ignore: cast_nullable_to_non_nullable
-                  as bool?,
-      ),
-    );
-  }
-}
-
-/// @nodoc
-@JsonSerializable()
-class _$ModelInfoImpl implements _ModelInfo {
-  const _$ModelInfoImpl({
-    required this.id,
-    this.name,
-    this.overrideSupportsReasoning,
-    this.overrideSupportsVision,
-  });
-
-  factory _$ModelInfoImpl.fromJson(Map<String, dynamic> json) =>
-      _$$ModelInfoImplFromJson(json);
-
-  @override
-  final String id;
-  @override
-  final String? name;
-  @override
-  final bool? overrideSupportsReasoning;
-  @override
-  final bool? overrideSupportsVision;
-
-  @override
-  String toString() {
-    return 'ModelInfo(id: $id, name: $name, overrideSupportsReasoning: $overrideSupportsReasoning, overrideSupportsVision: $overrideSupportsVision)';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$ModelInfoImpl &&
-            (identical(other.id, id) || other.id == id) &&
-            (identical(other.name, name) || other.name == name) &&
-            (identical(
-                  other.overrideSupportsReasoning,
-                  overrideSupportsReasoning,
-                ) ||
-                other.overrideSupportsReasoning == overrideSupportsReasoning) &&
-            (identical(other.overrideSupportsVision, overrideSupportsVision) ||
-                other.overrideSupportsVision == overrideSupportsVision));
-  }
-
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  int get hashCode => Object.hash(
-    runtimeType,
-    id,
-    name,
-    overrideSupportsReasoning,
-    overrideSupportsVision,
-  );
-
-  /// Create a copy of ModelInfo
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$ModelInfoImplCopyWith<_$ModelInfoImpl> get copyWith =>
-      __$$ModelInfoImplCopyWithImpl<_$ModelInfoImpl>(this, _$identity);
-
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$ModelInfoImplToJson(this);
-  }
-}
-
-abstract class _ModelInfo implements ModelInfo {
-  const factory _ModelInfo({
-    required final String id,
-    final String? name,
-    final bool? overrideSupportsReasoning,
-    final bool? overrideSupportsVision,
-  }) = _$ModelInfoImpl;
-
-  factory _ModelInfo.fromJson(Map<String, dynamic> json) =
-      _$ModelInfoImpl.fromJson;
-
-  @override
-  String get id;
-  @override
-  String? get name;
-  @override
-  bool? get overrideSupportsReasoning;
-  @override
-  bool? get overrideSupportsVision;
-
-  /// Create a copy of ModelInfo
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$ModelInfoImplCopyWith<_$ModelInfoImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-```
-
-## File: lib/core/models/model_info.g.dart
-```dart
-// GENERATED CODE - DO NOT MODIFY BY HAND
-
-part of 'model_info.dart';
-
-// **************************************************************************
-// JsonSerializableGenerator
-// **************************************************************************
-
-_$ModelInfoImpl _$$ModelInfoImplFromJson(Map<String, dynamic> json) =>
-    _$ModelInfoImpl(
-      id: json['id'] as String,
-      name: json['name'] as String?,
-      overrideSupportsReasoning: json['overrideSupportsReasoning'] as bool?,
-      overrideSupportsVision: json['overrideSupportsVision'] as bool?,
-    );
-
-Map<String, dynamic> _$$ModelInfoImplToJson(_$ModelInfoImpl instance) =>
-    <String, dynamic>{
-      'id': instance.id,
-      'name': instance.name,
-      'overrideSupportsReasoning': instance.overrideSupportsReasoning,
-      'overrideSupportsVision': instance.overrideSupportsVision,
-    };
 ```
 
 ## File: lib/core/utils/app_route_observer.dart
@@ -7346,6 +7802,307 @@ Map<String, dynamic> _$$ChatRoundImplToJson(_$ChatRoundImpl instance) =>
     };
 ```
 
+## File: lib/core/models/model_info.dart
+```dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'model_info.freezed.dart';
+part 'model_info.g.dart';
+
+@freezed
+class ModelInfo with _$ModelInfo {
+  const factory ModelInfo({
+    required String id,
+    String? name,
+
+    bool? overrideSupportsReasoning,
+    bool? overrideSupportsVision,
+  }) = _ModelInfo;
+
+  factory ModelInfo.fromJson(Map<String, dynamic> json) =>
+      _$ModelInfoFromJson(json);
+}
+```
+
+## File: lib/core/models/model_info.freezed.dart
+```dart
+// coverage:ignore-file
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint
+// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
+
+part of 'model_info.dart';
+
+// **************************************************************************
+// FreezedGenerator
+// **************************************************************************
+
+T _$identity<T>(T value) => value;
+
+final _privateConstructorUsedError = UnsupportedError(
+  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
+);
+
+ModelInfo _$ModelInfoFromJson(Map<String, dynamic> json) {
+  return _ModelInfo.fromJson(json);
+}
+
+/// @nodoc
+mixin _$ModelInfo {
+  String get id => throw _privateConstructorUsedError;
+  String? get name => throw _privateConstructorUsedError;
+  bool? get overrideSupportsReasoning => throw _privateConstructorUsedError;
+  bool? get overrideSupportsVision => throw _privateConstructorUsedError;
+
+  /// Serializes this ModelInfo to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+
+  /// Create a copy of ModelInfo
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $ModelInfoCopyWith<ModelInfo> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $ModelInfoCopyWith<$Res> {
+  factory $ModelInfoCopyWith(ModelInfo value, $Res Function(ModelInfo) then) =
+      _$ModelInfoCopyWithImpl<$Res, ModelInfo>;
+  @useResult
+  $Res call({
+    String id,
+    String? name,
+    bool? overrideSupportsReasoning,
+    bool? overrideSupportsVision,
+  });
+}
+
+/// @nodoc
+class _$ModelInfoCopyWithImpl<$Res, $Val extends ModelInfo>
+    implements $ModelInfoCopyWith<$Res> {
+  _$ModelInfoCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of ModelInfo
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? name = freezed,
+    Object? overrideSupportsReasoning = freezed,
+    Object? overrideSupportsVision = freezed,
+  }) {
+    return _then(
+      _value.copyWith(
+            id: null == id
+                ? _value.id
+                : id // ignore: cast_nullable_to_non_nullable
+                      as String,
+            name: freezed == name
+                ? _value.name
+                : name // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            overrideSupportsReasoning: freezed == overrideSupportsReasoning
+                ? _value.overrideSupportsReasoning
+                : overrideSupportsReasoning // ignore: cast_nullable_to_non_nullable
+                      as bool?,
+            overrideSupportsVision: freezed == overrideSupportsVision
+                ? _value.overrideSupportsVision
+                : overrideSupportsVision // ignore: cast_nullable_to_non_nullable
+                      as bool?,
+          )
+          as $Val,
+    );
+  }
+}
+
+/// @nodoc
+abstract class _$$ModelInfoImplCopyWith<$Res>
+    implements $ModelInfoCopyWith<$Res> {
+  factory _$$ModelInfoImplCopyWith(
+    _$ModelInfoImpl value,
+    $Res Function(_$ModelInfoImpl) then,
+  ) = __$$ModelInfoImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({
+    String id,
+    String? name,
+    bool? overrideSupportsReasoning,
+    bool? overrideSupportsVision,
+  });
+}
+
+/// @nodoc
+class __$$ModelInfoImplCopyWithImpl<$Res>
+    extends _$ModelInfoCopyWithImpl<$Res, _$ModelInfoImpl>
+    implements _$$ModelInfoImplCopyWith<$Res> {
+  __$$ModelInfoImplCopyWithImpl(
+    _$ModelInfoImpl _value,
+    $Res Function(_$ModelInfoImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of ModelInfo
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? name = freezed,
+    Object? overrideSupportsReasoning = freezed,
+    Object? overrideSupportsVision = freezed,
+  }) {
+    return _then(
+      _$ModelInfoImpl(
+        id: null == id
+            ? _value.id
+            : id // ignore: cast_nullable_to_non_nullable
+                  as String,
+        name: freezed == name
+            ? _value.name
+            : name // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        overrideSupportsReasoning: freezed == overrideSupportsReasoning
+            ? _value.overrideSupportsReasoning
+            : overrideSupportsReasoning // ignore: cast_nullable_to_non_nullable
+                  as bool?,
+        overrideSupportsVision: freezed == overrideSupportsVision
+            ? _value.overrideSupportsVision
+            : overrideSupportsVision // ignore: cast_nullable_to_non_nullable
+                  as bool?,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+@JsonSerializable()
+class _$ModelInfoImpl implements _ModelInfo {
+  const _$ModelInfoImpl({
+    required this.id,
+    this.name,
+    this.overrideSupportsReasoning,
+    this.overrideSupportsVision,
+  });
+
+  factory _$ModelInfoImpl.fromJson(Map<String, dynamic> json) =>
+      _$$ModelInfoImplFromJson(json);
+
+  @override
+  final String id;
+  @override
+  final String? name;
+  @override
+  final bool? overrideSupportsReasoning;
+  @override
+  final bool? overrideSupportsVision;
+
+  @override
+  String toString() {
+    return 'ModelInfo(id: $id, name: $name, overrideSupportsReasoning: $overrideSupportsReasoning, overrideSupportsVision: $overrideSupportsVision)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$ModelInfoImpl &&
+            (identical(other.id, id) || other.id == id) &&
+            (identical(other.name, name) || other.name == name) &&
+            (identical(
+                  other.overrideSupportsReasoning,
+                  overrideSupportsReasoning,
+                ) ||
+                other.overrideSupportsReasoning == overrideSupportsReasoning) &&
+            (identical(other.overrideSupportsVision, overrideSupportsVision) ||
+                other.overrideSupportsVision == overrideSupportsVision));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(
+    runtimeType,
+    id,
+    name,
+    overrideSupportsReasoning,
+    overrideSupportsVision,
+  );
+
+  /// Create a copy of ModelInfo
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$ModelInfoImplCopyWith<_$ModelInfoImpl> get copyWith =>
+      __$$ModelInfoImplCopyWithImpl<_$ModelInfoImpl>(this, _$identity);
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$ModelInfoImplToJson(this);
+  }
+}
+
+abstract class _ModelInfo implements ModelInfo {
+  const factory _ModelInfo({
+    required final String id,
+    final String? name,
+    final bool? overrideSupportsReasoning,
+    final bool? overrideSupportsVision,
+  }) = _$ModelInfoImpl;
+
+  factory _ModelInfo.fromJson(Map<String, dynamic> json) =
+      _$ModelInfoImpl.fromJson;
+
+  @override
+  String get id;
+  @override
+  String? get name;
+  @override
+  bool? get overrideSupportsReasoning;
+  @override
+  bool? get overrideSupportsVision;
+
+  /// Create a copy of ModelInfo
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$ModelInfoImplCopyWith<_$ModelInfoImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+```
+
+## File: lib/core/models/model_info.g.dart
+```dart
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+part of 'model_info.dart';
+
+// **************************************************************************
+// JsonSerializableGenerator
+// **************************************************************************
+
+_$ModelInfoImpl _$$ModelInfoImplFromJson(Map<String, dynamic> json) =>
+    _$ModelInfoImpl(
+      id: json['id'] as String,
+      name: json['name'] as String?,
+      overrideSupportsReasoning: json['overrideSupportsReasoning'] as bool?,
+      overrideSupportsVision: json['overrideSupportsVision'] as bool?,
+    );
+
+Map<String, dynamic> _$$ModelInfoImplToJson(_$ModelInfoImpl instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'name': instance.name,
+      'overrideSupportsReasoning': instance.overrideSupportsReasoning,
+      'overrideSupportsVision': instance.overrideSupportsVision,
+    };
+```
+
 ## File: lib/core/models/session.dart
 ```dart
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -9765,499 +10522,6 @@ class LocalFileSource{
 }
 ```
 
-## File: lib/data/data_sources/remote_api_source.dart
-```dart
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import '../../core/models/model_info.dart';
-import '../../core/models/api_message.dart';
-import '../../core/models/app_config.dart';
-import '../../core/models/chat_chunk.dart';
-import '../../core/utils/sse_parser.dart';
-import 'sse_event_decoder.dart';
-
-class RemoteApiSource{
-  final Map<String, http.Client> _activeClients = {};
-  final Set<String> _cancelledTasks = {};
-
-  Map<String, String> _buildHeaders(String apiKey, String apiMode) {
-    if (apiMode == 'google') {
-      // Google API Key 必须使用 x-goog-api-key 头部
-      return {
-        'x-goog-api-key': apiKey,
-        'Content-Type': 'application/json',
-      };
-    }
-    // 默认 OpenAI/Claude 等使用 Bearer
-    return {
-      'Authorization': 'Bearer $apiKey',
-      'Content-Type': 'application/json',
-    };
-  }
-
-  List<Map<String, dynamic>> _buildGoogleContents(List<ApiMessage> context) {
-    return context.map((message) {
-      // Google 使用 'model' 代表助手，'user' 代表用户
-      // 内联处理，不引入额外映射层
-      final role = message.role == 'assistant' ? 'model' : message.role;
-
-      final parts = <Map<String, dynamic>>[];
-
-      if (message.parts.isEmpty) {
-        final text = message.content?.trim() ?? '';
-        if (text.isNotEmpty) {
-          parts.add({'text': text});
-        }
-      } else {
-        for (final part in message.parts) {
-          parts.addAll(part.when(
-            text: (type, text) => [{'text': text}],
-            imageUrl: (type, imageUrl) {
-              final url = imageUrl.url;
-              // 解析 data URL 转换为 Google 的 inlineData
-              if (url.startsWith('data:')) {
-                final commaIndex = url.indexOf(',');
-                if (commaIndex != -1) {
-                  final mime = url.substring(5, commaIndex);
-                  final base64Data = url.substring(commaIndex + 1);
-                  return [
-                    {
-                      'inlineData': {
-                        'mimeType': mime,
-                        'data': base64Data,
-                      }
-                    }
-                  ];
-                }
-              }
-              // 不支持非 data URL，降级为文本
-              return [{'text': '[Image: $url]'}];
-            },
-          ));
-        }
-      }
-
-      if (parts.isEmpty) return null;
-
-      return {
-        'role': role,
-        'parts': parts,
-      };
-    }).whereType<Map<String, dynamic>>().toList();
-  }
-
-  String _buildUrl(String baseUrl, String path) {
-    final normalizedBase = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
-    final normalizedPath = path.trim().replaceAll(RegExp(r'^/+'), '');
-    return '$normalizedBase/$normalizedPath';
-  }
-
-  bool? _readBool(Map<String, dynamic> json, List<String> keys) {
-    for (final key in keys) {
-      if (!json.containsKey(key)) continue;
-      final value = json[key];
-      if (value is bool) return value;
-      if (value is num) return value != 0;
-      if (value is String) {
-        final lower = value.toLowerCase();
-        if (lower == 'true' || lower == '1' || lower == 'yes') return true;
-        if (lower == 'false' || lower == '0' || lower == 'no') return false;
-      }
-    }
-    return null;
-  }
-
-  ModelInfo _parseModelInfo(Map<String, dynamic> json) {
-    return ModelInfo(
-      id: (json['id'] ?? '').toString(),
-      name: json['name']?.toString(),
-      overrideSupportsReasoning: _readBool(json, ['overrideSupportsReasoning', 'override_supports_reasoning']),
-      overrideSupportsVision: _readBool(json, ['overrideSupportsVision', 'override_supports_vision']),
-    );
-    // 说明：初始拉取阶段仅保留 API 原始返回值与本地覆盖值，最终生效值由 UI/配置层按需计算
-  }
-
-  bool _isOnlySingleTextPart(ApiMessage message) {
-    if (message.parts.length != 1) return false;
-    return message.parts.first.maybeWhen(
-      text: (_, text) => true,
-      orElse: () => false,
-    );
-  }
-
-  Map<String, dynamic> _buildChatCompletionAssistantMessage(ApiMessage message) {
-    final result = <String, dynamic>{
-      'role': 'assistant',
-      'content': message.content ?? '',
-    };
-    if ((message.reasoning ?? '').trim().isNotEmpty) {
-      result['reasoning_content'] = message.reasoning;
-    }
-    return result;
-  }
-
-  Map<String, dynamic> _buildChatCompletionMessage(ApiMessage message) {
-    if (message.role == 'assistant') {
-      return _buildChatCompletionAssistantMessage(message);
-    }
-
-    if (message.parts.isEmpty) {
-      return {
-        'role': message.role,
-        'content': message.content ?? '',
-      };
-    }
-
-    if (_isOnlySingleTextPart(message)) {
-      final text = message.parts.first.maybeWhen(
-        text: (_, text) => text,
-        orElse: () => message.content ?? '',
-      );
-      return {
-        'role': message.role,
-        'content': text,
-      };
-    }
-
-    return {
-      'role': message.role,
-      'content': message.parts.map((part) {
-        return part.when(
-          text: (type, text) => {
-            'type': 'text',
-            'text': text,
-          },
-          imageUrl: (type, imageUrl) => {
-            'type': 'image_url',
-            'image_url': {
-              'url': imageUrl.url,
-            },
-          },
-        );
-      }).toList(),
-    };
-  }
-
-  List<Map<String, dynamic>> _buildChatCompletionMessages(
-    List<ApiMessage> context,
-  ) {
-    return context.map(_buildChatCompletionMessage).toList();
-  }
-
-  Map<String, dynamic> _buildResponsesUserLikeMessage(ApiMessage message) {
-    if (message.parts.isEmpty) {
-      return {
-        'role': message.role,
-        'content': message.content ?? '',
-       };
-    }
-
-    if (_isOnlySingleTextPart(message)) {
-      final text = message.parts.first.maybeWhen(
-        text: (_, text) => text,
-        orElse: () => message.content ?? '',
-      );
-      return {
-        'role': message.role,
-        'content': text,
-      };
-    }
-
-    return {
-      'role': message.role,
-      'content': message.parts.map((part) {
-        return part.when(
-          text: (type, text) => {
-            'type': 'input_text',
-            'text': text,
-          },
-          imageUrl: (type, imageUrl) => {
-            'type': 'input_image',
-            'image_url': imageUrl.url,
-          },
-        );
-      }).toList(),
-    };
-  }
-
-  List<Map<String, dynamic>> _buildResponsesAssistantItems(ApiMessage message) {
-    final items = <Map<String, dynamic>>[];
-
-    if ((message.reasoning ?? '').trim().isNotEmpty) {
-      items.add({
-        'type': 'reasoning',
-        'summary': [
-          {
-            'type': 'summary_text',
-             'text': message.reasoning,
-          }
-        ],
-      });
-    }
-
-    if ((message.content ?? '').trim().isNotEmpty) {
-      items.add({
-        'role': 'assistant',
-         'content': message.content,
-      });
-    }
-
-    return items;
-  }
-
-  List<Map<String, dynamic>> _buildResponsesInput(
-    List<ApiMessage> context,
-  ) {
-    final result = <Map<String, dynamic>>[];
-    for (final message in context) {
-      if (message.role == 'assistant') {
-        result.addAll(_buildResponsesAssistantItems(message));
-      } else {
-        result.add(_buildResponsesUserLikeMessage(message));
-      }
-    }
-    return result;
-  }
-
-  Map<String, dynamic> _buildRequestBody({
-    required String apiMode,
-    required String model,
-    required List<ApiMessage> context,
-    required bool enableReasoning,
-  }) {
-    if (apiMode == 'google') {
-      return {
-        'contents': _buildGoogleContents(context),
-        'generationConfig': {
-          // 可在此添加 temperature 等参数
-        },
-        // 参考代码中的 SafetySettings，设置为 OFF 以避免默认拦截
-        'safetySettings': [
-          {'category': 'HARM_CATEGORY_HARASSMENT', 'threshold': 'BLOCK_NONE'},
-          {'category': 'HARM_CATEGORY_HATE_SPEECH', 'threshold': 'BLOCK_NONE'},
-          {'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'threshold': 'BLOCK_NONE'},
-          {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold': 'BLOCK_NONE'},
-        ],
-      };
-    }
-
-    if (apiMode == 'responses') {
-      return {
-        'model': model,
-        'input': _buildResponsesInput(context),
-         'stream': true,
-        'store': false,
-        if (enableReasoning)
-          'reasoning': {
-            'effort': 'medium',
-          },
-      };
-    }
-
-    return {
-      'model': model,
-      'messages': _buildChatCompletionMessages(context),
-      'stream': true,
-      if (enableReasoning) 'reasoning_effort': 'medium',
-    };
-  }
-
-  Future<List<ModelInfo>> fetchModels({
-    required String baseUrl,
-    required String apiKey,
-    required String modelsPath,
-    required String apiMode, // 需要传入 apiMode 以区分解析逻辑
-  }) async {
-    try {
-      final url = Uri.parse(_buildUrl(baseUrl, modelsPath));
-      final response = await http.get(
-        url,
-        headers: _buildHeaders(apiKey, apiMode),
-      );
-
-      if (response.statusCode != 200) {
-        throw Exception('获取模型列表失败：${response.statusCode}');
-      }
-
-      final json = jsonDecode(response.body) as Map<String, dynamic>;
-
-      // ✅ Google 模式解析
-      if (apiMode == 'google') {
-        final models = json['models'] as List<dynamic>?;
-        if (models == null) return [];
-
-        return models.map((e) {
-          final m = e as Map<String, dynamic>;
-          final name = (m['name'] ?? '').toString();
-          // Google 返回的 name 格式为 "models/gemini-...", 需去除前缀
-          final id = name.startsWith('models/') ? name.substring(7) : name;
-          
-          // 参考代码检查 supportedGenerationMethods
-          final methods = m['supportedGenerationMethods'] as List<dynamic>?;
-          if (methods != null && !methods.contains('generateContent')) {
-            return null; // 过滤掉不支持生成的模型
-          }
-
-          return ModelInfo(
-            id: id,
-            name: m['displayName']?.toString(),
-          );
-        }).whereType<ModelInfo>().toList();
-      }
-
-      // 默认 OpenAI 格式解析
-      final data = json['data'] as List<dynamic>;
-      return data.map((e) => _parseModelInfo(e as Map<String, dynamic>)).toList();
-    } catch (e) {
-      throw Exception('获取模型列表失败：$e');
-    }
-  }
-
-  Stream<ChatChunk> chatStream({
-    required String taskId,
-    required Future<AppConfig> Function() loadConfig,
-    required List<ApiMessage> context,
-    bool enableReasoning = false,
-  }) async* {
-    final client = http.Client();
-    _activeClients[taskId] = client;
-
-    try {
-      final config = await loadConfig();
-
-      final baseUrl = config.baseUrl.trim();
-      final apiKey = config.apiKey.trim();
-      final chatPath = config.chatPath.trim();
-      final apiMode = config.apiMode.trim();
-      final model = config.selectedModel?.trim() ?? '';
-
-      if (baseUrl.isEmpty) {
-        yield const ChatChunk(isDone: true, error: 'Base URL 为空');
-        return;
-      }
- 
-      if (apiKey.isEmpty) {
-        yield const ChatChunk(isDone: true, error: 'API Key 为空');
-        return;
-      }
-
-      if (chatPath.isEmpty) {
-        yield const ChatChunk(isDone: true, error: 'Chat Path 为空');
-        return;
-      }
-
-      if (model.isEmpty) {
-        yield const ChatChunk(isDone: true, error: '未选择模型');
-        return;
-      }
-
-      String resolvedChatPath = chatPath;
-      if (resolvedChatPath.contains('{model}')) {
-        resolvedChatPath = resolvedChatPath.replaceAll('{model}', model);
-      }
-
-      final baseUri = Uri.parse(_buildUrl(baseUrl, resolvedChatPath));
-      final url = apiMode == 'google'
-        ? baseUri.replace(queryParameters: {...baseUri.queryParameters, 'alt': 'sse'})
-        : baseUri;
-
-      final requestBody = _buildRequestBody(
-        apiMode: apiMode,
-        model: model,
-        context: context,
-         enableReasoning: enableReasoning,
-      );
-
-      final request = http.Request('POST', url)
-        ..headers.addAll(_buildHeaders(apiKey, apiMode))
-        ..headers.addAll({
-          'Accept': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-        })
-        ..body = jsonEncode(requestBody);
-
-      final streamedResponse = await client.send(request);
-
-      if (streamedResponse.statusCode  < 200 ||
-          streamedResponse.statusCode  >= 300) {
-        final errorBody = await streamedResponse.stream.bytesToString();
-        throw Exception('流式请求失败：${streamedResponse.statusCode} $errorBody');
-      }
-
-      final parser = SseParser();
-      final stream = streamedResponse.stream.transform(utf8.decoder);
-
-      await for (final rawChunk in stream) {
-        if (_cancelledTasks.contains(taskId)) {
-          yield const ChatChunk(isDone: true);
-          return;
-        }
-
-        final events = parser.addChunk(rawChunk);
-
-        for (final event in events) {
-          if (_cancelledTasks.contains(taskId)) {
-            yield const ChatChunk(isDone: true);
-            return;
-           }
-
-          try {
-            final decoded = SseEventDecoder.decode(
-              apiMode: apiMode,
-              event: event,
-            );
-
-            if (decoded == null) continue;
-
-            yield decoded;
-
-            if (decoded.isDone) {
-              return;
-            }
-          } catch (_) {
-            // 单条 SSE 解析失败不让整个流中断
-          } 
-        }
-      }
-
-      final lastEvent = parser.close();
-      if (lastEvent != null) {
-        try {
-          final decoded = SseEventDecoder.decode(
-            apiMode: apiMode,
-            event: lastEvent,
-          );
-          if (decoded != null) {
-            yield decoded;
-            if (decoded.isDone) return;
-          }
-        } catch (_) {
-          // 忽略最后一次 flush 解码错误
-        }
-      }
-
-      yield const ChatChunk(isDone: true);
-    } catch (e) {
-      if (_cancelledTasks.contains(taskId)) {
-        yield const ChatChunk(isDone: true);
-      } else {
-        yield ChatChunk(isDone: true, error: '流式请求失败：$e');
-      }
-    } finally {
-      _activeClients[taskId]?.close();
-      _activeClients.remove(taskId);
-      _cancelledTasks.remove(taskId);
-    }
-  }
-
-  void cancelRequest(String taskId) {
-    _cancelledTasks.add(taskId);
-     _activeClients[taskId]?.close();
-    _activeClients.remove(taskId);
-  }
-}
-```
-
 ## File: lib/domain/states/chat_state.dart
 ```dart
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -10849,6 +11113,502 @@ class MessageBubble extends StatelessWidget {
 }
 ```
 
+## File: lib/data/data_sources/remote_api_source.dart
+```dart
+import 'dart:convert';
+import 'package:collection/collection.dart';
+import 'package:http/http.dart' as http;
+import '../../core/models/model_info.dart';
+import '../../core/models/api_message.dart';
+import '../../core/models/app_config.dart';
+import '../../core/models/chat_chunk.dart';
+import '../../core/utils/sse_parser.dart';
+import 'sse_event_decoder.dart';
+
+class RemoteApiSource{
+  final Map<String, http.Client> _activeClients = {};
+  final Set<String> _cancelledTasks = {};
+
+  Map<String, String> _buildHeaders(String apiKey, String apiMode) {
+    if (apiMode == 'google') {
+      // Google API Key 必须使用 x-goog-api-key 头部
+      return {
+        'x-goog-api-key': apiKey,
+        'Content-Type': 'application/json',
+      };
+    }
+    // 默认 OpenAI/Claude 等使用 Bearer
+    return {
+      'Authorization': 'Bearer $apiKey',
+      'Content-Type': 'application/json',
+    };
+  }
+
+  List<Map<String, dynamic>> _buildGoogleContents(List<ApiMessage> context) {
+    return context.map((message) {
+      // Google 使用 'model' 代表助手，'user' 代表用户
+      // 内联处理，不引入额外映射层
+      final role = message.role == 'assistant' ? 'model' : message.role;
+
+      final parts = <Map<String, dynamic>>[];
+
+      if (message.parts.isEmpty) {
+        final text = message.content?.trim() ?? '';
+        if (text.isNotEmpty) {
+          parts.add({'text': text});
+        }
+      } else {
+        for (final part in message.parts) {
+          parts.addAll(part.when(
+            text: (type, text) => [{'text': text}],
+            imageUrl: (type, imageUrl) {
+              final url = imageUrl.url;
+              // 解析 data URL 转换为 Google 的 inlineData
+              if (url.startsWith('data:')) {
+                final commaIndex = url.indexOf(',');
+                if (commaIndex != -1) {
+                  final mime = url.substring(5, commaIndex);
+                  final base64Data = url.substring(commaIndex + 1);
+                  return [
+                    {
+                      'inlineData': {
+                        'mimeType': mime,
+                        'data': base64Data,
+                      }
+                    }
+                  ];
+                }
+              }
+              // 不支持非 data URL，降级为文本
+              return [{'text': '[Image: $url]'}];
+            },
+          ));
+        }
+      }
+
+      if (parts.isEmpty) return null;
+
+      return {
+        'role': role,
+        'parts': parts,
+      };
+    }).whereType<Map<String, dynamic>>().toList();
+  }
+
+  String _buildUrl(String baseUrl, String path) {
+    final normalizedBase = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
+    final normalizedPath = path.trim().replaceAll(RegExp(r'^/+'), '');
+    return '$normalizedBase/$normalizedPath';
+  }
+
+  bool? _readBool(Map<String, dynamic> json, List<String> keys) {
+    for (final key in keys) {
+      if (!json.containsKey(key)) continue;
+      final value = json[key];
+      if (value is bool) return value;
+      if (value is num) return value != 0;
+      if (value is String) {
+        final lower = value.toLowerCase();
+        if (lower == 'true' || lower == '1' || lower == 'yes') return true;
+        if (lower == 'false' || lower == '0' || lower == 'no') return false;
+      }
+    }
+    return null;
+  }
+
+  ModelInfo _parseModelInfo(Map<String, dynamic> json) {
+    return ModelInfo(
+      id: (json['id'] ?? '').toString(),
+      name: json['name']?.toString(),
+      overrideSupportsReasoning: _readBool(json, ['overrideSupportsReasoning', 'override_supports_reasoning']),
+      overrideSupportsVision: _readBool(json, ['overrideSupportsVision', 'override_supports_vision']),
+    );
+    // 说明：初始拉取阶段仅保留 API 原始返回值与本地覆盖值，最终生效值由 UI/配置层按需计算
+  }
+
+  bool _isOnlySingleTextPart(ApiMessage message) {
+    if (message.parts.length != 1) return false;
+    return message.parts.first.maybeWhen(
+      text: (_, text) => true,
+      orElse: () => false,
+    );
+  }
+
+  Map<String, dynamic> _buildChatCompletionAssistantMessage(ApiMessage message) {
+    final result = <String, dynamic>{
+      'role': 'assistant',
+      'content': message.content ?? '',
+    };
+    if ((message.reasoning ?? '').trim().isNotEmpty) {
+      result['reasoning_content'] = message.reasoning;
+    }
+    return result;
+  }
+
+  Map<String, dynamic> _buildChatCompletionMessage(ApiMessage message) {
+    if (message.role == 'assistant') {
+      return _buildChatCompletionAssistantMessage(message);
+    }
+
+    if (message.parts.isEmpty) {
+      return {
+        'role': message.role,
+        'content': message.content ?? '',
+      };
+    }
+
+    if (_isOnlySingleTextPart(message)) {
+      final text = message.parts.first.maybeWhen(
+        text: (_, text) => text,
+        orElse: () => message.content ?? '',
+      );
+      return {
+        'role': message.role,
+        'content': text,
+      };
+    }
+
+    return {
+      'role': message.role,
+      'content': message.parts.map((part) {
+        return part.when(
+          text: (type, text) => {
+            'type': 'text',
+            'text': text,
+          },
+          imageUrl: (type, imageUrl) => {
+            'type': 'image_url',
+            'image_url': {
+              'url': imageUrl.url,
+            },
+          },
+        );
+      }).toList(),
+    };
+  }
+
+  List<Map<String, dynamic>> _buildChatCompletionMessages(
+    List<ApiMessage> context,
+  ) {
+    return context.map(_buildChatCompletionMessage).toList();
+  }
+
+  Map<String, dynamic> _buildResponsesUserLikeMessage(ApiMessage message) {
+    if (message.parts.isEmpty) {
+      return {
+        'role': message.role,
+        'content': message.content ?? '',
+       };
+    }
+
+    if (_isOnlySingleTextPart(message)) {
+      final text = message.parts.first.maybeWhen(
+        text: (_, text) => text,
+        orElse: () => message.content ?? '',
+      );
+      return {
+        'role': message.role,
+        'content': text,
+      };
+    }
+
+    return {
+      'role': message.role,
+      'content': message.parts.map((part) {
+        return part.when(
+          text: (type, text) => {
+            'type': 'input_text',
+            'text': text,
+          },
+          imageUrl: (type, imageUrl) => {
+            'type': 'input_image',
+            'image_url': imageUrl.url,
+          },
+        );
+      }).toList(),
+    };
+  }
+
+  List<Map<String, dynamic>> _buildResponsesAssistantItems(ApiMessage message) {
+    final items = <Map<String, dynamic>>[];
+
+    if ((message.reasoning ?? '').trim().isNotEmpty) {
+      items.add({
+        'type': 'reasoning',
+        'summary': [
+          {
+            'type': 'summary_text',
+             'text': message.reasoning,
+          }
+        ],
+      });
+    }
+
+    if ((message.content ?? '').trim().isNotEmpty) {
+      items.add({
+        'role': 'assistant',
+         'content': message.content,
+      });
+    }
+
+    return items;
+  }
+
+  List<Map<String, dynamic>> _buildResponsesInput(
+    List<ApiMessage> context,
+  ) {
+    final result = <Map<String, dynamic>>[];
+    for (final message in context) {
+      if (message.role == 'assistant') {
+        result.addAll(_buildResponsesAssistantItems(message));
+      } else {
+        result.add(_buildResponsesUserLikeMessage(message));
+      }
+    }
+    return result;
+  }
+
+  Map<String, dynamic> _buildRequestBody({
+    required String apiMode,
+    required String model,
+    required List<ApiMessage> context,
+    required bool enableReasoning,
+  }) {
+    if (apiMode == 'google') {
+      return {
+        'contents': _buildGoogleContents(context),
+        'generationConfig': {
+          // 可在此添加 temperature 等参数
+        },
+        // 参考代码中的 SafetySettings，设置为 OFF 以避免默认拦截
+        'safetySettings': [
+          {'category': 'HARM_CATEGORY_HARASSMENT', 'threshold': 'BLOCK_NONE'},
+          {'category': 'HARM_CATEGORY_HATE_SPEECH', 'threshold': 'BLOCK_NONE'},
+          {'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'threshold': 'BLOCK_NONE'},
+          {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold': 'BLOCK_NONE'},
+        ],
+      };
+    }
+
+    if (apiMode == 'responses') {
+      return {
+        'model': model,
+        'input': _buildResponsesInput(context),
+         'stream': true,
+        'store': false,
+        if (enableReasoning)
+          'reasoning': {
+            'effort': 'medium',
+          },
+      };
+    }
+
+    return {
+      'model': model,
+      'messages': _buildChatCompletionMessages(context),
+      'stream': true,
+      if (enableReasoning) 'reasoning_effort': 'medium',
+    };
+  }
+
+  Future<List<ModelInfo>> fetchModels({
+    required String baseUrl,
+    required String apiKey,
+    required String modelsPath,
+    required String apiMode, // 需要传入 apiMode 以区分解析逻辑
+  }) async {
+    try {
+      final url = Uri.parse(_buildUrl(baseUrl, modelsPath));
+      final response = await http.get(
+        url,
+        headers: _buildHeaders(apiKey, apiMode),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('获取模型列表失败：${response.statusCode}');
+      }
+
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+
+      // ✅ Google 模式解析
+      if (apiMode == 'google') {
+        final models = json['models'] as List<dynamic>?;
+        if (models == null) return [];
+
+        return models.map((e) {
+          final m = e as Map<String, dynamic>;
+          final name = (m['name'] ?? '').toString();
+          // Google 返回的 name 格式为 "models/gemini-...", 需去除前缀
+          final id = name.startsWith('models/') ? name.substring(7) : name;
+          
+          // 参考代码检查 supportedGenerationMethods
+          final methods = m['supportedGenerationMethods'] as List<dynamic>?;
+          if (methods != null && !methods.contains('generateContent')) {
+            return null; // 过滤掉不支持生成的模型
+          }
+
+          return ModelInfo(
+            id: id,
+            name: m['displayName']?.toString(),
+          );
+        }).whereType<ModelInfo>().toList();
+      }
+
+      // 默认 OpenAI 格式解析
+      final data = json['data'] as List<dynamic>;
+      return data.map((e) => _parseModelInfo(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      throw Exception('获取模型列表失败：$e');
+    }
+  }
+
+  Stream<ChatChunk> chatStream({
+    required String taskId,
+    required Future<AppConfig> Function() loadConfig,
+    required List<ApiMessage> context,
+  }) async* {
+    final client = http.Client();
+    _activeClients[taskId] = client;
+
+    try {
+      final config = await loadConfig();
+      final selectedId = config.selectedModel;
+      final selectedModel = config.availableModels
+        ?.firstWhereOrNull((m) => m.id == selectedId);
+      final enableReasoning = selectedModel?.overrideSupportsReasoning == true;
+      final baseUrl = config.baseUrl.trim();
+      final apiKey = config.apiKey.trim();
+      final chatPath = config.chatPath.trim();
+      final apiMode = config.apiMode.trim();
+      final model = config.selectedModel?.trim() ?? '';
+
+      if (baseUrl.isEmpty) {
+        yield const ChatChunk(isDone: true, error: 'Base URL 为空');
+        return;
+      }
+ 
+      if (apiKey.isEmpty) {
+        yield const ChatChunk(isDone: true, error: 'API Key 为空');
+        return;
+      }
+
+      if (chatPath.isEmpty) {
+        yield const ChatChunk(isDone: true, error: 'Chat Path 为空');
+        return;
+      }
+
+      if (model.isEmpty) {
+        yield const ChatChunk(isDone: true, error: '未选择模型');
+        return;
+      }
+
+      String resolvedChatPath = chatPath;
+      if (resolvedChatPath.contains('{model}')) {
+        resolvedChatPath = resolvedChatPath.replaceAll('{model}', model);
+      }
+
+      final baseUri = Uri.parse(_buildUrl(baseUrl, resolvedChatPath));
+      final url = apiMode == 'google'
+        ? baseUri.replace(queryParameters: {...baseUri.queryParameters, 'alt': 'sse'})
+        : baseUri;
+
+      final requestBody = _buildRequestBody(
+        apiMode: apiMode,
+        model: model,
+        context: context,
+        enableReasoning: enableReasoning,
+      );
+
+      final request = http.Request('POST', url)
+        ..headers.addAll(_buildHeaders(apiKey, apiMode))
+        ..headers.addAll({
+          'Accept': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+        })
+        ..body = jsonEncode(requestBody);
+
+      final streamedResponse = await client.send(request);
+
+      if (streamedResponse.statusCode  < 200 ||
+          streamedResponse.statusCode  >= 300) {
+        final errorBody = await streamedResponse.stream.bytesToString();
+        throw Exception('流式请求失败：${streamedResponse.statusCode} $errorBody');
+      }
+
+      final parser = SseParser();
+      final stream = streamedResponse.stream.transform(utf8.decoder);
+
+      await for (final rawChunk in stream) {
+        if (_cancelledTasks.contains(taskId)) {
+          yield const ChatChunk(isDone: true);
+          return;
+        }
+
+        final events = parser.addChunk(rawChunk);
+
+        for (final event in events) {
+          if (_cancelledTasks.contains(taskId)) {
+            yield const ChatChunk(isDone: true);
+            return;
+           }
+
+          try {
+            final decoded = SseEventDecoder.decode(
+              apiMode: apiMode,
+              event: event,
+            );
+
+            if (decoded == null) continue;
+
+            yield decoded;
+
+            if (decoded.isDone) {
+              return;
+            }
+          } catch (_) {
+            // 单条 SSE 解析失败不让整个流中断
+          } 
+        }
+      }
+
+      final lastEvent = parser.close();
+      if (lastEvent != null) {
+        try {
+          final decoded = SseEventDecoder.decode(
+            apiMode: apiMode,
+            event: lastEvent,
+          );
+          if (decoded != null) {
+            yield decoded;
+            if (decoded.isDone) return;
+          }
+        } catch (_) {
+          // 忽略最后一次 flush 解码错误
+        }
+      }
+
+      yield const ChatChunk(isDone: true);
+    } catch (e) {
+      if (_cancelledTasks.contains(taskId)) {
+        yield const ChatChunk(isDone: true);
+      } else {
+        yield ChatChunk(isDone: true, error: '流式请求失败：$e');
+      }
+    } finally {
+      _activeClients[taskId]?.close();
+      _activeClients.remove(taskId);
+      _cancelledTasks.remove(taskId);
+    }
+  }
+
+  void cancelRequest(String taskId) {
+    _cancelledTasks.add(taskId);
+     _activeClients[taskId]?.close();
+    _activeClients.remove(taskId);
+  }
+}
+```
+
 ## File: lib/domain/services/chat_round_factory.dart
 ```dart
 import '../../core/models/attachment.dart';
@@ -10904,269 +11664,6 @@ final configProvider = StreamProvider<AppConfig>((ref) {
 final configProfilesProvider = StreamProvider<AppConfigStore>((ref) {
   return ref.read(configServiceProvider).watchConfigStore();
 });
-```
-
-## File: lib/data/services/config_service.dart
-```dart
-import 'dart:async';
-import 'package:drift/drift.dart';
-import '../../core/models/app_config.dart';
-import '../../core/models/app_config_store.dart';
-import '../../core/models/model_info.dart';
-import '../../data/data_sources/remote_api_source.dart';
-import '../database/database.dart';
-import 'package:uuid/uuid.dart';
-
-class ConfigService{
-  final AppDatabase _db;
-  final RemoteApiSource _apiSource;
-
-  ConfigService(this._db, this._apiSource);
-
-  Future<AppConfigStore> _ensureInitialized() async {
-    final storeRow = await _db.select(_db.dbConfigStore).getSingleOrNull();
-    var activeId = storeRow?.activeProfileId ?? 'default';
-
-    final profileRows = await _db.select(_db.dbConfigProfiles).get();
-
-    if (profileRows.isEmpty) {
-      final defaultProfile = ConfigProfile(
-        id: 'default',
-        name: '默认配置',
-        config: AppConfig.defaultConfig(),
-      );
-
-      await _db.into(_db.dbConfigProfiles).insert(
-        DbConfigProfilesCompanion.insert(
-          id: defaultProfile.id,
-          name: defaultProfile.name,
-          config: defaultProfile.config,
-        ),
-      );
-      await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
-        const DbConfigStoreCompanion(
-          id: Value(1),
-          activeProfileId: Value('default'),
-        ),
-      );
-
-      activeId = 'default';
-      return AppConfigStore(
-        activeProfileId: activeId,
-        profiles: [defaultProfile],
-      );
-    }
-
-    final profiles = profileRows
-        .map((p) => ConfigProfile(id: p.id, name: p.name, config: p.config))
-        .toList();
-
-    if (!profiles.any((p) => p.id == activeId)) {
-      activeId = profiles.first.id;
-      await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
-        DbConfigStoreCompanion(
-          id: const Value(1),
-          activeProfileId: Value(activeId),
-        ),
-      );
-    }
-
-    return AppConfigStore(activeProfileId: activeId, profiles: profiles);
-  }
-
-  Future<AppConfigStore> loadConfigStore() async {
-    return await _ensureInitialized();
-  }
-
-  Future<AppConfig> loadConfig() async {
-    final store = await loadConfigStore();
-    return store.profiles.firstWhere(
-      (p) => p.id == store.activeProfileId,
-      orElse: () => store.profiles.first,
-    ).config;
-  }
-
-  Future<void> saveConfig(AppConfig config) async {
-    final activeId = await getActiveProfileId();
-    await (_db.update(_db.dbConfigProfiles)..where((t) => t.id.equals(activeId)))
-        .write(DbConfigProfilesCompanion(config: Value(config)));
-  }
-
-  Future<void> refreshModels() async {
-    final activeConfig = await loadConfig();
-
-    final remoteModels = await _apiSource.fetchModels(
-      baseUrl: activeConfig.baseUrl,
-      apiKey: activeConfig.apiKey,
-      modelsPath: activeConfig.modelsPath,
-      apiMode: activeConfig.apiMode,
-    );
-
-    final oldModels = activeConfig.availableModels ?? const <ModelInfo>[];
-    final oldById = {for (final model in oldModels) model.id: model};
-
-    final updatedModels = remoteModels.map((remote) {
-      final old = oldById[remote.id];
-      return remote.copyWith(
-        overrideSupportsReasoning: old?.overrideSupportsReasoning,
-        overrideSupportsVision: old?.overrideSupportsVision,
-      );
-    }).toList();
-
-    final updatedConfig = activeConfig.copyWith(
-      availableModels: updatedModels,
-    );
-
-    await saveConfig(updatedConfig);
-  }
-
-  Future<List<ConfigProfile>> getProfiles() async {
-    final store = await loadConfigStore();
-    return store.profiles;
-  }
-
-  Future<String> getActiveProfileId() async {
-    final storeRow = await _db.select(_db.dbConfigStore).getSingleOrNull();
-    var activeId = storeRow?.activeProfileId ?? 'default';
-
-    final profiles = await _db.select(_db.dbConfigProfiles).get();
-    if (!profiles.any((p) => p.id == activeId) && profiles.isNotEmpty) {
-      activeId = profiles.first.id;
-      await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
-        DbConfigStoreCompanion(
-          id: const Value(1),
-          activeProfileId: Value(activeId),
-        ),
-      );
-    }
-
-    return activeId;
-  }
-
-  Future<void> switchProfile(String profileId) async {
-    await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
-      DbConfigStoreCompanion(
-        id: const Value(1),
-        activeProfileId: Value(profileId),
-      ),
-    );
-  }
-
-  Future<void> createProfile(String name) async {
-    final activeConfig = await loadConfig();
-    final newId = const Uuid().v4();
-    final cleanName = name.trim().isEmpty ? '新配置' : name.trim();
-
-    await _db.into(_db.dbConfigProfiles).insert(
-      DbConfigProfilesCompanion.insert(
-        id: newId,
-        name: cleanName,
-        config: activeConfig,
-      ),
-    );
-    await switchProfile(newId);
-  }
-
-  Future<void> renameProfile(String profileId, String name) async {
-    if (name.trim().isEmpty) return;
-    await (_db.update(_db.dbConfigProfiles)
-          ..where((t) => t.id.equals(profileId)))
-        .write(DbConfigProfilesCompanion(name: Value(name.trim())));
-  }
-
-  Future<void> deleteProfile(String profileId) async {
-    final store = await loadConfigStore();
-
-    if (store.profiles.length <= 1) return;
-
-    if (store.activeProfileId == profileId) {
-      final remaining = store.profiles.where((p) => p.id != profileId).toList();
-      if (remaining.isNotEmpty) {
-        await switchProfile(remaining.first.id);
-      }
-    }
-
-    await (_db.delete(_db.dbConfigProfiles)
-          ..where((t) => t.id.equals(profileId)))
-        .go();
-  }
-
-  Stream<AppConfigStore> watchConfigStore() {
-    _ensureInitialized();
-
-    final storeStream = _db.select(_db.dbConfigStore).watchSingleOrNull();
-    final profilesStream = _db.select(_db.dbConfigProfiles).watch();
-
-    final outputController = StreamController<AppConfigStore>();
-
-    DbConfigStoreData? latestStoreRow;
-    List<DbConfigProfile> latestProfileRows = [];
-
-    void computeAndOutput() {
-      final storeRow = latestStoreRow;
-      final profileRows = latestProfileRows;
-
-      if (storeRow == null && profileRows.isEmpty) return;
-      if (profileRows.isEmpty) return;
-
-      var activeId = storeRow?.activeProfileId ?? 'default';
-
-      final profiles = profileRows
-          .map((p) => ConfigProfile(id: p.id, name: p.name, config: p.config))
-          .toList();
-
-      if (!profiles.any((p) => p.id == activeId)) {
-        activeId = profiles.first.id;
-        _db.into(_db.dbConfigStore).insertOnConflictUpdate(
-          DbConfigStoreCompanion(
-            id: const Value(1),
-            activeProfileId: Value(activeId),
-          ),
-        );
-      }
-
-      outputController.add(
-        AppConfigStore(activeProfileId: activeId, profiles: profiles),
-      );
-    }
-
-    final storeSubscription = storeStream.listen(
-      (row) {
-        latestStoreRow = row;
-        computeAndOutput();
-      },
-      onError: (e) {
-        outputController.addError(e);
-      },
-    );
-
-    final profilesSubscription = profilesStream.listen(
-      (rows) {
-        latestProfileRows = rows;
-        computeAndOutput();
-      },
-      onError: (e) {
-        outputController.addError(e);
-      },
-    );
-
-    outputController.onCancel = () {
-      storeSubscription.cancel();
-      profilesSubscription.cancel();
-    };
-
-    return outputController.stream;
-  }
-
-  Stream<AppConfig> watchConfig() {
-    return watchConfigStore().map((store) {
-      return store.profiles.firstWhere(
-        (p) => p.id == store.activeProfileId,
-        orElse: () => store.profiles.first,
-      ).config;
-    });
-  }
-}
 ```
 
 ## File: lib/presentation/widgets/input_bar.dart
@@ -11455,6 +11952,269 @@ class _InputBarState extends ConsumerState<InputBar> {
         ),
       ),
     );
+  }
+}
+```
+
+## File: lib/data/services/config_service.dart
+```dart
+import 'dart:async';
+import 'package:drift/drift.dart';
+import '../../core/models/app_config.dart';
+import '../../core/models/app_config_store.dart';
+import '../../core/models/model_info.dart';
+import '../../data/data_sources/remote_api_source.dart';
+import '../database/database.dart';
+import 'package:uuid/uuid.dart';
+
+class ConfigService{
+  final AppDatabase _db;
+  final RemoteApiSource _apiSource;
+
+  ConfigService(this._db, this._apiSource);
+
+  Future<AppConfigStore> _ensureInitialized() async {
+    final storeRow = await _db.select(_db.dbConfigStore).getSingleOrNull();
+    var activeId = storeRow?.activeProfileId ?? 'default';
+
+    final profileRows = await _db.select(_db.dbConfigProfiles).get();
+
+    if (profileRows.isEmpty) {
+      final defaultProfile = ConfigProfile(
+        id: 'default',
+        name: '默认配置',
+        config: AppConfig.defaultConfig(),
+      );
+
+      await _db.into(_db.dbConfigProfiles).insert(
+        DbConfigProfilesCompanion.insert(
+          id: defaultProfile.id,
+          name: defaultProfile.name,
+          config: defaultProfile.config,
+        ),
+      );
+      await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
+        const DbConfigStoreCompanion(
+          id: Value(1),
+          activeProfileId: Value('default'),
+        ),
+      );
+
+      activeId = 'default';
+      return AppConfigStore(
+        activeProfileId: activeId,
+        profiles: [defaultProfile],
+      );
+    }
+
+    final profiles = profileRows
+        .map((p) => ConfigProfile(id: p.id, name: p.name, config: p.config))
+        .toList();
+
+    if (!profiles.any((p) => p.id == activeId)) {
+      activeId = profiles.first.id;
+      await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
+        DbConfigStoreCompanion(
+          id: const Value(1),
+          activeProfileId: Value(activeId),
+        ),
+      );
+    }
+
+    return AppConfigStore(activeProfileId: activeId, profiles: profiles);
+  }
+
+  Future<AppConfigStore> loadConfigStore() async {
+    return await _ensureInitialized();
+  }
+
+  Future<AppConfig> loadConfig() async {
+    final store = await loadConfigStore();
+    return store.profiles.firstWhere(
+      (p) => p.id == store.activeProfileId,
+      orElse: () => store.profiles.first,
+    ).config;
+  }
+
+  Future<void> saveConfig(AppConfig config) async {
+    final activeId = await getActiveProfileId();
+    await (_db.update(_db.dbConfigProfiles)..where((t) => t.id.equals(activeId)))
+        .write(DbConfigProfilesCompanion(config: Value(config)));
+  }
+
+  Future<void> refreshModels() async {
+    final activeConfig = await loadConfig();
+
+    final remoteModels = await _apiSource.fetchModels(
+      baseUrl: activeConfig.baseUrl,
+      apiKey: activeConfig.apiKey,
+      modelsPath: activeConfig.modelsPath,
+      apiMode: activeConfig.apiMode,
+    );
+
+    final oldModels = activeConfig.availableModels ?? const <ModelInfo>[];
+    final oldById = {for (final model in oldModels) model.id: model};
+
+    final updatedModels = remoteModels.map((remote) {
+      final old = oldById[remote.id];
+      return remote.copyWith(
+        overrideSupportsReasoning: old?.overrideSupportsReasoning,
+        overrideSupportsVision: old?.overrideSupportsVision,
+      );
+    }).toList();
+
+    final updatedConfig = activeConfig.copyWith(
+      availableModels: updatedModels,
+    );
+
+    await saveConfig(updatedConfig);
+  }
+
+  Future<List<ConfigProfile>> getProfiles() async {
+    final store = await loadConfigStore();
+    return store.profiles;
+  }
+
+  Future<String> getActiveProfileId() async {
+    final storeRow = await _db.select(_db.dbConfigStore).getSingleOrNull();
+    var activeId = storeRow?.activeProfileId ?? 'default';
+
+    final profiles = await _db.select(_db.dbConfigProfiles).get();
+    if (!profiles.any((p) => p.id == activeId) && profiles.isNotEmpty) {
+      activeId = profiles.first.id;
+      await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
+        DbConfigStoreCompanion(
+          id: const Value(1),
+          activeProfileId: Value(activeId),
+        ),
+      );
+    }
+
+    return activeId;
+  }
+
+  Future<void> switchProfile(String profileId) async {
+    await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
+      DbConfigStoreCompanion(
+        id: const Value(1),
+        activeProfileId: Value(profileId),
+      ),
+    );
+  }
+
+  Future<void> createProfile(String name) async {
+    final activeConfig = await loadConfig();
+    final newId = const Uuid().v4();
+    final cleanName = name.trim().isEmpty ? '新配置' : name.trim();
+
+    await _db.into(_db.dbConfigProfiles).insert(
+      DbConfigProfilesCompanion.insert(
+        id: newId,
+        name: cleanName,
+        config: activeConfig,
+      ),
+    );
+    await switchProfile(newId);
+  }
+
+  Future<void> renameProfile(String profileId, String name) async {
+    if (name.trim().isEmpty) return;
+    await (_db.update(_db.dbConfigProfiles)
+          ..where((t) => t.id.equals(profileId)))
+        .write(DbConfigProfilesCompanion(name: Value(name.trim())));
+  }
+
+  Future<void> deleteProfile(String profileId) async {
+    final store = await loadConfigStore();
+
+    if (store.profiles.length <= 1) return;
+
+    if (store.activeProfileId == profileId) {
+      final remaining = store.profiles.where((p) => p.id != profileId).toList();
+      if (remaining.isNotEmpty) {
+        await switchProfile(remaining.first.id);
+      }
+    }
+
+    await (_db.delete(_db.dbConfigProfiles)
+          ..where((t) => t.id.equals(profileId)))
+        .go();
+  }
+
+  Stream<AppConfigStore> watchConfigStore() {
+    _ensureInitialized();
+
+    final storeStream = _db.select(_db.dbConfigStore).watchSingleOrNull();
+    final profilesStream = _db.select(_db.dbConfigProfiles).watch();
+
+    final outputController = StreamController<AppConfigStore>();
+
+    DbConfigStoreData? latestStoreRow;
+    List<DbConfigProfile> latestProfileRows = [];
+
+    void computeAndOutput() {
+      final storeRow = latestStoreRow;
+      final profileRows = latestProfileRows;
+
+      if (storeRow == null && profileRows.isEmpty) return;
+      if (profileRows.isEmpty) return;
+
+      var activeId = storeRow?.activeProfileId ?? 'default';
+
+      final profiles = profileRows
+          .map((p) => ConfigProfile(id: p.id, name: p.name, config: p.config))
+          .toList();
+
+      if (!profiles.any((p) => p.id == activeId)) {
+        activeId = profiles.first.id;
+        _db.into(_db.dbConfigStore).insertOnConflictUpdate(
+          DbConfigStoreCompanion(
+            id: const Value(1),
+            activeProfileId: Value(activeId),
+          ),
+        );
+      }
+
+      outputController.add(
+        AppConfigStore(activeProfileId: activeId, profiles: profiles),
+      );
+    }
+
+    final storeSubscription = storeStream.listen(
+      (row) {
+        latestStoreRow = row;
+        computeAndOutput();
+      },
+      onError: (e) {
+        outputController.addError(e);
+      },
+    );
+
+    final profilesSubscription = profilesStream.listen(
+      (rows) {
+        latestProfileRows = rows;
+        computeAndOutput();
+      },
+      onError: (e) {
+        outputController.addError(e);
+      },
+    );
+
+    outputController.onCancel = () {
+      storeSubscription.cancel();
+      profilesSubscription.cancel();
+    };
+
+    return outputController.stream;
+  }
+
+  Stream<AppConfig> watchConfig() {
+    return watchConfigStore().map((store) {
+      return store.profiles.firstWhere(
+        (p) => p.id == store.activeProfileId,
+        orElse: () => store.profiles.first,
+      ).config;
+    });
   }
 }
 ```
@@ -12440,28 +13200,29 @@ class ConversationRepository {
     });
   }
 
-  Future<void> updateRound(
-    String sessionId,
-    String roundId,
-    ChatRound updatedRound,
-  ) async {
-    await _db.transaction(() async {
-      await (_db.update(_db.dbChatRounds)..where((t) => t.id.equals(roundId)))
-          .write(
-        DbChatRoundsCompanion(
-          assistantThinking: Value(updatedRound.assistantThinking),
-          assistantContent: Value(updatedRound.assistantContent),
-          isIncomplete: Value(updatedRound.isIncomplete),
-          hasUnseenUpdate: Value(updatedRound.hasUnseenUpdate),
-        ),
-      );
-      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-          .write(
-        DbSessionsCompanion(
-          updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
-        ),
-      );
-    });
+  Future<void> updateRound({
+    required String roundId,
+    String? assistantThinking,
+    String? assistantContent,
+    bool? isIncomplete,
+    bool? hasUnseenUpdate,
+  }) async {
+    await (_db.update(_db.dbChatRounds)..where((t) => t.id.equals(roundId)))
+        .write(DbChatRoundsCompanion(
+          assistantThinking: assistantThinking != null
+              ? Value(assistantThinking)
+              : const Value.absent(),
+          assistantContent: assistantContent != null
+              ? Value(assistantContent)
+              : const Value.absent(),
+          isIncomplete: isIncomplete != null
+              ? Value(isIncomplete)
+              : const Value.absent(),
+          hasUnseenUpdate: hasUnseenUpdate != null
+              ? Value(hasUnseenUpdate)
+              : const Value.absent(),
+        ));
+    // ✅ 不再更新 Session 的 updatedAt
   }
 
   // ========== 附件读写接口保留 ==========
@@ -13453,17 +14214,11 @@ class ChatController {
         );
 
         final currentConfig = await ref.read(configServiceProvider).loadConfig();
-        final selectedId = currentConfig.selectedModel;
-        final selectedModel = currentConfig.availableModels
-            ?.where((m) => m.id == selectedId)
-            .firstOrNull;
-        final enableReasoning = selectedModel?.overrideSupportsReasoning == true;
 
         final stream = apiSource.chatStream(
           taskId: newRound.id,
           loadConfig: () async => currentConfig,
           context: apiContext,
-          enableReasoning: enableReasoning,
         );
 
         await for (final chunk in stream) {
@@ -13480,12 +14235,9 @@ class ChatController {
           if (lastDbUpdateTime == null ||
               now.difference(lastDbUpdateTime) >= updateInterval) {
             await repository.updateRound(
-              sessionId,
-              newRound.id,
-              newRound.copyWith(
-                assistantContent: contentBuffer.toString(),
-                assistantThinking: reasoningBuffer.toString(),
-              ),
+              roundId: newRound.id,
+              assistantContent: contentBuffer.toString(),
+              assistantThinking: reasoningBuffer.toString(),
             );
             lastDbUpdateTime = now;
           }
@@ -13502,16 +14254,13 @@ class ChatController {
         }
 
         await repository.updateRound(
-          sessionId,
-          newRound.id,
-          newRound.copyWith(
-            assistantContent: finalContent.trim().isEmpty ? null : finalContent,
-            assistantThinking: reasoningBuffer.toString().trim().isEmpty
-                ? null
-                : reasoningBuffer.toString(),
-            isIncomplete: false,
-            hasUnseenUpdate: true,
-          ),
+          roundId: newRound.id,
+          assistantContent: finalContent.trim().isEmpty ? null : finalContent,
+          assistantThinking: reasoningBuffer.toString().trim().isEmpty
+              ? null
+              : reasoningBuffer.toString(),
+          isIncomplete: false,
+          hasUnseenUpdate: true,
         );
         _stoppingRoundIds.remove(newRound.id);
       }
@@ -13538,9 +14287,8 @@ class ChatController {
 
   Future<void> markRoundSeen(ChatRound round) async {
     await ref.read(conversationRepositoryProvider).updateRound(
-      sessionId,
-      round.id,
-      round.copyWith(hasUnseenUpdate: false),
+      roundId: round.id,
+      hasUnseenUpdate: false,
     );
   }
 }

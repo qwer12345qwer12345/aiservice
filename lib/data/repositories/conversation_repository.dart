@@ -357,28 +357,29 @@ class ConversationRepository {
     });
   }
 
-  Future<void> updateRound(
-    String sessionId,
-    String roundId,
-    ChatRound updatedRound,
-  ) async {
-    await _db.transaction(() async {
-      await (_db.update(_db.dbChatRounds)..where((t) => t.id.equals(roundId)))
-          .write(
-        DbChatRoundsCompanion(
-          assistantThinking: Value(updatedRound.assistantThinking),
-          assistantContent: Value(updatedRound.assistantContent),
-          isIncomplete: Value(updatedRound.isIncomplete),
-          hasUnseenUpdate: Value(updatedRound.hasUnseenUpdate),
-        ),
-      );
-      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-          .write(
-        DbSessionsCompanion(
-          updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
-        ),
-      );
-    });
+  Future<void> updateRound({
+    required String roundId,
+    String? assistantThinking,
+    String? assistantContent,
+    bool? isIncomplete,
+    bool? hasUnseenUpdate,
+  }) async {
+    await (_db.update(_db.dbChatRounds)..where((t) => t.id.equals(roundId)))
+        .write(DbChatRoundsCompanion(
+          assistantThinking: assistantThinking != null
+              ? Value(assistantThinking)
+              : const Value.absent(),
+          assistantContent: assistantContent != null
+              ? Value(assistantContent)
+              : const Value.absent(),
+          isIncomplete: isIncomplete != null
+              ? Value(isIncomplete)
+              : const Value.absent(),
+          hasUnseenUpdate: hasUnseenUpdate != null
+              ? Value(hasUnseenUpdate)
+              : const Value.absent(),
+        ));
+    // ✅ 不再更新 Session 的 updatedAt
   }
 
   // ========== 附件读写接口保留 ==========

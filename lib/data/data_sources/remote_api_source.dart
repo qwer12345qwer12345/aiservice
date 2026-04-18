@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:collection/collection.dart';
 import 'package:http/http.dart' as http;
 import '../../core/models/model_info.dart';
 import '../../core/models/api_message.dart';
@@ -348,14 +349,16 @@ class RemoteApiSource{
     required String taskId,
     required Future<AppConfig> Function() loadConfig,
     required List<ApiMessage> context,
-    bool enableReasoning = false,
   }) async* {
     final client = http.Client();
     _activeClients[taskId] = client;
 
     try {
       final config = await loadConfig();
-
+      final selectedId = config.selectedModel;
+      final selectedModel = config.availableModels
+        ?.firstWhereOrNull((m) => m.id == selectedId);
+      final enableReasoning = selectedModel?.overrideSupportsReasoning == true;
       final baseUrl = config.baseUrl.trim();
       final apiKey = config.apiKey.trim();
       final chatPath = config.chatPath.trim();
@@ -396,7 +399,7 @@ class RemoteApiSource{
         apiMode: apiMode,
         model: model,
         context: context,
-         enableReasoning: enableReasoning,
+        enableReasoning: enableReasoning,
       );
 
       final request = http.Request('POST', url)
