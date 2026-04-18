@@ -54,17 +54,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     return config.availableModels?.where((m) => m.id == id).firstOrNull;
   }
 
-  bool _effectiveReasoningSwitch(ModelInfo? model) {
-    return model?.overrideSupportsReasoning ??
-        model?.supportsReasoning ??
-        false;
-  }
-
-  bool _effectiveVisionSwitch(ModelInfo? model) {
-    return model?.overrideSupportsVision ??
-        model?.supportsVision ??
-        false;
-  }
+  bool _effectiveReasoningSwitch(ModelInfo? model) => model?.overrideSupportsReasoning ?? false;
+  bool _effectiveVisionSwitch(ModelInfo? model) => model?.overrideSupportsVision ?? false;
 
   void _patchForm(AppConfig config) {
     final form = _formKey.currentState;
@@ -124,8 +115,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       final updatedModel = baseModel.copyWith(
         overrideSupportsReasoning: overrideSupportsReasoning,
         overrideSupportsVision: overrideSupportsVision,
-        supportsVision: overrideSupportsVision,
-        supportsReasoning: overrideSupportsReasoning,
       );
 
       if (index >= 0) {

@@ -78,7 +78,6 @@ lib/domain/models/tree_node.g.dart
 lib/domain/services/attachment_preparer.dart
 lib/domain/services/chat_context_builder.dart
 lib/domain/services/chat_round_factory.dart
-lib/domain/services/model_capability_registry.dart
 lib/domain/services/tree_builder.dart
 lib/domain/states/chat_state.dart
 lib/domain/states/chat_state.freezed.dart
@@ -2654,11 +2653,6 @@ class ModelInfo with _$ModelInfo {
     required String id,
     String? name,
 
-    // 最终生效能力（默认检测 + 手动覆盖后）
-    bool? supportsReasoning,
-    bool? supportsVision,
-
-    // 用户手动覆盖值
     bool? overrideSupportsReasoning,
     bool? overrideSupportsVision,
   }) = _ModelInfo;
@@ -2694,10 +2688,7 @@ ModelInfo _$ModelInfoFromJson(Map<String, dynamic> json) {
 /// @nodoc
 mixin _$ModelInfo {
   String get id => throw _privateConstructorUsedError;
-  String? get name =>
-      throw _privateConstructorUsedError; // 最终生效能力（默认检测 + 手动覆盖后）
-  bool? get supportsReasoning => throw _privateConstructorUsedError;
-  bool? get supportsVision => throw _privateConstructorUsedError; // 用户手动覆盖值
+  String? get name => throw _privateConstructorUsedError;
   bool? get overrideSupportsReasoning => throw _privateConstructorUsedError;
   bool? get overrideSupportsVision => throw _privateConstructorUsedError;
 
@@ -2719,8 +2710,6 @@ abstract class $ModelInfoCopyWith<$Res> {
   $Res call({
     String id,
     String? name,
-    bool? supportsReasoning,
-    bool? supportsVision,
     bool? overrideSupportsReasoning,
     bool? overrideSupportsVision,
   });
@@ -2743,8 +2732,6 @@ class _$ModelInfoCopyWithImpl<$Res, $Val extends ModelInfo>
   $Res call({
     Object? id = null,
     Object? name = freezed,
-    Object? supportsReasoning = freezed,
-    Object? supportsVision = freezed,
     Object? overrideSupportsReasoning = freezed,
     Object? overrideSupportsVision = freezed,
   }) {
@@ -2758,14 +2745,6 @@ class _$ModelInfoCopyWithImpl<$Res, $Val extends ModelInfo>
                 ? _value.name
                 : name // ignore: cast_nullable_to_non_nullable
                       as String?,
-            supportsReasoning: freezed == supportsReasoning
-                ? _value.supportsReasoning
-                : supportsReasoning // ignore: cast_nullable_to_non_nullable
-                      as bool?,
-            supportsVision: freezed == supportsVision
-                ? _value.supportsVision
-                : supportsVision // ignore: cast_nullable_to_non_nullable
-                      as bool?,
             overrideSupportsReasoning: freezed == overrideSupportsReasoning
                 ? _value.overrideSupportsReasoning
                 : overrideSupportsReasoning // ignore: cast_nullable_to_non_nullable
@@ -2792,8 +2771,6 @@ abstract class _$$ModelInfoImplCopyWith<$Res>
   $Res call({
     String id,
     String? name,
-    bool? supportsReasoning,
-    bool? supportsVision,
     bool? overrideSupportsReasoning,
     bool? overrideSupportsVision,
   });
@@ -2815,8 +2792,6 @@ class __$$ModelInfoImplCopyWithImpl<$Res>
   $Res call({
     Object? id = null,
     Object? name = freezed,
-    Object? supportsReasoning = freezed,
-    Object? supportsVision = freezed,
     Object? overrideSupportsReasoning = freezed,
     Object? overrideSupportsVision = freezed,
   }) {
@@ -2830,14 +2805,6 @@ class __$$ModelInfoImplCopyWithImpl<$Res>
             ? _value.name
             : name // ignore: cast_nullable_to_non_nullable
                   as String?,
-        supportsReasoning: freezed == supportsReasoning
-            ? _value.supportsReasoning
-            : supportsReasoning // ignore: cast_nullable_to_non_nullable
-                  as bool?,
-        supportsVision: freezed == supportsVision
-            ? _value.supportsVision
-            : supportsVision // ignore: cast_nullable_to_non_nullable
-                  as bool?,
         overrideSupportsReasoning: freezed == overrideSupportsReasoning
             ? _value.overrideSupportsReasoning
             : overrideSupportsReasoning // ignore: cast_nullable_to_non_nullable
@@ -2857,8 +2824,6 @@ class _$ModelInfoImpl implements _ModelInfo {
   const _$ModelInfoImpl({
     required this.id,
     this.name,
-    this.supportsReasoning,
-    this.supportsVision,
     this.overrideSupportsReasoning,
     this.overrideSupportsVision,
   });
@@ -2870,12 +2835,6 @@ class _$ModelInfoImpl implements _ModelInfo {
   final String id;
   @override
   final String? name;
-  // 最终生效能力（默认检测 + 手动覆盖后）
-  @override
-  final bool? supportsReasoning;
-  @override
-  final bool? supportsVision;
-  // 用户手动覆盖值
   @override
   final bool? overrideSupportsReasoning;
   @override
@@ -2883,7 +2842,7 @@ class _$ModelInfoImpl implements _ModelInfo {
 
   @override
   String toString() {
-    return 'ModelInfo(id: $id, name: $name, supportsReasoning: $supportsReasoning, supportsVision: $supportsVision, overrideSupportsReasoning: $overrideSupportsReasoning, overrideSupportsVision: $overrideSupportsVision)';
+    return 'ModelInfo(id: $id, name: $name, overrideSupportsReasoning: $overrideSupportsReasoning, overrideSupportsVision: $overrideSupportsVision)';
   }
 
   @override
@@ -2893,10 +2852,6 @@ class _$ModelInfoImpl implements _ModelInfo {
             other is _$ModelInfoImpl &&
             (identical(other.id, id) || other.id == id) &&
             (identical(other.name, name) || other.name == name) &&
-            (identical(other.supportsReasoning, supportsReasoning) ||
-                other.supportsReasoning == supportsReasoning) &&
-            (identical(other.supportsVision, supportsVision) ||
-                other.supportsVision == supportsVision) &&
             (identical(
                   other.overrideSupportsReasoning,
                   overrideSupportsReasoning,
@@ -2912,8 +2867,6 @@ class _$ModelInfoImpl implements _ModelInfo {
     runtimeType,
     id,
     name,
-    supportsReasoning,
-    supportsVision,
     overrideSupportsReasoning,
     overrideSupportsVision,
   );
@@ -2936,8 +2889,6 @@ abstract class _ModelInfo implements ModelInfo {
   const factory _ModelInfo({
     required final String id,
     final String? name,
-    final bool? supportsReasoning,
-    final bool? supportsVision,
     final bool? overrideSupportsReasoning,
     final bool? overrideSupportsVision,
   }) = _$ModelInfoImpl;
@@ -2948,11 +2899,7 @@ abstract class _ModelInfo implements ModelInfo {
   @override
   String get id;
   @override
-  String? get name; // 最终生效能力（默认检测 + 手动覆盖后）
-  @override
-  bool? get supportsReasoning;
-  @override
-  bool? get supportsVision; // 用户手动覆盖值
+  String? get name;
   @override
   bool? get overrideSupportsReasoning;
   @override
@@ -2981,8 +2928,6 @@ _$ModelInfoImpl _$$ModelInfoImplFromJson(Map<String, dynamic> json) =>
     _$ModelInfoImpl(
       id: json['id'] as String,
       name: json['name'] as String?,
-      supportsReasoning: json['supportsReasoning'] as bool?,
-      supportsVision: json['supportsVision'] as bool?,
       overrideSupportsReasoning: json['overrideSupportsReasoning'] as bool?,
       overrideSupportsVision: json['overrideSupportsVision'] as bool?,
     );
@@ -2991,8 +2936,6 @@ Map<String, dynamic> _$$ModelInfoImplToJson(_$ModelInfoImpl instance) =>
     <String, dynamic>{
       'id': instance.id,
       'name': instance.name,
-      'supportsReasoning': instance.supportsReasoning,
-      'supportsVision': instance.supportsVision,
       'overrideSupportsReasoning': instance.overrideSupportsReasoning,
       'overrideSupportsVision': instance.overrideSupportsVision,
     };
@@ -6937,56 +6880,6 @@ class PendingAttachment {
 }
 ```
 
-## File: lib/presentation/providers/input_notifier.dart
-```dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/input_state.dart';
-import '../models/pending_attachment.dart';
-
-/// 输入状态 Notifier
-///
-/// 职责：
-/// - 管理输入框文本和附件列表
-/// - 提供状态变更方法
-/// - 不包含发送逻辑、不包含编辑模式、不包含 isSending 状态
-class InputNotifier extends Notifier<InputState> {
-  @override
-  InputState build() => const InputState();
-
-  /// 更新输入文本
-  void updateText(String text) {
-    state = state.copyWith(text: text);
-  }
-
-  /// 添加附件
-  void addAttachment(PendingAttachment attachment) {
-    state = state.copyWith(
-      attachments: [...state.attachments, attachment],
-    );
-  }
-
-  /// 移除指定 ID 的附件
-  void removeAttachment(String id) {
-    state = state.copyWith(
-      attachments: state.attachments.where((a) => a.id != id).toList(),
-    );
-  }
-
-  /// 清空输入状态（文本和附件）
-  void clear() {
-    state = const InputState();
-  }
-}
-
-/// 全局输入状态 Provider
-///
-/// 特点：
-/// - 全局单例：所有会话共享同一份输入草稿
-/// - 自动保留：切换会话时草稿不会丢失
-final inputStateProvider =
-    NotifierProvider<InputNotifier, InputState>(InputNotifier.new);
-```
-
 ## File: lib/presentation/widgets/common/app_toast.dart
 ```dart
 import 'package:flutter/material.dart';
@@ -8550,6 +8443,56 @@ class TextAttachmentViewerPage extends StatelessWidget {
 }
 ```
 
+## File: lib/presentation/providers/input_notifier.dart
+```dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/input_state.dart';
+import '../models/pending_attachment.dart';
+
+/// 输入状态 Notifier
+///
+/// 职责：
+/// - 管理输入框文本和附件列表
+/// - 提供状态变更方法
+/// - 不包含发送逻辑、不包含编辑模式、不包含 isSending 状态
+class InputNotifier extends Notifier<InputState> {
+  @override
+  InputState build() => const InputState();
+
+  /// 更新输入文本
+  void updateText(String text) {
+    state = state.copyWith(text: text);
+  }
+
+  /// 添加附件
+  void addAttachment(PendingAttachment attachment) {
+    state = state.copyWith(
+      attachments: [...state.attachments, attachment],
+    );
+  }
+
+  /// 移除指定 ID 的附件
+  void removeAttachment(String id) {
+    state = state.copyWith(
+      attachments: state.attachments.where((a) => a.id != id).toList(),
+    );
+  }
+
+  /// 清空输入状态（文本和附件）
+  void clear() {
+    state = const InputState();
+  }
+}
+
+/// 全局输入状态 Provider
+///
+/// 特点：
+/// - 全局单例：所有会话共享同一份输入草稿
+/// - 自动保留：切换会话时草稿不会丢失
+final inputStateProvider =
+    NotifierProvider<InputNotifier, InputState>(InputNotifier.new);
+```
+
 ## File: lib/presentation/themes/app_theme.dart
 ```dart
 import 'package:flutter/material.dart';
@@ -8713,24 +8656,6 @@ class AppSection extends StatelessWidget {
       ),
     );
   }
-}
-```
-
-## File: lib/core/constants/app_constants.dart
-```dart
-abstract class AppConstants {
-  // 文件夹名称
-  static const String dirAttachments = 'attachments';
-
-  // 配置键
-  static const String keyBaseUrl = 'baseUrl';
-  static const String keyApiKey = 'apiKey';
-  static const String keyTheme = 'theme';
-  static const String keyModel = 'selectedModel';
-
-  // 默认值
-  static const String defaultBaseUrl = 'https://api.openai.com';
-  static const String defaultTheme = 'system';
 }
 ```
 
@@ -9220,256 +9145,6 @@ abstract class _TreePath implements TreePath {
 }
 ```
 
-## File: lib/domain/services/model_capability_registry.dart
-```dart
-import '../../core/models/model_info.dart';
-
-class ModelCapabilityRegistry {
-  static final List<_ModelRule> _rules = [
-    _ModelRule(
-      patterns: ['gpt', '4', 'o'],
-      supportsVision: true,
-      supportsReasoning: false,
-      priority: 100,
-    ),
-    _ModelRule(
-      patterns: ['gpt', '4', '1'],
-      supportsVision: true,
-      supportsReasoning: false,
-      priority: 100,
-    ),
-    _ModelRule(
-      patterns: ['o'],
-      numberAfter: true,
-      supportsVision: true,
-      supportsReasoning: true,
-      priority: 200,
-    ),
-    _ModelRule(
-      patterns: ['gpt', '5'],
-      supportsVision: true,
-      supportsReasoning: true,
-      priority: 150,
-    ),
-    _ModelRule(
-      patterns: ['gemini', '2', '5'],
-      supportsVision: true,
-      supportsReasoning: true,
-      priority: 150,
-    ),
-    _ModelRule(
-      patterns: ['gemini', '3'],
-      supportsVision: true,
-      supportsReasoning: true,
-      priority: 150,
-    ),
-    _ModelRule(
-      patterns: ['gemini', 'flash', 'latest'],
-      supportsVision: true,
-      supportsReasoning: true,
-      priority: 140,
-    ),
-    _ModelRule(
-      patterns: ['gemini', 'pro', 'latest'],
-      supportsVision: true,
-      supportsReasoning: true,
-      priority: 140,
-    ),
-    _ModelRule(
-      patterns: ['claude'],
-      supportsVision: true,
-      supportsReasoning: true,
-      priority: 120,
-    ),
-    _ModelRule(
-      patterns: ['deepseek', 'r', '1'],
-      supportsVision: false,
-      supportsReasoning: true,
-      priority: 160,
-    ),
-    _ModelRule(
-      patterns: ['deepseek', 'reasoner'],
-      supportsVision: false,
-      supportsReasoning: true,
-      priority: 160,
-    ),
-    _ModelRule(
-      patterns: ['deepseek', 'v', '3'],
-      supportsVision: false,
-      supportsReasoning: false,
-      priority: 120,
-    ),
-    _ModelRule(
-      patterns: ['deepseek', 'chat'],
-      supportsVision: false,
-      supportsReasoning: false,
-      priority: 120,
-    ),
-    _ModelRule(
-      patterns: ['qwen', '3', '5'],
-      supportsVision: true,
-      supportsReasoning: true,
-      priority: 150,
-    ),
-    _ModelRule(
-      patterns: ['qwen', '3'],
-      supportsVision: false,
-      supportsReasoning: true,
-      priority: 120,
-    ),
-    _ModelRule(
-      patterns: ['kimi', 'k', '2', '5'],
-      supportsVision: true,
-      supportsReasoning: true,
-      priority: 150,
-    ),
-    _ModelRule(
-      patterns: ['kimi', 'k', '2'],
-      supportsVision: false,
-      supportsReasoning: true,
-      priority: 120,
-    ),
-    _ModelRule(
-      patterns: ['glm', '4', '5'],
-      supportsVision: false,
-      supportsReasoning: true,
-      priority: 150,
-    ),
-    _ModelRule(
-      patterns: ['glm', '4', '6'],
-      supportsVision: false,
-      supportsReasoning: true,
-      priority: 150,
-    ),
-    _ModelRule(
-      patterns: ['glm', '4', '7'],
-      supportsVision: false,
-      supportsReasoning: true,
-      priority: 150,
-    ),
-    _ModelRule(
-      patterns: ['glm', '5'],
-      supportsVision: false,
-      supportsReasoning: true,
-      priority: 150,
-    ),
-    _ModelRule(
-      patterns: ['grok', '4'],
-      supportsVision: true,
-      supportsReasoning: true,
-      priority: 140,
-    ),
-    _ModelRule(
-      patterns: ['doubao', '1', '6'],
-      supportsVision: true,
-      supportsReasoning: true,
-      priority: 130,
-    ),
-    _ModelRule(
-      patterns: ['doubao', '1', '8'],
-      supportsVision: true,
-      supportsReasoning: true,
-      priority: 130,
-    ),
-  ];
-
-  static ModelInfo enhance(ModelInfo model) {
-    final tokens = _tokenize(model.id);
-    _ModelRule? best;
-
-    for (final rule in _rules) {
-      if (rule.matches(tokens)) {
-        if (best == null || rule.priority > best.priority) {
-          best = rule;
-        }
-      }
-    }
-
-    final detectedVision = best?.supportsVision;
-    final detectedReasoning = best?.supportsReasoning;
-
-    return model.copyWith(
-      supportsVision: model.overrideSupportsVision ?? detectedVision ?? model.supportsVision,
-      supportsReasoning: model.overrideSupportsReasoning ??
-          detectedReasoning ??
-          model.supportsReasoning,
-    );
-  }
-
-  static List<String> _tokenize(String input) {
-    final lower = input.toLowerCase();
-    final tokens = <String>[];
-    final buffer = StringBuffer();
-
-    bool? lastIsDigit;
-
-    void flush() {
-      if (buffer.isNotEmpty) {
-        tokens.add(buffer.toString());
-        buffer.clear();
-      }
-    }
-
-    for (final rune in lower.runes) {
-      final ch = String.fromCharCode(rune);
-      final isLetter = RegExp(r'[a-z]').hasMatch(ch);
-      final isDigit = RegExp(r'[0-9]').hasMatch(ch);
-
-      if (isLetter || isDigit) {
-        final currentIsDigit = isDigit;
-        if (lastIsDigit != null && lastIsDigit != currentIsDigit) {
-          flush();
-        }
-        buffer.write(ch);
-        lastIsDigit = currentIsDigit;
-      } else {
-        flush();
-        lastIsDigit = null;
-      }
-    }
-
-    flush();
-    return tokens;
-  }
-}
-
-class _ModelRule {
-  final List<String> patterns;
-  final bool supportsVision;
-  final bool supportsReasoning;
-  final int priority;
-  final bool numberAfter;
-
-  const _ModelRule({
-    required this.patterns,
-    required this.supportsVision,
-    required this.supportsReasoning,
-    required this.priority,
-    this.numberAfter = false,
-  });
-
-  bool matches(List<String> tokens) {
-    if (numberAfter && patterns.length == 1 && patterns.first == 'o') {
-      for (int i = 0; i < tokens.length - 1; i++) {
-        if (tokens[i] == 'o' && RegExp(r'^\d+$').hasMatch(tokens[i + 1])) {
-          return true;
-        }
-      }
-      return false;
-    }
-
-    int index = 0;
-    for (final token in tokens) {
-      if (token == patterns[index]) {
-        index++;
-        if (index == patterns.length) return true;
-      }
-    }
-    return false;
-  }
-}
-```
-
 ## File: lib/presentation/providers/attachment_bytes_provider.dart
 ```dart
 // presentation/providers/attachment_bytes_provider.dart
@@ -9890,69 +9565,21 @@ class _ThoughtBubbleState extends State<ThoughtBubble> {
 }
 ```
 
-## File: lib/data/data_sources/local_file_source.dart
+## File: lib/core/constants/app_constants.dart
 ```dart
-import 'dart:io';
-import 'dart:typed_data';
-import 'package:crypto/crypto.dart';
-import 'package:path/path.dart' as path;
-import '../../core/constants/app_constants.dart';
+abstract class AppConstants {
+  // 文件夹名称
+  static const String dirAttachments = 'attachments';
 
-class LocalFileSource{
-  final String _baseDir;
-  final Directory _directory;
+  // 配置键
+  static const String keyBaseUrl = 'baseUrl';
+  static const String keyApiKey = 'apiKey';
+  static const String keyTheme = 'theme';
+  static const String keyModel = 'selectedModel';
 
-  LocalFileSource(this._baseDir) : _directory = Directory(_baseDir);
-
-  Future<String> get basePath async => _baseDir;
-
-  Future<void> initDirectories() async {
-    await _directory.create(recursive: true);
-    await Directory(path.join(_baseDir, AppConstants.dirAttachments))
-      .create(recursive: true);
-  }
-
-  Future<void> deleteAttachment(String relativePath) async {
-    try {
-      final file = File(path.join(_baseDir, relativePath));
-      if (await file.exists()) {
-        await file.delete();
-       }
-    } on FileSystemException catch (e) {
-      throw Exception('删除文件失败：${e.message}');
-    }
-  }
-
-  Future<String> saveAttachment(Uint8List data, String fileName) async {
-    try {
-      final ext = path.extension(fileName).toLowerCase();
-      final hash = sha256.convert(data).toString();
-       final hashedFileName = '$hash$ext';
-      final relativePath = '${AppConstants.dirAttachments}/$hashedFileName';
-      final filePath = path.join(_baseDir, relativePath);
-       final file = File(filePath);
-
-      if (!await file.exists()) {
-        await file.writeAsBytes(data, flush: true);
-      }
-
-      return relativePath;
-    } on FileSystemException catch (e) {
-      throw Exception('保存附件失败：${e.message}');
-    }
-  }
-
-  Future<Uint8List> readAttachment(String relativePath) async {
-    try {
-      final file = File(path.join(_baseDir, relativePath));
-      if (!await file.exists()) {
-        throw Exception('附件不存在');
-      }
-      return await file.readAsBytes();
-    } on FileSystemException catch (e) {
-      throw Exception('读取附件失败：${e.message}');
-    }
-  }
+  // 默认值
+  static const String defaultBaseUrl = 'https://api.openai.com';
+  static const String defaultTheme = 'system';
 }
 ```
 
@@ -10072,6 +9699,72 @@ TreeNode _buildSubtreeIterative(
 }
 ```
 
+## File: lib/data/data_sources/local_file_source.dart
+```dart
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:crypto/crypto.dart';
+import 'package:path/path.dart' as path;
+import '../../core/constants/app_constants.dart';
+
+class LocalFileSource{
+  final String _baseDir;
+  final Directory _directory;
+
+  LocalFileSource(this._baseDir) : _directory = Directory(_baseDir);
+
+  Future<String> get basePath async => _baseDir;
+
+  Future<void> initDirectories() async {
+    await _directory.create(recursive: true);
+    await Directory(path.join(_baseDir, AppConstants.dirAttachments))
+      .create(recursive: true);
+  }
+
+  Future<void> deleteAttachment(String relativePath) async {
+    try {
+      final file = File(path.join(_baseDir, relativePath));
+      if (await file.exists()) {
+        await file.delete();
+       }
+    } on FileSystemException catch (e) {
+      throw Exception('删除文件失败：${e.message}');
+    }
+  }
+
+  Future<String> saveAttachment(Uint8List data, String fileName) async {
+    try {
+      final ext = path.extension(fileName).toLowerCase();
+      final hash = sha256.convert(data).toString();
+       final hashedFileName = '$hash$ext';
+      final relativePath = '${AppConstants.dirAttachments}/$hashedFileName';
+      final filePath = path.join(_baseDir, relativePath);
+       final file = File(filePath);
+
+      if (!await file.exists()) {
+        await file.writeAsBytes(data, flush: true);
+      }
+
+      return relativePath;
+    } on FileSystemException catch (e) {
+      throw Exception('保存附件失败：${e.message}');
+    }
+  }
+
+  Future<Uint8List> readAttachment(String relativePath) async {
+    try {
+      final file = File(path.join(_baseDir, relativePath));
+      if (!await file.exists()) {
+        throw Exception('附件不存在');
+      }
+      return await file.readAsBytes();
+    } on FileSystemException catch (e) {
+      throw Exception('读取附件失败：${e.message}');
+    }
+  }
+}
+```
+
 ## File: lib/data/data_sources/remote_api_source.dart
 ```dart
 import 'dart:convert';
@@ -10178,8 +9871,6 @@ class RemoteApiSource{
     return ModelInfo(
       id: (json['id'] ?? '').toString(),
       name: json['name']?.toString(),
-      supportsReasoning: _readBool(json, ['supportsReasoning', 'supports_reasoning']),
-      supportsVision: _readBool(json, ['supportsVision', 'supports_vision', 'vision', 'supportsImageInput', 'supports_image_input']),
       overrideSupportsReasoning: _readBool(json, ['overrideSupportsReasoning', 'override_supports_reasoning']),
       overrideSupportsVision: _readBool(json, ['overrideSupportsVision', 'override_supports_vision']),
     );
@@ -11316,13 +11007,9 @@ class ConfigService{
 
     final updatedModels = remoteModels.map((remote) {
       final old = oldById[remote.id];
-      final merged = remote.copyWith(
+      return remote.copyWith(
         overrideSupportsReasoning: old?.overrideSupportsReasoning,
         overrideSupportsVision: old?.overrideSupportsVision,
-      );
-      return merged.copyWith(
-        supportsVision: merged.overrideSupportsVision ?? merged.supportsVision,
-        supportsReasoning: merged.overrideSupportsReasoning ?? merged.supportsReasoning,
       );
     }).toList();
 
@@ -11480,57 +11167,6 @@ class ConfigService{
     });
   }
 }
-```
-
-## File: lib/presentation/providers/session_list_notifier.dart
-```dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../di/providers.dart';
-import '../../domain/models/session_list_item.dart';
-import '../../domain/models/session_card_meta.dart';
-import 'package:uuid/uuid.dart';
-
-final sessionListProvider = StreamProvider<List<SessionListItem>>((ref) {
-  final repository = ref.watch(conversationRepositoryProvider);
-  return repository.watchSessionListItems();
-});
-
-final sessionCardMetaProvider =
-    StreamProvider.family<SessionCardMeta, String>((ref, sessionId) {
-  final repository = ref.watch(conversationRepositoryProvider);
-  return repository.watchSessionCardMeta(sessionId);
-});
-
-class SessionListController {
-  final Ref ref;
-
-  SessionListController(this.ref);
-
-  Future<void> deleteSession(String sessionId) async {
-    final repository = ref.read(conversationRepositoryProvider);
-    await repository.deleteSession(sessionId);
-  }
-
-  Future<void> updateSessionTitle(String sessionId, String newTitle) async {
-    final repository = ref.read(conversationRepositoryProvider);
-    final cleanTitle = newTitle.trim();
-    if (cleanTitle.isEmpty) return;
-    await repository.updateSessionTitle(sessionId, cleanTitle);
-  }
-
-  Future<String> createSession(String title) async {
-    final repository = ref.read(conversationRepositoryProvider);
-
-    final sessionId = const Uuid().v4();
-
-    await repository.createSession(sessionId: sessionId, title: '新对话');
-    return sessionId;
-  }
-}
-
-final sessionListControllerProvider = Provider<SessionListController>((ref) {
-  return SessionListController(ref);
-});
 ```
 
 ## File: lib/presentation/widgets/input_bar.dart
@@ -11823,6 +11459,57 @@ class _InputBarState extends ConsumerState<InputBar> {
 }
 ```
 
+## File: lib/presentation/providers/session_list_notifier.dart
+```dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../di/providers.dart';
+import '../../domain/models/session_list_item.dart';
+import '../../domain/models/session_card_meta.dart';
+import 'package:uuid/uuid.dart';
+
+final sessionListProvider = StreamProvider<List<SessionListItem>>((ref) {
+  final repository = ref.watch(conversationRepositoryProvider);
+  return repository.watchSessionListItems();
+});
+
+final sessionCardMetaProvider =
+    StreamProvider.family<SessionCardMeta, String>((ref, sessionId) {
+  final repository = ref.watch(conversationRepositoryProvider);
+  return repository.watchSessionCardMeta(sessionId);
+});
+
+class SessionListController {
+  final Ref ref;
+
+  SessionListController(this.ref);
+
+  Future<void> deleteSession(String sessionId) async {
+    final repository = ref.read(conversationRepositoryProvider);
+    await repository.deleteSession(sessionId);
+  }
+
+  Future<void> updateSessionTitle(String sessionId, String newTitle) async {
+    final repository = ref.read(conversationRepositoryProvider);
+    final cleanTitle = newTitle.trim();
+    if (cleanTitle.isEmpty) return;
+    await repository.updateSessionTitle(sessionId, cleanTitle);
+  }
+
+  Future<String> createSession(String title) async {
+    final repository = ref.read(conversationRepositoryProvider);
+
+    final sessionId = const Uuid().v4();
+
+    await repository.createSession(sessionId: sessionId, title: '新对话');
+    return sessionId;
+  }
+}
+
+final sessionListControllerProvider = Provider<SessionListController>((ref) {
+  return SessionListController(ref);
+});
+```
+
 ## File: lib/presentation/pages/settings_page.dart
 ```dart
 import 'package:aiservice/di/providers.dart';
@@ -11881,17 +11568,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     return config.availableModels?.where((m) => m.id == id).firstOrNull;
   }
 
-  bool _effectiveReasoningSwitch(ModelInfo? model) {
-    return model?.overrideSupportsReasoning ??
-        model?.supportsReasoning ??
-        false;
-  }
-
-  bool _effectiveVisionSwitch(ModelInfo? model) {
-    return model?.overrideSupportsVision ??
-        model?.supportsVision ??
-        false;
-  }
+  bool _effectiveReasoningSwitch(ModelInfo? model) => model?.overrideSupportsReasoning ?? false;
+  bool _effectiveVisionSwitch(ModelInfo? model) => model?.overrideSupportsVision ?? false;
 
   void _patchForm(AppConfig config) {
     final form = _formKey.currentState;
@@ -11951,8 +11629,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       final updatedModel = baseModel.copyWith(
         overrideSupportsReasoning: overrideSupportsReasoning,
         overrideSupportsVision: overrideSupportsVision,
-        supportsVision: overrideSupportsVision,
-        supportsReasoning: overrideSupportsReasoning,
       );
 
       if (index >= 0) {
@@ -12415,6 +12091,7 @@ import '../../core/models/session.dart';
 import '../../domain/models/session_list_item.dart';
 import '../database/database.dart';
 import '../../domain/models/session_card_meta.dart';
+import 'package:rxdart/rxdart.dart';
 
 class ConversationRepository {
   final AppDatabase _db;
@@ -12438,24 +12115,50 @@ class ConversationRepository {
   }
 
   Stream<SessionCardMeta> watchSessionCardMeta(String sessionId) {
-    final query = (_db.select(_db.dbChatRounds)
-      ..where((t) => t.sessionId.equals(sessionId))
-      ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]));
-    return query.watch().map((rounds) {
-      final previewRound = rounds.isEmpty ? null : rounds.last;
-      final hasUnseen = rounds.any((r) => r.hasUnseenUpdate);
+    // 1. 仅查询最后一条 Round (倒序 + limit 1)
+    final lastRoundStream = (_db.select(_db.dbChatRounds)
+          ..where((t) => t.sessionId.equals(sessionId))
+          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
+          ..limit(1))
+        .watchSingleOrNull();
+
+    // 2. 仅查询 Round 总数 (Count 聚合，不加载数据)
+    final countStream = (
+      _db.selectOnly(_db.dbChatRounds)
+        ..addColumns([countAll()])
+        ..where(_db.dbChatRounds.sessionId.equals(sessionId))
+      )
+      .watchSingle()
+      .map((row) => row.read(countAll()) ?? 0);
+
+    // 3. 检查是否存在未读更新 (limit 1 短路查询)
+    final hasUnseenStream = (_db.select(_db.dbChatRounds)
+          ..where((t) => t.sessionId.equals(sessionId))
+          ..where((t) => t.hasUnseenUpdate.equals(true))
+          ..limit(1))
+        .watchSingleOrNull()
+        .map((row) => row != null);
+
+    // 4. 合并流
+    return Rx.combineLatest3(lastRoundStream, countStream, hasUnseenStream,
+        (lastRound, count, hasUnseen) {
+      final previewRound = lastRound;
+      
+      // 预览文本逻辑保持不变，但基于单个对象计算
       final userPreview = previewRound == null
           ? '点击开始新的对话'
           : previewRound.userContent.trim().isEmpty
               ? '（空输入）'
               : previewRound.userContent.trim();
+              
       final aiPreview = previewRound == null
           ? '（等待回复）'
           : (previewRound.assistantContent?.trim().isNotEmpty ?? false)
               ? previewRound.assistantContent!
               : (previewRound.isIncomplete ? '正在生成...' : '（等待回复）');
+
       return SessionCardMeta(
-        roundCount: rounds.length,
+        roundCount: count,
         previewRoundId: previewRound?.id,
         userPreview: userPreview,
         aiPreview: aiPreview,
@@ -12870,7 +12573,7 @@ class HomePage extends ConsumerWidget {
     final selectedModel = currentConfig?.availableModels
         ?.where((m) => m.id == selectedModelId)
         .firstOrNull;
-    final allowImages = selectedModel?.supportsVision == true;
+    final allowImages = selectedModel?.overrideSupportsVision == true;
 
     return AppPageScaffold(
       appBar: AppBar(
@@ -13754,7 +13457,7 @@ class ChatController {
         final selectedModel = currentConfig.availableModels
             ?.where((m) => m.id == selectedId)
             .firstOrNull;
-        final enableReasoning = selectedModel?.supportsReasoning == true;
+        final enableReasoning = selectedModel?.overrideSupportsReasoning == true;
 
         final stream = apiSource.chatStream(
           taskId: newRound.id,
@@ -13964,7 +13667,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     final selectedModel = currentConfig?.availableModels
         ?.where((m) => m.id == selectedModelId)
         .firstOrNull;
-    final allowImages = selectedModel?.supportsVision == true;
+    final allowImages = selectedModel?.overrideSupportsVision == true;
 
     if (_branchLeafId == null) {
       final topology =

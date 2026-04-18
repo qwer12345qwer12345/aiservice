@@ -22,10 +22,7 @@ ModelInfo _$ModelInfoFromJson(Map<String, dynamic> json) {
 /// @nodoc
 mixin _$ModelInfo {
   String get id => throw _privateConstructorUsedError;
-  String? get name =>
-      throw _privateConstructorUsedError; // 最终生效能力（默认检测 + 手动覆盖后）
-  bool? get supportsReasoning => throw _privateConstructorUsedError;
-  bool? get supportsVision => throw _privateConstructorUsedError; // 用户手动覆盖值
+  String? get name => throw _privateConstructorUsedError;
   bool? get overrideSupportsReasoning => throw _privateConstructorUsedError;
   bool? get overrideSupportsVision => throw _privateConstructorUsedError;
 
@@ -47,8 +44,6 @@ abstract class $ModelInfoCopyWith<$Res> {
   $Res call({
     String id,
     String? name,
-    bool? supportsReasoning,
-    bool? supportsVision,
     bool? overrideSupportsReasoning,
     bool? overrideSupportsVision,
   });
@@ -71,8 +66,6 @@ class _$ModelInfoCopyWithImpl<$Res, $Val extends ModelInfo>
   $Res call({
     Object? id = null,
     Object? name = freezed,
-    Object? supportsReasoning = freezed,
-    Object? supportsVision = freezed,
     Object? overrideSupportsReasoning = freezed,
     Object? overrideSupportsVision = freezed,
   }) {
@@ -86,14 +79,6 @@ class _$ModelInfoCopyWithImpl<$Res, $Val extends ModelInfo>
                 ? _value.name
                 : name // ignore: cast_nullable_to_non_nullable
                       as String?,
-            supportsReasoning: freezed == supportsReasoning
-                ? _value.supportsReasoning
-                : supportsReasoning // ignore: cast_nullable_to_non_nullable
-                      as bool?,
-            supportsVision: freezed == supportsVision
-                ? _value.supportsVision
-                : supportsVision // ignore: cast_nullable_to_non_nullable
-                      as bool?,
             overrideSupportsReasoning: freezed == overrideSupportsReasoning
                 ? _value.overrideSupportsReasoning
                 : overrideSupportsReasoning // ignore: cast_nullable_to_non_nullable
@@ -120,8 +105,6 @@ abstract class _$$ModelInfoImplCopyWith<$Res>
   $Res call({
     String id,
     String? name,
-    bool? supportsReasoning,
-    bool? supportsVision,
     bool? overrideSupportsReasoning,
     bool? overrideSupportsVision,
   });
@@ -143,8 +126,6 @@ class __$$ModelInfoImplCopyWithImpl<$Res>
   $Res call({
     Object? id = null,
     Object? name = freezed,
-    Object? supportsReasoning = freezed,
-    Object? supportsVision = freezed,
     Object? overrideSupportsReasoning = freezed,
     Object? overrideSupportsVision = freezed,
   }) {
@@ -158,14 +139,6 @@ class __$$ModelInfoImplCopyWithImpl<$Res>
             ? _value.name
             : name // ignore: cast_nullable_to_non_nullable
                   as String?,
-        supportsReasoning: freezed == supportsReasoning
-            ? _value.supportsReasoning
-            : supportsReasoning // ignore: cast_nullable_to_non_nullable
-                  as bool?,
-        supportsVision: freezed == supportsVision
-            ? _value.supportsVision
-            : supportsVision // ignore: cast_nullable_to_non_nullable
-                  as bool?,
         overrideSupportsReasoning: freezed == overrideSupportsReasoning
             ? _value.overrideSupportsReasoning
             : overrideSupportsReasoning // ignore: cast_nullable_to_non_nullable
@@ -185,8 +158,6 @@ class _$ModelInfoImpl implements _ModelInfo {
   const _$ModelInfoImpl({
     required this.id,
     this.name,
-    this.supportsReasoning,
-    this.supportsVision,
     this.overrideSupportsReasoning,
     this.overrideSupportsVision,
   });
@@ -198,12 +169,6 @@ class _$ModelInfoImpl implements _ModelInfo {
   final String id;
   @override
   final String? name;
-  // 最终生效能力（默认检测 + 手动覆盖后）
-  @override
-  final bool? supportsReasoning;
-  @override
-  final bool? supportsVision;
-  // 用户手动覆盖值
   @override
   final bool? overrideSupportsReasoning;
   @override
@@ -211,7 +176,7 @@ class _$ModelInfoImpl implements _ModelInfo {
 
   @override
   String toString() {
-    return 'ModelInfo(id: $id, name: $name, supportsReasoning: $supportsReasoning, supportsVision: $supportsVision, overrideSupportsReasoning: $overrideSupportsReasoning, overrideSupportsVision: $overrideSupportsVision)';
+    return 'ModelInfo(id: $id, name: $name, overrideSupportsReasoning: $overrideSupportsReasoning, overrideSupportsVision: $overrideSupportsVision)';
   }
 
   @override
@@ -221,10 +186,6 @@ class _$ModelInfoImpl implements _ModelInfo {
             other is _$ModelInfoImpl &&
             (identical(other.id, id) || other.id == id) &&
             (identical(other.name, name) || other.name == name) &&
-            (identical(other.supportsReasoning, supportsReasoning) ||
-                other.supportsReasoning == supportsReasoning) &&
-            (identical(other.supportsVision, supportsVision) ||
-                other.supportsVision == supportsVision) &&
             (identical(
                   other.overrideSupportsReasoning,
                   overrideSupportsReasoning,
@@ -240,8 +201,6 @@ class _$ModelInfoImpl implements _ModelInfo {
     runtimeType,
     id,
     name,
-    supportsReasoning,
-    supportsVision,
     overrideSupportsReasoning,
     overrideSupportsVision,
   );
@@ -264,8 +223,6 @@ abstract class _ModelInfo implements ModelInfo {
   const factory _ModelInfo({
     required final String id,
     final String? name,
-    final bool? supportsReasoning,
-    final bool? supportsVision,
     final bool? overrideSupportsReasoning,
     final bool? overrideSupportsVision,
   }) = _$ModelInfoImpl;
@@ -276,11 +233,7 @@ abstract class _ModelInfo implements ModelInfo {
   @override
   String get id;
   @override
-  String? get name; // 最终生效能力（默认检测 + 手动覆盖后）
-  @override
-  bool? get supportsReasoning;
-  @override
-  bool? get supportsVision; // 用户手动覆盖值
+  String? get name;
   @override
   bool? get overrideSupportsReasoning;
   @override

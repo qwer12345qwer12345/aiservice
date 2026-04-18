@@ -97,13 +97,9 @@ class ConfigService{
 
     final updatedModels = remoteModels.map((remote) {
       final old = oldById[remote.id];
-      final merged = remote.copyWith(
+      return remote.copyWith(
         overrideSupportsReasoning: old?.overrideSupportsReasoning,
         overrideSupportsVision: old?.overrideSupportsVision,
-      );
-      return merged.copyWith(
-        supportsVision: merged.overrideSupportsVision ?? merged.supportsVision,
-        supportsReasoning: merged.overrideSupportsReasoning ?? merged.supportsReasoning,
       );
     }).toList();
 

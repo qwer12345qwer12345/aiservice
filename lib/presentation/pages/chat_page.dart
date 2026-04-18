@@ -112,7 +112,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     final selectedModel = currentConfig?.availableModels
         ?.where((m) => m.id == selectedModelId)
         .firstOrNull;
-    final allowImages = selectedModel?.supportsVision == true;
+    final allowImages = selectedModel?.overrideSupportsVision == true;
 
     if (_branchLeafId == null) {
       final topology =

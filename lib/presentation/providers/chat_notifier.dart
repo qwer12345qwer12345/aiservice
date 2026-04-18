@@ -92,7 +92,7 @@ class ChatController {
         final selectedModel = currentConfig.availableModels
             ?.where((m) => m.id == selectedId)
             .firstOrNull;
-        final enableReasoning = selectedModel?.supportsReasoning == true;
+        final enableReasoning = selectedModel?.overrideSupportsReasoning == true;
 
         final stream = apiSource.chatStream(
           taskId: newRound.id,

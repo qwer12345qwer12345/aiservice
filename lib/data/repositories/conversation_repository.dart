@@ -8,6 +8,7 @@ import '../../core/models/session.dart';
 import '../../domain/models/session_list_item.dart';
 import '../database/database.dart';
 import '../../domain/models/session_card_meta.dart';
+import 'package:rxdart/rxdart.dart';
 
 class ConversationRepository {
   final AppDatabase _db;
@@ -31,24 +32,50 @@ class ConversationRepository {
   }
 
   Stream<SessionCardMeta> watchSessionCardMeta(String sessionId) {
-    final query = (_db.select(_db.dbChatRounds)
-      ..where((t) => t.sessionId.equals(sessionId))
-      ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]));
-    return query.watch().map((rounds) {
-      final previewRound = rounds.isEmpty ? null : rounds.last;
-      final hasUnseen = rounds.any((r) => r.hasUnseenUpdate);
+    // 1. 仅查询最后一条 Round (倒序 + limit 1)
+    final lastRoundStream = (_db.select(_db.dbChatRounds)
+          ..where((t) => t.sessionId.equals(sessionId))
+          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
+          ..limit(1))
+        .watchSingleOrNull();
+
+    // 2. 仅查询 Round 总数 (Count 聚合，不加载数据)
+    final countStream = (
+      _db.selectOnly(_db.dbChatRounds)
+        ..addColumns([countAll()])
+        ..where(_db.dbChatRounds.sessionId.equals(sessionId))
+      )
+      .watchSingle()
+      .map((row) => row.read(countAll()) ?? 0);
+
+    // 3. 检查是否存在未读更新 (limit 1 短路查询)
+    final hasUnseenStream = (_db.select(_db.dbChatRounds)
+          ..where((t) => t.sessionId.equals(sessionId))
+          ..where((t) => t.hasUnseenUpdate.equals(true))
+          ..limit(1))
+        .watchSingleOrNull()
+        .map((row) => row != null);
+
+    // 4. 合并流
+    return Rx.combineLatest3(lastRoundStream, countStream, hasUnseenStream,
+        (lastRound, count, hasUnseen) {
+      final previewRound = lastRound;
+      
+      // 预览文本逻辑保持不变，但基于单个对象计算
       final userPreview = previewRound == null
           ? '点击开始新的对话'
           : previewRound.userContent.trim().isEmpty
               ? '（空输入）'
               : previewRound.userContent.trim();
+              
       final aiPreview = previewRound == null
           ? '（等待回复）'
           : (previewRound.assistantContent?.trim().isNotEmpty ?? false)
               ? previewRound.assistantContent!
               : (previewRound.isIncomplete ? '正在生成...' : '（等待回复）');
+
       return SessionCardMeta(
-        roundCount: rounds.length,
+        roundCount: count,
         previewRoundId: previewRound?.id,
         userPreview: userPreview,
         aiPreview: aiPreview,

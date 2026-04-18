@@ -102,8 +102,6 @@ class RemoteApiSource{
     return ModelInfo(
       id: (json['id'] ?? '').toString(),
       name: json['name']?.toString(),
-      supportsReasoning: _readBool(json, ['supportsReasoning', 'supports_reasoning']),
-      supportsVision: _readBool(json, ['supportsVision', 'supports_vision', 'vision', 'supportsImageInput', 'supports_image_input']),
       overrideSupportsReasoning: _readBool(json, ['overrideSupportsReasoning', 'override_supports_reasoning']),
       overrideSupportsVision: _readBool(json, ['overrideSupportsVision', 'override_supports_vision']),
     );

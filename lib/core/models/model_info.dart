@@ -9,11 +9,6 @@ class ModelInfo with _$ModelInfo {
     required String id,
     String? name,
 
-    // 最终生效能力（默认检测 + 手动覆盖后）
-    bool? supportsReasoning,
-    bool? supportsVision,
-
-    // 用户手动覆盖值
     bool? overrideSupportsReasoning,
     bool? overrideSupportsVision,
   }) = _ModelInfo;

@@ -93,7 +93,7 @@ class HomePage extends ConsumerWidget {
     final selectedModel = currentConfig?.availableModels
         ?.where((m) => m.id == selectedModelId)
         .firstOrNull;
-    final allowImages = selectedModel?.supportsVision == true;
+    final allowImages = selectedModel?.overrideSupportsVision == true;
 
     return AppPageScaffold(
       appBar: AppBar(
