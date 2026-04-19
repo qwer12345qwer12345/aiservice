@@ -89,7 +89,7 @@ class ChatController {
   }
 
   void stopGeneration(String roundId) {
-    ref.read(remoteApiSourceProvider).cancelRequest(roundId);
+    ref.invalidate(chatGenerationProvider(roundId));
   }
 
   Future<void> markRoundSeen(ChatRound round) async {

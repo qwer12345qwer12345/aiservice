@@ -64,6 +64,10 @@ lib/core/models/session.g.dart
 lib/core/models/sse_event.dart
 lib/core/utils/app_route_observer.dart
 lib/core/utils/sse_parser.dart
+lib/data/data_sources/api_builders/api_request_builder.dart
+lib/data/data_sources/api_builders/chat_completions_api_builder.dart
+lib/data/data_sources/api_builders/google_api_builder.dart
+lib/data/data_sources/api_builders/responses_api_builder.dart
 lib/data/data_sources/local_file_source.dart
 lib/data/data_sources/remote_api_source.dart
 lib/data/data_sources/sse_event_decoder.dart
@@ -113,757 +117,384 @@ lib/presentation/widgets/thought_bubble.dart
 
 # Files
 
-## File: lib/core/models/generation_event.dart
+## File: lib/data/data_sources/api_builders/api_request_builder.dart
 ```dart
-import 'package:freezed_annotation/freezed_annotation.dart';
+import '../../../core/models/api_message.dart';
+import '../../../core/models/model_info.dart';
 
-part 'generation_event.freezed.dart';
+class ApiUriUtils {
+  static Uri buildNormalizedUri(String base, String path) {
+    final normalizedBase = base.trim().replaceAll(RegExp(r'/+$'), '');
+    final normalizedPath = path.trim().replaceAll(RegExp(r'^/+'), '');
+    return Uri.parse('$normalizedBase/$normalizedPath');
+  }
+}
 
-/// 生成过程中的统一事件
-@freezed
-class GenerationEvent with _$GenerationEvent {
-  const factory GenerationEvent.partial({
-    required String content,
-    required String reasoning,
-  }) = PartialGeneration;
+/// 构建请求所需的上下文
+class ApiBuildContext {
+  final String model;
+  final List<ApiMessage> context;
+  final bool enableReasoning;
+  final String apiKey;
+  final String baseUrl;
+  final String chatPath;
+  final String modelsPath;
 
-  const factory GenerationEvent.completed({
-    required String content,
-    required String reasoning,
-  }) = CompletedGeneration;
+  ApiBuildContext({
+    required this.model,
+    required this.context,
+    required this.enableReasoning,
+    required this.apiKey,
+    required this.baseUrl,
+    required this.chatPath,
+    required this.modelsPath,
+  });
+}
 
-  const factory GenerationEvent.failed({
-    required String error,
-  }) = FailedGeneration;
+/// API 请求构建器接口
+abstract class ApiRequestBuilder {
+  /// 构建请求 Headers
+  Map<String, String> buildHeaders(ApiBuildContext ctx);
+
+  /// 构建请求 URI
+  Uri buildUri(ApiBuildContext ctx);
+  Uri buildModelsUri(ApiBuildContext ctx);
+  
+  /// 构建请求 Body
+  Map<String, dynamic> buildRequestBody(ApiBuildContext ctx);
+
+  /// 解析模型列表响应
+  List<ModelInfo> parseModelsResponse(Map<String, dynamic> json);
 }
 ```
 
-## File: lib/core/models/generation_event.freezed.dart
+## File: lib/data/data_sources/api_builders/chat_completions_api_builder.dart
 ```dart
-// coverage:ignore-file
-// GENERATED CODE - DO NOT MODIFY BY HAND
-// ignore_for_file: type=lint
-// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
+import 'api_request_builder.dart';
+import '../../../core/models/api_message.dart';
+import '../../../core/models/model_info.dart';
 
-part of 'generation_event.dart';
-
-// **************************************************************************
-// FreezedGenerator
-// **************************************************************************
-
-T _$identity<T>(T value) => value;
-
-final _privateConstructorUsedError = UnsupportedError(
-  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
-);
-
-/// @nodoc
-mixin _$GenerationEvent {
-  @optionalTypeArgs
-  TResult when<TResult extends Object?>({
-    required TResult Function(String content, String reasoning) partial,
-    required TResult Function(String content, String reasoning) completed,
-    required TResult Function(String error) failed,
-  }) => throw _privateConstructorUsedError;
-  @optionalTypeArgs
-  TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function(String content, String reasoning)? partial,
-    TResult? Function(String content, String reasoning)? completed,
-    TResult? Function(String error)? failed,
-  }) => throw _privateConstructorUsedError;
-  @optionalTypeArgs
-  TResult maybeWhen<TResult extends Object?>({
-    TResult Function(String content, String reasoning)? partial,
-    TResult Function(String content, String reasoning)? completed,
-    TResult Function(String error)? failed,
-    required TResult orElse(),
-  }) => throw _privateConstructorUsedError;
-  @optionalTypeArgs
-  TResult map<TResult extends Object?>({
-    required TResult Function(PartialGeneration value) partial,
-    required TResult Function(CompletedGeneration value) completed,
-    required TResult Function(FailedGeneration value) failed,
-  }) => throw _privateConstructorUsedError;
-  @optionalTypeArgs
-  TResult? mapOrNull<TResult extends Object?>({
-    TResult? Function(PartialGeneration value)? partial,
-    TResult? Function(CompletedGeneration value)? completed,
-    TResult? Function(FailedGeneration value)? failed,
-  }) => throw _privateConstructorUsedError;
-  @optionalTypeArgs
-  TResult maybeMap<TResult extends Object?>({
-    TResult Function(PartialGeneration value)? partial,
-    TResult Function(CompletedGeneration value)? completed,
-    TResult Function(FailedGeneration value)? failed,
-    required TResult orElse(),
-  }) => throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-abstract class $GenerationEventCopyWith<$Res> {
-  factory $GenerationEventCopyWith(
-    GenerationEvent value,
-    $Res Function(GenerationEvent) then,
-  ) = _$GenerationEventCopyWithImpl<$Res, GenerationEvent>;
-}
-
-/// @nodoc
-class _$GenerationEventCopyWithImpl<$Res, $Val extends GenerationEvent>
-    implements $GenerationEventCopyWith<$Res> {
-  _$GenerationEventCopyWithImpl(this._value, this._then);
-
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-
-  /// Create a copy of GenerationEvent
-  /// with the given fields replaced by the non-null parameter values.
-}
-
-/// @nodoc
-abstract class _$$PartialGenerationImplCopyWith<$Res> {
-  factory _$$PartialGenerationImplCopyWith(
-    _$PartialGenerationImpl value,
-    $Res Function(_$PartialGenerationImpl) then,
-  ) = __$$PartialGenerationImplCopyWithImpl<$Res>;
-  @useResult
-  $Res call({String content, String reasoning});
-}
-
-/// @nodoc
-class __$$PartialGenerationImplCopyWithImpl<$Res>
-    extends _$GenerationEventCopyWithImpl<$Res, _$PartialGenerationImpl>
-    implements _$$PartialGenerationImplCopyWith<$Res> {
-  __$$PartialGenerationImplCopyWithImpl(
-    _$PartialGenerationImpl _value,
-    $Res Function(_$PartialGenerationImpl) _then,
-  ) : super(_value, _then);
-
-  /// Create a copy of GenerationEvent
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
+class ChatCompletionsApiBuilder implements ApiRequestBuilder {
   @override
-  $Res call({Object? content = null, Object? reasoning = null}) {
-    return _then(
-      _$PartialGenerationImpl(
-        content: null == content
-            ? _value.content
-            : content // ignore: cast_nullable_to_non_nullable
-                  as String,
-        reasoning: null == reasoning
-            ? _value.reasoning
-            : reasoning // ignore: cast_nullable_to_non_nullable
-                  as String,
-      ),
+  Map<String, String> buildHeaders(ApiBuildContext ctx) {
+    return {
+      'Authorization': 'Bearer ${ctx.apiKey}',
+      'Content-Type': 'application/json',
+    };
+  }
+
+  @override
+  Uri buildUri(ApiBuildContext ctx) {
+    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.chatPath);
+  }
+
+  @override
+  Uri buildModelsUri(ApiBuildContext ctx) {
+    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.modelsPath);
+  }
+  
+  @override
+  Map<String, dynamic> buildRequestBody(ApiBuildContext ctx) {
+    return {
+      'model': ctx.model,
+      'messages': _buildMessages(ctx.context),
+      'stream': true,
+      if (ctx.enableReasoning) 'reasoning_effort': 'medium',
+    };
+  }
+
+  @override
+  List<ModelInfo> parseModelsResponse(Map<String, dynamic> json) {
+    final data = json['data'] as List<dynamic>? ?? [];
+    return data.map((e) => _parseModelInfo(e as Map<String, dynamic>)).toList();
+  }
+
+  List<Map<String, dynamic>> _buildMessages(List<ApiMessage> context) {
+    return context.map(_buildMessage).toList();
+  }
+
+  Map<String, dynamic> _buildMessage(ApiMessage message) {
+    if (message.role == 'assistant') {
+      final result = <String, dynamic>{
+        'role': 'assistant',
+        'content': message.content ?? '',
+      };
+      if ((message.reasoning ?? '').trim().isNotEmpty) {
+        result['reasoning_content'] = message.reasoning;
+      }
+      return result;
+    }
+
+    if (message.parts.isEmpty) {
+      return {
+        'role': message.role,
+        'content': message.content ?? '',
+      };
+    }
+
+    return {
+      'role': message.role,
+      'content': message.parts.map((part) => part.when(
+            text: (type, text) => {'type': 'text', 'text': text},
+            imageUrl: (type, imageUrl) => {
+              'type': 'image_url',
+              'image_url': {'url': imageUrl.url},
+            },
+          )).toList(),
+    };
+  }
+
+  ModelInfo _parseModelInfo(Map<String, dynamic> json) {
+    bool? readBool(Map<String, dynamic> json, List<String> keys) {
+      for (final key in keys) {
+        if (!json.containsKey(key)) continue;
+        final value = json[key];
+        if (value is bool) return value;
+        if (value is num) return value != 0;
+        if (value is String) {
+          final lower = value.toLowerCase();
+          if (lower == 'true' || lower == '1' || lower == 'yes') return true;
+          if (lower == 'false' || lower == '0' || lower == 'no') return false;
+        }
+      }
+      return null;
+    }
+
+    return ModelInfo(
+      id: (json['id'] ?? '').toString(),
+      name: json['name']?.toString(),
+      overrideSupportsReasoning:
+          readBool(json, ['overrideSupportsReasoning', 'override_supports_reasoning']),
+      overrideSupportsVision:
+          readBool(json, ['overrideSupportsVision', 'override_supports_vision']),
     );
   }
-}
-
-/// @nodoc
-
-class _$PartialGenerationImpl implements PartialGeneration {
-  const _$PartialGenerationImpl({
-    required this.content,
-    required this.reasoning,
-  });
-
-  @override
-  final String content;
-  @override
-  final String reasoning;
-
-  @override
-  String toString() {
-    return 'GenerationEvent.partial(content: $content, reasoning: $reasoning)';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$PartialGenerationImpl &&
-            (identical(other.content, content) || other.content == content) &&
-            (identical(other.reasoning, reasoning) ||
-                other.reasoning == reasoning));
-  }
-
-  @override
-  int get hashCode => Object.hash(runtimeType, content, reasoning);
-
-  /// Create a copy of GenerationEvent
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$PartialGenerationImplCopyWith<_$PartialGenerationImpl> get copyWith =>
-      __$$PartialGenerationImplCopyWithImpl<_$PartialGenerationImpl>(
-        this,
-        _$identity,
-      );
-
-  @override
-  @optionalTypeArgs
-  TResult when<TResult extends Object?>({
-    required TResult Function(String content, String reasoning) partial,
-    required TResult Function(String content, String reasoning) completed,
-    required TResult Function(String error) failed,
-  }) {
-    return partial(content, reasoning);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function(String content, String reasoning)? partial,
-    TResult? Function(String content, String reasoning)? completed,
-    TResult? Function(String error)? failed,
-  }) {
-    return partial?.call(content, reasoning);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult maybeWhen<TResult extends Object?>({
-    TResult Function(String content, String reasoning)? partial,
-    TResult Function(String content, String reasoning)? completed,
-    TResult Function(String error)? failed,
-    required TResult orElse(),
-  }) {
-    if (partial != null) {
-      return partial(content, reasoning);
-    }
-    return orElse();
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult map<TResult extends Object?>({
-    required TResult Function(PartialGeneration value) partial,
-    required TResult Function(CompletedGeneration value) completed,
-    required TResult Function(FailedGeneration value) failed,
-  }) {
-    return partial(this);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult? mapOrNull<TResult extends Object?>({
-    TResult? Function(PartialGeneration value)? partial,
-    TResult? Function(CompletedGeneration value)? completed,
-    TResult? Function(FailedGeneration value)? failed,
-  }) {
-    return partial?.call(this);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult maybeMap<TResult extends Object?>({
-    TResult Function(PartialGeneration value)? partial,
-    TResult Function(CompletedGeneration value)? completed,
-    TResult Function(FailedGeneration value)? failed,
-    required TResult orElse(),
-  }) {
-    if (partial != null) {
-      return partial(this);
-    }
-    return orElse();
-  }
-}
-
-abstract class PartialGeneration implements GenerationEvent {
-  const factory PartialGeneration({
-    required final String content,
-    required final String reasoning,
-  }) = _$PartialGenerationImpl;
-
-  String get content;
-  String get reasoning;
-
-  /// Create a copy of GenerationEvent
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$PartialGenerationImplCopyWith<_$PartialGenerationImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-abstract class _$$CompletedGenerationImplCopyWith<$Res> {
-  factory _$$CompletedGenerationImplCopyWith(
-    _$CompletedGenerationImpl value,
-    $Res Function(_$CompletedGenerationImpl) then,
-  ) = __$$CompletedGenerationImplCopyWithImpl<$Res>;
-  @useResult
-  $Res call({String content, String reasoning});
-}
-
-/// @nodoc
-class __$$CompletedGenerationImplCopyWithImpl<$Res>
-    extends _$GenerationEventCopyWithImpl<$Res, _$CompletedGenerationImpl>
-    implements _$$CompletedGenerationImplCopyWith<$Res> {
-  __$$CompletedGenerationImplCopyWithImpl(
-    _$CompletedGenerationImpl _value,
-    $Res Function(_$CompletedGenerationImpl) _then,
-  ) : super(_value, _then);
-
-  /// Create a copy of GenerationEvent
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({Object? content = null, Object? reasoning = null}) {
-    return _then(
-      _$CompletedGenerationImpl(
-        content: null == content
-            ? _value.content
-            : content // ignore: cast_nullable_to_non_nullable
-                  as String,
-        reasoning: null == reasoning
-            ? _value.reasoning
-            : reasoning // ignore: cast_nullable_to_non_nullable
-                  as String,
-      ),
-    );
-  }
-}
-
-/// @nodoc
-
-class _$CompletedGenerationImpl implements CompletedGeneration {
-  const _$CompletedGenerationImpl({
-    required this.content,
-    required this.reasoning,
-  });
-
-  @override
-  final String content;
-  @override
-  final String reasoning;
-
-  @override
-  String toString() {
-    return 'GenerationEvent.completed(content: $content, reasoning: $reasoning)';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$CompletedGenerationImpl &&
-            (identical(other.content, content) || other.content == content) &&
-            (identical(other.reasoning, reasoning) ||
-                other.reasoning == reasoning));
-  }
-
-  @override
-  int get hashCode => Object.hash(runtimeType, content, reasoning);
-
-  /// Create a copy of GenerationEvent
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$CompletedGenerationImplCopyWith<_$CompletedGenerationImpl> get copyWith =>
-      __$$CompletedGenerationImplCopyWithImpl<_$CompletedGenerationImpl>(
-        this,
-        _$identity,
-      );
-
-  @override
-  @optionalTypeArgs
-  TResult when<TResult extends Object?>({
-    required TResult Function(String content, String reasoning) partial,
-    required TResult Function(String content, String reasoning) completed,
-    required TResult Function(String error) failed,
-  }) {
-    return completed(content, reasoning);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function(String content, String reasoning)? partial,
-    TResult? Function(String content, String reasoning)? completed,
-    TResult? Function(String error)? failed,
-  }) {
-    return completed?.call(content, reasoning);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult maybeWhen<TResult extends Object?>({
-    TResult Function(String content, String reasoning)? partial,
-    TResult Function(String content, String reasoning)? completed,
-    TResult Function(String error)? failed,
-    required TResult orElse(),
-  }) {
-    if (completed != null) {
-      return completed(content, reasoning);
-    }
-    return orElse();
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult map<TResult extends Object?>({
-    required TResult Function(PartialGeneration value) partial,
-    required TResult Function(CompletedGeneration value) completed,
-    required TResult Function(FailedGeneration value) failed,
-  }) {
-    return completed(this);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult? mapOrNull<TResult extends Object?>({
-    TResult? Function(PartialGeneration value)? partial,
-    TResult? Function(CompletedGeneration value)? completed,
-    TResult? Function(FailedGeneration value)? failed,
-  }) {
-    return completed?.call(this);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult maybeMap<TResult extends Object?>({
-    TResult Function(PartialGeneration value)? partial,
-    TResult Function(CompletedGeneration value)? completed,
-    TResult Function(FailedGeneration value)? failed,
-    required TResult orElse(),
-  }) {
-    if (completed != null) {
-      return completed(this);
-    }
-    return orElse();
-  }
-}
-
-abstract class CompletedGeneration implements GenerationEvent {
-  const factory CompletedGeneration({
-    required final String content,
-    required final String reasoning,
-  }) = _$CompletedGenerationImpl;
-
-  String get content;
-  String get reasoning;
-
-  /// Create a copy of GenerationEvent
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$CompletedGenerationImplCopyWith<_$CompletedGenerationImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-abstract class _$$FailedGenerationImplCopyWith<$Res> {
-  factory _$$FailedGenerationImplCopyWith(
-    _$FailedGenerationImpl value,
-    $Res Function(_$FailedGenerationImpl) then,
-  ) = __$$FailedGenerationImplCopyWithImpl<$Res>;
-  @useResult
-  $Res call({String error});
-}
-
-/// @nodoc
-class __$$FailedGenerationImplCopyWithImpl<$Res>
-    extends _$GenerationEventCopyWithImpl<$Res, _$FailedGenerationImpl>
-    implements _$$FailedGenerationImplCopyWith<$Res> {
-  __$$FailedGenerationImplCopyWithImpl(
-    _$FailedGenerationImpl _value,
-    $Res Function(_$FailedGenerationImpl) _then,
-  ) : super(_value, _then);
-
-  /// Create a copy of GenerationEvent
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({Object? error = null}) {
-    return _then(
-      _$FailedGenerationImpl(
-        error: null == error
-            ? _value.error
-            : error // ignore: cast_nullable_to_non_nullable
-                  as String,
-      ),
-    );
-  }
-}
-
-/// @nodoc
-
-class _$FailedGenerationImpl implements FailedGeneration {
-  const _$FailedGenerationImpl({required this.error});
-
-  @override
-  final String error;
-
-  @override
-  String toString() {
-    return 'GenerationEvent.failed(error: $error)';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$FailedGenerationImpl &&
-            (identical(other.error, error) || other.error == error));
-  }
-
-  @override
-  int get hashCode => Object.hash(runtimeType, error);
-
-  /// Create a copy of GenerationEvent
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$FailedGenerationImplCopyWith<_$FailedGenerationImpl> get copyWith =>
-      __$$FailedGenerationImplCopyWithImpl<_$FailedGenerationImpl>(
-        this,
-        _$identity,
-      );
-
-  @override
-  @optionalTypeArgs
-  TResult when<TResult extends Object?>({
-    required TResult Function(String content, String reasoning) partial,
-    required TResult Function(String content, String reasoning) completed,
-    required TResult Function(String error) failed,
-  }) {
-    return failed(error);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function(String content, String reasoning)? partial,
-    TResult? Function(String content, String reasoning)? completed,
-    TResult? Function(String error)? failed,
-  }) {
-    return failed?.call(error);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult maybeWhen<TResult extends Object?>({
-    TResult Function(String content, String reasoning)? partial,
-    TResult Function(String content, String reasoning)? completed,
-    TResult Function(String error)? failed,
-    required TResult orElse(),
-  }) {
-    if (failed != null) {
-      return failed(error);
-    }
-    return orElse();
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult map<TResult extends Object?>({
-    required TResult Function(PartialGeneration value) partial,
-    required TResult Function(CompletedGeneration value) completed,
-    required TResult Function(FailedGeneration value) failed,
-  }) {
-    return failed(this);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult? mapOrNull<TResult extends Object?>({
-    TResult? Function(PartialGeneration value)? partial,
-    TResult? Function(CompletedGeneration value)? completed,
-    TResult? Function(FailedGeneration value)? failed,
-  }) {
-    return failed?.call(this);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult maybeMap<TResult extends Object?>({
-    TResult Function(PartialGeneration value)? partial,
-    TResult Function(CompletedGeneration value)? completed,
-    TResult Function(FailedGeneration value)? failed,
-    required TResult orElse(),
-  }) {
-    if (failed != null) {
-      return failed(this);
-    }
-    return orElse();
-  }
-}
-
-abstract class FailedGeneration implements GenerationEvent {
-  const factory FailedGeneration({required final String error}) =
-      _$FailedGenerationImpl;
-
-  String get error;
-
-  /// Create a copy of GenerationEvent
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$FailedGenerationImplCopyWith<_$FailedGenerationImpl> get copyWith =>
-      throw _privateConstructorUsedError;
 }
 ```
 
-## File: lib/domain/services/stream_processor.dart
+## File: lib/data/data_sources/api_builders/google_api_builder.dart
 ```dart
-import 'dart:async';
-import '../../core/models/chat_chunk.dart';
-import '../../core/models/generation_event.dart';
+import 'api_request_builder.dart';
+import '../../../core/models/api_message.dart';
+import '../../../core/models/model_info.dart';
 
-/// 流处理器
-///
-/// 职责：
-/// - 累加 content 和 reasoning
-/// - 节流输出 partial 事件
-/// - 映射错误和完成状态
-/// - 纯逻辑，无副作用，易于测试
-class StreamProcessor {
-  final Duration throttleInterval;
+class GoogleApiBuilder implements ApiRequestBuilder {
+  @override
+  Map<String, String> buildHeaders(ApiBuildContext ctx) {
+    return {
+      'x-goog-api-key': ctx.apiKey,
+      'Content-Type': 'application/json',
+    };
+  }
 
-  StreamProcessor({this.throttleInterval = const Duration(seconds: 1)});
+  @override
+  Uri buildUri(ApiBuildContext ctx) {
+    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.modelsPath).replace(
+      queryParameters: {'alt': 'sse'},
+    );
+  }
 
-  /// 处理输入流并输出生成事件流
-  Stream<GenerationEvent> process(Stream<ChatChunk> input) async* {
-    final contentBuffer = StringBuffer();
-    final reasoningBuffer = StringBuffer();
-    String? error;
-    DateTime? lastEmitTime;
+  @override
+  Uri buildModelsUri(ApiBuildContext ctx) {
+    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.modelsPath);
+  }
 
-    // 辅助函数：检查是否需要节流输出
-    bool shouldEmit() {
-      final now = DateTime.now();
-      if (lastEmitTime == null) {
-        lastEmitTime = now;
-        return true;
-      }
-      if (now.difference(lastEmitTime!) >= throttleInterval) {
-        lastEmitTime = now;
-        return true;
-      }
-      return false;
-    }
+  @override
+  Map<String, dynamic> buildRequestBody(ApiBuildContext ctx) {
+    return {
+      'contents': _buildGoogleContents(ctx.context),
+      'generationConfig': {},
+      'safetySettings': [
+        {'category': 'HARM_CATEGORY_HARASSMENT', 'threshold': 'BLOCK_NONE'},
+        {'category': 'HARM_CATEGORY_HATE_SPEECH', 'threshold': 'BLOCK_NONE'},
+        {'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'threshold': 'BLOCK_NONE'},
+        {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold': 'BLOCK_NONE'},
+      ],
+    };
+  }
 
-    try {
-      await for (final chunk in input) {
-        // 错误处理
-        if (chunk.error != null) {
-          error = chunk.error;
-          break;
-        }
+  @override
+  List<ModelInfo> parseModelsResponse(Map<String, dynamic> json) {
+    final models = json['models'] as List<dynamic>?;
+    if (models == null) return [];
 
-        // 累加数据
-        if (chunk.content != null) {
-          contentBuffer.write(chunk.content);
-        }
-        if (chunk.reasoningContent != null) {
-          reasoningBuffer.write(chunk.reasoningContent);
-        }
+    return models.map((e) {
+      final m = e as Map<String, dynamic>;
+      final name = (m['name'] ?? '').toString();
+      final id = name.startsWith('models/') ? name.substring(7) : name;
 
-        // 节流输出
-        if (shouldEmit()) {
-          yield GenerationEvent.partial(
-            content: contentBuffer.toString(),
-            reasoning: reasoningBuffer.toString(),
-          );
-        }
-
-        // 完成处理
-        if (chunk.isDone) {
-          break;
-        }
+      final methods = m['supportedGenerationMethods'] as List<dynamic>?;
+      if (methods != null && !methods.contains('generateContent')) {
+        return null;
       }
 
-      // 最终输出
-      if (error != null) {
-        yield GenerationEvent.failed(error: error);
+      return ModelInfo(
+        id: id,
+        name: m['displayName']?.toString(),
+      );
+    }).whereType<ModelInfo>().toList();
+  }
+
+  List<Map<String, dynamic>> _buildGoogleContents(List<ApiMessage> context) {
+    return context.map((message) {
+      final role = message.role == 'assistant' ? 'model' : message.role;
+      final parts = <Map<String, dynamic>>[];
+
+      if (message.parts.isEmpty) {
+        final text = message.content?.trim() ?? '';
+        if (text.isNotEmpty) {
+          parts.add({'text': text});
+        }
       } else {
-        yield GenerationEvent.completed(
-          content: contentBuffer.toString(),
-          reasoning: reasoningBuffer.toString(),
-        );
+        for (final part in message.parts) {
+          parts.addAll(part.when(
+            text: (type, text) => [{'text': text}],
+            imageUrl: (type, imageUrl) {
+              final url = imageUrl.url;
+              if (url.startsWith('data:')) {
+                final commaIndex = url.indexOf(',');
+                if (commaIndex != -1) {
+                  final mime = url.substring(5, commaIndex);
+                  final base64Data = url.substring(commaIndex + 1);
+                  return [
+                    {
+                      'inlineData': {
+                        'mimeType': mime,
+                        'data': base64Data,
+                      }
+                    }
+                  ];
+                }
+              }
+              return [{'text': '[Image: $url]'}];
+            },
+          ));
+        }
       }
-    } catch (e) {
-      yield GenerationEvent.failed(error: e.toString());
-    }
+
+      if (parts.isEmpty) return null;
+      return {'role': role, 'parts': parts};
+    }).whereType<Map<String, dynamic>>().toList();
   }
 }
 ```
 
-## File: lib/presentation/providers/chat_generation_provider.dart
+## File: lib/data/data_sources/api_builders/responses_api_builder.dart
 ```dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'api_request_builder.dart';
+import '../../../core/models/api_message.dart';
+import '../../../core/models/model_info.dart';
 
-import '../../core/models/generation_event.dart';
-import '../../di/providers.dart';
-import '../../domain/services/chat_context_builder.dart';
-import '../../domain/services/stream_processor.dart';
-
-final chatGenerationProvider =
-  StreamProvider.family<void, String>((ref, roundId) {
-    Stream<GenerationEvent> runTask() async* {
-      final repository = ref.read(conversationRepositoryProvider);     
-      final configService = ref.read(configServiceProvider);
-      final apiSource = ref.read(remoteApiSourceProvider);
-
-      // 1. 构建上下文
-      final contextRounds = await repository.getContextRounds(roundId);
-      final apiContext = await buildApiContextFromRounds(contextRounds, repository);
-
-      // 2. 加载配置
-      final config = await configService.loadConfig();
-
-      // 3. 发起请求
-      final stream = apiSource.chatStream(
-        taskId: roundId,
-        loadConfig: () async => config,
-        context: apiContext,
-      );
-
-      // 4. 处理流
-      final processor = StreamProcessor();
-      yield* processor.process(stream);
-    }
-
-    void handleEvent(GenerationEvent event) {
-      final repository = ref.read(conversationRepositoryProvider);
-
-      event.when(
-        partial: (content, reasoning) {
-          repository.updateRound(
-            roundId: roundId,
-            assistantContent: content,
-            assistantThinking: reasoning,
-            isIncomplete: true,
-          );
-        },
-        completed: (content, reasoning) {
-          repository.updateRound(
-            roundId: roundId,
-            assistantContent: content,
-            assistantThinking: reasoning,
-            isIncomplete: false,
-            hasUnseenUpdate: true,
-          );
-        },
-        failed: (error) {
-          repository.updateRound(
-            roundId: roundId,
-            assistantContent: '[错误]\n$error',
-            assistantThinking: '',
-            isIncomplete: false,
-            hasUnseenUpdate: true,
-          );
-        },
-      );
-    }
-
-    return runTask().asyncMap((event) {
-      handleEvent(event);
-    });
+class ResponsesApiBuilder implements ApiRequestBuilder {
+  @override
+  Map<String, String> buildHeaders(ApiBuildContext ctx) {
+    return {
+      'Authorization': 'Bearer ${ctx.apiKey}',
+      'Content-Type': 'application/json',
+    };
   }
-);
+
+  @override
+  Uri buildUri(ApiBuildContext ctx) {
+    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.chatPath);
+  }
+
+  @override
+  Uri buildModelsUri(ApiBuildContext ctx) {
+    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.modelsPath);
+  }
+  
+  @override
+  Map<String, dynamic> buildRequestBody(ApiBuildContext ctx) {
+    return {
+      'model': ctx.model,
+      'input': _buildInput(ctx.context),
+      'stream': true,
+      'store': false,
+      if (ctx.enableReasoning)
+        'reasoning': {
+          'effort': 'medium',
+        },
+    };
+  }
+
+  @override
+  List<ModelInfo> parseModelsResponse(Map<String, dynamic> json) {
+    final data = json['data'] as List<dynamic>? ?? [];
+    return data.map((e) => _parseModelInfo(e as Map<String, dynamic>)).toList();
+  }
+  
+  List<Map<String, dynamic>> _buildInput(List<ApiMessage> context) {
+    final result = <Map<String, dynamic>>[];
+    for (final message in context) {
+      if (message.role == 'assistant') {
+        result.addAll(_buildAssistantItems(message));
+      } else {
+        result.add(_buildUserLikeMessage(message));
+      }
+    }
+    return result;
+  }
+
+  Map<String, dynamic> _buildUserLikeMessage(ApiMessage message) {
+    if (message.parts.isEmpty) {
+      return {'role': message.role, 'content': message.content ?? ''};
+    }
+
+    return {
+      'role': message.role,
+      'content': message.parts.map((part) => part.when(
+            text: (type, text) => {'type': 'input_text', 'text': text},
+            imageUrl: (type, imageUrl) => {
+              'type': 'input_image',
+              'image_url': imageUrl.url,
+            },
+          )).toList(),
+    };
+  }
+
+  List<Map<String, dynamic>> _buildAssistantItems(ApiMessage message) {
+    final items = <Map<String, dynamic>>[];
+    if ((message.reasoning ?? '').trim().isNotEmpty) {
+      items.add({
+        'type': 'reasoning',
+        'summary': [
+          {'type': 'summary_text', 'text': message.reasoning}
+        ],
+      });
+    }
+    if ((message.content ?? '').trim().isNotEmpty) {
+      items.add({'role': 'assistant', 'content': message.content});
+    }
+    return items;
+  }
+
+  ModelInfo _parseModelInfo(Map<String, dynamic> json) {
+    bool? readBool(Map<String, dynamic> json, List<String> keys) {
+      for (final key in keys) {
+        if (!json.containsKey(key)) continue;
+        final value = json[key];
+        if (value is bool) return value;
+        if (value is num) return value != 0;
+        if (value is String) {
+          final lower = value.toLowerCase();
+          if (lower == 'true' || lower == '1' || lower == 'yes') return true;
+          if (lower == 'false' || lower == '0' || lower == 'no') return false;
+        }
+      }
+      return null;
+    }
+
+    return ModelInfo(
+      id: (json['id'] ?? '').toString(),
+      name: json['name']?.toString(),
+      overrideSupportsReasoning:
+          readBool(json, ['overrideSupportsReasoning', 'override_supports_reasoning']),
+      overrideSupportsVision:
+          readBool(json, ['overrideSupportsVision', 'override_supports_vision']),
+    );
+  }
+}
 ```
 
 ## File: lib/core/models/api_message.dart
@@ -3393,6 +3024,599 @@ abstract class _ChatChunk implements ChatChunk {
   @override
   @JsonKey(includeFromJson: false, includeToJson: false)
   _$$ChatChunkImplCopyWith<_$ChatChunkImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+```
+
+## File: lib/core/models/generation_event.dart
+```dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'generation_event.freezed.dart';
+
+/// 生成过程中的统一事件
+@freezed
+class GenerationEvent with _$GenerationEvent {
+  const factory GenerationEvent.partial({
+    required String content,
+    required String reasoning,
+  }) = PartialGeneration;
+
+  const factory GenerationEvent.completed({
+    required String content,
+    required String reasoning,
+  }) = CompletedGeneration;
+
+  const factory GenerationEvent.failed({
+    required String error,
+  }) = FailedGeneration;
+}
+```
+
+## File: lib/core/models/generation_event.freezed.dart
+```dart
+// coverage:ignore-file
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint
+// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
+
+part of 'generation_event.dart';
+
+// **************************************************************************
+// FreezedGenerator
+// **************************************************************************
+
+T _$identity<T>(T value) => value;
+
+final _privateConstructorUsedError = UnsupportedError(
+  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
+);
+
+/// @nodoc
+mixin _$GenerationEvent {
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function(String content, String reasoning) partial,
+    required TResult Function(String content, String reasoning) completed,
+    required TResult Function(String error) failed,
+  }) => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function(String content, String reasoning)? partial,
+    TResult? Function(String content, String reasoning)? completed,
+    TResult? Function(String error)? failed,
+  }) => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function(String content, String reasoning)? partial,
+    TResult Function(String content, String reasoning)? completed,
+    TResult Function(String error)? failed,
+    required TResult orElse(),
+  }) => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(PartialGeneration value) partial,
+    required TResult Function(CompletedGeneration value) completed,
+    required TResult Function(FailedGeneration value) failed,
+  }) => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(PartialGeneration value)? partial,
+    TResult? Function(CompletedGeneration value)? completed,
+    TResult? Function(FailedGeneration value)? failed,
+  }) => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(PartialGeneration value)? partial,
+    TResult Function(CompletedGeneration value)? completed,
+    TResult Function(FailedGeneration value)? failed,
+    required TResult orElse(),
+  }) => throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $GenerationEventCopyWith<$Res> {
+  factory $GenerationEventCopyWith(
+    GenerationEvent value,
+    $Res Function(GenerationEvent) then,
+  ) = _$GenerationEventCopyWithImpl<$Res, GenerationEvent>;
+}
+
+/// @nodoc
+class _$GenerationEventCopyWithImpl<$Res, $Val extends GenerationEvent>
+    implements $GenerationEventCopyWith<$Res> {
+  _$GenerationEventCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+}
+
+/// @nodoc
+abstract class _$$PartialGenerationImplCopyWith<$Res> {
+  factory _$$PartialGenerationImplCopyWith(
+    _$PartialGenerationImpl value,
+    $Res Function(_$PartialGenerationImpl) then,
+  ) = __$$PartialGenerationImplCopyWithImpl<$Res>;
+  @useResult
+  $Res call({String content, String reasoning});
+}
+
+/// @nodoc
+class __$$PartialGenerationImplCopyWithImpl<$Res>
+    extends _$GenerationEventCopyWithImpl<$Res, _$PartialGenerationImpl>
+    implements _$$PartialGenerationImplCopyWith<$Res> {
+  __$$PartialGenerationImplCopyWithImpl(
+    _$PartialGenerationImpl _value,
+    $Res Function(_$PartialGenerationImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? content = null, Object? reasoning = null}) {
+    return _then(
+      _$PartialGenerationImpl(
+        content: null == content
+            ? _value.content
+            : content // ignore: cast_nullable_to_non_nullable
+                  as String,
+        reasoning: null == reasoning
+            ? _value.reasoning
+            : reasoning // ignore: cast_nullable_to_non_nullable
+                  as String,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+
+class _$PartialGenerationImpl implements PartialGeneration {
+  const _$PartialGenerationImpl({
+    required this.content,
+    required this.reasoning,
+  });
+
+  @override
+  final String content;
+  @override
+  final String reasoning;
+
+  @override
+  String toString() {
+    return 'GenerationEvent.partial(content: $content, reasoning: $reasoning)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$PartialGenerationImpl &&
+            (identical(other.content, content) || other.content == content) &&
+            (identical(other.reasoning, reasoning) ||
+                other.reasoning == reasoning));
+  }
+
+  @override
+  int get hashCode => Object.hash(runtimeType, content, reasoning);
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$PartialGenerationImplCopyWith<_$PartialGenerationImpl> get copyWith =>
+      __$$PartialGenerationImplCopyWithImpl<_$PartialGenerationImpl>(
+        this,
+        _$identity,
+      );
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function(String content, String reasoning) partial,
+    required TResult Function(String content, String reasoning) completed,
+    required TResult Function(String error) failed,
+  }) {
+    return partial(content, reasoning);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function(String content, String reasoning)? partial,
+    TResult? Function(String content, String reasoning)? completed,
+    TResult? Function(String error)? failed,
+  }) {
+    return partial?.call(content, reasoning);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function(String content, String reasoning)? partial,
+    TResult Function(String content, String reasoning)? completed,
+    TResult Function(String error)? failed,
+    required TResult orElse(),
+  }) {
+    if (partial != null) {
+      return partial(content, reasoning);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(PartialGeneration value) partial,
+    required TResult Function(CompletedGeneration value) completed,
+    required TResult Function(FailedGeneration value) failed,
+  }) {
+    return partial(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(PartialGeneration value)? partial,
+    TResult? Function(CompletedGeneration value)? completed,
+    TResult? Function(FailedGeneration value)? failed,
+  }) {
+    return partial?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(PartialGeneration value)? partial,
+    TResult Function(CompletedGeneration value)? completed,
+    TResult Function(FailedGeneration value)? failed,
+    required TResult orElse(),
+  }) {
+    if (partial != null) {
+      return partial(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class PartialGeneration implements GenerationEvent {
+  const factory PartialGeneration({
+    required final String content,
+    required final String reasoning,
+  }) = _$PartialGenerationImpl;
+
+  String get content;
+  String get reasoning;
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$PartialGenerationImplCopyWith<_$PartialGenerationImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class _$$CompletedGenerationImplCopyWith<$Res> {
+  factory _$$CompletedGenerationImplCopyWith(
+    _$CompletedGenerationImpl value,
+    $Res Function(_$CompletedGenerationImpl) then,
+  ) = __$$CompletedGenerationImplCopyWithImpl<$Res>;
+  @useResult
+  $Res call({String content, String reasoning});
+}
+
+/// @nodoc
+class __$$CompletedGenerationImplCopyWithImpl<$Res>
+    extends _$GenerationEventCopyWithImpl<$Res, _$CompletedGenerationImpl>
+    implements _$$CompletedGenerationImplCopyWith<$Res> {
+  __$$CompletedGenerationImplCopyWithImpl(
+    _$CompletedGenerationImpl _value,
+    $Res Function(_$CompletedGenerationImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? content = null, Object? reasoning = null}) {
+    return _then(
+      _$CompletedGenerationImpl(
+        content: null == content
+            ? _value.content
+            : content // ignore: cast_nullable_to_non_nullable
+                  as String,
+        reasoning: null == reasoning
+            ? _value.reasoning
+            : reasoning // ignore: cast_nullable_to_non_nullable
+                  as String,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+
+class _$CompletedGenerationImpl implements CompletedGeneration {
+  const _$CompletedGenerationImpl({
+    required this.content,
+    required this.reasoning,
+  });
+
+  @override
+  final String content;
+  @override
+  final String reasoning;
+
+  @override
+  String toString() {
+    return 'GenerationEvent.completed(content: $content, reasoning: $reasoning)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$CompletedGenerationImpl &&
+            (identical(other.content, content) || other.content == content) &&
+            (identical(other.reasoning, reasoning) ||
+                other.reasoning == reasoning));
+  }
+
+  @override
+  int get hashCode => Object.hash(runtimeType, content, reasoning);
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$CompletedGenerationImplCopyWith<_$CompletedGenerationImpl> get copyWith =>
+      __$$CompletedGenerationImplCopyWithImpl<_$CompletedGenerationImpl>(
+        this,
+        _$identity,
+      );
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function(String content, String reasoning) partial,
+    required TResult Function(String content, String reasoning) completed,
+    required TResult Function(String error) failed,
+  }) {
+    return completed(content, reasoning);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function(String content, String reasoning)? partial,
+    TResult? Function(String content, String reasoning)? completed,
+    TResult? Function(String error)? failed,
+  }) {
+    return completed?.call(content, reasoning);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function(String content, String reasoning)? partial,
+    TResult Function(String content, String reasoning)? completed,
+    TResult Function(String error)? failed,
+    required TResult orElse(),
+  }) {
+    if (completed != null) {
+      return completed(content, reasoning);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(PartialGeneration value) partial,
+    required TResult Function(CompletedGeneration value) completed,
+    required TResult Function(FailedGeneration value) failed,
+  }) {
+    return completed(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(PartialGeneration value)? partial,
+    TResult? Function(CompletedGeneration value)? completed,
+    TResult? Function(FailedGeneration value)? failed,
+  }) {
+    return completed?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(PartialGeneration value)? partial,
+    TResult Function(CompletedGeneration value)? completed,
+    TResult Function(FailedGeneration value)? failed,
+    required TResult orElse(),
+  }) {
+    if (completed != null) {
+      return completed(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class CompletedGeneration implements GenerationEvent {
+  const factory CompletedGeneration({
+    required final String content,
+    required final String reasoning,
+  }) = _$CompletedGenerationImpl;
+
+  String get content;
+  String get reasoning;
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$CompletedGenerationImplCopyWith<_$CompletedGenerationImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class _$$FailedGenerationImplCopyWith<$Res> {
+  factory _$$FailedGenerationImplCopyWith(
+    _$FailedGenerationImpl value,
+    $Res Function(_$FailedGenerationImpl) then,
+  ) = __$$FailedGenerationImplCopyWithImpl<$Res>;
+  @useResult
+  $Res call({String error});
+}
+
+/// @nodoc
+class __$$FailedGenerationImplCopyWithImpl<$Res>
+    extends _$GenerationEventCopyWithImpl<$Res, _$FailedGenerationImpl>
+    implements _$$FailedGenerationImplCopyWith<$Res> {
+  __$$FailedGenerationImplCopyWithImpl(
+    _$FailedGenerationImpl _value,
+    $Res Function(_$FailedGenerationImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? error = null}) {
+    return _then(
+      _$FailedGenerationImpl(
+        error: null == error
+            ? _value.error
+            : error // ignore: cast_nullable_to_non_nullable
+                  as String,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+
+class _$FailedGenerationImpl implements FailedGeneration {
+  const _$FailedGenerationImpl({required this.error});
+
+  @override
+  final String error;
+
+  @override
+  String toString() {
+    return 'GenerationEvent.failed(error: $error)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$FailedGenerationImpl &&
+            (identical(other.error, error) || other.error == error));
+  }
+
+  @override
+  int get hashCode => Object.hash(runtimeType, error);
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$FailedGenerationImplCopyWith<_$FailedGenerationImpl> get copyWith =>
+      __$$FailedGenerationImplCopyWithImpl<_$FailedGenerationImpl>(
+        this,
+        _$identity,
+      );
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function(String content, String reasoning) partial,
+    required TResult Function(String content, String reasoning) completed,
+    required TResult Function(String error) failed,
+  }) {
+    return failed(error);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function(String content, String reasoning)? partial,
+    TResult? Function(String content, String reasoning)? completed,
+    TResult? Function(String error)? failed,
+  }) {
+    return failed?.call(error);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function(String content, String reasoning)? partial,
+    TResult Function(String content, String reasoning)? completed,
+    TResult Function(String error)? failed,
+    required TResult orElse(),
+  }) {
+    if (failed != null) {
+      return failed(error);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(PartialGeneration value) partial,
+    required TResult Function(CompletedGeneration value) completed,
+    required TResult Function(FailedGeneration value) failed,
+  }) {
+    return failed(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(PartialGeneration value)? partial,
+    TResult? Function(CompletedGeneration value)? completed,
+    TResult? Function(FailedGeneration value)? failed,
+  }) {
+    return failed?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(PartialGeneration value)? partial,
+    TResult Function(CompletedGeneration value)? completed,
+    TResult Function(FailedGeneration value)? failed,
+    required TResult orElse(),
+  }) {
+    if (failed != null) {
+      return failed(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class FailedGeneration implements GenerationEvent {
+  const factory FailedGeneration({required final String error}) =
+      _$FailedGenerationImpl;
+
+  String get error;
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$FailedGenerationImplCopyWith<_$FailedGenerationImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }
 ```
@@ -7096,6 +7320,91 @@ class $AppDatabaseManager {
 }
 ```
 
+## File: lib/domain/services/stream_processor.dart
+```dart
+import 'dart:async';
+import '../../core/models/chat_chunk.dart';
+import '../../core/models/generation_event.dart';
+
+/// 流处理器
+///
+/// 职责：
+/// - 累加 content 和 reasoning
+/// - 节流输出 partial 事件
+/// - 映射错误和完成状态
+/// - 纯逻辑，无副作用，易于测试
+class StreamProcessor {
+  final Duration throttleInterval;
+
+  StreamProcessor({this.throttleInterval = const Duration(seconds: 1)});
+
+  /// 处理输入流并输出生成事件流
+  Stream<GenerationEvent> process(Stream<ChatChunk> input) async* {
+    final contentBuffer = StringBuffer();
+    final reasoningBuffer = StringBuffer();
+    String? error;
+    DateTime? lastEmitTime;
+
+    // 辅助函数：检查是否需要节流输出
+    bool shouldEmit() {
+      final now = DateTime.now();
+      if (lastEmitTime == null) {
+        lastEmitTime = now;
+        return true;
+      }
+      if (now.difference(lastEmitTime!) >= throttleInterval) {
+        lastEmitTime = now;
+        return true;
+      }
+      return false;
+    }
+
+    try {
+      await for (final chunk in input) {
+        // 错误处理
+        if (chunk.error != null) {
+          error = chunk.error;
+          break;
+        }
+
+        // 累加数据
+        if (chunk.content != null) {
+          contentBuffer.write(chunk.content);
+        }
+        if (chunk.reasoningContent != null) {
+          reasoningBuffer.write(chunk.reasoningContent);
+        }
+
+        // 节流输出
+        if (shouldEmit()) {
+          yield GenerationEvent.partial(
+            content: contentBuffer.toString(),
+            reasoning: reasoningBuffer.toString(),
+          );
+        }
+
+        // 完成处理
+        if (chunk.isDone) {
+          break;
+        }
+      }
+
+      // 最终输出
+      if (error != null) {
+        yield GenerationEvent.failed(error: error);
+      } else {
+        yield GenerationEvent.completed(
+          content: contentBuffer.toString(),
+          reasoning: reasoningBuffer.toString(),
+        );
+      }
+    } catch (e) {
+      yield GenerationEvent.failed(error: e.toString());
+    }
+  }
+}
+```
+
 ## File: lib/presentation/models/input_state.dart
 ```dart
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -7334,6 +7643,80 @@ class PendingAttachment {
     this.mimeType,
   });
 }
+```
+
+## File: lib/presentation/providers/chat_generation_provider.dart
+```dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/models/generation_event.dart';
+import '../../di/providers.dart';
+import '../../domain/services/chat_context_builder.dart';
+import '../../domain/services/stream_processor.dart';
+
+final chatGenerationProvider =
+  StreamProvider.family<void, String>((ref, roundId) {
+    Stream<GenerationEvent> runTask() async* {
+      final repository = ref.read(conversationRepositoryProvider);     
+      final configService = ref.read(configServiceProvider);
+      final apiSource = ref.read(remoteApiSourceProvider);
+
+      // 1. 构建上下文
+      final contextRounds = await repository.getContextRounds(roundId);
+      final apiContext = await buildApiContextFromRounds(contextRounds, repository);
+
+      // 2. 加载配置
+      final config = await configService.loadConfig();
+
+      // 3. 发起请求
+      final stream = apiSource.chatStream(
+        loadConfig: () async => config,
+        context: apiContext,
+      );
+
+      // 4. 处理流
+      final processor = StreamProcessor();
+      yield* processor.process(stream);
+    }
+
+    void handleEvent(GenerationEvent event) {
+      final repository = ref.read(conversationRepositoryProvider);
+
+      event.when(
+        partial: (content, reasoning) {
+          repository.updateRound(
+            roundId: roundId,
+            assistantContent: content,
+            assistantThinking: reasoning,
+            isIncomplete: true,
+          );
+        },
+        completed: (content, reasoning) {
+          repository.updateRound(
+            roundId: roundId,
+            assistantContent: content,
+            assistantThinking: reasoning,
+            isIncomplete: false,
+            hasUnseenUpdate: true,
+          );
+        },
+        failed: (error) {
+          repository.updateRound(
+            roundId: roundId,
+            assistantContent: '[错误]\n$error',
+            assistantThinking: '',
+            isIncomplete: false,
+            hasUnseenUpdate: true,
+          );
+        },
+      );
+    }
+
+    return runTask().asyncMap((event) {
+      handleEvent(event);
+    });
+  }
+);
 ```
 
 ## File: lib/presentation/widgets/common/app_toast.dart
@@ -11113,502 +11496,6 @@ class MessageBubble extends StatelessWidget {
 }
 ```
 
-## File: lib/data/data_sources/remote_api_source.dart
-```dart
-import 'dart:convert';
-import 'package:collection/collection.dart';
-import 'package:http/http.dart' as http;
-import '../../core/models/model_info.dart';
-import '../../core/models/api_message.dart';
-import '../../core/models/app_config.dart';
-import '../../core/models/chat_chunk.dart';
-import '../../core/utils/sse_parser.dart';
-import 'sse_event_decoder.dart';
-
-class RemoteApiSource{
-  final Map<String, http.Client> _activeClients = {};
-  final Set<String> _cancelledTasks = {};
-
-  Map<String, String> _buildHeaders(String apiKey, String apiMode) {
-    if (apiMode == 'google') {
-      // Google API Key 必须使用 x-goog-api-key 头部
-      return {
-        'x-goog-api-key': apiKey,
-        'Content-Type': 'application/json',
-      };
-    }
-    // 默认 OpenAI/Claude 等使用 Bearer
-    return {
-      'Authorization': 'Bearer $apiKey',
-      'Content-Type': 'application/json',
-    };
-  }
-
-  List<Map<String, dynamic>> _buildGoogleContents(List<ApiMessage> context) {
-    return context.map((message) {
-      // Google 使用 'model' 代表助手，'user' 代表用户
-      // 内联处理，不引入额外映射层
-      final role = message.role == 'assistant' ? 'model' : message.role;
-
-      final parts = <Map<String, dynamic>>[];
-
-      if (message.parts.isEmpty) {
-        final text = message.content?.trim() ?? '';
-        if (text.isNotEmpty) {
-          parts.add({'text': text});
-        }
-      } else {
-        for (final part in message.parts) {
-          parts.addAll(part.when(
-            text: (type, text) => [{'text': text}],
-            imageUrl: (type, imageUrl) {
-              final url = imageUrl.url;
-              // 解析 data URL 转换为 Google 的 inlineData
-              if (url.startsWith('data:')) {
-                final commaIndex = url.indexOf(',');
-                if (commaIndex != -1) {
-                  final mime = url.substring(5, commaIndex);
-                  final base64Data = url.substring(commaIndex + 1);
-                  return [
-                    {
-                      'inlineData': {
-                        'mimeType': mime,
-                        'data': base64Data,
-                      }
-                    }
-                  ];
-                }
-              }
-              // 不支持非 data URL，降级为文本
-              return [{'text': '[Image: $url]'}];
-            },
-          ));
-        }
-      }
-
-      if (parts.isEmpty) return null;
-
-      return {
-        'role': role,
-        'parts': parts,
-      };
-    }).whereType<Map<String, dynamic>>().toList();
-  }
-
-  String _buildUrl(String baseUrl, String path) {
-    final normalizedBase = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
-    final normalizedPath = path.trim().replaceAll(RegExp(r'^/+'), '');
-    return '$normalizedBase/$normalizedPath';
-  }
-
-  bool? _readBool(Map<String, dynamic> json, List<String> keys) {
-    for (final key in keys) {
-      if (!json.containsKey(key)) continue;
-      final value = json[key];
-      if (value is bool) return value;
-      if (value is num) return value != 0;
-      if (value is String) {
-        final lower = value.toLowerCase();
-        if (lower == 'true' || lower == '1' || lower == 'yes') return true;
-        if (lower == 'false' || lower == '0' || lower == 'no') return false;
-      }
-    }
-    return null;
-  }
-
-  ModelInfo _parseModelInfo(Map<String, dynamic> json) {
-    return ModelInfo(
-      id: (json['id'] ?? '').toString(),
-      name: json['name']?.toString(),
-      overrideSupportsReasoning: _readBool(json, ['overrideSupportsReasoning', 'override_supports_reasoning']),
-      overrideSupportsVision: _readBool(json, ['overrideSupportsVision', 'override_supports_vision']),
-    );
-    // 说明：初始拉取阶段仅保留 API 原始返回值与本地覆盖值，最终生效值由 UI/配置层按需计算
-  }
-
-  bool _isOnlySingleTextPart(ApiMessage message) {
-    if (message.parts.length != 1) return false;
-    return message.parts.first.maybeWhen(
-      text: (_, text) => true,
-      orElse: () => false,
-    );
-  }
-
-  Map<String, dynamic> _buildChatCompletionAssistantMessage(ApiMessage message) {
-    final result = <String, dynamic>{
-      'role': 'assistant',
-      'content': message.content ?? '',
-    };
-    if ((message.reasoning ?? '').trim().isNotEmpty) {
-      result['reasoning_content'] = message.reasoning;
-    }
-    return result;
-  }
-
-  Map<String, dynamic> _buildChatCompletionMessage(ApiMessage message) {
-    if (message.role == 'assistant') {
-      return _buildChatCompletionAssistantMessage(message);
-    }
-
-    if (message.parts.isEmpty) {
-      return {
-        'role': message.role,
-        'content': message.content ?? '',
-      };
-    }
-
-    if (_isOnlySingleTextPart(message)) {
-      final text = message.parts.first.maybeWhen(
-        text: (_, text) => text,
-        orElse: () => message.content ?? '',
-      );
-      return {
-        'role': message.role,
-        'content': text,
-      };
-    }
-
-    return {
-      'role': message.role,
-      'content': message.parts.map((part) {
-        return part.when(
-          text: (type, text) => {
-            'type': 'text',
-            'text': text,
-          },
-          imageUrl: (type, imageUrl) => {
-            'type': 'image_url',
-            'image_url': {
-              'url': imageUrl.url,
-            },
-          },
-        );
-      }).toList(),
-    };
-  }
-
-  List<Map<String, dynamic>> _buildChatCompletionMessages(
-    List<ApiMessage> context,
-  ) {
-    return context.map(_buildChatCompletionMessage).toList();
-  }
-
-  Map<String, dynamic> _buildResponsesUserLikeMessage(ApiMessage message) {
-    if (message.parts.isEmpty) {
-      return {
-        'role': message.role,
-        'content': message.content ?? '',
-       };
-    }
-
-    if (_isOnlySingleTextPart(message)) {
-      final text = message.parts.first.maybeWhen(
-        text: (_, text) => text,
-        orElse: () => message.content ?? '',
-      );
-      return {
-        'role': message.role,
-        'content': text,
-      };
-    }
-
-    return {
-      'role': message.role,
-      'content': message.parts.map((part) {
-        return part.when(
-          text: (type, text) => {
-            'type': 'input_text',
-            'text': text,
-          },
-          imageUrl: (type, imageUrl) => {
-            'type': 'input_image',
-            'image_url': imageUrl.url,
-          },
-        );
-      }).toList(),
-    };
-  }
-
-  List<Map<String, dynamic>> _buildResponsesAssistantItems(ApiMessage message) {
-    final items = <Map<String, dynamic>>[];
-
-    if ((message.reasoning ?? '').trim().isNotEmpty) {
-      items.add({
-        'type': 'reasoning',
-        'summary': [
-          {
-            'type': 'summary_text',
-             'text': message.reasoning,
-          }
-        ],
-      });
-    }
-
-    if ((message.content ?? '').trim().isNotEmpty) {
-      items.add({
-        'role': 'assistant',
-         'content': message.content,
-      });
-    }
-
-    return items;
-  }
-
-  List<Map<String, dynamic>> _buildResponsesInput(
-    List<ApiMessage> context,
-  ) {
-    final result = <Map<String, dynamic>>[];
-    for (final message in context) {
-      if (message.role == 'assistant') {
-        result.addAll(_buildResponsesAssistantItems(message));
-      } else {
-        result.add(_buildResponsesUserLikeMessage(message));
-      }
-    }
-    return result;
-  }
-
-  Map<String, dynamic> _buildRequestBody({
-    required String apiMode,
-    required String model,
-    required List<ApiMessage> context,
-    required bool enableReasoning,
-  }) {
-    if (apiMode == 'google') {
-      return {
-        'contents': _buildGoogleContents(context),
-        'generationConfig': {
-          // 可在此添加 temperature 等参数
-        },
-        // 参考代码中的 SafetySettings，设置为 OFF 以避免默认拦截
-        'safetySettings': [
-          {'category': 'HARM_CATEGORY_HARASSMENT', 'threshold': 'BLOCK_NONE'},
-          {'category': 'HARM_CATEGORY_HATE_SPEECH', 'threshold': 'BLOCK_NONE'},
-          {'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'threshold': 'BLOCK_NONE'},
-          {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold': 'BLOCK_NONE'},
-        ],
-      };
-    }
-
-    if (apiMode == 'responses') {
-      return {
-        'model': model,
-        'input': _buildResponsesInput(context),
-         'stream': true,
-        'store': false,
-        if (enableReasoning)
-          'reasoning': {
-            'effort': 'medium',
-          },
-      };
-    }
-
-    return {
-      'model': model,
-      'messages': _buildChatCompletionMessages(context),
-      'stream': true,
-      if (enableReasoning) 'reasoning_effort': 'medium',
-    };
-  }
-
-  Future<List<ModelInfo>> fetchModels({
-    required String baseUrl,
-    required String apiKey,
-    required String modelsPath,
-    required String apiMode, // 需要传入 apiMode 以区分解析逻辑
-  }) async {
-    try {
-      final url = Uri.parse(_buildUrl(baseUrl, modelsPath));
-      final response = await http.get(
-        url,
-        headers: _buildHeaders(apiKey, apiMode),
-      );
-
-      if (response.statusCode != 200) {
-        throw Exception('获取模型列表失败：${response.statusCode}');
-      }
-
-      final json = jsonDecode(response.body) as Map<String, dynamic>;
-
-      // ✅ Google 模式解析
-      if (apiMode == 'google') {
-        final models = json['models'] as List<dynamic>?;
-        if (models == null) return [];
-
-        return models.map((e) {
-          final m = e as Map<String, dynamic>;
-          final name = (m['name'] ?? '').toString();
-          // Google 返回的 name 格式为 "models/gemini-...", 需去除前缀
-          final id = name.startsWith('models/') ? name.substring(7) : name;
-          
-          // 参考代码检查 supportedGenerationMethods
-          final methods = m['supportedGenerationMethods'] as List<dynamic>?;
-          if (methods != null && !methods.contains('generateContent')) {
-            return null; // 过滤掉不支持生成的模型
-          }
-
-          return ModelInfo(
-            id: id,
-            name: m['displayName']?.toString(),
-          );
-        }).whereType<ModelInfo>().toList();
-      }
-
-      // 默认 OpenAI 格式解析
-      final data = json['data'] as List<dynamic>;
-      return data.map((e) => _parseModelInfo(e as Map<String, dynamic>)).toList();
-    } catch (e) {
-      throw Exception('获取模型列表失败：$e');
-    }
-  }
-
-  Stream<ChatChunk> chatStream({
-    required String taskId,
-    required Future<AppConfig> Function() loadConfig,
-    required List<ApiMessage> context,
-  }) async* {
-    final client = http.Client();
-    _activeClients[taskId] = client;
-
-    try {
-      final config = await loadConfig();
-      final selectedId = config.selectedModel;
-      final selectedModel = config.availableModels
-        ?.firstWhereOrNull((m) => m.id == selectedId);
-      final enableReasoning = selectedModel?.overrideSupportsReasoning == true;
-      final baseUrl = config.baseUrl.trim();
-      final apiKey = config.apiKey.trim();
-      final chatPath = config.chatPath.trim();
-      final apiMode = config.apiMode.trim();
-      final model = config.selectedModel?.trim() ?? '';
-
-      if (baseUrl.isEmpty) {
-        yield const ChatChunk(isDone: true, error: 'Base URL 为空');
-        return;
-      }
- 
-      if (apiKey.isEmpty) {
-        yield const ChatChunk(isDone: true, error: 'API Key 为空');
-        return;
-      }
-
-      if (chatPath.isEmpty) {
-        yield const ChatChunk(isDone: true, error: 'Chat Path 为空');
-        return;
-      }
-
-      if (model.isEmpty) {
-        yield const ChatChunk(isDone: true, error: '未选择模型');
-        return;
-      }
-
-      String resolvedChatPath = chatPath;
-      if (resolvedChatPath.contains('{model}')) {
-        resolvedChatPath = resolvedChatPath.replaceAll('{model}', model);
-      }
-
-      final baseUri = Uri.parse(_buildUrl(baseUrl, resolvedChatPath));
-      final url = apiMode == 'google'
-        ? baseUri.replace(queryParameters: {...baseUri.queryParameters, 'alt': 'sse'})
-        : baseUri;
-
-      final requestBody = _buildRequestBody(
-        apiMode: apiMode,
-        model: model,
-        context: context,
-        enableReasoning: enableReasoning,
-      );
-
-      final request = http.Request('POST', url)
-        ..headers.addAll(_buildHeaders(apiKey, apiMode))
-        ..headers.addAll({
-          'Accept': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-        })
-        ..body = jsonEncode(requestBody);
-
-      final streamedResponse = await client.send(request);
-
-      if (streamedResponse.statusCode  < 200 ||
-          streamedResponse.statusCode  >= 300) {
-        final errorBody = await streamedResponse.stream.bytesToString();
-        throw Exception('流式请求失败：${streamedResponse.statusCode} $errorBody');
-      }
-
-      final parser = SseParser();
-      final stream = streamedResponse.stream.transform(utf8.decoder);
-
-      await for (final rawChunk in stream) {
-        if (_cancelledTasks.contains(taskId)) {
-          yield const ChatChunk(isDone: true);
-          return;
-        }
-
-        final events = parser.addChunk(rawChunk);
-
-        for (final event in events) {
-          if (_cancelledTasks.contains(taskId)) {
-            yield const ChatChunk(isDone: true);
-            return;
-           }
-
-          try {
-            final decoded = SseEventDecoder.decode(
-              apiMode: apiMode,
-              event: event,
-            );
-
-            if (decoded == null) continue;
-
-            yield decoded;
-
-            if (decoded.isDone) {
-              return;
-            }
-          } catch (_) {
-            // 单条 SSE 解析失败不让整个流中断
-          } 
-        }
-      }
-
-      final lastEvent = parser.close();
-      if (lastEvent != null) {
-        try {
-          final decoded = SseEventDecoder.decode(
-            apiMode: apiMode,
-            event: lastEvent,
-          );
-          if (decoded != null) {
-            yield decoded;
-            if (decoded.isDone) return;
-          }
-        } catch (_) {
-          // 忽略最后一次 flush 解码错误
-        }
-      }
-
-      yield const ChatChunk(isDone: true);
-    } catch (e) {
-      if (_cancelledTasks.contains(taskId)) {
-        yield const ChatChunk(isDone: true);
-      } else {
-        yield ChatChunk(isDone: true, error: '流式请求失败：$e');
-      }
-    } finally {
-      _activeClients[taskId]?.close();
-      _activeClients.remove(taskId);
-      _cancelledTasks.remove(taskId);
-    }
-  }
-
-  void cancelRequest(String taskId) {
-    _cancelledTasks.add(taskId);
-     _activeClients[taskId]?.close();
-    _activeClients.remove(taskId);
-  }
-}
-```
-
 ## File: lib/domain/services/chat_round_factory.dart
 ```dart
 import '../../core/models/attachment.dart';
@@ -11664,6 +11551,171 @@ final configProvider = StreamProvider<AppConfig>((ref) {
 final configProfilesProvider = StreamProvider<AppConfigStore>((ref) {
   return ref.read(configServiceProvider).watchConfigStore();
 });
+```
+
+## File: lib/data/data_sources/remote_api_source.dart
+```dart
+import 'dart:convert';
+import 'package:collection/collection.dart';
+import 'package:http/http.dart' as http;
+import '../../core/models/model_info.dart';
+import '../../core/models/api_message.dart';
+import '../../core/models/app_config.dart';
+import '../../core/models/chat_chunk.dart';
+import '../../core/utils/sse_parser.dart';
+import 'sse_event_decoder.dart';
+import 'api_builders/api_request_builder.dart';
+import 'api_builders/google_api_builder.dart';
+import 'api_builders/chat_completions_api_builder.dart';
+import 'api_builders/responses_api_builder.dart';
+
+class RemoteApiSource {
+  ApiRequestBuilder _getBuilder(String apiMode) {
+    switch (apiMode) {
+      case 'google':
+        return GoogleApiBuilder();
+      case 'responses':
+        return ResponsesApiBuilder();
+      case 'chat_completions':
+      default:
+        return ChatCompletionsApiBuilder();
+    }
+  }
+
+  Future<List<ModelInfo>> fetchModels({
+    required String baseUrl,
+    required String apiKey,
+    required String modelsPath,
+    required String apiMode,
+  }) async {
+    final builder = _getBuilder(apiMode);
+    final ctx = ApiBuildContext(
+      model: '',
+      context: [],
+      enableReasoning: false,
+      apiKey: apiKey,
+      baseUrl: baseUrl,
+      chatPath: '',
+      modelsPath: modelsPath,
+    );
+
+    final url = builder.buildModelsUri(ctx);
+
+    final response = await http.get(
+      url,
+      headers: builder.buildHeaders(ctx),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('获取模型列表失败：${response.statusCode}');
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return builder.parseModelsResponse(json);
+  }
+
+  Stream<ChatChunk> chatStream({
+    required Future<AppConfig> Function() loadConfig,
+    required List<ApiMessage> context,
+  }) async* {
+    final client = http.Client();
+
+    try {
+      final config = await loadConfig();
+      final selectedId = config.selectedModel;
+      final selectedModel =
+          config.availableModels?.firstWhereOrNull((m) => m.id == selectedId);
+      final enableReasoning = selectedModel?.overrideSupportsReasoning == true;
+      final model = config.selectedModel?.trim() ?? '';
+      final apiMode = config.apiMode.trim();
+
+      if (config.baseUrl.isEmpty) {
+        yield const ChatChunk(isDone: true, error: 'Base URL 为空');
+        return;
+      }
+      if (config.apiKey.isEmpty) {
+        yield const ChatChunk(isDone: true, error: 'API Key 为空');
+        return;
+      }
+      if (config.chatPath.isEmpty) {
+        yield const ChatChunk(isDone: true, error: 'Chat Path 为空');
+        return;
+      }
+      if (model.isEmpty) {
+        yield const ChatChunk(isDone: true, error: '未选择模型');
+        return;
+      }
+
+      final builder = _getBuilder(apiMode);
+
+      String resolvedChatPath = config.chatPath.trim();
+      if (resolvedChatPath.contains('{model}')) {
+        resolvedChatPath = resolvedChatPath.replaceAll('{model}', model);
+      }
+
+      final ctx = ApiBuildContext(
+        model: model,
+        context: context,
+        enableReasoning: enableReasoning,
+        apiKey: config.apiKey.trim(),
+        baseUrl: config.baseUrl.trim(),
+        chatPath: resolvedChatPath,
+        modelsPath: config.modelsPath.trim(),
+      );
+
+      final uri = builder.buildUri(ctx);
+      final requestBody = builder.buildRequestBody(ctx);
+
+      final request = http.Request('POST', uri)
+        ..headers.addAll(builder.buildHeaders(ctx))
+        ..headers.addAll({
+          'Accept': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+        })
+        ..body = jsonEncode(requestBody);
+
+      final streamedResponse = await client.send(request);
+
+      if (streamedResponse.statusCode < 200 || streamedResponse.statusCode >= 300) {
+        final errorBody = await streamedResponse.stream.bytesToString();
+        throw Exception('${streamedResponse.statusCode} $errorBody');
+      }
+
+      final parser = SseParser();
+      final stream = streamedResponse.stream.transform(utf8.decoder);
+
+      await for (final rawChunk in stream) {
+        final events = parser.addChunk(rawChunk);
+        for (final event in events) {
+          try {
+            final decoded = SseEventDecoder.decode(apiMode: apiMode, event: event);
+            if (decoded == null) continue;
+            
+            yield decoded;
+            
+            if (decoded.isDone) return;
+          } catch (_) {}
+        }
+      }
+
+      final lastEvent = parser.close();
+      if (lastEvent != null) {
+        try {
+          final decoded = SseEventDecoder.decode(apiMode: apiMode, event: lastEvent);
+          if (decoded != null) {
+            yield decoded;
+            if (decoded.isDone) return;
+          }
+        } catch (_) {}
+      }
+      yield const ChatChunk(isDone: true);
+    } catch (e) {
+      yield ChatChunk(isDone: true, error: '$e');
+    } finally {
+      client.close();
+    }
+  }
+}
 ```
 
 ## File: lib/presentation/widgets/input_bar.dart
@@ -12839,404 +12891,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 }
 ```
 
-## File: lib/data/repositories/conversation_repository.dart
-```dart
-// data/repositories/conversation_repository.dart
-import 'dart:async';
-import 'package:drift/drift.dart';
-import '../data_sources/local_file_source.dart';
-import '../../core/models/attachment.dart';
-import '../../core/models/chat_round.dart';
-import '../../core/models/session.dart';
-import '../../domain/models/session_list_item.dart';
-import '../database/database.dart';
-import '../../domain/models/session_card_meta.dart';
-import 'package:rxdart/rxdart.dart';
-
-class ConversationRepository {
-  final AppDatabase _db;
-  final LocalFileSource _fileService;
-  ConversationRepository(this._db, this._fileService);
-
-  // ========== 响应式查询 ==========
-
-  Stream<List<SessionListItem>> watchSessionListItems() {
-    final query = (_db.select(_db.dbSessions)
-      ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]));
-    return query.watch().map((sessions) {
-      return sessions.map((session) {
-        return SessionListItem(
-          id: session.id,
-          title: session.title,
-          updatedAt: session.updatedAt,
-        );
-      }).toList();
-    });
-  }
-
-  Stream<SessionCardMeta> watchSessionCardMeta(String sessionId) {
-    // 1. 仅查询最后一条 Round (倒序 + limit 1)
-    final lastRoundStream = (_db.select(_db.dbChatRounds)
-          ..where((t) => t.sessionId.equals(sessionId))
-          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
-          ..limit(1))
-        .watchSingleOrNull();
-
-    // 2. 仅查询 Round 总数 (Count 聚合，不加载数据)
-    final countStream = (
-      _db.selectOnly(_db.dbChatRounds)
-        ..addColumns([countAll()])
-        ..where(_db.dbChatRounds.sessionId.equals(sessionId))
-      )
-      .watchSingle()
-      .map((row) => row.read(countAll()) ?? 0);
-
-    // 3. 检查是否存在未读更新 (limit 1 短路查询)
-    final hasUnseenStream = (_db.select(_db.dbChatRounds)
-          ..where((t) => t.sessionId.equals(sessionId))
-          ..where((t) => t.hasUnseenUpdate.equals(true))
-          ..limit(1))
-        .watchSingleOrNull()
-        .map((row) => row != null);
-
-    // 4. 合并流
-    return Rx.combineLatest3(lastRoundStream, countStream, hasUnseenStream,
-        (lastRound, count, hasUnseen) {
-      final previewRound = lastRound;
-      
-      // 预览文本逻辑保持不变，但基于单个对象计算
-      final userPreview = previewRound == null
-          ? '点击开始新的对话'
-          : previewRound.userContent.trim().isEmpty
-              ? '（空输入）'
-              : previewRound.userContent.trim();
-              
-      final aiPreview = previewRound == null
-          ? '（等待回复）'
-          : (previewRound.assistantContent?.trim().isNotEmpty ?? false)
-              ? previewRound.assistantContent!
-              : (previewRound.isIncomplete ? '正在生成...' : '（等待回复）');
-
-      return SessionCardMeta(
-        roundCount: count,
-        previewRoundId: previewRound?.id,
-        userPreview: userPreview,
-        aiPreview: aiPreview,
-        hasUnseen: hasUnseen,
-        isStreaming: previewRound?.isIncomplete == true,
-      );
-    });
-  }
-  // ========== 细粒度监听（新增） ==========
-
-  /// 仅监听会话的拓扑结构（ID 与父子关系）
-  /// 只有在增删消息时触发，AI 说话时不触发
-  Stream<List<({String id, String? parentId})>> watchSessionTopology(String sessionId) {
-    final query = _db.selectOnly(_db.dbChatRounds)
-      ..addColumns([_db.dbChatRounds.id, _db.dbChatRounds.parentId])
-      ..where(_db.dbChatRounds.sessionId.equals(sessionId))
-      ..orderBy([OrderingTerm.asc(_db.dbChatRounds.createdAt)]);
-      
-    return query.watch().map((rows) => rows.map((r) => (
-      id: r.read(_db.dbChatRounds.id)!,
-      parentId: r.read(_db.dbChatRounds.parentId)
-    )).toList());
-  }
-
-  /// 仅监听单条消息的完整详情（含附件）
-  Stream<ChatRound?> watchSingleRound(String roundId) {
-    final query = _db.select(_db.dbChatRounds).join([
-      leftOuterJoin(
-        _db.dbAttachments,
-        _db.dbAttachments.roundId.equalsExp(_db.dbChatRounds.id),
-      ),
-    ])..where(_db.dbChatRounds.id.equals(roundId));
-
-    return query.watch().map((rows) {
-      if (rows.isEmpty) return null;
-      final roundRow = rows.first.readTable(_db.dbChatRounds);
-      final attachments = rows
-          .where((row) => row.readTableOrNull(_db.dbAttachments) != null)
-          .map((row) {
-            final a = row.readTable(_db.dbAttachments);
-            return Attachment(
-              id: a.id,
-              name: a.name,
-              relativePath: a.relativePath,
-              isImage: a.isImage,
-              mimeType: a.mimeType,
-            );
-          }).toList();
-      return _mapToChatRound(roundRow, attachments);
-    });
-  }
-
-  Future<List<ChatRound>> getContextRounds(String roundId) async {
-    // 1. 使用递归 CTE 直接查询从目标节点到根的路径（数据库层按时间正序返回）
-    final roundsQuery = _db.customSelect(
-      '''
-      WITH RECURSIVE ctx_chain AS (
-        -- 基础情况：目标节点
-        SELECT id, session_id, parent_id, created_at, user_content,
-              assistant_thinking, assistant_content, is_incomplete, has_unseen_update
-        FROM db_chat_rounds WHERE id = :roundId
-        UNION ALL
-        -- 递归情况：向上查找父节点
-        SELECT r.id, r.session_id, r.parent_id, r.created_at, r.user_content,
-              r.assistant_thinking, r.assistant_content, r.is_incomplete, r.has_unseen_update
-        FROM db_chat_rounds r
-        INNER JOIN ctx_chain c ON r.id = c.parent_id
-      )
-      SELECT * FROM ctx_chain ORDER BY created_at ASC
-      ''',
-      readsFrom: {_db.dbChatRounds},
-      variables: [Variable.withString(roundId)],
-    );
-
-    final dbRounds = await roundsQuery.map((row) {
-      return DbChatRound(
-        id: row.read<String>('id'),
-        sessionId: row.read<String>('session_id'),
-        parentId: row.read<String?>('parent_id'),
-        createdAt: row.read<int>('created_at'),
-        userContent: row.read<String>('user_content'),
-        assistantThinking: row.read<String?>('assistant_thinking'),
-        assistantContent: row.read<String?>('assistant_content'),
-        isIncomplete: row.read<bool>('is_incomplete'),
-        hasUnseenUpdate: row.read<bool>('has_unseen_update'),
-      );
-    }).get();
-
-    if (dbRounds.isEmpty) return [];
-
-    // 2. 批量查询链路上所有轮次的附件
-    final roundIds = dbRounds.map((r) => r.id).toList();
-    final dbAttachments = await (_db.select(_db.dbAttachments)
-          ..where((t) => t.roundId.isIn(roundIds)))
-        .get();
-
-    // 3. 按 roundId 分组附件
-    final attachmentMap = <String, List<Attachment>>{};
-    for (final att in dbAttachments) {
-      attachmentMap.putIfAbsent(att.roundId, () => []).add(
-        Attachment(
-          id: att.id,
-          name: att.name,
-          relativePath: att.relativePath,
-          isImage: att.isImage,
-          mimeType: att.mimeType,
-        ),
-      );
-    }
-
-    // 4. 组装返回（CTE 已按 created_at ASC 排序，无需 reversed）
-    return dbRounds.map((round) => _mapToChatRound(round, attachmentMap[round.id] ?? [])).toList();
-  }
-
-  Stream<String?> watchSessionTitle(String sessionId) {
-    return (_db.select(_db.dbSessions)
-          ..where((t) => t.id.equals(sessionId)))
-        .map((row) => row.title)
-        .watchSingleOrNull();
-  }
-
-  ChatRound _mapToChatRound(DbChatRound row, List<Attachment> attachments) {
-    return ChatRound(
-      id: row.id,
-      parentId: row.parentId,
-      createdAt: row.createdAt,
-      userContent: row.userContent,
-      userAttachments: attachments,
-      assistantThinking: row.assistantThinking,
-      assistantContent: row.assistantContent,
-      isIncomplete: row.isIncomplete,
-      hasUnseenUpdate: row.hasUnseenUpdate,
-    );
-  }
-
-  Future<void> _cleanupOrphanAttachments(Iterable<String> relativePaths) async {
-    final uniquePaths = relativePaths.toSet();
-    if (uniquePaths.isEmpty) return;
-
-    final referencedPaths = await (_db.select(_db.dbAttachments)
-          ..where((t) => t.relativePath.isIn(uniquePaths)))
-        .map((t) => t.relativePath)
-        .get();
-
-    final orphanPaths = uniquePaths.difference(referencedPaths.toSet());
-
-    for (final path in orphanPaths) {
-      try {
-        await _fileService.deleteAttachment(path);
-      } catch (_) {
-      }
-    }
-  }
-
-  // ========== 写操作 ==========
-
-  Future<void> deleteRoundsAndCleanupOrphanAttachments(
-    String sessionId,
-    List<String> roundIds,
-  ) async {
-    if (roundIds.isEmpty) return;
-
-    // 1. 收集候选附件路径
-    final candidatePaths = (await (_db.select(_db.dbAttachments).join([
-      innerJoin(
-        _db.dbChatRounds,
-        _db.dbChatRounds.id.equalsExp(_db.dbAttachments.roundId),
-      ),
-    ])
-          ..where(_db.dbChatRounds.sessionId.equals(sessionId))
-          ..where(_db.dbChatRounds.id.isIn(roundIds)))
-        .get())
-        .map((row) => row.readTable(_db.dbAttachments).relativePath)
-        .toSet();
-
-    // 2. 提交数据库变更 (级联删除会自动清理 dbAttachments)
-    await _db.transaction(() async {
-      await (_db.delete(_db.dbChatRounds)
-            ..where((t) => t.sessionId.equals(sessionId) & t.id.isIn(roundIds)))
-          .go();
-      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-          .write(
-        DbSessionsCompanion(
-          updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
-        ),
-      );
-    });
-
-    // 3. 基于最终态清理物理文件
-    await _cleanupOrphanAttachments(candidatePaths);
-  }
-
-  Future<void> deleteSession(String sessionId) async {
-    // 1. 收集候选附件路径
-    final candidatePaths = (await (_db.select(_db.dbAttachments).join([
-      innerJoin(
-        _db.dbChatRounds,
-        _db.dbChatRounds.id.equalsExp(_db.dbAttachments.roundId),
-      ),
-    ])
-          ..where(_db.dbChatRounds.sessionId.equals(sessionId)))
-        .get())
-        .map((row) => row.readTable(_db.dbAttachments).relativePath)
-        .toSet();
-
-    // 2. 提交数据库变更
-    await (_db.delete(_db.dbSessions)..where((t) => t.id.equals(sessionId))).go();
-
-    // 3. 基于最终态清理物理文件
-    await _cleanupOrphanAttachments(candidatePaths);
-  }
-
-  Future<Session> createSession({
-    required String sessionId,
-    required String title,
-  }) async {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final session = Session(
-      id: sessionId,
-      title: title,
-      createdAt: now,
-      updatedAt: now,
-      rounds: [],
-    );
-    await _db.into(_db.dbSessions).insert(
-          DbSessionsCompanion.insert(
-            id: session.id,
-            title: session.title,
-            createdAt: session.createdAt,
-            updatedAt: session.updatedAt,
-          ),
-        );
-    return session;
-  }
-
-  Future<void> updateSessionTitle(String sessionId, String title) async {
-    await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-        .write(
-      DbSessionsCompanion(
-        title: Value(title),
-        updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
-      ),
-    );
-  }
-
-  Future<void> appendRound(String sessionId, ChatRound round) async {
-    await _db.transaction(() async {
-      await _db.into(_db.dbChatRounds).insert(
-            DbChatRoundsCompanion.insert(
-              id: round.id,
-              sessionId: sessionId,
-              parentId: Value(round.parentId),
-              createdAt: round.createdAt,
-              userContent: round.userContent,
-              assistantThinking: Value(round.assistantThinking),
-              assistantContent: Value(round.assistantContent),
-              isIncomplete: Value(round.isIncomplete),
-              hasUnseenUpdate: Value(round.hasUnseenUpdate),
-            ),
-          );
-      for (final attach in round.userAttachments) {
-        await _db.into(_db.dbAttachments).insert(
-              DbAttachmentsCompanion.insert(
-                id: attach.id,
-                roundId: round.id,
-                name: attach.name,
-                relativePath: attach.relativePath,
-                isImage: Value(attach.isImage),
-                mimeType: Value(attach.mimeType),
-              ),
-            );
-      }
-      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-          .write(
-        DbSessionsCompanion(
-          updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
-        ),
-      );
-    });
-  }
-
-  Future<void> updateRound({
-    required String roundId,
-    String? assistantThinking,
-    String? assistantContent,
-    bool? isIncomplete,
-    bool? hasUnseenUpdate,
-  }) async {
-    await (_db.update(_db.dbChatRounds)..where((t) => t.id.equals(roundId)))
-        .write(DbChatRoundsCompanion(
-          assistantThinking: assistantThinking != null
-              ? Value(assistantThinking)
-              : const Value.absent(),
-          assistantContent: assistantContent != null
-              ? Value(assistantContent)
-              : const Value.absent(),
-          isIncomplete: isIncomplete != null
-              ? Value(isIncomplete)
-              : const Value.absent(),
-          hasUnseenUpdate: hasUnseenUpdate != null
-              ? Value(hasUnseenUpdate)
-              : const Value.absent(),
-        ));
-    // ✅ 不再更新 Session 的 updatedAt
-  }
-
-  // ========== 附件读写接口保留 ==========
-  Future<String> saveAttachment(Uint8List data, String fileName) async =>
-      await _fileService.saveAttachment(data, fileName);
-
-  Future<Uint8List> getAttachment(String relativePath) async =>
-      await _fileService.readAttachment(relativePath);
-
-  Future<void> deleteAttachment(String relativePath) async =>
-      await _fileService.deleteAttachment(relativePath);
-}
-```
-
 ## File: lib/presentation/pages/home_page.dart
 ```dart
 import 'package:flutter/material.dart';
@@ -13738,6 +13392,404 @@ class _PreviewLine extends StatelessWidget {
 }
 ```
 
+## File: lib/data/repositories/conversation_repository.dart
+```dart
+// data/repositories/conversation_repository.dart
+import 'dart:async';
+import 'package:drift/drift.dart';
+import '../data_sources/local_file_source.dart';
+import '../../core/models/attachment.dart';
+import '../../core/models/chat_round.dart';
+import '../../core/models/session.dart';
+import '../../domain/models/session_list_item.dart';
+import '../database/database.dart';
+import '../../domain/models/session_card_meta.dart';
+import 'package:rxdart/rxdart.dart';
+
+class ConversationRepository {
+  final AppDatabase _db;
+  final LocalFileSource _fileService;
+  ConversationRepository(this._db, this._fileService);
+
+  // ========== 响应式查询 ==========
+
+  Stream<List<SessionListItem>> watchSessionListItems() {
+    final query = (_db.select(_db.dbSessions)
+      ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]));
+    return query.watch().map((sessions) {
+      return sessions.map((session) {
+        return SessionListItem(
+          id: session.id,
+          title: session.title,
+          updatedAt: session.updatedAt,
+        );
+      }).toList();
+    });
+  }
+
+  Stream<SessionCardMeta> watchSessionCardMeta(String sessionId) {
+    // 1. 仅查询最后一条 Round (倒序 + limit 1)
+    final lastRoundStream = (_db.select(_db.dbChatRounds)
+          ..where((t) => t.sessionId.equals(sessionId))
+          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
+          ..limit(1))
+        .watchSingleOrNull();
+
+    // 2. 仅查询 Round 总数 (Count 聚合，不加载数据)
+    final countStream = (
+      _db.selectOnly(_db.dbChatRounds)
+        ..addColumns([countAll()])
+        ..where(_db.dbChatRounds.sessionId.equals(sessionId))
+      )
+      .watchSingle()
+      .map((row) => row.read(countAll()) ?? 0);
+
+    // 3. 检查是否存在未读更新 (limit 1 短路查询)
+    final hasUnseenStream = (_db.select(_db.dbChatRounds)
+          ..where((t) => t.sessionId.equals(sessionId))
+          ..where((t) => t.hasUnseenUpdate.equals(true))
+          ..limit(1))
+        .watchSingleOrNull()
+        .map((row) => row != null);
+
+    // 4. 合并流
+    return Rx.combineLatest3(lastRoundStream, countStream, hasUnseenStream,
+        (lastRound, count, hasUnseen) {
+      final previewRound = lastRound;
+      
+      // 预览文本逻辑保持不变，但基于单个对象计算
+      final userPreview = previewRound == null
+          ? '点击开始新的对话'
+          : previewRound.userContent.trim().isEmpty
+              ? '（空输入）'
+              : previewRound.userContent.trim();
+              
+      final aiPreview = previewRound == null
+          ? '（等待回复）'
+          : (previewRound.assistantContent?.trim().isNotEmpty ?? false)
+              ? previewRound.assistantContent!
+              : (previewRound.isIncomplete ? '正在生成...' : '（等待回复）');
+
+      return SessionCardMeta(
+        roundCount: count,
+        previewRoundId: previewRound?.id,
+        userPreview: userPreview,
+        aiPreview: aiPreview,
+        hasUnseen: hasUnseen,
+        isStreaming: previewRound?.isIncomplete == true,
+      );
+    });
+  }
+  // ========== 细粒度监听（新增） ==========
+
+  /// 仅监听会话的拓扑结构（ID 与父子关系）
+  /// 只有在增删消息时触发，AI 说话时不触发
+  Stream<List<({String id, String? parentId})>> watchSessionTopology(String sessionId) {
+    final query = _db.selectOnly(_db.dbChatRounds)
+      ..addColumns([_db.dbChatRounds.id, _db.dbChatRounds.parentId])
+      ..where(_db.dbChatRounds.sessionId.equals(sessionId))
+      ..orderBy([OrderingTerm.asc(_db.dbChatRounds.createdAt)]);
+      
+    return query.watch().map((rows) => rows.map((r) => (
+      id: r.read(_db.dbChatRounds.id)!,
+      parentId: r.read(_db.dbChatRounds.parentId)
+    )).toList());
+  }
+
+  /// 仅监听单条消息的完整详情（含附件）
+  Stream<ChatRound?> watchSingleRound(String roundId) {
+    final query = _db.select(_db.dbChatRounds).join([
+      leftOuterJoin(
+        _db.dbAttachments,
+        _db.dbAttachments.roundId.equalsExp(_db.dbChatRounds.id),
+      ),
+    ])..where(_db.dbChatRounds.id.equals(roundId));
+
+    return query.watch().map((rows) {
+      if (rows.isEmpty) return null;
+      final roundRow = rows.first.readTable(_db.dbChatRounds);
+      final attachments = rows
+          .where((row) => row.readTableOrNull(_db.dbAttachments) != null)
+          .map((row) {
+            final a = row.readTable(_db.dbAttachments);
+            return Attachment(
+              id: a.id,
+              name: a.name,
+              relativePath: a.relativePath,
+              isImage: a.isImage,
+              mimeType: a.mimeType,
+            );
+          }).toList();
+      return _mapToChatRound(roundRow, attachments);
+    });
+  }
+
+  Future<List<ChatRound>> getContextRounds(String roundId) async {
+    // 1. 使用递归 CTE 直接查询从目标节点到根的路径（数据库层按时间正序返回）
+    final roundsQuery = _db.customSelect(
+      '''
+      WITH RECURSIVE ctx_chain AS (
+        -- 基础情况：目标节点
+        SELECT id, session_id, parent_id, created_at, user_content,
+              assistant_thinking, assistant_content, is_incomplete, has_unseen_update
+        FROM db_chat_rounds WHERE id = :roundId
+        UNION ALL
+        -- 递归情况：向上查找父节点
+        SELECT r.id, r.session_id, r.parent_id, r.created_at, r.user_content,
+              r.assistant_thinking, r.assistant_content, r.is_incomplete, r.has_unseen_update
+        FROM db_chat_rounds r
+        INNER JOIN ctx_chain c ON r.id = c.parent_id
+      )
+      SELECT * FROM ctx_chain ORDER BY created_at ASC
+      ''',
+      readsFrom: {_db.dbChatRounds},
+      variables: [Variable.withString(roundId)],
+    );
+
+    final dbRounds = await roundsQuery.map((row) {
+      return DbChatRound(
+        id: row.read<String>('id'),
+        sessionId: row.read<String>('session_id'),
+        parentId: row.read<String?>('parent_id'),
+        createdAt: row.read<int>('created_at'),
+        userContent: row.read<String>('user_content'),
+        assistantThinking: row.read<String?>('assistant_thinking'),
+        assistantContent: row.read<String?>('assistant_content'),
+        isIncomplete: row.read<bool>('is_incomplete'),
+        hasUnseenUpdate: row.read<bool>('has_unseen_update'),
+      );
+    }).get();
+
+    if (dbRounds.isEmpty) return [];
+
+    // 2. 批量查询链路上所有轮次的附件
+    final roundIds = dbRounds.map((r) => r.id).toList();
+    final dbAttachments = await (_db.select(_db.dbAttachments)
+          ..where((t) => t.roundId.isIn(roundIds)))
+        .get();
+
+    // 3. 按 roundId 分组附件
+    final attachmentMap = <String, List<Attachment>>{};
+    for (final att in dbAttachments) {
+      attachmentMap.putIfAbsent(att.roundId, () => []).add(
+        Attachment(
+          id: att.id,
+          name: att.name,
+          relativePath: att.relativePath,
+          isImage: att.isImage,
+          mimeType: att.mimeType,
+        ),
+      );
+    }
+
+    // 4. 组装返回（CTE 已按 created_at ASC 排序，无需 reversed）
+    return dbRounds.map((round) => _mapToChatRound(round, attachmentMap[round.id] ?? [])).toList();
+  }
+
+  Stream<String?> watchSessionTitle(String sessionId) {
+    return (_db.select(_db.dbSessions)
+          ..where((t) => t.id.equals(sessionId)))
+        .map((row) => row.title)
+        .watchSingleOrNull();
+  }
+
+  ChatRound _mapToChatRound(DbChatRound row, List<Attachment> attachments) {
+    return ChatRound(
+      id: row.id,
+      parentId: row.parentId,
+      createdAt: row.createdAt,
+      userContent: row.userContent,
+      userAttachments: attachments,
+      assistantThinking: row.assistantThinking,
+      assistantContent: row.assistantContent,
+      isIncomplete: row.isIncomplete,
+      hasUnseenUpdate: row.hasUnseenUpdate,
+    );
+  }
+
+  Future<void> _cleanupOrphanAttachments(Iterable<String> relativePaths) async {
+    final uniquePaths = relativePaths.toSet();
+    if (uniquePaths.isEmpty) return;
+
+    final referencedPaths = await (_db.select(_db.dbAttachments)
+          ..where((t) => t.relativePath.isIn(uniquePaths)))
+        .map((t) => t.relativePath)
+        .get();
+
+    final orphanPaths = uniquePaths.difference(referencedPaths.toSet());
+
+    for (final path in orphanPaths) {
+      try {
+        await _fileService.deleteAttachment(path);
+      } catch (_) {
+      }
+    }
+  }
+
+  // ========== 写操作 ==========
+
+  Future<void> deleteRoundsAndCleanupOrphanAttachments(
+    String sessionId,
+    List<String> roundIds,
+  ) async {
+    if (roundIds.isEmpty) return;
+
+    // 1. 收集候选附件路径
+    final candidatePaths = (await (_db.select(_db.dbAttachments).join([
+      innerJoin(
+        _db.dbChatRounds,
+        _db.dbChatRounds.id.equalsExp(_db.dbAttachments.roundId),
+      ),
+    ])
+          ..where(_db.dbChatRounds.sessionId.equals(sessionId))
+          ..where(_db.dbChatRounds.id.isIn(roundIds)))
+        .get())
+        .map((row) => row.readTable(_db.dbAttachments).relativePath)
+        .toSet();
+
+    // 2. 提交数据库变更 (级联删除会自动清理 dbAttachments)
+    await _db.transaction(() async {
+      await (_db.delete(_db.dbChatRounds)
+            ..where((t) => t.sessionId.equals(sessionId) & t.id.isIn(roundIds)))
+          .go();
+      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
+          .write(
+        DbSessionsCompanion(
+          updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+        ),
+      );
+    });
+
+    // 3. 基于最终态清理物理文件
+    await _cleanupOrphanAttachments(candidatePaths);
+  }
+
+  Future<void> deleteSession(String sessionId) async {
+    // 1. 收集候选附件路径
+    final candidatePaths = (await (_db.select(_db.dbAttachments).join([
+      innerJoin(
+        _db.dbChatRounds,
+        _db.dbChatRounds.id.equalsExp(_db.dbAttachments.roundId),
+      ),
+    ])
+          ..where(_db.dbChatRounds.sessionId.equals(sessionId)))
+        .get())
+        .map((row) => row.readTable(_db.dbAttachments).relativePath)
+        .toSet();
+
+    // 2. 提交数据库变更
+    await (_db.delete(_db.dbSessions)..where((t) => t.id.equals(sessionId))).go();
+
+    // 3. 基于最终态清理物理文件
+    await _cleanupOrphanAttachments(candidatePaths);
+  }
+
+  Future<Session> createSession({
+    required String sessionId,
+    required String title,
+  }) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final session = Session(
+      id: sessionId,
+      title: title,
+      createdAt: now,
+      updatedAt: now,
+      rounds: [],
+    );
+    await _db.into(_db.dbSessions).insert(
+          DbSessionsCompanion.insert(
+            id: session.id,
+            title: session.title,
+            createdAt: session.createdAt,
+            updatedAt: session.updatedAt,
+          ),
+        );
+    return session;
+  }
+
+  Future<void> updateSessionTitle(String sessionId, String title) async {
+    await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
+        .write(
+      DbSessionsCompanion(
+        title: Value(title),
+        updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
+  }
+
+  Future<void> appendRound(String sessionId, ChatRound round) async {
+    await _db.transaction(() async {
+      await _db.into(_db.dbChatRounds).insert(
+            DbChatRoundsCompanion.insert(
+              id: round.id,
+              sessionId: sessionId,
+              parentId: Value(round.parentId),
+              createdAt: round.createdAt,
+              userContent: round.userContent,
+              assistantThinking: Value(round.assistantThinking),
+              assistantContent: Value(round.assistantContent),
+              isIncomplete: Value(round.isIncomplete),
+              hasUnseenUpdate: Value(round.hasUnseenUpdate),
+            ),
+          );
+      for (final attach in round.userAttachments) {
+        await _db.into(_db.dbAttachments).insert(
+              DbAttachmentsCompanion.insert(
+                id: attach.id,
+                roundId: round.id,
+                name: attach.name,
+                relativePath: attach.relativePath,
+                isImage: Value(attach.isImage),
+                mimeType: Value(attach.mimeType),
+              ),
+            );
+      }
+      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
+          .write(
+        DbSessionsCompanion(
+          updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+        ),
+      );
+    });
+  }
+
+  Future<void> updateRound({
+    required String roundId,
+    String? assistantThinking,
+    String? assistantContent,
+    bool? isIncomplete,
+    bool? hasUnseenUpdate,
+  }) async {
+    await (_db.update(_db.dbChatRounds)..where((t) => t.id.equals(roundId)))
+        .write(DbChatRoundsCompanion(
+          assistantThinking: assistantThinking != null
+              ? Value(assistantThinking)
+              : const Value.absent(),
+          assistantContent: assistantContent != null
+              ? Value(assistantContent)
+              : const Value.absent(),
+          isIncomplete: isIncomplete != null
+              ? Value(isIncomplete)
+              : const Value.absent(),
+          hasUnseenUpdate: hasUnseenUpdate != null
+              ? Value(hasUnseenUpdate)
+              : const Value.absent(),
+        ));
+    // ✅ 不再更新 Session 的 updatedAt
+  }
+
+  // ========== 附件读写接口保留 ==========
+  Future<String> saveAttachment(Uint8List data, String fileName) async =>
+      await _fileService.saveAttachment(data, fileName);
+
+  Future<Uint8List> getAttachment(String relativePath) async =>
+      await _fileService.readAttachment(relativePath);
+
+  Future<void> deleteAttachment(String relativePath) async =>
+      await _fileService.deleteAttachment(relativePath);
+}
+```
+
 ## File: lib/presentation/pages/branch_tree_page.dart
 ```dart
 import 'package:flutter/material.dart';
@@ -14120,183 +14172,6 @@ class _SkeletonBar extends StatelessWidget {
     return child;
   }
 }
-```
-
-## File: lib/presentation/providers/chat_notifier.dart
-```dart
-import 'dart:async';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/chat_round.dart';
-import '../../di/providers.dart';
-import '../../domain/services/attachment_preparer.dart';
-import '../../domain/services/chat_context_builder.dart';
-import 'package:uuid/uuid.dart';
-
-final sessionTitleProvider = StreamProvider.family<String, String>((ref, sessionId) {
-  return ref.watch(conversationRepositoryProvider).watchSessionTitle(sessionId)
-      .map((title) => title ?? '对话');
-});
-
-final chatTopologyProvider =
-    StreamProvider.family<List<({String id, String? parentId})>, String>(
-  (ref, sessionId) {
-    return ref.watch(conversationRepositoryProvider).watchSessionTopology(sessionId);
-  },
-);
-
-final roundDetailProvider = StreamProvider.family<ChatRound?, String>((ref, roundId) {
-  return ref.watch(conversationRepositoryProvider).watchSingleRound(roundId);
-});
-
-final visibleRoundIdsProvider =
-    Provider.family<List<String>, ({String sessionId, String? roundId})>(
-  (ref, args) {
-    final topology = ref.watch(chatTopologyProvider(args.sessionId)).valueOrNull ?? [];
-    if (args.roundId == null) return const [];
-
-    final idToParent = {for (var t in topology) t.id: t.parentId};
-    final path = <String>[];
-    String? currentId = args.roundId;
-
-    while (currentId != null && idToParent.containsKey(currentId)) {
-      path.add(currentId);
-      currentId = idToParent[currentId];
-    }
-    return path.reversed.toList();
-  },
-);
-
-class ChatController {
-  final Ref ref;
-  final String sessionId;
-  final Set<String> _stoppingRoundIds = {};
-
-  ChatController(this.ref, this.sessionId);
-
-  Future<String> sendMessage({
-    required String content,
-    required String? parentRoundId,
-    List<dynamic>? attachments,
-  }) async {
-    final repository = ref.read(conversationRepositoryProvider);
-    final saved = await savePendingAttachments(
-      repository,
-      attachments?.cast() ?? [],
-    );
-
-    final newRound = ChatRound(
-      id: const Uuid().v4(),
-      parentId: parentRoundId,
-      createdAt: DateTime.now().millisecondsSinceEpoch,
-      userContent: content,
-      userAttachments: saved,
-      isIncomplete: true,
-      hasUnseenUpdate: false,
-    );
-
-    await repository.appendRound(sessionId, newRound);
-
-    () async {
-      final apiSource = ref.read(remoteApiSourceProvider);
-      final contentBuffer = StringBuffer();
-      final reasoningBuffer = StringBuffer();
-      String? error;
-      DateTime? lastDbUpdateTime;
-      const updateInterval = Duration(seconds: 1);
-
-      try {
-        final contextRounds = await repository.getContextRounds(
-          newRound.id,
-        );
-        final apiContext = await buildApiContextFromRounds(
-          contextRounds,
-          repository,
-        );
-
-        final currentConfig = await ref.read(configServiceProvider).loadConfig();
-
-        final stream = apiSource.chatStream(
-          taskId: newRound.id,
-          loadConfig: () async => currentConfig,
-          context: apiContext,
-        );
-
-        await for (final chunk in stream) {
-          if (chunk.error != null) {
-            error = chunk.error;
-            break;
-          }
-          if (chunk.isDone) break;
-
-          if (chunk.content != null) contentBuffer.write(chunk.content);
-          if (chunk.reasoningContent != null) reasoningBuffer.write(chunk.reasoningContent);
-
-          final now = DateTime.now();
-          if (lastDbUpdateTime == null ||
-              now.difference(lastDbUpdateTime) >= updateInterval) {
-            await repository.updateRound(
-              roundId: newRound.id,
-              assistantContent: contentBuffer.toString(),
-              assistantThinking: reasoningBuffer.toString(),
-            );
-            lastDbUpdateTime = now;
-          }
-        }
-      } catch (e) {
-        error = e.toString();
-      } finally {
-
-        String finalContent = contentBuffer.toString();
-        if (error != null) {
-          finalContent += '\n\n[错误]\n$error';
-        } else if (_stoppingRoundIds.contains(newRound.id)) {
-          finalContent += '\n\n[已停止]';
-        }
-
-        await repository.updateRound(
-          roundId: newRound.id,
-          assistantContent: finalContent.trim().isEmpty ? null : finalContent,
-          assistantThinking: reasoningBuffer.toString().trim().isEmpty
-              ? null
-              : reasoningBuffer.toString(),
-          isIncomplete: false,
-          hasUnseenUpdate: true,
-        );
-        _stoppingRoundIds.remove(newRound.id);
-      }
-    }();
-
-    return newRound.id;
-  }
-
-  Future<String> retryFromRound(String roundId) async {
-    final source = await ref.read(roundDetailProvider(roundId).future);
-    if (source == null) throw Exception('找不到对应的对话轮次');
-
-    return sendMessage(
-      content: source.userContent,
-      parentRoundId: source.parentId,
-      attachments: source.userAttachments,
-    );
-  }
-
-  void stopGeneration(String roundId) {
-    _stoppingRoundIds.add(roundId);
-    ref.read(remoteApiSourceProvider).cancelRequest(roundId);
-  }
-
-  Future<void> markRoundSeen(ChatRound round) async {
-    await ref.read(conversationRepositoryProvider).updateRound(
-      roundId: round.id,
-      hasUnseenUpdate: false,
-    );
-  }
-}
-
-final chatControllerProvider =
-    Provider.family<ChatController, String>((ref, sessionId) {
-  return ChatController(ref, sessionId);
-});
 ```
 
 ## File: lib/presentation/pages/chat_page.dart
@@ -14750,4 +14625,114 @@ class _PaginationBar extends StatelessWidget {
     );
   }
 }
+```
+
+## File: lib/presentation/providers/chat_notifier.dart
+```dart
+import 'dart:async';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/chat_round.dart';
+import '../../di/providers.dart';
+import '../../domain/services/attachment_preparer.dart';
+import 'chat_generation_provider.dart';
+import 'package:uuid/uuid.dart';
+
+final sessionTitleProvider = StreamProvider.family<String, String>((ref, sessionId) {
+  return ref.watch(conversationRepositoryProvider).watchSessionTitle(sessionId)
+      .map((title) => title ?? '对话');
+});
+
+final chatTopologyProvider =
+    StreamProvider.family<List<({String id, String? parentId})>, String>(
+  (ref, sessionId) {
+    return ref.watch(conversationRepositoryProvider).watchSessionTopology(sessionId);
+  },
+);
+
+final roundDetailProvider = StreamProvider.family<ChatRound?, String>((ref, roundId) {
+  return ref.watch(conversationRepositoryProvider).watchSingleRound(roundId);
+});
+
+final visibleRoundIdsProvider =
+    Provider.family<List<String>, ({String sessionId, String? roundId})>(
+  (ref, args) {
+    final topology = ref.watch(chatTopologyProvider(args.sessionId)).valueOrNull ?? [];
+    if (args.roundId == null) return const [];
+
+    final idToParent = {for (var t in topology) t.id: t.parentId};
+    final path = <String>[];
+    String? currentId = args.roundId;
+
+    while (currentId != null && idToParent.containsKey(currentId)) {
+      path.add(currentId);
+      currentId = idToParent[currentId];
+    }
+    return path.reversed.toList();
+  },
+);
+
+class ChatController {
+  final Ref ref;
+  final String sessionId;
+
+  ChatController(this.ref, this.sessionId);
+
+  Future<String> sendMessage({
+    required String content,
+    required String? parentRoundId,
+    List<dynamic>? attachments,
+  }) async {
+    final repository = ref.read(conversationRepositoryProvider);
+    final saved = await savePendingAttachments(
+      repository,
+      attachments?.cast() ?? [],
+    );
+
+    final newRound = ChatRound(
+      id: const Uuid().v4(),
+      parentId: parentRoundId,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+      userContent: content,
+      userAttachments: saved,
+      isIncomplete: true,
+      hasUnseenUpdate: false,
+    );
+
+    await repository.appendRound(sessionId, newRound);
+
+    ref.listen(
+      chatGenerationProvider(newRound.id),
+      (previous, next) {},
+    );
+
+    return newRound.id;
+  }
+
+  Future<String> retryFromRound(String roundId) async {
+    final source = await ref.read(roundDetailProvider(roundId).future);
+    if (source == null) throw Exception('找不到对应的对话轮次');
+
+    return sendMessage(
+      content: source.userContent,
+      parentRoundId: source.parentId,
+      attachments: source.userAttachments,
+    );
+  }
+
+  void stopGeneration(String roundId) {
+    ref.invalidate(chatGenerationProvider(roundId));
+  }
+
+  Future<void> markRoundSeen(ChatRound round) async {
+    await ref.read(conversationRepositoryProvider).updateRound(
+      roundId: round.id,
+      hasUnseenUpdate: false,
+    );
+  }
+}
+
+final chatControllerProvider =
+    Provider.family<ChatController, String>((ref, sessionId) {
+  return ChatController(ref, sessionId);
+});
 ```

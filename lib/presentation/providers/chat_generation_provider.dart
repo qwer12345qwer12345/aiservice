@@ -21,7 +21,6 @@ final chatGenerationProvider =
 
       // 3. 发起请求
       final stream = apiSource.chatStream(
-        taskId: roundId,
         loadConfig: () async => config,
         context: apiContext,
       );
