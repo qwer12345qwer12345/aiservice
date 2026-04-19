@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -78,5 +79,9 @@ class AppTheme {
         behavior: SnackBarBehavior.floating,
       ),
     );
+  }
+
+  static CupertinoThemeData get cupertinoTheme {
+    return const CupertinoThemeData();
   }
 }

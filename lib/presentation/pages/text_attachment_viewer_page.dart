@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../widgets/common/app_page_scaffold.dart';
@@ -23,19 +24,15 @@ class TextAttachmentViewerPage extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return AppPageScaffold(
-      appBar: AppBar(
-        title: Text(
+      navigationBar: CupertinoNavigationBar(
+        middle: Text(
           title,
           overflow: TextOverflow.ellipsis,
-          style: textTheme.titleMedium,
         ),
-        actions: [
-          IconButton(
-            tooltip: '复制全文',
-            onPressed: _copyAll,
-            icon: const Icon(Icons.content_copy_outlined),
-          ),
-        ],
+        trailing: CupertinoButton(
+          onPressed: _copyAll,
+          child: const Icon(CupertinoIcons.doc_on_doc),
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),

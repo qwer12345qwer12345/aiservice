@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:graphview/GraphView.dart';
@@ -142,7 +143,9 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     final targetId = widget.initialFocusRoundId;
 
     return AppPageScaffold(
-      appBar: AppBar(title: const Text('分支树')),
+      navigationBar: CupertinoNavigationBar(
+        middle: Text('分支树')
+      ),
       body: roots.isEmpty
           ? const Center(child: Text('暂无分支结构'))
           : InteractiveViewer(

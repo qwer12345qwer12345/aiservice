@@ -1,4 +1,5 @@
 import 'package:aiservice/di/providers.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -158,8 +159,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     });
 
     return AppPageScaffold(
-      appBar: AppBar(
-        title: const Text('设置'),
+      navigationBar: CupertinoNavigationBar(
+        middle: Text('设置'),
       ),
       body: profilesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),

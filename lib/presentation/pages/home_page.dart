@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
@@ -96,23 +97,20 @@ class HomePage extends ConsumerWidget {
     final allowImages = selectedModel?.overrideSupportsVision == true;
 
     return AppPageScaffold(
-      appBar: AppBar(
-        title: const Text('AI Chat'),
-        actions: [
-          IconButton(
-            tooltip: '设置',
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const SettingsPage(),
-                ),
-              );
-            },
-          ),
-        ],
+      navigationBar: CupertinoNavigationBar(
+      middle: const Text('AI Chat'),
+      trailing: CupertinoButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            CupertinoPageRoute(
+              builder: (_) => const SettingsPage(),
+            ),
+          );
+        },
+        child: const Icon(CupertinoIcons.settings),
       ),
+    ),
       body: Column(
         children: [
           Expanded(

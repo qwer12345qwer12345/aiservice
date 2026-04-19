@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 
 class AppPageScaffold extends StatelessWidget {
-  final PreferredSizeWidget? appBar;
+  final ObstructingPreferredSizeWidget? navigationBar;
   final Widget body;
   final Widget? bottomNavigationBar;
   final Color? backgroundColor;
@@ -9,7 +9,7 @@ class AppPageScaffold extends StatelessWidget {
 
   const AppPageScaffold({
     super.key,
-    this.appBar,
+    this.navigationBar,
     required this.body,
     this.bottomNavigationBar,
     this.backgroundColor,
@@ -20,14 +20,19 @@ class AppPageScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final content = useSafeArea ? SafeArea(child: body) : body;
 
-    return Scaffold(
+    return CupertinoPageScaffold(
       backgroundColor: backgroundColor,
-      appBar: appBar,
-      bottomNavigationBar: bottomNavigationBar,
-      body: GestureDetector(
+      navigationBar: navigationBar,
+
+      child: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-        child: content,
+        
+        child: Column(
+          children: [
+            Expanded(child: content),
+          ],
+        ),
       ),
     );
   }

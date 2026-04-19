@@ -103,6 +103,7 @@ lib/presentation/providers/chat_notifier.dart
 lib/presentation/providers/config_notifier.dart
 lib/presentation/providers/input_notifier.dart
 lib/presentation/providers/session_list_notifier.dart
+lib/presentation/providers/settings_form_notifier.dart
 lib/presentation/themes/app_theme.dart
 lib/presentation/themes/app_tokens.dart
 lib/presentation/widgets/attachment_list.dart
@@ -117,384 +118,193 @@ lib/presentation/widgets/thought_bubble.dart
 
 # Files
 
-## File: lib/data/data_sources/api_builders/api_request_builder.dart
+## File: lib/presentation/providers/settings_form_notifier.dart
 ```dart
-import '../../../core/models/api_message.dart';
-import '../../../core/models/model_info.dart';
+import 'package:aiservice/data/services/config_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/app_config.dart';
+import '../../core/models/model_info.dart';
+import '../../di/providers.dart';
 
-class ApiUriUtils {
-  static Uri buildNormalizedUri(String base, String path) {
-    final normalizedBase = base.trim().replaceAll(RegExp(r'/+$'), '');
-    final normalizedPath = path.trim().replaceAll(RegExp(r'^/+'), '');
-    return Uri.parse('$normalizedBase/$normalizedPath');
-  }
-}
+/// 设置表单的状态
+class SettingsFormState {
+  final AppConfig config;
+  final bool isSaving;
+  final String? error;
 
-/// 构建请求所需的上下文
-class ApiBuildContext {
-  final String model;
-  final List<ApiMessage> context;
-  final bool enableReasoning;
-  final String apiKey;
-  final String baseUrl;
-  final String chatPath;
-  final String modelsPath;
-
-  ApiBuildContext({
-    required this.model,
-    required this.context,
-    required this.enableReasoning,
-    required this.apiKey,
-    required this.baseUrl,
-    required this.chatPath,
-    required this.modelsPath,
+  const SettingsFormState({
+    required this.config,
+    this.isSaving = false,
+    this.error,
   });
-}
 
-/// API 请求构建器接口
-abstract class ApiRequestBuilder {
-  /// 构建请求 Headers
-  Map<String, String> buildHeaders(ApiBuildContext ctx);
-
-  /// 构建请求 URI
-  Uri buildUri(ApiBuildContext ctx);
-  Uri buildModelsUri(ApiBuildContext ctx);
-  
-  /// 构建请求 Body
-  Map<String, dynamic> buildRequestBody(ApiBuildContext ctx);
-
-  /// 解析模型列表响应
-  List<ModelInfo> parseModelsResponse(Map<String, dynamic> json);
-}
-```
-
-## File: lib/data/data_sources/api_builders/chat_completions_api_builder.dart
-```dart
-import 'api_request_builder.dart';
-import '../../../core/models/api_message.dart';
-import '../../../core/models/model_info.dart';
-
-class ChatCompletionsApiBuilder implements ApiRequestBuilder {
-  @override
-  Map<String, String> buildHeaders(ApiBuildContext ctx) {
-    return {
-      'Authorization': 'Bearer ${ctx.apiKey}',
-      'Content-Type': 'application/json',
-    };
-  }
-
-  @override
-  Uri buildUri(ApiBuildContext ctx) {
-    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.chatPath);
-  }
-
-  @override
-  Uri buildModelsUri(ApiBuildContext ctx) {
-    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.modelsPath);
-  }
-  
-  @override
-  Map<String, dynamic> buildRequestBody(ApiBuildContext ctx) {
-    return {
-      'model': ctx.model,
-      'messages': _buildMessages(ctx.context),
-      'stream': true,
-      if (ctx.enableReasoning) 'reasoning_effort': 'medium',
-    };
-  }
-
-  @override
-  List<ModelInfo> parseModelsResponse(Map<String, dynamic> json) {
-    final data = json['data'] as List<dynamic>? ?? [];
-    return data.map((e) => _parseModelInfo(e as Map<String, dynamic>)).toList();
-  }
-
-  List<Map<String, dynamic>> _buildMessages(List<ApiMessage> context) {
-    return context.map(_buildMessage).toList();
-  }
-
-  Map<String, dynamic> _buildMessage(ApiMessage message) {
-    if (message.role == 'assistant') {
-      final result = <String, dynamic>{
-        'role': 'assistant',
-        'content': message.content ?? '',
-      };
-      if ((message.reasoning ?? '').trim().isNotEmpty) {
-        result['reasoning_content'] = message.reasoning;
-      }
-      return result;
-    }
-
-    if (message.parts.isEmpty) {
-      return {
-        'role': message.role,
-        'content': message.content ?? '',
-      };
-    }
-
-    return {
-      'role': message.role,
-      'content': message.parts.map((part) => part.when(
-            text: (type, text) => {'type': 'text', 'text': text},
-            imageUrl: (type, imageUrl) => {
-              'type': 'image_url',
-              'image_url': {'url': imageUrl.url},
-            },
-          )).toList(),
-    };
-  }
-
-  ModelInfo _parseModelInfo(Map<String, dynamic> json) {
-    bool? readBool(Map<String, dynamic> json, List<String> keys) {
-      for (final key in keys) {
-        if (!json.containsKey(key)) continue;
-        final value = json[key];
-        if (value is bool) return value;
-        if (value is num) return value != 0;
-        if (value is String) {
-          final lower = value.toLowerCase();
-          if (lower == 'true' || lower == '1' || lower == 'yes') return true;
-          if (lower == 'false' || lower == '0' || lower == 'no') return false;
-        }
-      }
-      return null;
-    }
-
-    return ModelInfo(
-      id: (json['id'] ?? '').toString(),
-      name: json['name']?.toString(),
-      overrideSupportsReasoning:
-          readBool(json, ['overrideSupportsReasoning', 'override_supports_reasoning']),
-      overrideSupportsVision:
-          readBool(json, ['overrideSupportsVision', 'override_supports_vision']),
+  SettingsFormState copyWith({
+    AppConfig? config,
+    bool? isSaving,
+    String? error,
+  }) {
+    return SettingsFormState(
+      config: config ?? this.config,
+      isSaving: isSaving ?? this.isSaving,
+      error: error,
     );
   }
 }
-```
 
-## File: lib/data/data_sources/api_builders/google_api_builder.dart
-```dart
-import 'api_request_builder.dart';
-import '../../../core/models/api_message.dart';
-import '../../../core/models/model_info.dart';
+/// 设置表单 Notifier
+///
+/// 职责：
+/// - 管理表单草稿状态
+/// - 提供字段更新方法
+/// - 处理保存逻辑
+class SettingsFormNotifier extends Notifier<SettingsFormState> {
+  late final ConfigService _configService;
 
-class GoogleApiBuilder implements ApiRequestBuilder {
   @override
-  Map<String, String> buildHeaders(ApiBuildContext ctx) {
-    return {
-      'x-goog-api-key': ctx.apiKey,
-      'Content-Type': 'application/json',
-    };
+  SettingsFormState build() {
+    _configService = ref.read(configServiceProvider);
+    // 初始状态为空配置，等待加载
+    return SettingsFormState(config: AppConfig.defaultConfig());
   }
 
-  @override
-  Uri buildUri(ApiBuildContext ctx) {
-    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.modelsPath).replace(
-      queryParameters: {'alt': 'sse'},
+  /// 从实际配置加载到草稿
+  void load(AppConfig config) {
+    state = state.copyWith(config: config, error: null);
+  }
+
+  /// 更新 Base URL
+  void updateBaseUrl(String value) {
+    state = state.copyWith(
+      config: state.config.copyWith(baseUrl: value),
     );
   }
 
-  @override
-  Uri buildModelsUri(ApiBuildContext ctx) {
-    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.modelsPath);
-  }
-
-  @override
-  Map<String, dynamic> buildRequestBody(ApiBuildContext ctx) {
-    return {
-      'contents': _buildGoogleContents(ctx.context),
-      'generationConfig': {},
-      'safetySettings': [
-        {'category': 'HARM_CATEGORY_HARASSMENT', 'threshold': 'BLOCK_NONE'},
-        {'category': 'HARM_CATEGORY_HATE_SPEECH', 'threshold': 'BLOCK_NONE'},
-        {'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'threshold': 'BLOCK_NONE'},
-        {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold': 'BLOCK_NONE'},
-      ],
-    };
-  }
-
-  @override
-  List<ModelInfo> parseModelsResponse(Map<String, dynamic> json) {
-    final models = json['models'] as List<dynamic>?;
-    if (models == null) return [];
-
-    return models.map((e) {
-      final m = e as Map<String, dynamic>;
-      final name = (m['name'] ?? '').toString();
-      final id = name.startsWith('models/') ? name.substring(7) : name;
-
-      final methods = m['supportedGenerationMethods'] as List<dynamic>?;
-      if (methods != null && !methods.contains('generateContent')) {
-        return null;
-      }
-
-      return ModelInfo(
-        id: id,
-        name: m['displayName']?.toString(),
-      );
-    }).whereType<ModelInfo>().toList();
-  }
-
-  List<Map<String, dynamic>> _buildGoogleContents(List<ApiMessage> context) {
-    return context.map((message) {
-      final role = message.role == 'assistant' ? 'model' : message.role;
-      final parts = <Map<String, dynamic>>[];
-
-      if (message.parts.isEmpty) {
-        final text = message.content?.trim() ?? '';
-        if (text.isNotEmpty) {
-          parts.add({'text': text});
-        }
-      } else {
-        for (final part in message.parts) {
-          parts.addAll(part.when(
-            text: (type, text) => [{'text': text}],
-            imageUrl: (type, imageUrl) {
-              final url = imageUrl.url;
-              if (url.startsWith('data:')) {
-                final commaIndex = url.indexOf(',');
-                if (commaIndex != -1) {
-                  final mime = url.substring(5, commaIndex);
-                  final base64Data = url.substring(commaIndex + 1);
-                  return [
-                    {
-                      'inlineData': {
-                        'mimeType': mime,
-                        'data': base64Data,
-                      }
-                    }
-                  ];
-                }
-              }
-              return [{'text': '[Image: $url]'}];
-            },
-          ));
-        }
-      }
-
-      if (parts.isEmpty) return null;
-      return {'role': role, 'parts': parts};
-    }).whereType<Map<String, dynamic>>().toList();
-  }
-}
-```
-
-## File: lib/data/data_sources/api_builders/responses_api_builder.dart
-```dart
-import 'api_request_builder.dart';
-import '../../../core/models/api_message.dart';
-import '../../../core/models/model_info.dart';
-
-class ResponsesApiBuilder implements ApiRequestBuilder {
-  @override
-  Map<String, String> buildHeaders(ApiBuildContext ctx) {
-    return {
-      'Authorization': 'Bearer ${ctx.apiKey}',
-      'Content-Type': 'application/json',
-    };
-  }
-
-  @override
-  Uri buildUri(ApiBuildContext ctx) {
-    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.chatPath);
-  }
-
-  @override
-  Uri buildModelsUri(ApiBuildContext ctx) {
-    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.modelsPath);
-  }
-  
-  @override
-  Map<String, dynamic> buildRequestBody(ApiBuildContext ctx) {
-    return {
-      'model': ctx.model,
-      'input': _buildInput(ctx.context),
-      'stream': true,
-      'store': false,
-      if (ctx.enableReasoning)
-        'reasoning': {
-          'effort': 'medium',
-        },
-    };
-  }
-
-  @override
-  List<ModelInfo> parseModelsResponse(Map<String, dynamic> json) {
-    final data = json['data'] as List<dynamic>? ?? [];
-    return data.map((e) => _parseModelInfo(e as Map<String, dynamic>)).toList();
-  }
-  
-  List<Map<String, dynamic>> _buildInput(List<ApiMessage> context) {
-    final result = <Map<String, dynamic>>[];
-    for (final message in context) {
-      if (message.role == 'assistant') {
-        result.addAll(_buildAssistantItems(message));
-      } else {
-        result.add(_buildUserLikeMessage(message));
-      }
-    }
-    return result;
-  }
-
-  Map<String, dynamic> _buildUserLikeMessage(ApiMessage message) {
-    if (message.parts.isEmpty) {
-      return {'role': message.role, 'content': message.content ?? ''};
-    }
-
-    return {
-      'role': message.role,
-      'content': message.parts.map((part) => part.when(
-            text: (type, text) => {'type': 'input_text', 'text': text},
-            imageUrl: (type, imageUrl) => {
-              'type': 'input_image',
-              'image_url': imageUrl.url,
-            },
-          )).toList(),
-    };
-  }
-
-  List<Map<String, dynamic>> _buildAssistantItems(ApiMessage message) {
-    final items = <Map<String, dynamic>>[];
-    if ((message.reasoning ?? '').trim().isNotEmpty) {
-      items.add({
-        'type': 'reasoning',
-        'summary': [
-          {'type': 'summary_text', 'text': message.reasoning}
-        ],
-      });
-    }
-    if ((message.content ?? '').trim().isNotEmpty) {
-      items.add({'role': 'assistant', 'content': message.content});
-    }
-    return items;
-  }
-
-  ModelInfo _parseModelInfo(Map<String, dynamic> json) {
-    bool? readBool(Map<String, dynamic> json, List<String> keys) {
-      for (final key in keys) {
-        if (!json.containsKey(key)) continue;
-        final value = json[key];
-        if (value is bool) return value;
-        if (value is num) return value != 0;
-        if (value is String) {
-          final lower = value.toLowerCase();
-          if (lower == 'true' || lower == '1' || lower == 'yes') return true;
-          if (lower == 'false' || lower == '0' || lower == 'no') return false;
-        }
-      }
-      return null;
-    }
-
-    return ModelInfo(
-      id: (json['id'] ?? '').toString(),
-      name: json['name']?.toString(),
-      overrideSupportsReasoning:
-          readBool(json, ['overrideSupportsReasoning', 'override_supports_reasoning']),
-      overrideSupportsVision:
-          readBool(json, ['overrideSupportsVision', 'override_supports_vision']),
+  /// 更新 API Key
+  void updateApiKey(String value) {
+    state = state.copyWith(
+      config: state.config.copyWith(apiKey: value),
     );
   }
+
+  /// 更新 Models Path
+  void updateModelsPath(String value) {
+    state = state.copyWith(
+      config: state.config.copyWith(modelsPath: value),
+    );
+  }
+
+  /// 更新 Chat Path
+  void updateChatPath(String value) {
+    state = state.copyWith(
+      config: state.config.copyWith(chatPath: value),
+    );
+  }
+
+  /// 更新 API Mode
+  void updateApiMode(String value) {
+    final defaults = _defaultPathsForMode(value);
+    state = state.copyWith(
+      config: state.config.copyWith(
+        apiMode: value,
+        modelsPath: defaults['models']!,
+        chatPath: defaults['chat']!,
+      ),
+    );
+  }
+
+  /// 更新选中的模型
+  void updateSelectedModel(String value) {
+    state = state.copyWith(
+      config: state.config.copyWith(selectedModel: value.isEmpty ? null : value),
+    );
+  }
+
+  /// 切换推理能力
+  void toggleReasoning(bool value) {
+    _updateModelCapability(
+      overrideSupportsReasoning: value,
+    );
+  }
+
+  /// 切换视觉能力
+  void toggleVision(bool value) {
+    _updateModelCapability(
+      overrideSupportsVision: value,
+    );
+  }
+
+  /// 内部方法：更新当前模型的能力覆盖
+  void _updateModelCapability({
+    bool? overrideSupportsReasoning,
+    bool? overrideSupportsVision,
+  }) {
+    final modelId = state.config.selectedModel;
+    if (modelId == null || modelId.isEmpty) return;
+
+    final models = [...(state.config.availableModels ?? const <ModelInfo>[])];
+    final index = models.indexWhere((m) => m.id == modelId);
+    final baseModel = index >= 0 ? models[index] : ModelInfo(id: modelId);
+
+    final updatedModel = baseModel.copyWith(
+      overrideSupportsReasoning: overrideSupportsReasoning ?? baseModel.overrideSupportsReasoning,
+      overrideSupportsVision: overrideSupportsVision ?? baseModel.overrideSupportsVision,
+    );
+
+    if (index >= 0) {
+      models[index] = updatedModel;
+    } else {
+      models.add(updatedModel);
+    }
+
+    state = state.copyWith(
+      config: state.config.copyWith(availableModels: models),
+    );
+  }
+
+  /// 保存配置
+  Future<void> save() async {
+    state = state.copyWith(isSaving: true, error: null);
+    try {
+      await _configService.saveConfig(state.config);
+      state = state.copyWith(isSaving: false);
+    } catch (e) {
+      state = state.copyWith(isSaving: false, error: e.toString());
+      rethrow;
+    }
+  }
+
+  /// 恢复默认配置
+  void restoreDefaults() {
+    state = state.copyWith(config: AppConfig.defaultConfig());
+  }
+
+  /// 辅助方法：根据 API Mode 获取默认路径
+  Map<String, String> _defaultPathsForMode(String apiMode) {
+    switch (apiMode) {
+      case 'google':
+        return {
+          'models': 'v1beta/models',
+          'chat': 'v1beta/models/{model}:streamGenerateContent',
+        };
+      case 'responses':
+        return {
+          'models': 'v1/models',
+          'chat': 'v1/responses',
+        };
+      case 'chat_completions':
+      default:
+        return {
+          'models': 'v1/models',
+          'chat': 'v1/chat/completions',
+        };
+    }
+  }
 }
+
+/// Provider
+final settingsFormProvider = NotifierProvider<SettingsFormNotifier, SettingsFormState>(
+  SettingsFormNotifier.new,
+);
 ```
 
 ## File: lib/core/models/api_message.dart
@@ -3735,6 +3545,386 @@ class SseParser {
     _id = null;
 
     return event;
+  }
+}
+```
+
+## File: lib/data/data_sources/api_builders/api_request_builder.dart
+```dart
+import '../../../core/models/api_message.dart';
+import '../../../core/models/model_info.dart';
+
+class ApiUriUtils {
+  static Uri buildNormalizedUri(String base, String path) {
+    final normalizedBase = base.trim().replaceAll(RegExp(r'/+$'), '');
+    final normalizedPath = path.trim().replaceAll(RegExp(r'^/+'), '');
+    return Uri.parse('$normalizedBase/$normalizedPath');
+  }
+}
+
+/// 构建请求所需的上下文
+class ApiBuildContext {
+  final String model;
+  final List<ApiMessage> context;
+  final bool enableReasoning;
+  final String apiKey;
+  final String baseUrl;
+  final String chatPath;
+  final String modelsPath;
+
+  ApiBuildContext({
+    required this.model,
+    required this.context,
+    required this.enableReasoning,
+    required this.apiKey,
+    required this.baseUrl,
+    required this.chatPath,
+    required this.modelsPath,
+  });
+}
+
+/// API 请求构建器接口
+abstract class ApiRequestBuilder {
+  /// 构建请求 Headers
+  Map<String, String> buildHeaders(ApiBuildContext ctx);
+
+  /// 构建请求 URI
+  Uri buildUri(ApiBuildContext ctx);
+  Uri buildModelsUri(ApiBuildContext ctx);
+  
+  /// 构建请求 Body
+  Map<String, dynamic> buildRequestBody(ApiBuildContext ctx);
+
+  /// 解析模型列表响应
+  List<ModelInfo> parseModelsResponse(Map<String, dynamic> json);
+}
+```
+
+## File: lib/data/data_sources/api_builders/chat_completions_api_builder.dart
+```dart
+import 'api_request_builder.dart';
+import '../../../core/models/api_message.dart';
+import '../../../core/models/model_info.dart';
+
+class ChatCompletionsApiBuilder implements ApiRequestBuilder {
+  @override
+  Map<String, String> buildHeaders(ApiBuildContext ctx) {
+    return {
+      'Authorization': 'Bearer ${ctx.apiKey}',
+      'Content-Type': 'application/json',
+    };
+  }
+
+  @override
+  Uri buildUri(ApiBuildContext ctx) {
+    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.chatPath);
+  }
+
+  @override
+  Uri buildModelsUri(ApiBuildContext ctx) {
+    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.modelsPath);
+  }
+  
+  @override
+  Map<String, dynamic> buildRequestBody(ApiBuildContext ctx) {
+    return {
+      'model': ctx.model,
+      'messages': _buildMessages(ctx.context),
+      'stream': true,
+      if (ctx.enableReasoning) 'reasoning_effort': 'medium',
+    };
+  }
+
+  @override
+  List<ModelInfo> parseModelsResponse(Map<String, dynamic> json) {
+    final data = json['data'] as List<dynamic>? ?? [];
+    return data.map((e) => _parseModelInfo(e as Map<String, dynamic>)).toList();
+  }
+
+  List<Map<String, dynamic>> _buildMessages(List<ApiMessage> context) {
+    return context.map(_buildMessage).toList();
+  }
+
+  Map<String, dynamic> _buildMessage(ApiMessage message) {
+    if (message.role == 'assistant') {
+      final result = <String, dynamic>{
+        'role': 'assistant',
+        'content': message.content ?? '',
+      };
+      if ((message.reasoning ?? '').trim().isNotEmpty) {
+        result['reasoning_content'] = message.reasoning;
+      }
+      return result;
+    }
+
+    if (message.parts.isEmpty) {
+      return {
+        'role': message.role,
+        'content': message.content ?? '',
+      };
+    }
+
+    return {
+      'role': message.role,
+      'content': message.parts.map((part) => part.when(
+            text: (type, text) => {'type': 'text', 'text': text},
+            imageUrl: (type, imageUrl) => {
+              'type': 'image_url',
+              'image_url': {'url': imageUrl.url},
+            },
+          )).toList(),
+    };
+  }
+
+  ModelInfo _parseModelInfo(Map<String, dynamic> json) {
+    bool? readBool(Map<String, dynamic> json, List<String> keys) {
+      for (final key in keys) {
+        if (!json.containsKey(key)) continue;
+        final value = json[key];
+        if (value is bool) return value;
+        if (value is num) return value != 0;
+        if (value is String) {
+          final lower = value.toLowerCase();
+          if (lower == 'true' || lower == '1' || lower == 'yes') return true;
+          if (lower == 'false' || lower == '0' || lower == 'no') return false;
+        }
+      }
+      return null;
+    }
+
+    return ModelInfo(
+      id: (json['id'] ?? '').toString(),
+      name: json['name']?.toString(),
+      overrideSupportsReasoning:
+          readBool(json, ['overrideSupportsReasoning', 'override_supports_reasoning']),
+      overrideSupportsVision:
+          readBool(json, ['overrideSupportsVision', 'override_supports_vision']),
+    );
+  }
+}
+```
+
+## File: lib/data/data_sources/api_builders/google_api_builder.dart
+```dart
+import 'api_request_builder.dart';
+import '../../../core/models/api_message.dart';
+import '../../../core/models/model_info.dart';
+
+class GoogleApiBuilder implements ApiRequestBuilder {
+  @override
+  Map<String, String> buildHeaders(ApiBuildContext ctx) {
+    return {
+      'x-goog-api-key': ctx.apiKey,
+      'Content-Type': 'application/json',
+    };
+  }
+
+  @override
+  Uri buildUri(ApiBuildContext ctx) {
+    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.modelsPath).replace(
+      queryParameters: {'alt': 'sse'},
+    );
+  }
+
+  @override
+  Uri buildModelsUri(ApiBuildContext ctx) {
+    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.modelsPath);
+  }
+
+  @override
+  Map<String, dynamic> buildRequestBody(ApiBuildContext ctx) {
+    return {
+      'contents': _buildGoogleContents(ctx.context),
+      'generationConfig': {},
+      'safetySettings': [
+        {'category': 'HARM_CATEGORY_HARASSMENT', 'threshold': 'BLOCK_NONE'},
+        {'category': 'HARM_CATEGORY_HATE_SPEECH', 'threshold': 'BLOCK_NONE'},
+        {'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'threshold': 'BLOCK_NONE'},
+        {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold': 'BLOCK_NONE'},
+      ],
+    };
+  }
+
+  @override
+  List<ModelInfo> parseModelsResponse(Map<String, dynamic> json) {
+    final models = json['models'] as List<dynamic>?;
+    if (models == null) return [];
+
+    return models.map((e) {
+      final m = e as Map<String, dynamic>;
+      final name = (m['name'] ?? '').toString();
+      final id = name.startsWith('models/') ? name.substring(7) : name;
+
+      final methods = m['supportedGenerationMethods'] as List<dynamic>?;
+      if (methods != null && !methods.contains('generateContent')) {
+        return null;
+      }
+
+      return ModelInfo(
+        id: id,
+        name: m['displayName']?.toString(),
+      );
+    }).whereType<ModelInfo>().toList();
+  }
+
+  List<Map<String, dynamic>> _buildGoogleContents(List<ApiMessage> context) {
+    return context.map((message) {
+      final role = message.role == 'assistant' ? 'model' : message.role;
+      final parts = <Map<String, dynamic>>[];
+
+      if (message.parts.isEmpty) {
+        final text = message.content?.trim() ?? '';
+        if (text.isNotEmpty) {
+          parts.add({'text': text});
+        }
+      } else {
+        for (final part in message.parts) {
+          parts.addAll(part.when(
+            text: (type, text) => [{'text': text}],
+            imageUrl: (type, imageUrl) {
+              final url = imageUrl.url;
+              if (url.startsWith('data:')) {
+                final commaIndex = url.indexOf(',');
+                if (commaIndex != -1) {
+                  final mime = url.substring(5, commaIndex);
+                  final base64Data = url.substring(commaIndex + 1);
+                  return [
+                    {
+                      'inlineData': {
+                        'mimeType': mime,
+                        'data': base64Data,
+                      }
+                    }
+                  ];
+                }
+              }
+              return [{'text': '[Image: $url]'}];
+            },
+          ));
+        }
+      }
+
+      if (parts.isEmpty) return null;
+      return {'role': role, 'parts': parts};
+    }).whereType<Map<String, dynamic>>().toList();
+  }
+}
+```
+
+## File: lib/data/data_sources/api_builders/responses_api_builder.dart
+```dart
+import 'api_request_builder.dart';
+import '../../../core/models/api_message.dart';
+import '../../../core/models/model_info.dart';
+
+class ResponsesApiBuilder implements ApiRequestBuilder {
+  @override
+  Map<String, String> buildHeaders(ApiBuildContext ctx) {
+    return {
+      'Authorization': 'Bearer ${ctx.apiKey}',
+      'Content-Type': 'application/json',
+    };
+  }
+
+  @override
+  Uri buildUri(ApiBuildContext ctx) {
+    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.chatPath);
+  }
+
+  @override
+  Uri buildModelsUri(ApiBuildContext ctx) {
+    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.modelsPath);
+  }
+  
+  @override
+  Map<String, dynamic> buildRequestBody(ApiBuildContext ctx) {
+    return {
+      'model': ctx.model,
+      'input': _buildInput(ctx.context),
+      'stream': true,
+      'store': false,
+      if (ctx.enableReasoning)
+        'reasoning': {
+          'effort': 'medium',
+        },
+    };
+  }
+
+  @override
+  List<ModelInfo> parseModelsResponse(Map<String, dynamic> json) {
+    final data = json['data'] as List<dynamic>? ?? [];
+    return data.map((e) => _parseModelInfo(e as Map<String, dynamic>)).toList();
+  }
+  
+  List<Map<String, dynamic>> _buildInput(List<ApiMessage> context) {
+    final result = <Map<String, dynamic>>[];
+    for (final message in context) {
+      if (message.role == 'assistant') {
+        result.addAll(_buildAssistantItems(message));
+      } else {
+        result.add(_buildUserLikeMessage(message));
+      }
+    }
+    return result;
+  }
+
+  Map<String, dynamic> _buildUserLikeMessage(ApiMessage message) {
+    if (message.parts.isEmpty) {
+      return {'role': message.role, 'content': message.content ?? ''};
+    }
+
+    return {
+      'role': message.role,
+      'content': message.parts.map((part) => part.when(
+            text: (type, text) => {'type': 'input_text', 'text': text},
+            imageUrl: (type, imageUrl) => {
+              'type': 'input_image',
+              'image_url': imageUrl.url,
+            },
+          )).toList(),
+    };
+  }
+
+  List<Map<String, dynamic>> _buildAssistantItems(ApiMessage message) {
+    final items = <Map<String, dynamic>>[];
+    if ((message.reasoning ?? '').trim().isNotEmpty) {
+      items.add({
+        'type': 'reasoning',
+        'summary': [
+          {'type': 'summary_text', 'text': message.reasoning}
+        ],
+      });
+    }
+    if ((message.content ?? '').trim().isNotEmpty) {
+      items.add({'role': 'assistant', 'content': message.content});
+    }
+    return items;
+  }
+
+  ModelInfo _parseModelInfo(Map<String, dynamic> json) {
+    bool? readBool(Map<String, dynamic> json, List<String> keys) {
+      for (final key in keys) {
+        if (!json.containsKey(key)) continue;
+        final value = json[key];
+        if (value is bool) return value;
+        if (value is num) return value != 0;
+        if (value is String) {
+          final lower = value.toLowerCase();
+          if (lower == 'true' || lower == '1' || lower == 'yes') return true;
+          if (lower == 'false' || lower == '0' || lower == 'no') return false;
+        }
+      }
+      return null;
+    }
+
+    return ModelInfo(
+      id: (json['id'] ?? '').toString(),
+      name: json['name']?.toString(),
+      overrideSupportsReasoning:
+          readBool(json, ['overrideSupportsReasoning', 'override_supports_reasoning']),
+      overrideSupportsVision:
+          readBool(json, ['overrideSupportsVision', 'override_supports_vision']),
+    );
   }
 }
 ```
@@ -7645,80 +7835,6 @@ class PendingAttachment {
 }
 ```
 
-## File: lib/presentation/providers/chat_generation_provider.dart
-```dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import '../../core/models/generation_event.dart';
-import '../../di/providers.dart';
-import '../../domain/services/chat_context_builder.dart';
-import '../../domain/services/stream_processor.dart';
-
-final chatGenerationProvider =
-  StreamProvider.family<void, String>((ref, roundId) {
-    Stream<GenerationEvent> runTask() async* {
-      final repository = ref.read(conversationRepositoryProvider);     
-      final configService = ref.read(configServiceProvider);
-      final apiSource = ref.read(remoteApiSourceProvider);
-
-      // 1. 构建上下文
-      final contextRounds = await repository.getContextRounds(roundId);
-      final apiContext = await buildApiContextFromRounds(contextRounds, repository);
-
-      // 2. 加载配置
-      final config = await configService.loadConfig();
-
-      // 3. 发起请求
-      final stream = apiSource.chatStream(
-        loadConfig: () async => config,
-        context: apiContext,
-      );
-
-      // 4. 处理流
-      final processor = StreamProcessor();
-      yield* processor.process(stream);
-    }
-
-    void handleEvent(GenerationEvent event) {
-      final repository = ref.read(conversationRepositoryProvider);
-
-      event.when(
-        partial: (content, reasoning) {
-          repository.updateRound(
-            roundId: roundId,
-            assistantContent: content,
-            assistantThinking: reasoning,
-            isIncomplete: true,
-          );
-        },
-        completed: (content, reasoning) {
-          repository.updateRound(
-            roundId: roundId,
-            assistantContent: content,
-            assistantThinking: reasoning,
-            isIncomplete: false,
-            hasUnseenUpdate: true,
-          );
-        },
-        failed: (error) {
-          repository.updateRound(
-            roundId: roundId,
-            assistantContent: '[错误]\n$error',
-            assistantThinking: '',
-            isIncomplete: false,
-            hasUnseenUpdate: true,
-          );
-        },
-      );
-    }
-
-    return runTask().asyncMap((event) {
-      handleEvent(event);
-    });
-  }
-);
-```
-
 ## File: lib/presentation/widgets/common/app_toast.dart
 ```dart
 import 'package:flutter/material.dart';
@@ -9524,6 +9640,7 @@ Future<List<ApiMessageContentPart>> _buildAttachmentParts(
 
 ## File: lib/presentation/pages/text_attachment_viewer_page.dart
 ```dart
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../widgets/common/app_page_scaffold.dart';
@@ -9549,19 +9666,15 @@ class TextAttachmentViewerPage extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return AppPageScaffold(
-      appBar: AppBar(
-        title: Text(
+      navigationBar: CupertinoNavigationBar(
+        middle: Text(
           title,
           overflow: TextOverflow.ellipsis,
-          style: textTheme.titleMedium,
         ),
-        actions: [
-          IconButton(
-            tooltip: '复制全文',
-            onPressed: _copyAll,
-            icon: const Icon(Icons.content_copy_outlined),
-          ),
-        ],
+        trailing: CupertinoButton(
+          onPressed: _copyAll,
+          child: const Icon(CupertinoIcons.doc_on_doc),
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -9581,6 +9694,80 @@ class TextAttachmentViewerPage extends StatelessWidget {
     );
   }
 }
+```
+
+## File: lib/presentation/providers/chat_generation_provider.dart
+```dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/models/generation_event.dart';
+import '../../di/providers.dart';
+import '../../domain/services/chat_context_builder.dart';
+import '../../domain/services/stream_processor.dart';
+
+final chatGenerationProvider =
+  StreamProvider.family<void, String>((ref, roundId) {
+    Stream<GenerationEvent> runTask() async* {
+      final repository = ref.read(conversationRepositoryProvider);     
+      final configService = ref.read(configServiceProvider);
+      final apiSource = ref.read(remoteApiSourceProvider);
+
+      // 1. 构建上下文
+      final contextRounds = await repository.getContextRounds(roundId);
+      final apiContext = await buildApiContextFromRounds(contextRounds, repository);
+
+      // 2. 加载配置
+      final config = await configService.loadConfig();
+
+      // 3. 发起请求
+      final stream = apiSource.chatStream(
+        loadConfig: () async => config,
+        context: apiContext,
+      );
+
+      // 4. 处理流
+      final processor = StreamProcessor();
+      yield* processor.process(stream);
+    }
+
+    void handleEvent(GenerationEvent event) {
+      final repository = ref.read(conversationRepositoryProvider);
+
+      event.when(
+        partial: (content, reasoning) {
+          repository.updateRound(
+            roundId: roundId,
+            assistantContent: content,
+            assistantThinking: reasoning,
+            isIncomplete: true,
+          );
+        },
+        completed: (content, reasoning) {
+          repository.updateRound(
+            roundId: roundId,
+            assistantContent: content,
+            assistantThinking: reasoning,
+            isIncomplete: false,
+            hasUnseenUpdate: true,
+          );
+        },
+        failed: (error) {
+          repository.updateRound(
+            roundId: roundId,
+            assistantContent: '[错误]\n$error',
+            assistantThinking: '',
+            isIncomplete: false,
+            hasUnseenUpdate: true,
+          );
+        },
+      );
+    }
+
+    return runTask().asyncMap((event) {
+      handleEvent(event);
+    });
+  }
+);
 ```
 
 ## File: lib/presentation/providers/input_notifier.dart
@@ -9635,6 +9822,7 @@ final inputStateProvider =
 
 ## File: lib/presentation/themes/app_theme.dart
 ```dart
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -9715,6 +9903,10 @@ class AppTheme {
         behavior: SnackBarBehavior.floating,
       ),
     );
+  }
+
+  static CupertinoThemeData get cupertinoTheme {
+    return const CupertinoThemeData();
   }
 }
 ```
@@ -10574,10 +10766,10 @@ class _FileAttachmentChip extends ConsumerWidget {
 
 ## File: lib/presentation/widgets/common/app_page_scaffold.dart
 ```dart
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 
 class AppPageScaffold extends StatelessWidget {
-  final PreferredSizeWidget? appBar;
+  final ObstructingPreferredSizeWidget? navigationBar;
   final Widget body;
   final Widget? bottomNavigationBar;
   final Color? backgroundColor;
@@ -10585,7 +10777,7 @@ class AppPageScaffold extends StatelessWidget {
 
   const AppPageScaffold({
     super.key,
-    this.appBar,
+    this.navigationBar,
     required this.body,
     this.bottomNavigationBar,
     this.backgroundColor,
@@ -10596,14 +10788,19 @@ class AppPageScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final content = useSafeArea ? SafeArea(child: body) : body;
 
-    return Scaffold(
+    return CupertinoPageScaffold(
       backgroundColor: backgroundColor,
-      appBar: appBar,
-      bottomNavigationBar: bottomNavigationBar,
-      body: GestureDetector(
+      navigationBar: navigationBar,
+
+      child: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-        child: content,
+        
+        child: Column(
+          children: [
+            Expanded(child: content),
+          ],
+        ),
       ),
     );
   }
@@ -11372,12 +11569,14 @@ abstract class _ChatState implements ChatState {
 
 ## File: lib/main.dart
 ```dart
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/utils/app_route_observer.dart';
 import 'di/providers.dart'; // 仅导入 providers
 import 'presentation/pages/home_page.dart';
 import 'presentation/themes/app_theme.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -11399,13 +11598,20 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return CupertinoApp(
       title: 'AI Chat',
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
+      theme: AppTheme.cupertinoTheme,
       navigatorObservers: [appRouteObserver],
       home: const HomePage(),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en', 'US'),
+        Locale('zh', 'CN'),
+      ],
     );
   }
 }
@@ -12325,6 +12531,7 @@ final sessionListControllerProvider = Provider<SessionListController>((ref) {
 ## File: lib/presentation/pages/settings_page.dart
 ```dart
 import 'package:aiservice/di/providers.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12484,8 +12691,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     });
 
     return AppPageScaffold(
-      appBar: AppBar(
-        title: const Text('设置'),
+      navigationBar: CupertinoNavigationBar(
+        middle: Text('设置'),
       ),
       body: profilesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -12893,6 +13100,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
 ## File: lib/presentation/pages/home_page.dart
 ```dart
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
@@ -12991,23 +13199,20 @@ class HomePage extends ConsumerWidget {
     final allowImages = selectedModel?.overrideSupportsVision == true;
 
     return AppPageScaffold(
-      appBar: AppBar(
-        title: const Text('AI Chat'),
-        actions: [
-          IconButton(
-            tooltip: '设置',
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const SettingsPage(),
-                ),
-              );
-            },
-          ),
-        ],
+      navigationBar: CupertinoNavigationBar(
+      middle: const Text('AI Chat'),
+      trailing: CupertinoButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            CupertinoPageRoute(
+              builder: (_) => const SettingsPage(),
+            ),
+          );
+        },
+        child: const Icon(CupertinoIcons.settings),
       ),
+    ),
       body: Column(
         children: [
           Expanded(
@@ -13792,6 +13997,7 @@ class ConversationRepository {
 
 ## File: lib/presentation/pages/branch_tree_page.dart
 ```dart
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:graphview/GraphView.dart';
@@ -13936,7 +14142,9 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     final targetId = widget.initialFocusRoundId;
 
     return AppPageScaffold(
-      appBar: AppBar(title: const Text('分支树')),
+      navigationBar: CupertinoNavigationBar(
+        middle: Text('分支树')
+      ),
       body: roots.isEmpty
           ? const Center(child: Text('暂无分支结构'))
           : InteractiveViewer(
@@ -14176,6 +14384,7 @@ class _SkeletonBar extends StatelessWidget {
 
 ## File: lib/presentation/pages/chat_page.dart
 ```dart
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14318,27 +14527,22 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     }
 
     return AppPageScaffold(
-      appBar: AppBar(
-        title: Text(sessionTitle),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.account_tree_outlined),
-            onPressed: (_currentRoundId == null)
-                ? null
-                : () async {
-                    final selectedId =
-                        await Navigator.of(context).push<String>(
-                      MaterialPageRoute(
-                        builder: (_) => BranchTreePage(
-                          sessionId: widget.sessionId,
-                          initialFocusRoundId: _currentRoundId!,
-                        ),
-                      ),
-                    );
-                    if (selectedId != null) _updateBranch(selectedId);
-                  },
-          ),
-        ],
+      navigationBar: CupertinoNavigationBar(
+        middle: Text(sessionTitle),
+        trailing: CupertinoButton(
+          onPressed: () async {
+            final selectedId = await Navigator.of(context).push<String>(
+              CupertinoPageRoute(
+                builder: (_) => BranchTreePage(
+                  sessionId: widget.sessionId,
+                  initialFocusRoundId: _currentRoundId!,
+                ),
+              ),
+            );
+            if (selectedId != null) _updateBranch(selectedId);
+          },
+          child: const Icon(CupertinoIcons.arrow_branch),
+        ),
       ),
       body: Column(
         children: [

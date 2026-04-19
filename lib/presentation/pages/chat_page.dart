@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -140,27 +141,22 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     }
 
     return AppPageScaffold(
-      appBar: AppBar(
-        title: Text(sessionTitle),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.account_tree_outlined),
-            onPressed: (_currentRoundId == null)
-                ? null
-                : () async {
-                    final selectedId =
-                        await Navigator.of(context).push<String>(
-                      MaterialPageRoute(
-                        builder: (_) => BranchTreePage(
-                          sessionId: widget.sessionId,
-                          initialFocusRoundId: _currentRoundId!,
-                        ),
-                      ),
-                    );
-                    if (selectedId != null) _updateBranch(selectedId);
-                  },
-          ),
-        ],
+      navigationBar: CupertinoNavigationBar(
+        middle: Text(sessionTitle),
+        trailing: CupertinoButton(
+          onPressed: () async {
+            final selectedId = await Navigator.of(context).push<String>(
+              CupertinoPageRoute(
+                builder: (_) => BranchTreePage(
+                  sessionId: widget.sessionId,
+                  initialFocusRoundId: _currentRoundId!,
+                ),
+              ),
+            );
+            if (selectedId != null) _updateBranch(selectedId);
+          },
+          child: const Icon(CupertinoIcons.arrow_branch),
+        ),
       ),
       body: Column(
         children: [
