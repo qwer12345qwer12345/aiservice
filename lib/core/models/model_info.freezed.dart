@@ -22,7 +22,6 @@ ModelInfo _$ModelInfoFromJson(Map<String, dynamic> json) {
 /// @nodoc
 mixin _$ModelInfo {
   String get id => throw _privateConstructorUsedError;
-  String? get name => throw _privateConstructorUsedError;
   bool? get overrideSupportsReasoning => throw _privateConstructorUsedError;
   bool? get overrideSupportsVision => throw _privateConstructorUsedError;
 
@@ -43,7 +42,6 @@ abstract class $ModelInfoCopyWith<$Res> {
   @useResult
   $Res call({
     String id,
-    String? name,
     bool? overrideSupportsReasoning,
     bool? overrideSupportsVision,
   });
@@ -65,7 +63,6 @@ class _$ModelInfoCopyWithImpl<$Res, $Val extends ModelInfo>
   @override
   $Res call({
     Object? id = null,
-    Object? name = freezed,
     Object? overrideSupportsReasoning = freezed,
     Object? overrideSupportsVision = freezed,
   }) {
@@ -75,10 +72,6 @@ class _$ModelInfoCopyWithImpl<$Res, $Val extends ModelInfo>
                 ? _value.id
                 : id // ignore: cast_nullable_to_non_nullable
                       as String,
-            name: freezed == name
-                ? _value.name
-                : name // ignore: cast_nullable_to_non_nullable
-                      as String?,
             overrideSupportsReasoning: freezed == overrideSupportsReasoning
                 ? _value.overrideSupportsReasoning
                 : overrideSupportsReasoning // ignore: cast_nullable_to_non_nullable
@@ -104,7 +97,6 @@ abstract class _$$ModelInfoImplCopyWith<$Res>
   @useResult
   $Res call({
     String id,
-    String? name,
     bool? overrideSupportsReasoning,
     bool? overrideSupportsVision,
   });
@@ -125,7 +117,6 @@ class __$$ModelInfoImplCopyWithImpl<$Res>
   @override
   $Res call({
     Object? id = null,
-    Object? name = freezed,
     Object? overrideSupportsReasoning = freezed,
     Object? overrideSupportsVision = freezed,
   }) {
@@ -135,10 +126,6 @@ class __$$ModelInfoImplCopyWithImpl<$Res>
             ? _value.id
             : id // ignore: cast_nullable_to_non_nullable
                   as String,
-        name: freezed == name
-            ? _value.name
-            : name // ignore: cast_nullable_to_non_nullable
-                  as String?,
         overrideSupportsReasoning: freezed == overrideSupportsReasoning
             ? _value.overrideSupportsReasoning
             : overrideSupportsReasoning // ignore: cast_nullable_to_non_nullable
@@ -157,7 +144,6 @@ class __$$ModelInfoImplCopyWithImpl<$Res>
 class _$ModelInfoImpl implements _ModelInfo {
   const _$ModelInfoImpl({
     required this.id,
-    this.name,
     this.overrideSupportsReasoning,
     this.overrideSupportsVision,
   });
@@ -168,15 +154,13 @@ class _$ModelInfoImpl implements _ModelInfo {
   @override
   final String id;
   @override
-  final String? name;
-  @override
   final bool? overrideSupportsReasoning;
   @override
   final bool? overrideSupportsVision;
 
   @override
   String toString() {
-    return 'ModelInfo(id: $id, name: $name, overrideSupportsReasoning: $overrideSupportsReasoning, overrideSupportsVision: $overrideSupportsVision)';
+    return 'ModelInfo(id: $id, overrideSupportsReasoning: $overrideSupportsReasoning, overrideSupportsVision: $overrideSupportsVision)';
   }
 
   @override
@@ -185,7 +169,6 @@ class _$ModelInfoImpl implements _ModelInfo {
         (other.runtimeType == runtimeType &&
             other is _$ModelInfoImpl &&
             (identical(other.id, id) || other.id == id) &&
-            (identical(other.name, name) || other.name == name) &&
             (identical(
                   other.overrideSupportsReasoning,
                   overrideSupportsReasoning,
@@ -200,7 +183,6 @@ class _$ModelInfoImpl implements _ModelInfo {
   int get hashCode => Object.hash(
     runtimeType,
     id,
-    name,
     overrideSupportsReasoning,
     overrideSupportsVision,
   );
@@ -222,7 +204,6 @@ class _$ModelInfoImpl implements _ModelInfo {
 abstract class _ModelInfo implements ModelInfo {
   const factory _ModelInfo({
     required final String id,
-    final String? name,
     final bool? overrideSupportsReasoning,
     final bool? overrideSupportsVision,
   }) = _$ModelInfoImpl;
@@ -232,8 +213,6 @@ abstract class _ModelInfo implements ModelInfo {
 
   @override
   String get id;
-  @override
-  String? get name;
   @override
   bool? get overrideSupportsReasoning;
   @override

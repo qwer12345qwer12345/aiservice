@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'api_builders/local_api_builder.dart';
 import 'package:collection/collection.dart';
 import 'package:http/http.dart' as http;
 import '../../core/models/model_info.dart';
@@ -19,6 +20,8 @@ class RemoteApiSource {
         return GoogleApiBuilder();
       case 'responses':
         return ResponsesApiBuilder();
+      case 'local':
+        return LocalApiBuilder();
       case 'chat_completions':
       default:
         return ChatCompletionsApiBuilder();
@@ -65,12 +68,29 @@ class RemoteApiSource {
 
     try {
       final config = await loadConfig();
+      final apiMode = config.apiMode.trim();
+      
+      if (apiMode == 'local') {
+        final builder = LocalApiBuilder();
+        final ctx = ApiBuildContext(
+          model: config.selectedModel?.trim() ?? '',
+          context: context,
+          enableReasoning: false,
+          apiKey: '',
+          baseUrl: '',
+          chatPath: '',
+          modelsPath: '',
+        );
+        yield* builder.generateStream(ctx);
+        return;
+      }
+
       final selectedId = config.selectedModel;
       final selectedModel =
           config.availableModels?.firstWhereOrNull((m) => m.id == selectedId);
       final enableReasoning = selectedModel?.overrideSupportsReasoning == true;
       final model = config.selectedModel?.trim() ?? '';
-      final apiMode = config.apiMode.trim();
+      
 
       if (config.baseUrl.isEmpty) {
         yield const ChatChunk(isDone: true, error: 'Base URL 为空');

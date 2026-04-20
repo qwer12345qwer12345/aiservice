@@ -54,7 +54,6 @@ class GoogleApiBuilder implements ApiRequestBuilder {
 
       return ModelInfo(
         id: id,
-        name: m['displayName']?.toString(),
       );
     }).whereType<ModelInfo>().toList();
   }

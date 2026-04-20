@@ -7,7 +7,6 @@ part 'model_info.g.dart';
 class ModelInfo with _$ModelInfo {
   const factory ModelInfo({
     required String id,
-    String? name,
 
     bool? overrideSupportsReasoning,
     bool? overrideSupportsVision,

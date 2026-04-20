@@ -67,6 +67,7 @@ lib/core/utils/sse_parser.dart
 lib/data/data_sources/api_builders/api_request_builder.dart
 lib/data/data_sources/api_builders/chat_completions_api_builder.dart
 lib/data/data_sources/api_builders/google_api_builder.dart
+lib/data/data_sources/api_builders/local_api_builder.dart
 lib/data/data_sources/api_builders/model_info_parser.dart
 lib/data/data_sources/api_builders/responses_api_builder.dart
 lib/data/data_sources/local_file_source.dart
@@ -115,42 +116,110 @@ lib/presentation/widgets/thought_bubble.dart
 
 # Files
 
-## File: lib/data/data_sources/api_builders/model_info_parser.dart
+## File: lib/data/data_sources/api_builders/local_api_builder.dart
 ```dart
-// lib/data/data_sources/api_builders/model_info_parser.dart
+import 'dart:async';
+import '../../../core/models/api_message.dart';
+import 'package:flutter_llama/flutter_llama.dart';
+import 'api_request_builder.dart';
+import '../../../core/models/chat_chunk.dart';
 import '../../../core/models/model_info.dart';
 
-class ModelInfoParser {
-  /// 从 /v1/models 或 /v1/responses 等标准 OpenAI 风格响应中解析模型列表
-  static List<ModelInfo> parseModelsResponse(Map<String, dynamic> json) {
-    final data = json['data'] as List<dynamic>? ?? [];
-    return data.map((e) => _parseModelInfo(e as Map<String, dynamic>)).toList();
-  }
+class LocalApiBuilder implements ApiRequestBuilder {
+  static final FlutterLlama _llama = FlutterLlama.instance;
+  static String? _loadedModelPath;
+  static bool _isLoaded = false;
 
-  static ModelInfo _parseModelInfo(Map<String, dynamic> json) {
-    bool? readBool(Map<String, dynamic> json, List<String> keys) {
-      for (final key in keys) {
-        if (!json.containsKey(key)) continue;
-        final value = json[key];
-        if (value is bool) return value;
-        if (value is num) return value != 0;
-        if (value is String) {
-          final lower = value.toLowerCase();
-          if (lower == 'true' || lower == '1' || lower == 'yes') return true;
-          if (lower == 'false' || lower == '0' || lower == 'no') return false;
+  @override
+  Map<String, String> buildHeaders(ApiBuildContext ctx) => {};
+
+  @override
+  Uri buildUri(ApiBuildContext ctx) => Uri();
+
+  @override
+  Uri buildModelsUri(ApiBuildContext ctx) => Uri();
+
+  @override
+  Map<String, dynamic> buildRequestBody(ApiBuildContext ctx) => {};
+
+  @override
+  List<ModelInfo> parseModelsResponse(Map<String, dynamic> json) => [];
+
+  /// 将历史消息列表格式化为带轮次编号的 prompt
+  String _buildPromptFromContext(List<ApiMessage> context) {
+    final buffer = StringBuffer();
+    int round = 0;
+    for (final msg in context) {
+      if (msg.role == 'user') {
+        round++;
+        // 提取用户消息文本
+        String text = msg.content ?? '';
+        if (text.isEmpty && msg.parts.isNotEmpty) {
+          // 从 parts 中提取所有文本部分
+          final textParts = msg.parts.whereType<ApiMessageTextPart>();
+          text = textParts.map((p) => p.text).join('\n');
+        }
+        if (text.isNotEmpty) {
+          buffer.writeln('User $round: $text');
+        }
+      } else if (msg.role == 'assistant') {
+        String text = msg.content ?? '';
+        if (text.isNotEmpty) {
+          buffer.writeln('Assistant $round: $text');
         }
       }
-      return null;
+    }
+    // 添加下一轮的引导标记
+    buffer.write('Assistant $round: ');
+    return buffer.toString();
+  }
+
+  Stream<ChatChunk> generateStream(ApiBuildContext ctx) async* {
+    final modelPath = ctx.model;
+    if (modelPath.isEmpty) {
+      yield const ChatChunk(isDone: true, error: '未选择本地模型');
+      return;
     }
 
-    return ModelInfo(
-      id: (json['id'] ?? '').toString(),
-      name: json['name']?.toString(),
-      overrideSupportsReasoning:
-          readBool(json, ['overrideSupportsReasoning', 'override_supports_reasoning']),
-      overrideSupportsVision:
-          readBool(json, ['overrideSupportsVision', 'override_supports_vision']),
-    );
+    // 构建包含完整历史且带轮次编号的 prompt
+    final prompt = _buildPromptFromContext(ctx.context);
+
+    // 加载模型（如果已加载且路径相同则跳过）
+    if (!_isLoaded || _loadedModelPath != modelPath) {
+      if (_isLoaded) await _llama.unloadModel();
+      try {
+        final loadConfig = LlamaConfig(
+          modelPath: modelPath,
+          nThreads: 4,
+          nGpuLayers: -1,
+          contextSize: 262144,
+          batchSize: 512,
+          useGpu: true,
+          verbose: false,
+        );
+        final success = await _llama.loadModel(loadConfig);
+        if (!success) {
+          yield const ChatChunk(isDone: true, error: '模型加载失败');
+          return;
+        }
+        _isLoaded = true;
+        _loadedModelPath = modelPath;
+      } catch (e) {
+        yield ChatChunk(isDone: true, error: '加载模型异常：$e');
+        return;
+      }
+    }
+
+    final params = GenerationParams(prompt: prompt);
+
+    try {
+      await for (final token in _llama.generateStream(params)) {
+        yield ChatChunk(content: token, isDone: false);
+      }
+      yield const ChatChunk(isDone: true);
+    } catch (e) {
+      yield ChatChunk(isDone: true, error: '生成失败：$e');
+    }
   }
 }
 ```
@@ -3448,85 +3517,6 @@ abstract class ApiRequestBuilder {
 }
 ```
 
-## File: lib/data/data_sources/api_builders/chat_completions_api_builder.dart
-```dart
-import 'package:aiservice/data/data_sources/api_builders/model_info_parser.dart';
-
-import 'api_request_builder.dart';
-import '../../../core/models/api_message.dart';
-import '../../../core/models/model_info.dart';
-
-class ChatCompletionsApiBuilder implements ApiRequestBuilder {
-  @override
-  Map<String, String> buildHeaders(ApiBuildContext ctx) {
-    return {
-      'Authorization': 'Bearer ${ctx.apiKey}',
-      'Content-Type': 'application/json',
-    };
-  }
-
-  @override
-  Uri buildUri(ApiBuildContext ctx) {
-    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.chatPath);
-  }
-
-  @override
-  Uri buildModelsUri(ApiBuildContext ctx) {
-    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.modelsPath);
-  }
-  
-  @override
-  Map<String, dynamic> buildRequestBody(ApiBuildContext ctx) {
-    return {
-      'model': ctx.model,
-      'messages': _buildMessages(ctx.context),
-      'stream': true,
-      if (ctx.enableReasoning) 'reasoning_effort': 'medium',
-    };
-  }
-
-  @override
-  List<ModelInfo> parseModelsResponse(Map<String, dynamic> json) {
-    return ModelInfoParser.parseModelsResponse(json);
-  }
-
-  List<Map<String, dynamic>> _buildMessages(List<ApiMessage> context) {
-    return context.map(_buildMessage).toList();
-  }
-
-  Map<String, dynamic> _buildMessage(ApiMessage message) {
-    if (message.role == 'assistant') {
-      final result = <String, dynamic>{
-        'role': 'assistant',
-        'content': message.content ?? '',
-      };
-      if ((message.reasoning ?? '').trim().isNotEmpty) {
-        result['reasoning_content'] = message.reasoning;
-      }
-      return result;
-    }
-
-    if (message.parts.isEmpty) {
-      return {
-        'role': message.role,
-        'content': message.content ?? '',
-      };
-    }
-
-    return {
-      'role': message.role,
-      'content': message.parts.map((part) => part.when(
-            text: (type, text) => {'type': 'text', 'text': text},
-            imageUrl: (type, imageUrl) => {
-              'type': 'image_url',
-              'image_url': {'url': imageUrl.url},
-            },
-          )).toList(),
-    };
-  }
-}
-```
-
 ## File: lib/data/data_sources/api_builders/google_api_builder.dart
 ```dart
 import 'api_request_builder.dart';
@@ -3585,7 +3575,6 @@ class GoogleApiBuilder implements ApiRequestBuilder {
 
       return ModelInfo(
         id: id,
-        name: m['displayName']?.toString(),
       );
     }).whereType<ModelInfo>().toList();
   }
@@ -3634,94 +3623,41 @@ class GoogleApiBuilder implements ApiRequestBuilder {
 }
 ```
 
-## File: lib/data/data_sources/api_builders/responses_api_builder.dart
+## File: lib/data/data_sources/api_builders/model_info_parser.dart
 ```dart
-import 'package:aiservice/data/data_sources/api_builders/model_info_parser.dart';
-import 'api_request_builder.dart';
-import '../../../core/models/api_message.dart';
+// lib/data/data_sources/api_builders/model_info_parser.dart
 import '../../../core/models/model_info.dart';
 
-class ResponsesApiBuilder implements ApiRequestBuilder {
-  @override
-  Map<String, String> buildHeaders(ApiBuildContext ctx) {
-    return {
-      'Authorization': 'Bearer ${ctx.apiKey}',
-      'Content-Type': 'application/json',
-    };
+class ModelInfoParser {
+  /// 从 /v1/models 或 /v1/responses 等标准 OpenAI 风格响应中解析模型列表
+  static List<ModelInfo> parseModelsResponse(Map<String, dynamic> json) {
+    final data = json['data'] as List<dynamic>? ?? [];
+    return data.map((e) => _parseModelInfo(e as Map<String, dynamic>)).toList();
   }
 
-  @override
-  Uri buildUri(ApiBuildContext ctx) {
-    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.chatPath);
-  }
-
-  @override
-  Uri buildModelsUri(ApiBuildContext ctx) {
-    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.modelsPath);
-  }
-  
-  @override
-  Map<String, dynamic> buildRequestBody(ApiBuildContext ctx) {
-    return {
-      'model': ctx.model,
-      'input': _buildInput(ctx.context),
-      'stream': true,
-      'store': false,
-      if (ctx.enableReasoning)
-        'reasoning': {
-          'effort': 'medium',
-        },
-    };
-  }
-
-  @override
-  List<ModelInfo> parseModelsResponse(Map<String, dynamic> json) {
-    return ModelInfoParser.parseModelsResponse(json);
-  }
-  
-  List<Map<String, dynamic>> _buildInput(List<ApiMessage> context) {
-    final result = <Map<String, dynamic>>[];
-    for (final message in context) {
-      if (message.role == 'assistant') {
-        result.addAll(_buildAssistantItems(message));
-      } else {
-        result.add(_buildUserLikeMessage(message));
+  static ModelInfo _parseModelInfo(Map<String, dynamic> json) {
+    bool? readBool(Map<String, dynamic> json, List<String> keys) {
+      for (final key in keys) {
+        if (!json.containsKey(key)) continue;
+        final value = json[key];
+        if (value is bool) return value;
+        if (value is num) return value != 0;
+        if (value is String) {
+          final lower = value.toLowerCase();
+          if (lower == 'true' || lower == '1' || lower == 'yes') return true;
+          if (lower == 'false' || lower == '0' || lower == 'no') return false;
+        }
       }
-    }
-    return result;
-  }
-
-  Map<String, dynamic> _buildUserLikeMessage(ApiMessage message) {
-    if (message.parts.isEmpty) {
-      return {'role': message.role, 'content': message.content ?? ''};
+      return null;
     }
 
-    return {
-      'role': message.role,
-      'content': message.parts.map((part) => part.when(
-            text: (type, text) => {'type': 'input_text', 'text': text},
-            imageUrl: (type, imageUrl) => {
-              'type': 'input_image',
-              'image_url': imageUrl.url,
-            },
-          )).toList(),
-    };
-  }
-
-  List<Map<String, dynamic>> _buildAssistantItems(ApiMessage message) {
-    final items = <Map<String, dynamic>>[];
-    if ((message.reasoning ?? '').trim().isNotEmpty) {
-      items.add({
-        'type': 'reasoning',
-        'summary': [
-          {'type': 'summary_text', 'text': message.reasoning}
-        ],
-      });
-    }
-    if ((message.content ?? '').trim().isNotEmpty) {
-      items.add({'role': 'assistant', 'content': message.content});
-    }
-    return items;
+    return ModelInfo(
+      id: (json['id'] ?? '').toString(),
+      overrideSupportsReasoning:
+          readBool(json, ['overrideSupportsReasoning', 'override_supports_reasoning']),
+      overrideSupportsVision:
+          readBool(json, ['overrideSupportsVision', 'override_supports_vision']),
+    );
   }
 }
 ```
@@ -8178,7 +8114,6 @@ part 'model_info.g.dart';
 class ModelInfo with _$ModelInfo {
   const factory ModelInfo({
     required String id,
-    String? name,
 
     bool? overrideSupportsReasoning,
     bool? overrideSupportsVision,
@@ -8215,7 +8150,6 @@ ModelInfo _$ModelInfoFromJson(Map<String, dynamic> json) {
 /// @nodoc
 mixin _$ModelInfo {
   String get id => throw _privateConstructorUsedError;
-  String? get name => throw _privateConstructorUsedError;
   bool? get overrideSupportsReasoning => throw _privateConstructorUsedError;
   bool? get overrideSupportsVision => throw _privateConstructorUsedError;
 
@@ -8236,7 +8170,6 @@ abstract class $ModelInfoCopyWith<$Res> {
   @useResult
   $Res call({
     String id,
-    String? name,
     bool? overrideSupportsReasoning,
     bool? overrideSupportsVision,
   });
@@ -8258,7 +8191,6 @@ class _$ModelInfoCopyWithImpl<$Res, $Val extends ModelInfo>
   @override
   $Res call({
     Object? id = null,
-    Object? name = freezed,
     Object? overrideSupportsReasoning = freezed,
     Object? overrideSupportsVision = freezed,
   }) {
@@ -8268,10 +8200,6 @@ class _$ModelInfoCopyWithImpl<$Res, $Val extends ModelInfo>
                 ? _value.id
                 : id // ignore: cast_nullable_to_non_nullable
                       as String,
-            name: freezed == name
-                ? _value.name
-                : name // ignore: cast_nullable_to_non_nullable
-                      as String?,
             overrideSupportsReasoning: freezed == overrideSupportsReasoning
                 ? _value.overrideSupportsReasoning
                 : overrideSupportsReasoning // ignore: cast_nullable_to_non_nullable
@@ -8297,7 +8225,6 @@ abstract class _$$ModelInfoImplCopyWith<$Res>
   @useResult
   $Res call({
     String id,
-    String? name,
     bool? overrideSupportsReasoning,
     bool? overrideSupportsVision,
   });
@@ -8318,7 +8245,6 @@ class __$$ModelInfoImplCopyWithImpl<$Res>
   @override
   $Res call({
     Object? id = null,
-    Object? name = freezed,
     Object? overrideSupportsReasoning = freezed,
     Object? overrideSupportsVision = freezed,
   }) {
@@ -8328,10 +8254,6 @@ class __$$ModelInfoImplCopyWithImpl<$Res>
             ? _value.id
             : id // ignore: cast_nullable_to_non_nullable
                   as String,
-        name: freezed == name
-            ? _value.name
-            : name // ignore: cast_nullable_to_non_nullable
-                  as String?,
         overrideSupportsReasoning: freezed == overrideSupportsReasoning
             ? _value.overrideSupportsReasoning
             : overrideSupportsReasoning // ignore: cast_nullable_to_non_nullable
@@ -8350,7 +8272,6 @@ class __$$ModelInfoImplCopyWithImpl<$Res>
 class _$ModelInfoImpl implements _ModelInfo {
   const _$ModelInfoImpl({
     required this.id,
-    this.name,
     this.overrideSupportsReasoning,
     this.overrideSupportsVision,
   });
@@ -8361,15 +8282,13 @@ class _$ModelInfoImpl implements _ModelInfo {
   @override
   final String id;
   @override
-  final String? name;
-  @override
   final bool? overrideSupportsReasoning;
   @override
   final bool? overrideSupportsVision;
 
   @override
   String toString() {
-    return 'ModelInfo(id: $id, name: $name, overrideSupportsReasoning: $overrideSupportsReasoning, overrideSupportsVision: $overrideSupportsVision)';
+    return 'ModelInfo(id: $id, overrideSupportsReasoning: $overrideSupportsReasoning, overrideSupportsVision: $overrideSupportsVision)';
   }
 
   @override
@@ -8378,7 +8297,6 @@ class _$ModelInfoImpl implements _ModelInfo {
         (other.runtimeType == runtimeType &&
             other is _$ModelInfoImpl &&
             (identical(other.id, id) || other.id == id) &&
-            (identical(other.name, name) || other.name == name) &&
             (identical(
                   other.overrideSupportsReasoning,
                   overrideSupportsReasoning,
@@ -8393,7 +8311,6 @@ class _$ModelInfoImpl implements _ModelInfo {
   int get hashCode => Object.hash(
     runtimeType,
     id,
-    name,
     overrideSupportsReasoning,
     overrideSupportsVision,
   );
@@ -8415,7 +8332,6 @@ class _$ModelInfoImpl implements _ModelInfo {
 abstract class _ModelInfo implements ModelInfo {
   const factory _ModelInfo({
     required final String id,
-    final String? name,
     final bool? overrideSupportsReasoning,
     final bool? overrideSupportsVision,
   }) = _$ModelInfoImpl;
@@ -8425,8 +8341,6 @@ abstract class _ModelInfo implements ModelInfo {
 
   @override
   String get id;
-  @override
-  String? get name;
   @override
   bool? get overrideSupportsReasoning;
   @override
@@ -8454,7 +8368,6 @@ part of 'model_info.dart';
 _$ModelInfoImpl _$$ModelInfoImplFromJson(Map<String, dynamic> json) =>
     _$ModelInfoImpl(
       id: json['id'] as String,
-      name: json['name'] as String?,
       overrideSupportsReasoning: json['overrideSupportsReasoning'] as bool?,
       overrideSupportsVision: json['overrideSupportsVision'] as bool?,
     );
@@ -8462,7 +8375,6 @@ _$ModelInfoImpl _$$ModelInfoImplFromJson(Map<String, dynamic> json) =>
 Map<String, dynamic> _$$ModelInfoImplToJson(_$ModelInfoImpl instance) =>
     <String, dynamic>{
       'id': instance.id,
-      'name': instance.name,
       'overrideSupportsReasoning': instance.overrideSupportsReasoning,
       'overrideSupportsVision': instance.overrideSupportsVision,
     };
@@ -9089,19 +9001,174 @@ Map<String, dynamic> _$$SessionConfigImplToJson(_$SessionConfigImpl instance) =>
     };
 ```
 
-## File: lib/core/models/sse_event.dart
+## File: lib/data/data_sources/api_builders/chat_completions_api_builder.dart
 ```dart
-// 保持你原有SseEvent的非空约定，避免修改下游Decoder
-class SseEvent {
-  final String? id;
-  final String? event;
-  final String data; // 保持非空，和你原有逻辑一致
+import 'package:aiservice/data/data_sources/api_builders/model_info_parser.dart';
 
-  const SseEvent({
-    this.id,
-    this.event,
-    required this.data,
-  });
+import 'api_request_builder.dart';
+import '../../../core/models/api_message.dart';
+import '../../../core/models/model_info.dart';
+
+class ChatCompletionsApiBuilder implements ApiRequestBuilder {
+  @override
+  Map<String, String> buildHeaders(ApiBuildContext ctx) {
+    return {
+      'Authorization': 'Bearer ${ctx.apiKey}',
+      'Content-Type': 'application/json',
+    };
+  }
+
+  @override
+  Uri buildUri(ApiBuildContext ctx) {
+    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.chatPath);
+  }
+
+  @override
+  Uri buildModelsUri(ApiBuildContext ctx) {
+    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.modelsPath);
+  }
+  
+  @override
+  Map<String, dynamic> buildRequestBody(ApiBuildContext ctx) {
+    return {
+      'model': ctx.model,
+      'messages': _buildMessages(ctx.context),
+      'stream': true,
+      if (ctx.enableReasoning) 'reasoning_effort': 'medium',
+    };
+  }
+
+  @override
+  List<ModelInfo> parseModelsResponse(Map<String, dynamic> json) {
+    return ModelInfoParser.parseModelsResponse(json);
+  }
+
+  List<Map<String, dynamic>> _buildMessages(List<ApiMessage> context) {
+    return context.map(_buildMessage).toList();
+  }
+
+  Map<String, dynamic> _buildMessage(ApiMessage message) {
+    if (message.role == 'assistant') {
+      final result = <String, dynamic>{
+        'role': 'assistant',
+        'content': message.content ?? '',
+      };
+      if ((message.reasoning ?? '').trim().isNotEmpty) {
+        result['reasoning_content'] = message.reasoning;
+      }
+      return result;
+    }
+
+    if (message.parts.isEmpty) {
+      return {
+        'role': message.role,
+        'content': message.content ?? '',
+      };
+    }
+
+    return {
+      'role': message.role,
+      'content': message.parts.map((part) => part.when(
+            text: (type, text) => {'type': 'text', 'text': text},
+            imageUrl: (type, imageUrl) => {
+              'type': 'image_url',
+              'image_url': {'url': imageUrl.url},
+            },
+          )).toList(),
+    };
+  }
+}
+```
+
+## File: lib/data/data_sources/api_builders/responses_api_builder.dart
+```dart
+import 'package:aiservice/data/data_sources/api_builders/model_info_parser.dart';
+import 'api_request_builder.dart';
+import '../../../core/models/api_message.dart';
+import '../../../core/models/model_info.dart';
+
+class ResponsesApiBuilder implements ApiRequestBuilder {
+  @override
+  Map<String, String> buildHeaders(ApiBuildContext ctx) {
+    return {
+      'Authorization': 'Bearer ${ctx.apiKey}',
+      'Content-Type': 'application/json',
+    };
+  }
+
+  @override
+  Uri buildUri(ApiBuildContext ctx) {
+    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.chatPath);
+  }
+
+  @override
+  Uri buildModelsUri(ApiBuildContext ctx) {
+    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.modelsPath);
+  }
+  
+  @override
+  Map<String, dynamic> buildRequestBody(ApiBuildContext ctx) {
+    return {
+      'model': ctx.model,
+      'input': _buildInput(ctx.context),
+      'stream': true,
+      'store': false,
+      if (ctx.enableReasoning)
+        'reasoning': {
+          'effort': 'medium',
+        },
+    };
+  }
+
+  @override
+  List<ModelInfo> parseModelsResponse(Map<String, dynamic> json) {
+    return ModelInfoParser.parseModelsResponse(json);
+  }
+  
+  List<Map<String, dynamic>> _buildInput(List<ApiMessage> context) {
+    final result = <Map<String, dynamic>>[];
+    for (final message in context) {
+      if (message.role == 'assistant') {
+        result.addAll(_buildAssistantItems(message));
+      } else {
+        result.add(_buildUserLikeMessage(message));
+      }
+    }
+    return result;
+  }
+
+  Map<String, dynamic> _buildUserLikeMessage(ApiMessage message) {
+    if (message.parts.isEmpty) {
+      return {'role': message.role, 'content': message.content ?? ''};
+    }
+
+    return {
+      'role': message.role,
+      'content': message.parts.map((part) => part.when(
+            text: (type, text) => {'type': 'input_text', 'text': text},
+            imageUrl: (type, imageUrl) => {
+              'type': 'input_image',
+              'image_url': imageUrl.url,
+            },
+          )).toList(),
+    };
+  }
+
+  List<Map<String, dynamic>> _buildAssistantItems(ApiMessage message) {
+    final items = <Map<String, dynamic>>[];
+    if ((message.reasoning ?? '').trim().isNotEmpty) {
+      items.add({
+        'type': 'reasoning',
+        'summary': [
+          {'type': 'summary_text', 'text': message.reasoning}
+        ],
+      });
+    }
+    if ((message.content ?? '').trim().isNotEmpty) {
+      items.add({'role': 'assistant', 'content': message.content});
+    }
+    return items;
+  }
 }
 ```
 
@@ -9379,103 +9446,6 @@ Future<List<Attachment>> savePendingAttachments(
 }
 ```
 
-## File: lib/domain/services/chat_context_builder.dart
-```dart
-import 'dart:convert';
-import 'package:aiservice/core/models/attachment.dart';
-
-import '../../core/models/api_message.dart';
-import '../../core/models/chat_round.dart';
-import '../../data/repositories/conversation_repository.dart';
-
-Future<List<ApiMessage>> buildApiContextFromRounds(
-  List<ChatRound> rounds,
-  ConversationRepository repository,
-) async {
-  final result = <ApiMessage>[];
-
-  for (final round in rounds) {
-    final userMessage = await _buildUserMessage(round, repository);
-    result.add(userMessage);
-
-    final assistantMessage = _buildAssistantMessage(round);
-    if (assistantMessage != null) {
-      result.add(assistantMessage);
-    }
-  }
-
-  return result;
-}
-
-ApiMessage? _buildAssistantMessage(ChatRound round) {
-  final thinking = round.assistantThinking?.trim() ?? '';
-  final content = round.assistantContent?.trim() ?? '';
-
-  if (thinking.isEmpty && content.isEmpty) return null;
-
-  return ApiMessage(
-    role: 'assistant',
-    content: content.isEmpty ? null : content,
-    reasoning: thinking.isEmpty ? null : thinking,
-  );
-}
-
-Future<ApiMessage> _buildUserMessage(
-  ChatRound round,
-  ConversationRepository repository,
-) async {
-  final parts = <ApiMessageContentPart>[];
-
-  if (round.userContent.trim().isNotEmpty) {
-    parts.add(ApiMessageContentPart.text(text: round.userContent.trim()));
-  }
-
-  for (final attachment in round.userAttachments) {
-    final attachmentParts = await _buildAttachmentParts(attachment, repository);
-    parts.addAll(attachmentParts);
-  }
-
-  if (parts.isEmpty) {
-    return const ApiMessage(role: 'user', content: '');
-  }
-
-  if (_isOnlySingleTextPart(parts)) {
-    final text = parts.first.maybeWhen(
-      text: (_, text) => text,
-      orElse: () => '',
-    );
-    return ApiMessage(role: 'user', content: text);
-  }
-
-  return ApiMessage(role: 'user', parts: parts);
-}
-
-bool _isOnlySingleTextPart(List<ApiMessageContentPart> parts) {
-  if (parts.length != 1) return false;
-  return parts.first.maybeWhen(
-    text: (_, text) => true,
-    orElse: () => false,
-  );
-}
-
-Future<List<ApiMessageContentPart>> _buildAttachmentParts(
-  Attachment attachment,
-  ConversationRepository repository,
-) async {
-  if (attachment.isImage) {
-    final bytes = await repository.getAttachment(attachment.relativePath);
-    final mimeType = attachment.mimeType;
-    final base64Data = base64Encode(bytes);
-    return [ApiMessageContentPart.imageUrl(imageUrl: ApiImageUrl(url: 'data:$mimeType;base64,$base64Data'))];
-  } else {
-    // 上层保证非图片一定是可读文本文件
-    final bytes = await repository.getAttachment(attachment.relativePath);
-    final text = utf8.decode(bytes, allowMalformed: true);
-    return [ApiMessageContentPart.text(text: text)];
-  }
-}
-```
-
 ## File: lib/presentation/providers/chat_generation_provider.dart
 ```dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9609,6 +9579,7 @@ import '../../core/models/model_info.dart';
 import '../../data/services/config_service.dart';
 import '../../di/providers.dart';
 import 'config_notifier.dart'; // 导入 configProvider
+import 'package:file_picker/file_picker.dart';
 
 /// 设置表单的状态
 class SettingsFormState {
@@ -9758,6 +9729,11 @@ class SettingsFormNotifier extends Notifier<SettingsFormState> {
 
   Future<void> refreshModels() async {
     if (state.isRefreshingModels) return;
+    if (state.config.apiMode == 'local') {
+      await addLocalModel();
+      return;
+    }
+
     state = state.copyWith(isRefreshingModels: true, modelsRefreshError: null);
     try {
       await _configService.refreshModels();
@@ -9769,6 +9745,33 @@ class SettingsFormNotifier extends Notifier<SettingsFormState> {
       );
       rethrow;
     }
+  }
+
+  Future<void> addLocalModel() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['gguf'],
+    );
+    if (result == null || result.files.single.path == null) return;
+
+    final path = result.files.single.path!;
+
+    final newModel = ModelInfo(id: path);
+
+    final currentModels = List<ModelInfo>.from(state.config.availableModels ?? []);
+    if (currentModels.any((m) => m.id == path)) {
+      // 已存在则直接选中
+      state = state.copyWith(config: state.config.copyWith(selectedModel: path));
+      return;
+    }
+
+    currentModels.add(newModel);
+    state = state.copyWith(
+      config: state.config.copyWith(
+        availableModels: currentModels,
+        selectedModel: path,
+      ),
+    );
   }
 
   Map<String, String> _defaultPathsForMode(String apiMode) {
@@ -9786,6 +9789,22 @@ class SettingsFormNotifier extends Notifier<SettingsFormState> {
 final settingsFormProvider = NotifierProvider<SettingsFormNotifier, SettingsFormState>(
   SettingsFormNotifier.new,
 );
+```
+
+## File: lib/core/models/sse_event.dart
+```dart
+// 保持你原有SseEvent的非空约定，避免修改下游Decoder
+class SseEvent {
+  final String? id;
+  final String? event;
+  final String data; // 保持非空，和你原有逻辑一致
+
+  const SseEvent({
+    this.id,
+    this.event,
+    required this.data,
+  });
+}
 ```
 
 ## File: lib/domain/models/session_list_item.dart
@@ -10271,6 +10290,103 @@ abstract class _TreePath implements TreePath {
   @JsonKey(includeFromJson: false, includeToJson: false)
   _$$TreePathImplCopyWith<_$TreePathImpl> get copyWith =>
       throw _privateConstructorUsedError;
+}
+```
+
+## File: lib/domain/services/chat_context_builder.dart
+```dart
+import 'dart:convert';
+import 'package:aiservice/core/models/attachment.dart';
+
+import '../../core/models/api_message.dart';
+import '../../core/models/chat_round.dart';
+import '../../data/repositories/conversation_repository.dart';
+
+Future<List<ApiMessage>> buildApiContextFromRounds(
+  List<ChatRound> rounds,
+  ConversationRepository repository,
+) async {
+  final result = <ApiMessage>[];
+
+  for (final round in rounds) {
+    final userMessage = await _buildUserMessage(round, repository);
+    result.add(userMessage);
+
+    final assistantMessage = _buildAssistantMessage(round);
+    if (assistantMessage != null) {
+      result.add(assistantMessage);
+    }
+  }
+
+  return result;
+}
+
+ApiMessage? _buildAssistantMessage(ChatRound round) {
+  final thinking = round.assistantThinking?.trim() ?? '';
+  final content = round.assistantContent?.trim() ?? '';
+
+  if (thinking.isEmpty && content.isEmpty) return null;
+
+  return ApiMessage(
+    role: 'assistant',
+    content: content.isEmpty ? null : content,
+    reasoning: thinking.isEmpty ? null : thinking,
+  );
+}
+
+Future<ApiMessage> _buildUserMessage(
+  ChatRound round,
+  ConversationRepository repository,
+) async {
+  final parts = <ApiMessageContentPart>[];
+
+  if (round.userContent.trim().isNotEmpty) {
+    parts.add(ApiMessageContentPart.text(text: round.userContent.trim()));
+  }
+
+  for (final attachment in round.userAttachments) {
+    final attachmentParts = await _buildAttachmentParts(attachment, repository);
+    parts.addAll(attachmentParts);
+  }
+
+  if (parts.isEmpty) {
+    return const ApiMessage(role: 'user', content: '');
+  }
+
+  if (_isOnlySingleTextPart(parts)) {
+    final text = parts.first.maybeWhen(
+      text: (_, text) => text,
+      orElse: () => '',
+    );
+    return ApiMessage(role: 'user', content: text);
+  }
+
+  return ApiMessage(role: 'user', parts: parts);
+}
+
+bool _isOnlySingleTextPart(List<ApiMessageContentPart> parts) {
+  if (parts.length != 1) return false;
+  return parts.first.maybeWhen(
+    text: (_, text) => true,
+    orElse: () => false,
+  );
+}
+
+Future<List<ApiMessageContentPart>> _buildAttachmentParts(
+  Attachment attachment,
+  ConversationRepository repository,
+) async {
+  if (attachment.isImage) {
+    final bytes = await repository.getAttachment(attachment.relativePath);
+    final mimeType = attachment.mimeType;
+    final base64Data = base64Encode(bytes);
+    return [ApiMessageContentPart.imageUrl(imageUrl: ApiImageUrl(url: 'data:$mimeType;base64,$base64Data'))];
+  } else {
+    // 上层保证非图片一定是可读文本文件
+    final bytes = await repository.getAttachment(attachment.relativePath);
+    final text = utf8.decode(bytes, allowMalformed: true);
+    return [ApiMessageContentPart.text(text: text)];
+  }
 }
 ```
 
@@ -11118,6 +11234,7 @@ class MyApp extends StatelessWidget {
 ## File: lib/data/data_sources/remote_api_source.dart
 ```dart
 import 'dart:convert';
+import 'api_builders/local_api_builder.dart';
 import 'package:collection/collection.dart';
 import 'package:http/http.dart' as http;
 import '../../core/models/model_info.dart';
@@ -11138,6 +11255,8 @@ class RemoteApiSource {
         return GoogleApiBuilder();
       case 'responses':
         return ResponsesApiBuilder();
+      case 'local':
+        return LocalApiBuilder();
       case 'chat_completions':
       default:
         return ChatCompletionsApiBuilder();
@@ -11184,12 +11303,29 @@ class RemoteApiSource {
 
     try {
       final config = await loadConfig();
+      final apiMode = config.apiMode.trim();
+      
+      if (apiMode == 'local') {
+        final builder = LocalApiBuilder();
+        final ctx = ApiBuildContext(
+          model: config.selectedModel?.trim() ?? '',
+          context: context,
+          enableReasoning: false,
+          apiKey: '',
+          baseUrl: '',
+          chatPath: '',
+          modelsPath: '',
+        );
+        yield* builder.generateStream(ctx);
+        return;
+      }
+
       final selectedId = config.selectedModel;
       final selectedModel =
           config.availableModels?.firstWhereOrNull((m) => m.id == selectedId);
       final enableReasoning = selectedModel?.overrideSupportsReasoning == true;
       final model = config.selectedModel?.trim() ?? '';
-      final apiMode = config.apiMode.trim();
+      
 
       if (config.baseUrl.isEmpty) {
         yield const ChatChunk(isDone: true, error: 'Base URL 为空');
@@ -11278,6 +11414,57 @@ class RemoteApiSource {
     }
   }
 }
+```
+
+## File: lib/presentation/providers/session_list_notifier.dart
+```dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../di/providers.dart';
+import '../../domain/models/session_list_item.dart';
+import '../../domain/models/session_card_meta.dart';
+import 'package:uuid/uuid.dart';
+
+final sessionListProvider = StreamProvider<List<SessionListItem>>((ref) {
+  final repository = ref.watch(conversationRepositoryProvider);
+  return repository.watchSessionListItems();
+});
+
+final sessionCardMetaProvider =
+    StreamProvider.family<SessionCardMeta, String>((ref, sessionId) {
+  final repository = ref.watch(conversationRepositoryProvider);
+  return repository.watchSessionCardMeta(sessionId);
+});
+
+class SessionListController {
+  final Ref ref;
+
+  SessionListController(this.ref);
+
+  Future<void> deleteSession(String sessionId) async {
+    final repository = ref.read(conversationRepositoryProvider);
+    await repository.deleteSession(sessionId);
+  }
+
+  Future<void> updateSessionTitle(String sessionId, String newTitle) async {
+    final repository = ref.read(conversationRepositoryProvider);
+    final cleanTitle = newTitle.trim();
+    if (cleanTitle.isEmpty) return;
+    await repository.updateSessionTitle(sessionId, cleanTitle);
+  }
+
+  Future<String> createSession(String title) async {
+    final repository = ref.read(conversationRepositoryProvider);
+
+    final sessionId = const Uuid().v4();
+
+    await repository.createSession(sessionId: sessionId, title: '新对话');
+    return sessionId;
+  }
+}
+
+final sessionListControllerProvider = Provider<SessionListController>((ref) {
+  return SessionListController(ref);
+});
 ```
 
 ## File: lib/data/services/config_service.dart
@@ -11524,57 +11711,6 @@ class ConfigService{
     });
   }
 }
-```
-
-## File: lib/presentation/providers/session_list_notifier.dart
-```dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../di/providers.dart';
-import '../../domain/models/session_list_item.dart';
-import '../../domain/models/session_card_meta.dart';
-import 'package:uuid/uuid.dart';
-
-final sessionListProvider = StreamProvider<List<SessionListItem>>((ref) {
-  final repository = ref.watch(conversationRepositoryProvider);
-  return repository.watchSessionListItems();
-});
-
-final sessionCardMetaProvider =
-    StreamProvider.family<SessionCardMeta, String>((ref, sessionId) {
-  final repository = ref.watch(conversationRepositoryProvider);
-  return repository.watchSessionCardMeta(sessionId);
-});
-
-class SessionListController {
-  final Ref ref;
-
-  SessionListController(this.ref);
-
-  Future<void> deleteSession(String sessionId) async {
-    final repository = ref.read(conversationRepositoryProvider);
-    await repository.deleteSession(sessionId);
-  }
-
-  Future<void> updateSessionTitle(String sessionId, String newTitle) async {
-    final repository = ref.read(conversationRepositoryProvider);
-    final cleanTitle = newTitle.trim();
-    if (cleanTitle.isEmpty) return;
-    await repository.updateSessionTitle(sessionId, cleanTitle);
-  }
-
-  Future<String> createSession(String title) async {
-    final repository = ref.read(conversationRepositoryProvider);
-
-    final sessionId = const Uuid().v4();
-
-    await repository.createSession(sessionId: sessionId, title: '新对话');
-    return sessionId;
-  }
-}
-
-final sessionListControllerProvider = Provider<SessionListController>((ref) {
-  return SessionListController(ref);
-});
 ```
 
 ## File: lib/presentation/widgets/input_bar.dart
@@ -12140,6 +12276,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             onPressed: () { notifier.updateApiMode('google'); Navigator.pop(context); },
             child: const Text('google'),
           ),
+          CupertinoActionSheetAction(
+            onPressed: () { notifier.updateApiMode('local'); Navigator.pop(context); },
+            child: const Text('local'),
+          ),
         ],
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.pop(context),
@@ -12155,7 +12295,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       builder: (context) => CupertinoActionSheet(
         title: const Text('选择模型'),
         actions: models.map((model) {
-          final label = (model.name ?? '').trim().isNotEmpty ? '${model.name} (${model.id})' : model.id;
+          final label = model.id;
           return CupertinoActionSheetAction(
             onPressed: () {
               Navigator.pop(context);

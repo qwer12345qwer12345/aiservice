@@ -5,6 +5,7 @@ import '../../core/models/model_info.dart';
 import '../../data/services/config_service.dart';
 import '../../di/providers.dart';
 import 'config_notifier.dart'; // 导入 configProvider
+import 'package:file_picker/file_picker.dart';
 
 /// 设置表单的状态
 class SettingsFormState {
@@ -154,6 +155,11 @@ class SettingsFormNotifier extends Notifier<SettingsFormState> {
 
   Future<void> refreshModels() async {
     if (state.isRefreshingModels) return;
+    if (state.config.apiMode == 'local') {
+      await addLocalModel();
+      return;
+    }
+
     state = state.copyWith(isRefreshingModels: true, modelsRefreshError: null);
     try {
       await _configService.refreshModels();
@@ -165,6 +171,33 @@ class SettingsFormNotifier extends Notifier<SettingsFormState> {
       );
       rethrow;
     }
+  }
+
+  Future<void> addLocalModel() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['gguf'],
+    );
+    if (result == null || result.files.single.path == null) return;
+
+    final path = result.files.single.path!;
+
+    final newModel = ModelInfo(id: path);
+
+    final currentModels = List<ModelInfo>.from(state.config.availableModels ?? []);
+    if (currentModels.any((m) => m.id == path)) {
+      // 已存在则直接选中
+      state = state.copyWith(config: state.config.copyWith(selectedModel: path));
+      return;
+    }
+
+    currentModels.add(newModel);
+    state = state.copyWith(
+      config: state.config.copyWith(
+        availableModels: currentModels,
+        selectedModel: path,
+      ),
+    );
   }
 
   Map<String, String> _defaultPathsForMode(String apiMode) {

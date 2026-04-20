@@ -247,6 +247,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             onPressed: () { notifier.updateApiMode('google'); Navigator.pop(context); },
             child: const Text('google'),
           ),
+          CupertinoActionSheetAction(
+            onPressed: () { notifier.updateApiMode('local'); Navigator.pop(context); },
+            child: const Text('local'),
+          ),
         ],
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.pop(context),
@@ -262,7 +266,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       builder: (context) => CupertinoActionSheet(
         title: const Text('选择模型'),
         actions: models.map((model) {
-          final label = (model.name ?? '').trim().isNotEmpty ? '${model.name} (${model.id})' : model.id;
+          final label = model.id;
           return CupertinoActionSheetAction(
             onPressed: () {
               Navigator.pop(context);

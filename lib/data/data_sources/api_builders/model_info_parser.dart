@@ -26,7 +26,6 @@ class ModelInfoParser {
 
     return ModelInfo(
       id: (json['id'] ?? '').toString(),
-      name: json['name']?.toString(),
       overrideSupportsReasoning:
           readBool(json, ['overrideSupportsReasoning', 'override_supports_reasoning']),
       overrideSupportsVision:
