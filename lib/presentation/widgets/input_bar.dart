@@ -1,4 +1,5 @@
 import 'package:aiservice/presentation/models/input_state.dart';
+import 'package:aiservice/presentation/widgets/common/app_toast.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -44,6 +45,22 @@ class _InputBarState extends ConsumerState<InputBar> {
     super.dispose();
   }
 
+  void _addPendingAttachment({
+    required String name,
+    required String path,
+    required bool isImage,
+    required String mimeType,
+  }) {
+    final attachment = PendingAttachment(
+      id: const Uuid().v4(),
+      name: name,
+      path: path,
+      isImage: isImage,
+      mimeType: mimeType,
+    );
+    ref.read(inputStateProvider.notifier).addAttachment(attachment);
+  }
+
   bool _isImageFile(String name) {
     final lower = name.toLowerCase();
     return lower.endsWith('.png') ||
@@ -54,20 +71,30 @@ class _InputBarState extends ConsumerState<InputBar> {
         lower.endsWith('.bmp');
   }
 
-  String? _guessMimeType(String name) {
+  bool _isTextFile(String name) {
     final lower = name.toLowerCase();
+    return lower.endsWith('.txt') ||
+        lower.endsWith('.md') ||
+        lower.endsWith('.json') ||
+        lower.endsWith('.dart') ||
+        lower.endsWith('.yaml') ||
+        lower.endsWith('.yml') ||
+        lower.endsWith('.log') ||
+        lower.endsWith('.csv');
+  }
+
+  String _mimeForImage(String fileName) {
+    final lower = fileName.toLowerCase();
     if (lower.endsWith('.png')) return 'image/png';
     if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
     if (lower.endsWith('.gif')) return 'image/gif';
     if (lower.endsWith('.webp')) return 'image/webp';
     if (lower.endsWith('.bmp')) return 'image/bmp';
-    if (lower.endsWith('.txt')) return 'text/plain';
-    if (lower.endsWith('.md')) return 'text/markdown';
-    if (lower.endsWith('.json')) return 'application/json';
-    if (lower.endsWith('.pdf')) return 'application/pdf';
-    if (lower.endsWith('.dart')) return 'text/plain';
-    if (lower.endsWith('.yaml') || lower.endsWith('.yml')) return 'text/yaml';
-    return null;
+    return 'image/png'; // 默认
+  }
+
+  String _mimeForText(String fileName) {
+    return 'text/plain';
   }
 
   Future<void> _pickFileAttachment() async {
@@ -81,16 +108,24 @@ class _InputBarState extends ConsumerState<InputBar> {
     final filePath = file.path;
     if (filePath == null || filePath.trim().isEmpty) return;
 
-    final mimeType = _guessMimeType(file.name);
     final isImage = _isImageFile(file.name);
-    final attachment = PendingAttachment(
-      id: const Uuid().v4(),
+    final isText = _isTextFile(file.name);
+
+    if (!isImage && !isText) {
+      if (mounted) {
+        await AppToast.show('仅支持图片和文本文件（.txt, .md, .json, .dart, .yaml 等）');
+      }
+      return;
+    }
+
+    final mimeType = isImage ? _mimeForImage(file.name) : _mimeForText(file.name);
+
+    _addPendingAttachment(
       name: file.name,
       path: filePath,
       isImage: isImage,
       mimeType: mimeType,
     );
-    ref.read(inputStateProvider.notifier).addAttachment(attachment);
   }
 
   Future<void> _pickImageFromGallery() async {
@@ -99,15 +134,16 @@ class _InputBarState extends ConsumerState<InputBar> {
       imageQuality: 100,
     );
     if (file == null) return;
-    final name = file.name;
-    final attachment = PendingAttachment(
-      id: const Uuid().v4(),
-      name: name,
+
+    // 优先使用 XFile 提供的 mimeType，否则根据文件名后缀猜测
+    final mimeType = file.mimeType ?? _mimeForImage(file.name);
+
+    _addPendingAttachment(
+      name: file.name,
       path: file.path,
       isImage: true,
-      mimeType: _guessMimeType(name) ?? 'image/*',
+      mimeType: mimeType,
     );
-    ref.read(inputStateProvider.notifier).addAttachment(attachment);
   }
 
   void _removeAttachment(String id) {

@@ -350,22 +350,6 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  flutter_client_sse:
-    dependency: "direct main"
-    description:
-      name: flutter_client_sse
-      sha256: "4ce0297206473dfc064b255fe086713240002e149f52519bd48c21423e4aa5d2"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.0.3"
-  flutter_form_builder:
-    dependency: "direct main"
-    description:
-      name: flutter_form_builder
-      sha256: "1233251b4bc1d5deb245745d2a89dcebf4cdd382e1ec3f21f1c6703b700e574f"
-      url: "https://pub.dev"
-    source: hosted
-    version: "10.3.0+2"
   flutter_lints:
     dependency: "direct dev"
     description:
@@ -469,14 +453,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.3.2"
-  graphview:
-    dependency: "direct dev"
-    description:
-      name: graphview
-      sha256: a683865b36172cc8c470f45f6d34bb901ba5b4e80fc345f6a0021abc57fa8f4c
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.5.1"
   hooks:
     dependency: transitive
     description:
@@ -693,22 +669,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.0"
-  mockito:
-    dependency: "direct dev"
-    description:
-      name: mockito
-      sha256: "4546eac99e8967ea91bae633d2ca7698181d008e95fa4627330cf903d573277a"
-      url: "https://pub.dev"
-    source: hosted
-    version: "5.4.6"
-  mocktail:
-    dependency: "direct main"
-    description:
-      name: mocktail
-      sha256: "890df3f9688106f25755f26b1c60589a92b3ab91a22b8b224947ad041bf172d8"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.0.4"
   native_toolchain_c:
     dependency: transitive
     description:

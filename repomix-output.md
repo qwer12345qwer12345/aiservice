@@ -67,6 +67,7 @@ lib/core/utils/sse_parser.dart
 lib/data/data_sources/api_builders/api_request_builder.dart
 lib/data/data_sources/api_builders/chat_completions_api_builder.dart
 lib/data/data_sources/api_builders/google_api_builder.dart
+lib/data/data_sources/api_builders/model_info_parser.dart
 lib/data/data_sources/api_builders/responses_api_builder.dart
 lib/data/data_sources/local_file_source.dart
 lib/data/data_sources/remote_api_source.dart
@@ -83,11 +84,8 @@ lib/domain/models/tree_node.freezed.dart
 lib/domain/models/tree_node.g.dart
 lib/domain/services/attachment_preparer.dart
 lib/domain/services/chat_context_builder.dart
-lib/domain/services/chat_round_factory.dart
 lib/domain/services/stream_processor.dart
 lib/domain/services/tree_builder.dart
-lib/domain/states/chat_state.dart
-lib/domain/states/chat_state.freezed.dart
 lib/main.dart
 lib/presentation/models/input_state.dart
 lib/presentation/models/input_state.freezed.dart
@@ -105,18 +103,57 @@ lib/presentation/providers/input_notifier.dart
 lib/presentation/providers/session_list_notifier.dart
 lib/presentation/providers/settings_form_notifier.dart
 lib/presentation/themes/app_theme.dart
-lib/presentation/themes/app_tokens.dart
 lib/presentation/widgets/attachment_list.dart
-lib/presentation/widgets/common/app_card.dart
 lib/presentation/widgets/common/app_page_scaffold.dart
 lib/presentation/widgets/common/app_section.dart
 lib/presentation/widgets/common/app_toast.dart
+lib/presentation/widgets/common/declarative_text_field.dart
 lib/presentation/widgets/input_bar.dart
 lib/presentation/widgets/message_bubble.dart
 lib/presentation/widgets/thought_bubble.dart
 ```
 
 # Files
+
+## File: lib/data/data_sources/api_builders/model_info_parser.dart
+```dart
+// lib/data/data_sources/api_builders/model_info_parser.dart
+import '../../../core/models/model_info.dart';
+
+class ModelInfoParser {
+  /// 从 /v1/models 或 /v1/responses 等标准 OpenAI 风格响应中解析模型列表
+  static List<ModelInfo> parseModelsResponse(Map<String, dynamic> json) {
+    final data = json['data'] as List<dynamic>? ?? [];
+    return data.map((e) => _parseModelInfo(e as Map<String, dynamic>)).toList();
+  }
+
+  static ModelInfo _parseModelInfo(Map<String, dynamic> json) {
+    bool? readBool(Map<String, dynamic> json, List<String> keys) {
+      for (final key in keys) {
+        if (!json.containsKey(key)) continue;
+        final value = json[key];
+        if (value is bool) return value;
+        if (value is num) return value != 0;
+        if (value is String) {
+          final lower = value.toLowerCase();
+          if (lower == 'true' || lower == '1' || lower == 'yes') return true;
+          if (lower == 'false' || lower == '0' || lower == 'no') return false;
+        }
+      }
+      return null;
+    }
+
+    return ModelInfo(
+      id: (json['id'] ?? '').toString(),
+      name: json['name']?.toString(),
+      overrideSupportsReasoning:
+          readBool(json, ['overrideSupportsReasoning', 'override_supports_reasoning']),
+      overrideSupportsVision:
+          readBool(json, ['overrideSupportsVision', 'override_supports_vision']),
+    );
+  }
+}
+```
 
 ## File: lib/core/models/api_message.dart
 ```dart
@@ -3413,6 +3450,8 @@ abstract class ApiRequestBuilder {
 
 ## File: lib/data/data_sources/api_builders/chat_completions_api_builder.dart
 ```dart
+import 'package:aiservice/data/data_sources/api_builders/model_info_parser.dart';
+
 import 'api_request_builder.dart';
 import '../../../core/models/api_message.dart';
 import '../../../core/models/model_info.dart';
@@ -3448,8 +3487,7 @@ class ChatCompletionsApiBuilder implements ApiRequestBuilder {
 
   @override
   List<ModelInfo> parseModelsResponse(Map<String, dynamic> json) {
-    final data = json['data'] as List<dynamic>? ?? [];
-    return data.map((e) => _parseModelInfo(e as Map<String, dynamic>)).toList();
+    return ModelInfoParser.parseModelsResponse(json);
   }
 
   List<Map<String, dynamic>> _buildMessages(List<ApiMessage> context) {
@@ -3485,32 +3523,6 @@ class ChatCompletionsApiBuilder implements ApiRequestBuilder {
             },
           )).toList(),
     };
-  }
-
-  ModelInfo _parseModelInfo(Map<String, dynamic> json) {
-    bool? readBool(Map<String, dynamic> json, List<String> keys) {
-      for (final key in keys) {
-        if (!json.containsKey(key)) continue;
-        final value = json[key];
-        if (value is bool) return value;
-        if (value is num) return value != 0;
-        if (value is String) {
-          final lower = value.toLowerCase();
-          if (lower == 'true' || lower == '1' || lower == 'yes') return true;
-          if (lower == 'false' || lower == '0' || lower == 'no') return false;
-        }
-      }
-      return null;
-    }
-
-    return ModelInfo(
-      id: (json['id'] ?? '').toString(),
-      name: json['name']?.toString(),
-      overrideSupportsReasoning:
-          readBool(json, ['overrideSupportsReasoning', 'override_supports_reasoning']),
-      overrideSupportsVision:
-          readBool(json, ['overrideSupportsVision', 'override_supports_vision']),
-    );
   }
 }
 ```
@@ -3624,6 +3636,7 @@ class GoogleApiBuilder implements ApiRequestBuilder {
 
 ## File: lib/data/data_sources/api_builders/responses_api_builder.dart
 ```dart
+import 'package:aiservice/data/data_sources/api_builders/model_info_parser.dart';
 import 'api_request_builder.dart';
 import '../../../core/models/api_message.dart';
 import '../../../core/models/model_info.dart';
@@ -3663,8 +3676,7 @@ class ResponsesApiBuilder implements ApiRequestBuilder {
 
   @override
   List<ModelInfo> parseModelsResponse(Map<String, dynamic> json) {
-    final data = json['data'] as List<dynamic>? ?? [];
-    return data.map((e) => _parseModelInfo(e as Map<String, dynamic>)).toList();
+    return ModelInfoParser.parseModelsResponse(json);
   }
   
   List<Map<String, dynamic>> _buildInput(List<ApiMessage> context) {
@@ -3710,32 +3722,6 @@ class ResponsesApiBuilder implements ApiRequestBuilder {
       items.add({'role': 'assistant', 'content': message.content});
     }
     return items;
-  }
-
-  ModelInfo _parseModelInfo(Map<String, dynamic> json) {
-    bool? readBool(Map<String, dynamic> json, List<String> keys) {
-      for (final key in keys) {
-        if (!json.containsKey(key)) continue;
-        final value = json[key];
-        if (value is bool) return value;
-        if (value is num) return value != 0;
-        if (value is String) {
-          final lower = value.toLowerCase();
-          if (lower == 'true' || lower == '1' || lower == 'yes') return true;
-          if (lower == 'false' || lower == '0' || lower == 'no') return false;
-        }
-      }
-      return null;
-    }
-
-    return ModelInfo(
-      id: (json['id'] ?? '').toString(),
-      name: json['name']?.toString(),
-      overrideSupportsReasoning:
-          readBool(json, ['overrideSupportsReasoning', 'override_supports_reasoning']),
-      overrideSupportsVision:
-          readBool(json, ['overrideSupportsVision', 'override_supports_vision']),
-    );
   }
 }
 ```
@@ -7646,195 +7632,6 @@ class PendingAttachment {
 }
 ```
 
-## File: lib/presentation/providers/settings_form_notifier.dart
-```dart
-import 'package:aiservice/data/services/config_service.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/app_config.dart';
-import '../../core/models/model_info.dart';
-import '../../di/providers.dart';
-
-/// 设置表单的状态
-class SettingsFormState {
-  final AppConfig config;
-  final bool isSaving;
-  final String? error;
-
-  const SettingsFormState({
-    required this.config,
-    this.isSaving = false,
-    this.error,
-  });
-
-  SettingsFormState copyWith({
-    AppConfig? config,
-    bool? isSaving,
-    String? error,
-  }) {
-    return SettingsFormState(
-      config: config ?? this.config,
-      isSaving: isSaving ?? this.isSaving,
-      error: error,
-    );
-  }
-}
-
-/// 设置表单 Notifier
-///
-/// 职责：
-/// - 管理表单草稿状态
-/// - 提供字段更新方法
-/// - 处理保存逻辑
-class SettingsFormNotifier extends Notifier<SettingsFormState> {
-  late final ConfigService _configService;
-
-  @override
-  SettingsFormState build() {
-    _configService = ref.read(configServiceProvider);
-    // 初始状态为空配置，等待加载
-    return SettingsFormState(config: AppConfig.defaultConfig());
-  }
-
-  /// 从实际配置加载到草稿
-  void load(AppConfig config) {
-    state = state.copyWith(config: config, error: null);
-  }
-
-  /// 更新 Base URL
-  void updateBaseUrl(String value) {
-    state = state.copyWith(
-      config: state.config.copyWith(baseUrl: value),
-    );
-  }
-
-  /// 更新 API Key
-  void updateApiKey(String value) {
-    state = state.copyWith(
-      config: state.config.copyWith(apiKey: value),
-    );
-  }
-
-  /// 更新 Models Path
-  void updateModelsPath(String value) {
-    state = state.copyWith(
-      config: state.config.copyWith(modelsPath: value),
-    );
-  }
-
-  /// 更新 Chat Path
-  void updateChatPath(String value) {
-    state = state.copyWith(
-      config: state.config.copyWith(chatPath: value),
-    );
-  }
-
-  /// 更新 API Mode
-  void updateApiMode(String value) {
-    final defaults = _defaultPathsForMode(value);
-    state = state.copyWith(
-      config: state.config.copyWith(
-        apiMode: value,
-        modelsPath: defaults['models']!,
-        chatPath: defaults['chat']!,
-      ),
-    );
-  }
-
-  /// 更新选中的模型
-  void updateSelectedModel(String value) {
-    state = state.copyWith(
-      config: state.config.copyWith(selectedModel: value.isEmpty ? null : value),
-    );
-  }
-
-  /// 切换推理能力
-  void toggleReasoning(bool value) {
-    _updateModelCapability(
-      overrideSupportsReasoning: value,
-    );
-  }
-
-  /// 切换视觉能力
-  void toggleVision(bool value) {
-    _updateModelCapability(
-      overrideSupportsVision: value,
-    );
-  }
-
-  /// 内部方法：更新当前模型的能力覆盖
-  void _updateModelCapability({
-    bool? overrideSupportsReasoning,
-    bool? overrideSupportsVision,
-  }) {
-    final modelId = state.config.selectedModel;
-    if (modelId == null || modelId.isEmpty) return;
-
-    final models = [...(state.config.availableModels ?? const <ModelInfo>[])];
-    final index = models.indexWhere((m) => m.id == modelId);
-    final baseModel = index >= 0 ? models[index] : ModelInfo(id: modelId);
-
-    final updatedModel = baseModel.copyWith(
-      overrideSupportsReasoning: overrideSupportsReasoning ?? baseModel.overrideSupportsReasoning,
-      overrideSupportsVision: overrideSupportsVision ?? baseModel.overrideSupportsVision,
-    );
-
-    if (index >= 0) {
-      models[index] = updatedModel;
-    } else {
-      models.add(updatedModel);
-    }
-
-    state = state.copyWith(
-      config: state.config.copyWith(availableModels: models),
-    );
-  }
-
-  /// 保存配置
-  Future<void> save() async {
-    state = state.copyWith(isSaving: true, error: null);
-    try {
-      await _configService.saveConfig(state.config);
-      state = state.copyWith(isSaving: false);
-    } catch (e) {
-      state = state.copyWith(isSaving: false, error: e.toString());
-      rethrow;
-    }
-  }
-
-  /// 恢复默认配置
-  void restoreDefaults() {
-    state = state.copyWith(config: AppConfig.defaultConfig());
-  }
-
-  /// 辅助方法：根据 API Mode 获取默认路径
-  Map<String, String> _defaultPathsForMode(String apiMode) {
-    switch (apiMode) {
-      case 'google':
-        return {
-          'models': 'v1beta/models',
-          'chat': 'v1beta/models/{model}:streamGenerateContent',
-        };
-      case 'responses':
-        return {
-          'models': 'v1/models',
-          'chat': 'v1/responses',
-        };
-      case 'chat_completions':
-      default:
-        return {
-          'models': 'v1/models',
-          'chat': 'v1/chat/completions',
-        };
-    }
-  }
-}
-
-/// Provider
-final settingsFormProvider = NotifierProvider<SettingsFormNotifier, SettingsFormState>(
-  SettingsFormNotifier.new,
-);
-```
-
 ## File: lib/presentation/widgets/common/app_toast.dart
 ```dart
 import 'package:flutter/material.dart';
@@ -7857,6 +7654,75 @@ abstract class AppToast {
       backgroundColor: backgroundColor,
       textColor: textColor,
       fontSize: fontSize,
+    );
+  }
+}
+```
+
+## File: lib/presentation/widgets/common/declarative_text_field.dart
+```dart
+import 'package:flutter/cupertino.dart';
+
+/// 声明式受控文本输入框
+/// 自动与外部 value 同步，无需手动管理 TextEditingController
+class DeclarativeCupertinoTextField extends StatefulWidget {
+  final String value;
+  final ValueChanged<String> onChanged;
+  final String? placeholder;
+  final TextInputType? keyboardType;
+  final bool obscureText;
+
+  const DeclarativeCupertinoTextField({
+    super.key,
+    required this.value,
+    required this.onChanged,
+    this.placeholder,
+    this.keyboardType,
+    this.obscureText = false,
+  });
+
+  @override
+  State<DeclarativeCupertinoTextField> createState() => _DeclarativeCupertinoTextFieldState();
+}
+
+class _DeclarativeCupertinoTextFieldState extends State<DeclarativeCupertinoTextField> {
+  late TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.value);
+  }
+
+  @override
+  void didUpdateWidget(DeclarativeCupertinoTextField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.value != _controller.text) {
+      final selection = _controller.selection;
+      _controller.text = widget.value;
+      // 尽量保持光标位置
+      if (selection.isValid && selection.baseOffset <= widget.value.length) {
+        _controller.selection = selection;
+      } else {
+        _controller.selection = TextSelection.collapsed(offset: widget.value.length);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoTextField(
+      controller: _controller,
+      placeholder: widget.placeholder,
+      keyboardType: widget.keyboardType,
+      obscureText: widget.obscureText,
+      onChanged: widget.onChanged,
     );
   }
 }
@@ -9225,33 +9091,17 @@ Map<String, dynamic> _$$SessionConfigImplToJson(_$SessionConfigImpl instance) =>
 
 ## File: lib/core/models/sse_event.dart
 ```dart
-// 导入库的模型和枚举
-import 'package:flutter_client_sse/flutter_client_sse.dart';
-
 // 保持你原有SseEvent的非空约定，避免修改下游Decoder
 class SseEvent {
   final String? id;
   final String? event;
   final String data; // 保持非空，和你原有逻辑一致
 
-  // 从库的SSEModel转换，自动处理空值
-  factory SseEvent.fromSSEModel(SSEModel model) {
-    return SseEvent(
-      id: model.id,
-      event: model.event,
-      // 空值处理：保证data永远非空，不会给下游Decoder传null
-      data: model.data?.trim() ?? '',
-    );
-  }
-
   const SseEvent({
     this.id,
     this.event,
     required this.data,
   });
-
-  @override
-  String toString() => 'SseEvent(id: $id, event: $event, data: $data)';
 }
 ```
 
@@ -9532,6 +9382,8 @@ Future<List<Attachment>> savePendingAttachments(
 ## File: lib/domain/services/chat_context_builder.dart
 ```dart
 import 'dart:convert';
+import 'package:aiservice/core/models/attachment.dart';
+
 import '../../core/models/api_message.dart';
 import '../../core/models/chat_round.dart';
 import '../../data/repositories/conversation_repository.dart';
@@ -9607,34 +9459,20 @@ bool _isOnlySingleTextPart(List<ApiMessageContentPart> parts) {
 }
 
 Future<List<ApiMessageContentPart>> _buildAttachmentParts(
-  dynamic attachment,
+  Attachment attachment,
   ConversationRepository repository,
 ) async {
-  final lowerName = attachment.name.toLowerCase();
-  final mime = (attachment.mimeType ?? '').toLowerCase();
-
-  final isTextFile = mime.startsWith('text/') ||
-      mime == 'application/json' ||
-      lowerName.endsWith('.md') ||
-      lowerName.endsWith('.txt') ||
-      lowerName.endsWith('.json') ||
-      lowerName.endsWith('.dart') ||
-      lowerName.endsWith('.yaml') ||
-      lowerName.endsWith('.yml');
-
   if (attachment.isImage) {
     final bytes = await repository.getAttachment(attachment.relativePath);
-    final mimeType = attachment.mimeType ?? 'image/png';
+    final mimeType = attachment.mimeType;
     final base64Data = base64Encode(bytes);
     return [ApiMessageContentPart.imageUrl(imageUrl: ApiImageUrl(url: 'data:$mimeType;base64,$base64Data'))];
-  }
-
-  if (isTextFile) {
+  } else {
+    // 上层保证非图片一定是可读文本文件
     final bytes = await repository.getAttachment(attachment.relativePath);
-    return [ApiMessageContentPart.text(text: utf8.decode(bytes, allowMalformed: true))];
+    final text = utf8.decode(bytes, allowMalformed: true);
+    return [ApiMessageContentPart.text(text: text)];
   }
-
-  return [ApiMessageContentPart.text(text: '[附件: ${attachment.name}]')];
 }
 ```
 
@@ -9762,65 +9600,192 @@ final inputStateProvider =
     NotifierProvider<InputNotifier, InputState>(InputNotifier.new);
 ```
 
-## File: lib/presentation/widgets/common/app_card.dart
+## File: lib/presentation/providers/settings_form_notifier.dart
 ```dart
-import 'package:flutter/cupertino.dart';
+// lib/presentation/providers/settings_form_notifier.dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/app_config.dart';
+import '../../core/models/model_info.dart';
+import '../../data/services/config_service.dart';
+import '../../di/providers.dart';
+import 'config_notifier.dart'; // 导入 configProvider
 
-class AppCard extends StatelessWidget {
-  final Widget child;
-  final EdgeInsetsGeometry padding;
-  final EdgeInsetsGeometry? margin;
+/// 设置表单的状态
+class SettingsFormState {
+  final AppConfig config;
+  final bool isSaving;
+  final String? error;
+  final bool isRefreshingModels;
+  final String? modelsRefreshError;
 
-  const AppCard({
-    super.key,
-    required this.child,
-    this.padding = const EdgeInsets.all(16),
-    this.margin,
+  const SettingsFormState({
+    required this.config,
+    this.isSaving = false,
+    this.error,
+    this.isRefreshingModels = false,
+    this.modelsRefreshError,
   });
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: margin,
-      padding: padding,
-      child: child,
+  SettingsFormState copyWith({
+    AppConfig? config,
+    bool? isSaving,
+    String? error,
+    bool? isRefreshingModels,
+    String? modelsRefreshError,
+  }) {
+    return SettingsFormState(
+      config: config ?? this.config,
+      isSaving: isSaving ?? this.isSaving,
+      error: error,
+      isRefreshingModels: isRefreshingModels ?? this.isRefreshingModels,
+      modelsRefreshError: modelsRefreshError,
     );
   }
 }
-```
 
-## File: lib/presentation/widgets/common/app_section.dart
-```dart
-import 'package:flutter/cupertino.dart';
-
-class AppSection extends StatelessWidget {
-  final String title;
-  final String? subtitle;
-  final List<Widget> children;
-  final EdgeInsetsGeometry? margin;
-
-  const AppSection({
-    super.key,
-    required this.title,
-    this.subtitle,
-    required this.children,
-    this.margin,
-  });
+/// 设置表单 Notifier
+class SettingsFormNotifier extends Notifier<SettingsFormState> {
+  late final ConfigService _configService;
+  AppConfig? _lastLoadedConfig;
 
   @override
-  Widget build(BuildContext context) {
-    final textTheme = CupertinoTheme.of(context).textTheme;
+  SettingsFormState build() {
+    _configService = ref.read(configServiceProvider);
 
-    return Container(
-      margin: margin ?? const EdgeInsets.only(bottom: 16),
-      child: CupertinoFormSection.insetGrouped(
-        header: Text(title, style: textTheme.navTitleTextStyle),
-        footer: subtitle != null ? Text(subtitle!, style: textTheme.tabLabelTextStyle) : null,
-        children: children,
+    // 1. 尝试获取初始值（如果已经加载）
+    final initialConfig = ref.read(configProvider).valueOrNull;
+    if (initialConfig != null) {
+      _lastLoadedConfig = initialConfig;
+      state = SettingsFormState(config: initialConfig);
+    } else {
+      state = SettingsFormState(config: AppConfig.defaultConfig());
+    }
+
+    // 2. 监听全局配置变化，自动同步
+    ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
+      next.whenData((config) {
+        if (_lastLoadedConfig != config) {
+          _lastLoadedConfig = config;
+          _load(config);
+        }
+      });
+    });
+
+    return state;
+  }
+
+  void _load(AppConfig config) {
+    state = state.copyWith(config: config, error: null);
+  }
+
+  void updateBaseUrl(String value) {
+    state = state.copyWith(config: state.config.copyWith(baseUrl: value));
+  }
+
+  void updateApiKey(String value) {
+    state = state.copyWith(config: state.config.copyWith(apiKey: value));
+  }
+
+  void updateModelsPath(String value) {
+    state = state.copyWith(config: state.config.copyWith(modelsPath: value));
+  }
+
+  void updateChatPath(String value) {
+    state = state.copyWith(config: state.config.copyWith(chatPath: value));
+  }
+
+  void updateApiMode(String value) {
+    final defaults = _defaultPathsForMode(value);
+    state = state.copyWith(
+      config: state.config.copyWith(
+        apiMode: value,
+        modelsPath: defaults['models']!,
+        chatPath: defaults['chat']!,
       ),
     );
   }
+
+  void updateSelectedModel(String value) {
+    state = state.copyWith(
+      config: state.config.copyWith(selectedModel: value.isEmpty ? null : value),
+    );
+  }
+
+  void toggleReasoning(bool value) {
+    _updateModelCapability(overrideSupportsReasoning: value);
+  }
+
+  void toggleVision(bool value) {
+    _updateModelCapability(overrideSupportsVision: value);
+  }
+
+  void _updateModelCapability({bool? overrideSupportsReasoning, bool? overrideSupportsVision}) {
+    final modelId = state.config.selectedModel;
+    if (modelId == null || modelId.isEmpty) return;
+
+    final models = [...(state.config.availableModels ?? const <ModelInfo>[])];
+    final index = models.indexWhere((m) => m.id == modelId);
+    final baseModel = index >= 0 ? models[index] : ModelInfo(id: modelId);
+
+    final updatedModel = baseModel.copyWith(
+      overrideSupportsReasoning: overrideSupportsReasoning ?? baseModel.overrideSupportsReasoning,
+      overrideSupportsVision: overrideSupportsVision ?? baseModel.overrideSupportsVision,
+    );
+
+    if (index >= 0) {
+      models[index] = updatedModel;
+    } else {
+      models.add(updatedModel);
+    }
+
+    state = state.copyWith(config: state.config.copyWith(availableModels: models));
+  }
+
+  Future<void> save() async {
+    state = state.copyWith(isSaving: true, error: null);
+    try {
+      await _configService.saveConfig(state.config);
+      state = state.copyWith(isSaving: false);
+    } catch (e) {
+      state = state.copyWith(isSaving: false, error: e.toString());
+      rethrow;
+    }
+  }
+
+  void restoreDefaults() {
+    state = state.copyWith(config: AppConfig.defaultConfig());
+  }
+
+  Future<void> refreshModels() async {
+    if (state.isRefreshingModels) return;
+    state = state.copyWith(isRefreshingModels: true, modelsRefreshError: null);
+    try {
+      await _configService.refreshModels();
+      state = state.copyWith(isRefreshingModels: false);
+    } catch (e) {
+      state = state.copyWith(
+        isRefreshingModels: false,
+        modelsRefreshError: e.toString(),
+      );
+      rethrow;
+    }
+  }
+
+  Map<String, String> _defaultPathsForMode(String apiMode) {
+    switch (apiMode) {
+      case 'google':
+        return {'models': 'v1beta/models', 'chat': 'v1beta/models/{model}:streamGenerateContent'};
+      case 'responses':
+        return {'models': 'v1/models', 'chat': 'v1/responses'};
+      default:
+        return {'models': 'v1/models', 'chat': 'v1/chat/completions'};
+    }
+  }
 }
+
+final settingsFormProvider = NotifierProvider<SettingsFormNotifier, SettingsFormState>(
+  SettingsFormNotifier.new,
+);
 ```
 
 ## File: lib/domain/models/session_list_item.dart
@@ -10309,6 +10274,192 @@ abstract class _TreePath implements TreePath {
 }
 ```
 
+## File: lib/presentation/providers/attachment_bytes_provider.dart
+```dart
+// presentation/providers/attachment_bytes_provider.dart
+
+import 'dart:typed_data';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../di/providers.dart';
+
+// 使用 autoDispose，组件销毁时自动释放内存
+final attachmentBytesProvider =
+    FutureProvider.autoDispose.family<Uint8List, String>(
+  (ref, relativePath) async {
+    final repository = ref.read(conversationRepositoryProvider);
+    return repository.getAttachment(relativePath);
+  },
+);
+```
+
+## File: lib/presentation/widgets/common/app_section.dart
+```dart
+import 'package:flutter/cupertino.dart';
+
+class AppSection extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final List<Widget> children;
+  final EdgeInsetsGeometry? margin;
+
+  const AppSection({
+    super.key,
+    required this.title,
+    this.subtitle,
+    required this.children,
+    this.margin,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = CupertinoTheme.of(context).textTheme;
+
+    return Container(
+      margin: margin ?? const EdgeInsets.only(bottom: 16),
+      child: CupertinoFormSection.insetGrouped(
+        header: Text(title, style: textTheme.navTitleTextStyle),
+        footer: subtitle != null ? Text(subtitle!, style: textTheme.tabLabelTextStyle) : null,
+        children: children,
+      ),
+    );
+  }
+}
+```
+
+## File: lib/core/constants/app_constants.dart
+```dart
+abstract class AppConstants {
+  // 文件夹名称
+  static const String dirAttachments = 'attachments';
+
+  // 配置键
+  static const String keyBaseUrl = 'baseUrl';
+  static const String keyApiKey = 'apiKey';
+  static const String keyTheme = 'theme';
+  static const String keyModel = 'selectedModel';
+
+  // 默认值
+  static const String defaultBaseUrl = 'https://api.openai.com';
+  static const String defaultTheme = 'system';
+}
+```
+
+## File: lib/di/providers.dart
+```dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
+
+import '../data/data_sources/local_file_source.dart';
+import '../data/data_sources/remote_api_source.dart';
+import '../data/database/database.dart';
+import '../data/services/config_service.dart';
+import '../data/repositories/conversation_repository.dart';
+
+/// 1. 环境初始化 Provider
+final localFileSourceProvider = FutureProvider<LocalFileSource>((ref) async {
+  final appDir = await getApplicationDocumentsDirectory();
+  final fileSource = LocalFileSource(appDir.path);
+  await fileSource.initDirectories();
+  return fileSource;
+});
+
+/// 2. 数据库 Provider
+final appDatabaseProvider = Provider<AppDatabase>((ref) {
+  ref.watch(localFileSourceProvider); // 触发依赖追踪
+  return AppDatabase();
+});
+
+/// 3. 远程 API 数据源
+final remoteApiSourceProvider = Provider<RemoteApiSource>((ref) {
+  return RemoteApiSource();
+});
+
+/// 4. 配置服务
+final configServiceProvider = Provider<ConfigService>((ref) {
+  return ConfigService(
+    ref.watch(appDatabaseProvider),
+    ref.watch(remoteApiSourceProvider),
+  );
+});
+
+/// 5. 会话仓库
+final conversationRepositoryProvider = Provider<ConversationRepository>((ref) {
+  return ConversationRepository(
+    ref.watch(appDatabaseProvider),
+    ref.watch(localFileSourceProvider).requireValue, // main() 已阻塞等待，此处必定就绪
+  );
+});
+```
+
+## File: lib/domain/services/tree_builder.dart
+```dart
+import '../models/tree_node.dart';
+
+List<TreeNode> buildTree(List<({String id, String? parentId})> topology) {
+  if (topology.isEmpty) return [];
+
+  final nodeMap = <String, TreeNode>{
+    for (final t in topology)
+      t.id: TreeNode(id: t.id, parentId: t.parentId, children: const [], depth: 0),
+  };
+
+  final childrenMap = <String, List<String>>{};
+  final rootIds = <String>[];
+
+  for (final t in topology) {
+    if (t.parentId == null) {
+      rootIds.add(t.id);
+    } else {
+      childrenMap.putIfAbsent(t.parentId!, () => []).add(t.id);
+    }
+  }
+
+  final roots = <TreeNode>[];
+  for (final rootId in rootIds) {
+    final root = nodeMap[rootId];
+    if (root != null) {
+      roots.add(_buildSubtreeIterative(root, childrenMap, nodeMap));
+    }
+  }
+  return roots;
+}
+
+TreeNode _buildSubtreeIterative(
+  TreeNode root,
+  Map<String, List<String>> childrenMap,
+  Map<String, TreeNode> nodeMap,
+) {
+  final postOrder = <TreeNode>[];
+  final stack = <TreeNode>[root];
+  while (stack.isNotEmpty) {
+    final node = stack.removeLast();
+    postOrder.add(node);
+    for (final cid in childrenMap[node.id] ?? []) {
+      final child = nodeMap[cid];
+      if (child != null) stack.add(child);
+    }
+  }
+
+  final updatedMap = <String, TreeNode>{};
+  for (int i = postOrder.length - 1; i >= 0; i--) {
+    final original = postOrder[i];
+    final childIds = childrenMap[original.id] ?? [];
+    final builtChildren = <TreeNode>[];
+    int maxChildDepth = -1;
+    for (final cid in childIds) {
+      final builtChild = updatedMap[cid]!;
+      builtChildren.add(builtChild);
+      if (builtChild.depth > maxChildDepth) maxChildDepth = builtChild.depth;
+    }
+    updatedMap[original.id] = original.copyWith(
+      depth: maxChildDepth + 1,
+      children: builtChildren,
+    );
+  }
+  return updatedMap[root.id]!;
+}
+```
+
 ## File: lib/presentation/pages/text_attachment_viewer_page.dart
 ```dart
 import 'package:flutter/cupertino.dart';
@@ -10364,24 +10515,6 @@ class TextAttachmentViewerPage extends StatelessWidget {
 }
 ```
 
-## File: lib/presentation/providers/attachment_bytes_provider.dart
-```dart
-// presentation/providers/attachment_bytes_provider.dart
-
-import 'dart:typed_data';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../di/providers.dart';
-
-// 使用 autoDispose，组件销毁时自动释放内存
-final attachmentBytesProvider =
-    FutureProvider.autoDispose.family<Uint8List, String>(
-  (ref, relativePath) async {
-    final repository = ref.read(conversationRepositoryProvider);
-    return repository.getAttachment(relativePath);
-  },
-);
-```
-
 ## File: lib/presentation/themes/app_theme.dart
 ```dart
 import 'package:flutter/cupertino.dart';
@@ -10390,19 +10523,6 @@ class AppTheme {
   static CupertinoThemeData get cupertinoTheme {
     return const CupertinoThemeData();
   }
-}
-```
-
-## File: lib/presentation/themes/app_tokens.dart
-```dart
-abstract class AppTokens {
-  const AppTokens._();
-
-  static const double spaceXs = 4;
-  static const double spaceSm = 8;
-  static const double spaceMd = 12;
-  static const double spaceLg = 16;
-  static const double spaceXl = 24;
 }
 ```
 
@@ -10671,6 +10791,49 @@ class _FileAttachmentChip extends ConsumerWidget {
 }
 ```
 
+## File: lib/presentation/widgets/common/app_page_scaffold.dart
+```dart
+import 'package:flutter/cupertino.dart';
+
+class AppPageScaffold extends StatelessWidget {
+  final ObstructingPreferredSizeWidget? navigationBar;
+  final Widget body;
+  final Widget? bottomNavigationBar;
+  final Color? backgroundColor;
+  final bool useSafeArea;
+
+  const AppPageScaffold({
+    super.key,
+    this.navigationBar,
+    required this.body,
+    this.bottomNavigationBar,
+    this.backgroundColor,
+    this.useSafeArea = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final content = useSafeArea ? SafeArea(child: body) : body;
+
+    return CupertinoPageScaffold(
+      backgroundColor: backgroundColor,
+      navigationBar: navigationBar,
+
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        
+        child: Column(
+          children: [
+            Expanded(child: content),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+
 ## File: lib/presentation/widgets/thought_bubble.dart
 ```dart
 import 'package:flutter/cupertino.dart';
@@ -10743,183 +10906,6 @@ class _ThoughtBubbleState extends State<ThoughtBubble> {
 }
 ```
 
-## File: lib/core/constants/app_constants.dart
-```dart
-abstract class AppConstants {
-  // 文件夹名称
-  static const String dirAttachments = 'attachments';
-
-  // 配置键
-  static const String keyBaseUrl = 'baseUrl';
-  static const String keyApiKey = 'apiKey';
-  static const String keyTheme = 'theme';
-  static const String keyModel = 'selectedModel';
-
-  // 默认值
-  static const String defaultBaseUrl = 'https://api.openai.com';
-  static const String defaultTheme = 'system';
-}
-```
-
-## File: lib/di/providers.dart
-```dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
-
-import '../data/data_sources/local_file_source.dart';
-import '../data/data_sources/remote_api_source.dart';
-import '../data/database/database.dart';
-import '../data/services/config_service.dart';
-import '../data/repositories/conversation_repository.dart';
-
-/// 1. 环境初始化 Provider
-final localFileSourceProvider = FutureProvider<LocalFileSource>((ref) async {
-  final appDir = await getApplicationDocumentsDirectory();
-  final fileSource = LocalFileSource(appDir.path);
-  await fileSource.initDirectories();
-  return fileSource;
-});
-
-/// 2. 数据库 Provider
-final appDatabaseProvider = Provider<AppDatabase>((ref) {
-  ref.watch(localFileSourceProvider); // 触发依赖追踪
-  return AppDatabase();
-});
-
-/// 3. 远程 API 数据源
-final remoteApiSourceProvider = Provider<RemoteApiSource>((ref) {
-  return RemoteApiSource();
-});
-
-/// 4. 配置服务
-final configServiceProvider = Provider<ConfigService>((ref) {
-  return ConfigService(
-    ref.watch(appDatabaseProvider),
-    ref.watch(remoteApiSourceProvider),
-  );
-});
-
-/// 5. 会话仓库
-final conversationRepositoryProvider = Provider<ConversationRepository>((ref) {
-  return ConversationRepository(
-    ref.watch(appDatabaseProvider),
-    ref.watch(localFileSourceProvider).requireValue, // main() 已阻塞等待，此处必定就绪
-  );
-});
-```
-
-## File: lib/domain/services/tree_builder.dart
-```dart
-import '../models/tree_node.dart';
-
-List<TreeNode> buildTree(List<({String id, String? parentId})> topology) {
-  if (topology.isEmpty) return [];
-
-  final nodeMap = <String, TreeNode>{
-    for (final t in topology)
-      t.id: TreeNode(id: t.id, parentId: t.parentId, children: const [], depth: 0),
-  };
-
-  final childrenMap = <String, List<String>>{};
-  final rootIds = <String>[];
-
-  for (final t in topology) {
-    if (t.parentId == null) {
-      rootIds.add(t.id);
-    } else {
-      childrenMap.putIfAbsent(t.parentId!, () => []).add(t.id);
-    }
-  }
-
-  final roots = <TreeNode>[];
-  for (final rootId in rootIds) {
-    final root = nodeMap[rootId];
-    if (root != null) {
-      roots.add(_buildSubtreeIterative(root, childrenMap, nodeMap));
-    }
-  }
-  return roots;
-}
-
-TreeNode _buildSubtreeIterative(
-  TreeNode root,
-  Map<String, List<String>> childrenMap,
-  Map<String, TreeNode> nodeMap,
-) {
-  final postOrder = <TreeNode>[];
-  final stack = <TreeNode>[root];
-  while (stack.isNotEmpty) {
-    final node = stack.removeLast();
-    postOrder.add(node);
-    for (final cid in childrenMap[node.id] ?? []) {
-      final child = nodeMap[cid];
-      if (child != null) stack.add(child);
-    }
-  }
-
-  final updatedMap = <String, TreeNode>{};
-  for (int i = postOrder.length - 1; i >= 0; i--) {
-    final original = postOrder[i];
-    final childIds = childrenMap[original.id] ?? [];
-    final builtChildren = <TreeNode>[];
-    int maxChildDepth = -1;
-    for (final cid in childIds) {
-      final builtChild = updatedMap[cid]!;
-      builtChildren.add(builtChild);
-      if (builtChild.depth > maxChildDepth) maxChildDepth = builtChild.depth;
-    }
-    updatedMap[original.id] = original.copyWith(
-      depth: maxChildDepth + 1,
-      children: builtChildren,
-    );
-  }
-  return updatedMap[root.id]!;
-}
-```
-
-## File: lib/presentation/widgets/common/app_page_scaffold.dart
-```dart
-import 'package:flutter/cupertino.dart';
-
-class AppPageScaffold extends StatelessWidget {
-  final ObstructingPreferredSizeWidget? navigationBar;
-  final Widget body;
-  final Widget? bottomNavigationBar;
-  final Color? backgroundColor;
-  final bool useSafeArea;
-
-  const AppPageScaffold({
-    super.key,
-    this.navigationBar,
-    required this.body,
-    this.bottomNavigationBar,
-    this.backgroundColor,
-    this.useSafeArea = true,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final content = useSafeArea ? SafeArea(child: body) : body;
-
-    return CupertinoPageScaffold(
-      backgroundColor: backgroundColor,
-      navigationBar: navigationBar,
-
-      child: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-        
-        child: Column(
-          children: [
-            Expanded(child: content),
-          ],
-        ),
-      ),
-    );
-  }
-}
-```
-
 ## File: lib/data/data_sources/local_file_source.dart
 ```dart
 import 'dart:io';
@@ -10986,469 +10972,22 @@ class LocalFileSource{
 }
 ```
 
-## File: lib/domain/states/chat_state.dart
+## File: lib/presentation/providers/config_notifier.dart
 ```dart
-import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/app_config.dart';
+import '../../core/models/app_config_store.dart';
+import '../../di/providers.dart';
 
-part 'chat_state.freezed.dart';
+/// 监听当前激活的配置（响应式）
+final configProvider = StreamProvider<AppConfig>((ref) {
+  return ref.read(configServiceProvider).watchConfig();
+});
 
-@freezed
-class StreamStatus with _$StreamStatus {
-  const factory StreamStatus({
-    @Default('') String content,
-    @Default('') String reasoning,
-    @Default(false) bool isStreaming,
-  }) = _StreamStatus;
-}
-
-@freezed
-class ChatState with _$ChatState {
-  const factory ChatState({
-    String? currentRoundId,
-    String? branchLeafRoundId,
-    String? error,
-    @Default(false) bool isLoading,
-  }) = _ChatState;
-
-  factory ChatState.initial() => const ChatState(
-        error: null,
-        isLoading: false,
-      );
-}
-
-extension ChatStateX on ChatState {
-  ChatState copyWithCurrentRoundId(String roundId) {
-    return copyWith(currentRoundId: roundId);
-  }
-
-  ChatState copyWithBranchLeafRoundId(String roundId) {
-    return copyWith(branchLeafRoundId: roundId);
-  }
-
-  ChatState copyWithError(String error) {
-    return copyWith(
-      error: error,
-      isLoading: false,
-    );
-  }
-
-  ChatState copyWithLoading(bool loading) {
-    return copyWith(isLoading: loading);
-  }
-}
-```
-
-## File: lib/domain/states/chat_state.freezed.dart
-```dart
-// coverage:ignore-file
-// GENERATED CODE - DO NOT MODIFY BY HAND
-// ignore_for_file: type=lint
-// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
-
-part of 'chat_state.dart';
-
-// **************************************************************************
-// FreezedGenerator
-// **************************************************************************
-
-T _$identity<T>(T value) => value;
-
-final _privateConstructorUsedError = UnsupportedError(
-  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
-);
-
-/// @nodoc
-mixin _$StreamStatus {
-  String get content => throw _privateConstructorUsedError;
-  String get reasoning => throw _privateConstructorUsedError;
-  bool get isStreaming => throw _privateConstructorUsedError;
-
-  /// Create a copy of StreamStatus
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $StreamStatusCopyWith<StreamStatus> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-abstract class $StreamStatusCopyWith<$Res> {
-  factory $StreamStatusCopyWith(
-    StreamStatus value,
-    $Res Function(StreamStatus) then,
-  ) = _$StreamStatusCopyWithImpl<$Res, StreamStatus>;
-  @useResult
-  $Res call({String content, String reasoning, bool isStreaming});
-}
-
-/// @nodoc
-class _$StreamStatusCopyWithImpl<$Res, $Val extends StreamStatus>
-    implements $StreamStatusCopyWith<$Res> {
-  _$StreamStatusCopyWithImpl(this._value, this._then);
-
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-
-  /// Create a copy of StreamStatus
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? content = null,
-    Object? reasoning = null,
-    Object? isStreaming = null,
-  }) {
-    return _then(
-      _value.copyWith(
-            content: null == content
-                ? _value.content
-                : content // ignore: cast_nullable_to_non_nullable
-                      as String,
-            reasoning: null == reasoning
-                ? _value.reasoning
-                : reasoning // ignore: cast_nullable_to_non_nullable
-                      as String,
-            isStreaming: null == isStreaming
-                ? _value.isStreaming
-                : isStreaming // ignore: cast_nullable_to_non_nullable
-                      as bool,
-          )
-          as $Val,
-    );
-  }
-}
-
-/// @nodoc
-abstract class _$$StreamStatusImplCopyWith<$Res>
-    implements $StreamStatusCopyWith<$Res> {
-  factory _$$StreamStatusImplCopyWith(
-    _$StreamStatusImpl value,
-    $Res Function(_$StreamStatusImpl) then,
-  ) = __$$StreamStatusImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({String content, String reasoning, bool isStreaming});
-}
-
-/// @nodoc
-class __$$StreamStatusImplCopyWithImpl<$Res>
-    extends _$StreamStatusCopyWithImpl<$Res, _$StreamStatusImpl>
-    implements _$$StreamStatusImplCopyWith<$Res> {
-  __$$StreamStatusImplCopyWithImpl(
-    _$StreamStatusImpl _value,
-    $Res Function(_$StreamStatusImpl) _then,
-  ) : super(_value, _then);
-
-  /// Create a copy of StreamStatus
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? content = null,
-    Object? reasoning = null,
-    Object? isStreaming = null,
-  }) {
-    return _then(
-      _$StreamStatusImpl(
-        content: null == content
-            ? _value.content
-            : content // ignore: cast_nullable_to_non_nullable
-                  as String,
-        reasoning: null == reasoning
-            ? _value.reasoning
-            : reasoning // ignore: cast_nullable_to_non_nullable
-                  as String,
-        isStreaming: null == isStreaming
-            ? _value.isStreaming
-            : isStreaming // ignore: cast_nullable_to_non_nullable
-                  as bool,
-      ),
-    );
-  }
-}
-
-/// @nodoc
-
-class _$StreamStatusImpl implements _StreamStatus {
-  const _$StreamStatusImpl({
-    this.content = '',
-    this.reasoning = '',
-    this.isStreaming = false,
-  });
-
-  @override
-  @JsonKey()
-  final String content;
-  @override
-  @JsonKey()
-  final String reasoning;
-  @override
-  @JsonKey()
-  final bool isStreaming;
-
-  @override
-  String toString() {
-    return 'StreamStatus(content: $content, reasoning: $reasoning, isStreaming: $isStreaming)';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$StreamStatusImpl &&
-            (identical(other.content, content) || other.content == content) &&
-            (identical(other.reasoning, reasoning) ||
-                other.reasoning == reasoning) &&
-            (identical(other.isStreaming, isStreaming) ||
-                other.isStreaming == isStreaming));
-  }
-
-  @override
-  int get hashCode => Object.hash(runtimeType, content, reasoning, isStreaming);
-
-  /// Create a copy of StreamStatus
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$StreamStatusImplCopyWith<_$StreamStatusImpl> get copyWith =>
-      __$$StreamStatusImplCopyWithImpl<_$StreamStatusImpl>(this, _$identity);
-}
-
-abstract class _StreamStatus implements StreamStatus {
-  const factory _StreamStatus({
-    final String content,
-    final String reasoning,
-    final bool isStreaming,
-  }) = _$StreamStatusImpl;
-
-  @override
-  String get content;
-  @override
-  String get reasoning;
-  @override
-  bool get isStreaming;
-
-  /// Create a copy of StreamStatus
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$StreamStatusImplCopyWith<_$StreamStatusImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-mixin _$ChatState {
-  String? get currentRoundId => throw _privateConstructorUsedError;
-  String? get branchLeafRoundId => throw _privateConstructorUsedError;
-  String? get error => throw _privateConstructorUsedError;
-  bool get isLoading => throw _privateConstructorUsedError;
-
-  /// Create a copy of ChatState
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $ChatStateCopyWith<ChatState> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-abstract class $ChatStateCopyWith<$Res> {
-  factory $ChatStateCopyWith(ChatState value, $Res Function(ChatState) then) =
-      _$ChatStateCopyWithImpl<$Res, ChatState>;
-  @useResult
-  $Res call({
-    String? currentRoundId,
-    String? branchLeafRoundId,
-    String? error,
-    bool isLoading,
-  });
-}
-
-/// @nodoc
-class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
-    implements $ChatStateCopyWith<$Res> {
-  _$ChatStateCopyWithImpl(this._value, this._then);
-
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-
-  /// Create a copy of ChatState
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? currentRoundId = freezed,
-    Object? branchLeafRoundId = freezed,
-    Object? error = freezed,
-    Object? isLoading = null,
-  }) {
-    return _then(
-      _value.copyWith(
-            currentRoundId: freezed == currentRoundId
-                ? _value.currentRoundId
-                : currentRoundId // ignore: cast_nullable_to_non_nullable
-                      as String?,
-            branchLeafRoundId: freezed == branchLeafRoundId
-                ? _value.branchLeafRoundId
-                : branchLeafRoundId // ignore: cast_nullable_to_non_nullable
-                      as String?,
-            error: freezed == error
-                ? _value.error
-                : error // ignore: cast_nullable_to_non_nullable
-                      as String?,
-            isLoading: null == isLoading
-                ? _value.isLoading
-                : isLoading // ignore: cast_nullable_to_non_nullable
-                      as bool,
-          )
-          as $Val,
-    );
-  }
-}
-
-/// @nodoc
-abstract class _$$ChatStateImplCopyWith<$Res>
-    implements $ChatStateCopyWith<$Res> {
-  factory _$$ChatStateImplCopyWith(
-    _$ChatStateImpl value,
-    $Res Function(_$ChatStateImpl) then,
-  ) = __$$ChatStateImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({
-    String? currentRoundId,
-    String? branchLeafRoundId,
-    String? error,
-    bool isLoading,
-  });
-}
-
-/// @nodoc
-class __$$ChatStateImplCopyWithImpl<$Res>
-    extends _$ChatStateCopyWithImpl<$Res, _$ChatStateImpl>
-    implements _$$ChatStateImplCopyWith<$Res> {
-  __$$ChatStateImplCopyWithImpl(
-    _$ChatStateImpl _value,
-    $Res Function(_$ChatStateImpl) _then,
-  ) : super(_value, _then);
-
-  /// Create a copy of ChatState
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? currentRoundId = freezed,
-    Object? branchLeafRoundId = freezed,
-    Object? error = freezed,
-    Object? isLoading = null,
-  }) {
-    return _then(
-      _$ChatStateImpl(
-        currentRoundId: freezed == currentRoundId
-            ? _value.currentRoundId
-            : currentRoundId // ignore: cast_nullable_to_non_nullable
-                  as String?,
-        branchLeafRoundId: freezed == branchLeafRoundId
-            ? _value.branchLeafRoundId
-            : branchLeafRoundId // ignore: cast_nullable_to_non_nullable
-                  as String?,
-        error: freezed == error
-            ? _value.error
-            : error // ignore: cast_nullable_to_non_nullable
-                  as String?,
-        isLoading: null == isLoading
-            ? _value.isLoading
-            : isLoading // ignore: cast_nullable_to_non_nullable
-                  as bool,
-      ),
-    );
-  }
-}
-
-/// @nodoc
-
-class _$ChatStateImpl implements _ChatState {
-  const _$ChatStateImpl({
-    this.currentRoundId,
-    this.branchLeafRoundId,
-    this.error,
-    this.isLoading = false,
-  });
-
-  @override
-  final String? currentRoundId;
-  @override
-  final String? branchLeafRoundId;
-  @override
-  final String? error;
-  @override
-  @JsonKey()
-  final bool isLoading;
-
-  @override
-  String toString() {
-    return 'ChatState(currentRoundId: $currentRoundId, branchLeafRoundId: $branchLeafRoundId, error: $error, isLoading: $isLoading)';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$ChatStateImpl &&
-            (identical(other.currentRoundId, currentRoundId) ||
-                other.currentRoundId == currentRoundId) &&
-            (identical(other.branchLeafRoundId, branchLeafRoundId) ||
-                other.branchLeafRoundId == branchLeafRoundId) &&
-            (identical(other.error, error) || other.error == error) &&
-            (identical(other.isLoading, isLoading) ||
-                other.isLoading == isLoading));
-  }
-
-  @override
-  int get hashCode => Object.hash(
-    runtimeType,
-    currentRoundId,
-    branchLeafRoundId,
-    error,
-    isLoading,
-  );
-
-  /// Create a copy of ChatState
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$ChatStateImplCopyWith<_$ChatStateImpl> get copyWith =>
-      __$$ChatStateImplCopyWithImpl<_$ChatStateImpl>(this, _$identity);
-}
-
-abstract class _ChatState implements ChatState {
-  const factory _ChatState({
-    final String? currentRoundId,
-    final String? branchLeafRoundId,
-    final String? error,
-    final bool isLoading,
-  }) = _$ChatStateImpl;
-
-  @override
-  String? get currentRoundId;
-  @override
-  String? get branchLeafRoundId;
-  @override
-  String? get error;
-  @override
-  bool get isLoading;
-
-  /// Create a copy of ChatState
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$ChatStateImplCopyWith<_$ChatStateImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
+/// 监听配置存档列表（响应式）
+final configProfilesProvider = StreamProvider<AppConfigStore>((ref) {
+  return ref.read(configServiceProvider).watchConfigStore();
+});
 ```
 
 ## File: lib/presentation/widgets/message_bubble.dart
@@ -11527,45 +11066,6 @@ class MessageBubble extends StatelessWidget {
 }
 ```
 
-## File: lib/domain/services/chat_round_factory.dart
-```dart
-import '../../core/models/attachment.dart';
-import '../../core/models/chat_round.dart';
-import 'package:uuid/uuid.dart';
-
-class ChatRoundFactory {
-  static ChatRound createUserRound({
-    required String content,
-    required String? parentId,
-    required List<Attachment> attachments,
-  }) {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    return ChatRound(
-      id: const Uuid().v4(),
-      parentId: parentId,
-      createdAt: now,
-      userContent: content,
-      userAttachments: attachments,
-      isIncomplete: true,
-    );
-  }
-
-  static ChatRound createRetryRound({
-    required ChatRound sourceRound,
-  }) {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    return ChatRound(
-      id: const Uuid().v4(),
-      parentId: sourceRound.parentId,
-      createdAt: now,
-      userContent: sourceRound.userContent,
-      userAttachments: sourceRound.userAttachments,
-      isIncomplete: true,
-    );
-  }
-}
-```
-
 ## File: lib/main.dart
 ```dart
 import 'package:flutter/cupertino.dart';
@@ -11613,24 +11113,6 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-```
-
-## File: lib/presentation/providers/config_notifier.dart
-```dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/app_config.dart';
-import '../../core/models/app_config_store.dart';
-import '../../di/providers.dart';
-
-/// 监听当前激活的配置（响应式）
-final configProvider = StreamProvider<AppConfig>((ref) {
-  return ref.read(configServiceProvider).watchConfig();
-});
-
-/// 监听配置存档列表（响应式）
-final configProfilesProvider = StreamProvider<AppConfigStore>((ref) {
-  return ref.read(configServiceProvider).watchConfigStore();
-});
 ```
 
 ## File: lib/data/data_sources/remote_api_source.dart
@@ -11798,282 +11280,6 @@ class RemoteApiSource {
 }
 ```
 
-## File: lib/presentation/widgets/input_bar.dart
-```dart
-import 'package:aiservice/presentation/models/input_state.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:uuid/uuid.dart';
-
-import '../models/pending_attachment.dart';
-import '../providers/input_notifier.dart';
-
-class InputBar extends ConsumerStatefulWidget {
-  final Future<void> Function(String text, List<PendingAttachment> attachments) onSend;
-  final VoidCallback? onStop;
-  final bool isIncomplete;
-  final String hintText;
-  final bool allowImages;
-
-  const InputBar({
-    super.key,
-    required this.onSend,
-    this.onStop,
-    this.isIncomplete = false,
-    this.hintText = '输入消息...',
-    this.allowImages = false,
-  });
-
-  @override
-  ConsumerState<InputBar> createState() => _InputBarState();
-}
-
-class _InputBarState extends ConsumerState<InputBar> {
-  late final TextEditingController _controller;
-  final ImagePicker _imagePicker = ImagePicker();
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  bool _isImageFile(String name) {
-    final lower = name.toLowerCase();
-    return lower.endsWith('.png') ||
-        lower.endsWith('.jpg') ||
-        lower.endsWith('.jpeg') ||
-        lower.endsWith('.gif') ||
-        lower.endsWith('.webp') ||
-        lower.endsWith('.bmp');
-  }
-
-  String? _guessMimeType(String name) {
-    final lower = name.toLowerCase();
-    if (lower.endsWith('.png')) return 'image/png';
-    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
-    if (lower.endsWith('.gif')) return 'image/gif';
-    if (lower.endsWith('.webp')) return 'image/webp';
-    if (lower.endsWith('.bmp')) return 'image/bmp';
-    if (lower.endsWith('.txt')) return 'text/plain';
-    if (lower.endsWith('.md')) return 'text/markdown';
-    if (lower.endsWith('.json')) return 'application/json';
-    if (lower.endsWith('.pdf')) return 'application/pdf';
-    if (lower.endsWith('.dart')) return 'text/plain';
-    if (lower.endsWith('.yaml') || lower.endsWith('.yml')) return 'text/yaml';
-    return null;
-  }
-
-  Future<void> _pickFileAttachment() async {
-    final result = await FilePicker.platform.pickFiles(
-      allowMultiple: false,
-      withData: false,
-      type: FileType.any,
-    );
-    if (result == null || result.files.isEmpty) return;
-    final file = result.files.single;
-    final filePath = file.path;
-    if (filePath == null || filePath.trim().isEmpty) return;
-
-    final mimeType = _guessMimeType(file.name);
-    final isImage = _isImageFile(file.name);
-    final attachment = PendingAttachment(
-      id: const Uuid().v4(),
-      name: file.name,
-      path: filePath,
-      isImage: isImage,
-      mimeType: mimeType,
-    );
-    ref.read(inputStateProvider.notifier).addAttachment(attachment);
-  }
-
-  Future<void> _pickImageFromGallery() async {
-    final file = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 100,
-    );
-    if (file == null) return;
-    final name = file.name;
-    final attachment = PendingAttachment(
-      id: const Uuid().v4(),
-      name: name,
-      path: file.path,
-      isImage: true,
-      mimeType: _guessMimeType(name) ?? 'image/*',
-    );
-    ref.read(inputStateProvider.notifier).addAttachment(attachment);
-  }
-
-  void _removeAttachment(String id) {
-    ref.read(inputStateProvider.notifier).removeAttachment(id);
-  }
-
-  Future<void> _showAddAttachmentSheet() async {
-    FocusScope.of(context).unfocus();
-    
-    await showCupertinoModalPopup<void>(
-      context: context,
-      builder: (context) {
-        return CupertinoActionSheet(
-          actions: [
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _pickFileAttachment();
-              },
-              child: const Text('文件'),
-            ),
-            if (widget.allowImages)
-              CupertinoActionSheetAction(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  _pickImageFromGallery();
-                },
-                child: const Text('相册'),
-              ),
-          ],
-          cancelButton: CupertinoActionSheetAction(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('取消'),
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _handleSend() async {
-    FocusScope.of(context).unfocus();
-
-    final state = ref.read(inputStateProvider);
-    if (!state.canSend) return;
-
-    try {
-      await widget.onSend(state.text, state.attachments);
-      ref.read(inputStateProvider.notifier).clear();
-    } catch (e) {
-      // 发送失败，保持输入内容和附件不变
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    ref.listen<String>(
-      inputStateProvider.select((s) => s.text),
-      (previous, next) {
-        if (next != _controller.text) {
-          _controller.value = TextEditingValue(
-            text: next,
-            selection: TextSelection.collapsed(offset: next.length),
-            composing: TextRange.empty,
-          );
-        }
-      },
-    );
-
-    final inputState = ref.watch(inputStateProvider);
-    final attachments = inputState.attachments;
-    final canSend = inputState.canSend;
-    final showStopButton = widget.isIncomplete;
-
-    return SafeArea(
-      top: false,
-      child: Container(
-        color: CupertinoColors.systemBackground,
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (attachments.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: attachments.map((attachment) {
-                      return CupertinoButton(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        onPressed: () {},
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              attachment.isImage
-                                  ? CupertinoIcons.photo
-                                  : CupertinoIcons.doc,
-                              size: 18,
-                            ),
-                            const SizedBox(width: 6),
-                            ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 180),
-                              child: Text(
-                                attachment.name,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            GestureDetector(
-                              onTap: () => _removeAttachment(attachment.id),
-                              child: const Icon(CupertinoIcons.xmark_circle_fill, size: 18),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                CupertinoButton(
-                  padding: EdgeInsets.zero,
-                  onPressed: _showAddAttachmentSheet,
-                  child: const Icon(CupertinoIcons.add),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: CupertinoTextField(
-                    controller: _controller,
-                    minLines: 1,
-                    maxLines: 6,
-                    keyboardType: TextInputType.multiline,
-                    placeholder: widget.hintText,
-                    onChanged: (value) {
-                      ref.read(inputStateProvider.notifier).updateText(value);
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                if (showStopButton)
-                  CupertinoButton.filled(
-                    onPressed: widget.onStop,
-                    child: const Icon(CupertinoIcons.stop_fill),
-                  )
-                else
-                  CupertinoButton.filled(
-                    onPressed: canSend ? _handleSend : null,
-                    child: const Icon(CupertinoIcons.arrow_up),
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-```
-
 ## File: lib/data/services/config_service.dart
 ```dart
 import 'dart:async';
@@ -12155,7 +11361,8 @@ class ConfigService{
   }
 
   Future<void> saveConfig(AppConfig config) async {
-    final activeId = await getActiveProfileId();
+    final store = await loadConfigStore();
+    final activeId = store.activeProfileId;
     await (_db.update(_db.dbConfigProfiles)..where((t) => t.id.equals(activeId)))
         .write(DbConfigProfilesCompanion(config: Value(config)));
   }
@@ -12191,24 +11398,6 @@ class ConfigService{
   Future<List<ConfigProfile>> getProfiles() async {
     final store = await loadConfigStore();
     return store.profiles;
-  }
-
-  Future<String> getActiveProfileId() async {
-    final storeRow = await _db.select(_db.dbConfigStore).getSingleOrNull();
-    var activeId = storeRow?.activeProfileId ?? 'default';
-
-    final profiles = await _db.select(_db.dbConfigProfiles).get();
-    if (!profiles.any((p) => p.id == activeId) && profiles.isNotEmpty) {
-      activeId = profiles.first.id;
-      await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
-        DbConfigStoreCompanion(
-          id: const Value(1),
-          activeProfileId: Value(activeId),
-        ),
-      );
-    }
-
-    return activeId;
   }
 
   Future<void> switchProfile(String profileId) async {
@@ -12388,18 +11577,332 @@ final sessionListControllerProvider = Provider<SessionListController>((ref) {
 });
 ```
 
-## File: lib/presentation/pages/settings_page.dart
+## File: lib/presentation/widgets/input_bar.dart
 ```dart
-import 'package:aiservice/di/providers.dart';
+import 'package:aiservice/presentation/models/input_state.dart';
+import 'package:aiservice/presentation/widgets/common/app_toast.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:uuid/uuid.dart';
 
-import '../../core/models/app_config.dart';
+import '../models/pending_attachment.dart';
+import '../providers/input_notifier.dart';
+
+class InputBar extends ConsumerStatefulWidget {
+  final Future<void> Function(String text, List<PendingAttachment> attachments) onSend;
+  final VoidCallback? onStop;
+  final bool isIncomplete;
+  final String hintText;
+  final bool allowImages;
+
+  const InputBar({
+    super.key,
+    required this.onSend,
+    this.onStop,
+    this.isIncomplete = false,
+    this.hintText = '输入消息...',
+    this.allowImages = false,
+  });
+
+  @override
+  ConsumerState<InputBar> createState() => _InputBarState();
+}
+
+class _InputBarState extends ConsumerState<InputBar> {
+  late final TextEditingController _controller;
+  final ImagePicker _imagePicker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _addPendingAttachment({
+    required String name,
+    required String path,
+    required bool isImage,
+    required String mimeType,
+  }) {
+    final attachment = PendingAttachment(
+      id: const Uuid().v4(),
+      name: name,
+      path: path,
+      isImage: isImage,
+      mimeType: mimeType,
+    );
+    ref.read(inputStateProvider.notifier).addAttachment(attachment);
+  }
+
+  bool _isImageFile(String name) {
+    final lower = name.toLowerCase();
+    return lower.endsWith('.png') ||
+        lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.gif') ||
+        lower.endsWith('.webp') ||
+        lower.endsWith('.bmp');
+  }
+
+  bool _isTextFile(String name) {
+    final lower = name.toLowerCase();
+    return lower.endsWith('.txt') ||
+        lower.endsWith('.md') ||
+        lower.endsWith('.json') ||
+        lower.endsWith('.dart') ||
+        lower.endsWith('.yaml') ||
+        lower.endsWith('.yml') ||
+        lower.endsWith('.log') ||
+        lower.endsWith('.csv');
+  }
+
+  String _mimeForImage(String fileName) {
+    final lower = fileName.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+    if (lower.endsWith('.gif')) return 'image/gif';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    if (lower.endsWith('.bmp')) return 'image/bmp';
+    return 'image/png'; // 默认
+  }
+
+  String _mimeForText(String fileName) {
+    return 'text/plain';
+  }
+
+  Future<void> _pickFileAttachment() async {
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: false,
+      withData: false,
+      type: FileType.any,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.single;
+    final filePath = file.path;
+    if (filePath == null || filePath.trim().isEmpty) return;
+
+    final isImage = _isImageFile(file.name);
+    final isText = _isTextFile(file.name);
+
+    if (!isImage && !isText) {
+      if (mounted) {
+        await AppToast.show('仅支持图片和文本文件（.txt, .md, .json, .dart, .yaml 等）');
+      }
+      return;
+    }
+
+    final mimeType = isImage ? _mimeForImage(file.name) : _mimeForText(file.name);
+
+    _addPendingAttachment(
+      name: file.name,
+      path: filePath,
+      isImage: isImage,
+      mimeType: mimeType,
+    );
+  }
+
+  Future<void> _pickImageFromGallery() async {
+    final file = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 100,
+    );
+    if (file == null) return;
+
+    // 优先使用 XFile 提供的 mimeType，否则根据文件名后缀猜测
+    final mimeType = file.mimeType ?? _mimeForImage(file.name);
+
+    _addPendingAttachment(
+      name: file.name,
+      path: file.path,
+      isImage: true,
+      mimeType: mimeType,
+    );
+  }
+
+  void _removeAttachment(String id) {
+    ref.read(inputStateProvider.notifier).removeAttachment(id);
+  }
+
+  Future<void> _showAddAttachmentSheet() async {
+    FocusScope.of(context).unfocus();
+    
+    await showCupertinoModalPopup<void>(
+      context: context,
+      builder: (context) {
+        return CupertinoActionSheet(
+          actions: [
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _pickFileAttachment();
+              },
+              child: const Text('文件'),
+            ),
+            if (widget.allowImages)
+              CupertinoActionSheetAction(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _pickImageFromGallery();
+                },
+                child: const Text('相册'),
+              ),
+          ],
+          cancelButton: CupertinoActionSheetAction(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('取消'),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _handleSend() async {
+    FocusScope.of(context).unfocus();
+
+    final state = ref.read(inputStateProvider);
+    if (!state.canSend) return;
+
+    try {
+      await widget.onSend(state.text, state.attachments);
+      ref.read(inputStateProvider.notifier).clear();
+    } catch (e) {
+      // 发送失败，保持输入内容和附件不变
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen<String>(
+      inputStateProvider.select((s) => s.text),
+      (previous, next) {
+        if (next != _controller.text) {
+          _controller.value = TextEditingValue(
+            text: next,
+            selection: TextSelection.collapsed(offset: next.length),
+            composing: TextRange.empty,
+          );
+        }
+      },
+    );
+
+    final inputState = ref.watch(inputStateProvider);
+    final attachments = inputState.attachments;
+    final canSend = inputState.canSend;
+    final showStopButton = widget.isIncomplete;
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        color: CupertinoColors.systemBackground,
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (attachments.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: attachments.map((attachment) {
+                      return CupertinoButton(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        onPressed: () {},
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              attachment.isImage
+                                  ? CupertinoIcons.photo
+                                  : CupertinoIcons.doc,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 6),
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 180),
+                              child: Text(
+                                attachment.name,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            GestureDetector(
+                              onTap: () => _removeAttachment(attachment.id),
+                              child: const Icon(CupertinoIcons.xmark_circle_fill, size: 18),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: _showAddAttachmentSheet,
+                  child: const Icon(CupertinoIcons.add),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: CupertinoTextField(
+                    controller: _controller,
+                    minLines: 1,
+                    maxLines: 6,
+                    keyboardType: TextInputType.multiline,
+                    placeholder: widget.hintText,
+                    onChanged: (value) {
+                      ref.read(inputStateProvider.notifier).updateText(value);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (showStopButton)
+                  CupertinoButton.filled(
+                    onPressed: widget.onStop,
+                    child: const Icon(CupertinoIcons.stop_fill),
+                  )
+                else
+                  CupertinoButton.filled(
+                    onPressed: canSend ? _handleSend : null,
+                    child: const Icon(CupertinoIcons.arrow_up),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+
+## File: lib/presentation/pages/settings_page.dart
+```dart
+// lib/presentation/pages/settings_page.dart
+import 'package:flutter/cupertino.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/app_config_store.dart';
 import '../../core/models/model_info.dart';
+import '../../data/services/config_service.dart';
+import '../../di/providers.dart';
 import '../providers/config_notifier.dart';
+import '../providers/settings_form_notifier.dart';
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_toast.dart';
+import '../widgets/common/declarative_text_field.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -12409,190 +11912,19 @@ class SettingsPage extends ConsumerStatefulWidget {
 }
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
-  final _formKey = GlobalKey<FormState>();
-
-  // Controllers
-  late final TextEditingController _baseUrlController;
-  late final TextEditingController _apiKeyController;
-  late final TextEditingController _modelsPathController;
-  late final TextEditingController _chatPathController;
-  late final TextEditingController _selectedModelController;
-
-  String _selectedApiMode = 'chat_completions';
-  bool _overrideSupportsReasoning = false;
-  bool _overrideSupportsVision = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _baseUrlController = TextEditingController();
-    _apiKeyController = TextEditingController();
-    _modelsPathController = TextEditingController();
-    _chatPathController = TextEditingController();
-    _selectedModelController = TextEditingController();
-  }
-
-  @override
-  void dispose() {
-    _baseUrlController.dispose();
-    _apiKeyController.dispose();
-    _modelsPathController.dispose();
-    _chatPathController.dispose();
-    _selectedModelController.dispose();
-    super.dispose();
-  }
-
-  String _defaultModelsPathForApiMode(String apiMode) {
-    switch (apiMode) {
-      case 'google':
-        return 'v1beta/models';
-      case 'responses':
-      case 'chat_completions':
-      default:
-        return 'v1/models';
-    }
-  }
-
-  String _defaultChatPathForApiMode(String apiMode) {
-    switch (apiMode) {
-      case 'google':
-        return 'v1beta/models/{model}:streamGenerateContent';
-      case 'responses':
-        return 'v1/responses';
-      case 'chat_completions':
-      default:
-        return 'v1/chat/completions';
-    }
-  }
-
-  ModelInfo? _findModel(AppConfig config, String? modelId) {
-    final id = modelId?.trim() ?? '';
-    if (id.isEmpty) return null;
-    return config.availableModels?.where((m) => m.id == id).firstOrNull;
-  }
-
-  void _updateFormFromConfig(AppConfig config) {
-    _baseUrlController.text = config.baseUrl;
-    _apiKeyController.text = config.apiKey;
-    _modelsPathController.text = config.modelsPath;
-    _chatPathController.text = config.chatPath;
-    _selectedApiMode = config.apiMode;
-    _selectedModelController.text = config.selectedModel ?? '';
-
-    final model = _findModel(config, config.selectedModel);
-    _overrideSupportsReasoning = model?.overrideSupportsReasoning ?? false;
-    _overrideSupportsVision = model?.overrideSupportsVision ?? false;
-
-    setState(() {});
-  }
-
-  Future<void> _save(AppConfig currentConfig) async {
-    if (!_formKey.currentState!.validate()) return;
-
-    final selectedModelId = _selectedModelController.text.trim();
-
-    final models = [...(currentConfig.availableModels ?? const <ModelInfo>[])];
-
-    if (selectedModelId.isNotEmpty) {
-      final index = models.indexWhere((m) => m.id == selectedModelId);
-      final baseModel = index >= 0 ? models[index] : ModelInfo(id: selectedModelId);
-
-      final updatedModel = baseModel.copyWith(
-        overrideSupportsReasoning: _overrideSupportsReasoning,
-        overrideSupportsVision: _overrideSupportsVision,
-      );
-
-      if (index >= 0) {
-        models[index] = updatedModel;
-      } else {
-        models.add(updatedModel);
-      }
-    }
-
-    final rawModelsPath = _modelsPathController.text.trim();
-    final rawChatPath = _chatPathController.text.trim();
-
-    final updatedConfig = currentConfig.copyWith(
-      baseUrl: _baseUrlController.text.trim(),
-      apiKey: _apiKeyController.text.trim(),
-      modelsPath: rawModelsPath.isEmpty ? _defaultModelsPathForApiMode(_selectedApiMode) : rawModelsPath,
-      chatPath: rawChatPath.isEmpty ? _defaultChatPathForApiMode(_selectedApiMode) : rawChatPath,
-      apiMode: _selectedApiMode,
-      selectedModel: selectedModelId.isEmpty ? null : selectedModelId,
-      availableModels: models,
-    );
-
-    await ref.read(configServiceProvider).saveConfig(updatedConfig);
-  }
-
-  void _showApiModePicker() {
-    showCupertinoModalPopup(
-      context: context,
-      builder: (context) {
-        return CupertinoActionSheet(
-          actions: [
-            CupertinoActionSheetAction(
-              onPressed: () {
-                setState(() {
-                  _selectedApiMode = 'chat_completions';
-                  _modelsPathController.text = _defaultModelsPathForApiMode(_selectedApiMode);
-                  _chatPathController.text = _defaultChatPathForApiMode(_selectedApiMode);
-                });
-                Navigator.pop(context);
-              },
-              child: const Text('chat_completions'),
-            ),
-            CupertinoActionSheetAction(
-              onPressed: () {
-                setState(() {
-                  _selectedApiMode = 'responses';
-                  _modelsPathController.text = _defaultModelsPathForApiMode(_selectedApiMode);
-                  _chatPathController.text = _defaultChatPathForApiMode(_selectedApiMode);
-                });
-                Navigator.pop(context);
-              },
-              child: const Text('responses'),
-            ),
-            CupertinoActionSheetAction(
-              onPressed: () {
-                setState(() {
-                  _selectedApiMode = 'google';
-                  _modelsPathController.text = _defaultModelsPathForApiMode(_selectedApiMode);
-                  _chatPathController.text = _defaultChatPathForApiMode(_selectedApiMode);
-                });
-                Navigator.pop(context);
-              },
-              child: const Text('google'),
-            ),
-          ],
-          cancelButton: CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final configAsync = ref.watch(configProvider);
+    final formState = ref.watch(settingsFormProvider);
+    final formNotifier = ref.read(settingsFormProvider.notifier);
     final profilesAsync = ref.watch(configProfilesProvider);
-
-    ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
-      next.whenData((config) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _updateFormFromConfig(config);
-        });
-      });
-    });
+    final configService = ref.read(configServiceProvider);
 
     return AppPageScaffold(
       navigationBar: CupertinoNavigationBar(
         middle: const Text('设置'),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
-          onPressed: _confirmRestoreDefaults,
+          onPressed: () => _confirmRestoreDefaults(context, formNotifier),
           child: const Icon(CupertinoIcons.arrow_counterclockwise),
         ),
       ),
@@ -12600,31 +11932,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         loading: () => const Center(child: CupertinoActivityIndicator()),
         error: (e, _) => Center(child: Text('加载配置存档失败：$e')),
         data: (store) {
-          return configAsync.when(
-            loading: () => const Center(child: CupertinoActivityIndicator()),
-            error: (e, _) => Center(child: Text('加载配置失败：$e')),
-            data: (config) {
-              return Form(
-                key: _formKey,
-                child: ListView(
-                  children: [
-                    _buildProfileSection(store),
-                    _buildConnectionSection(),
-                    _buildModelSection(config),
-                    _buildActionSection(config),
-                  ],
-                ),
-              );
-            },
+          return ListView(
+            children: [
+              _buildProfileSection(context, store, configService),
+              _buildConnectionSection(formState, formNotifier),
+              _buildModelSection(formState, formNotifier),
+              _buildActionSection(formState, formNotifier),
+            ],
           );
         },
       ),
     );
   }
 
-  Widget _buildProfileSection(AppConfigStore store) {
+  Widget _buildProfileSection(
+    BuildContext context,
+    AppConfigStore store,
+    ConfigService configService,
+  ) {
     final activeProfile = store.profiles.firstWhere((p) => p.id == store.activeProfileId);
-
     return CupertinoFormSection.insetGrouped(
       header: const Text('配置存档'),
       children: [
@@ -12632,7 +11958,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           prefix: const Text('当前配置'),
           child: CupertinoButton(
             padding: EdgeInsets.zero,
-            onPressed: () => _showProfileManagementSheet(store),
+            onPressed: () => _showProfileManagementSheet(context, store, configService),
             child: Text(activeProfile.name),
           ),
         ),
@@ -12640,45 +11966,61 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
-  Widget _buildConnectionSection() {
+  Widget _buildConnectionSection(SettingsFormState formState, SettingsFormNotifier notifier) {
     return CupertinoFormSection.insetGrouped(
       header: const Text('连接配置'),
       children: [
-        CupertinoTextFormFieldRow(
-          controller: _baseUrlController,
-          placeholder: 'https://api.openai.com',
+        CupertinoFormRow(
           prefix: const Text('Base URL'),
-          // 保持原逻辑：无验证，允许空值
+          child: DeclarativeCupertinoTextField(
+            value: formState.config.baseUrl,
+            onChanged: notifier.updateBaseUrl,
+            placeholder: 'https://api.openai.com',
+          ),
         ),
-        CupertinoTextFormFieldRow(
-          controller: _apiKeyController,
-          placeholder: 'API Key',
+        CupertinoFormRow(
           prefix: const Text('API Key'),
+          child: DeclarativeCupertinoTextField(
+            value: formState.config.apiKey,
+            onChanged: notifier.updateApiKey,
+            placeholder: 'API Key',
+            obscureText: true,
+          ),
         ),
-        CupertinoTextFormFieldRow(
-          controller: _modelsPathController,
-          placeholder: _defaultModelsPathForApiMode(_selectedApiMode),
+        CupertinoFormRow(
           prefix: const Text('Models Path'),
+          child: DeclarativeCupertinoTextField(
+            value: formState.config.modelsPath,
+            onChanged: notifier.updateModelsPath,
+          ),
         ),
-        CupertinoTextFormFieldRow(
-          controller: _chatPathController,
-          placeholder: _defaultChatPathForApiMode(_selectedApiMode),
+        CupertinoFormRow(
           prefix: const Text('Chat Path'),
+          child: DeclarativeCupertinoTextField(
+            value: formState.config.chatPath,
+            onChanged: notifier.updateChatPath,
+          ),
         ),
         CupertinoFormRow(
           prefix: const Text('API Mode'),
           child: CupertinoButton(
             padding: EdgeInsets.zero,
-            onPressed: _showApiModePicker,
-            child: Text(_selectedApiMode),
+            onPressed: () => _showApiModePicker(context, notifier),
+            child: Text(formState.config.apiMode),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildModelSection(AppConfig config) {
-    final models = config.availableModels ?? const <ModelInfo>[];
+  Widget _buildModelSection(SettingsFormState formState, SettingsFormNotifier notifier) {
+    final models = formState.config.availableModels ?? const <ModelInfo>[];
+    final currentModelId = formState.config.selectedModel;
+    final currentModel = currentModelId != null
+        ? models.where((m) => m.id == currentModelId).firstOrNull
+        : null;
+    final supportsReasoning = currentModel?.overrideSupportsReasoning ?? false;
+    final supportsVision = currentModel?.overrideSupportsVision ?? false;
 
     return CupertinoFormSection.insetGrouped(
       header: const Text('模型设置'),
@@ -12688,31 +12030,36 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           child: Row(
             children: [
               Expanded(
-                child: CupertinoTextField(
-                  controller: _selectedModelController,
+                child: DeclarativeCupertinoTextField(
+                  value: currentModelId ?? '',
+                  onChanged: notifier.updateSelectedModel,
                   placeholder: '输入模型 ID',
-                  onChanged: (value) {
-                    final model = _findModel(config, value);
-                    setState(() {
-                      _overrideSupportsReasoning = model?.overrideSupportsReasoning ?? false;
-                      _overrideSupportsVision = model?.overrideSupportsVision ?? false;
-                    });
-                  },
                 ),
               ),
               const SizedBox(width: 8),
               CupertinoButton(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
                 minSize: 0,
-                onPressed: models.isNotEmpty ? () => _showModelPicker(models, config) : null,
+                onPressed: models.isNotEmpty
+                    ? () => _showModelPicker(context, models, notifier)
+                    : null,
                 child: const Text('从列表选择'),
               ),
               const SizedBox(width: 8),
               CupertinoButton(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
                 minSize: 0,
-                onPressed: _refreshModels,
-                child: const Text('立即同步'),
+                onPressed: () async {
+                  try {
+                    await notifier.refreshModels();
+                    if (mounted) await AppToast.show('模型列表已同步');
+                  } catch (e) {
+                    if (mounted) await AppToast.show('同步模型失败：$e');
+                  }
+                },
+                child: formState.isRefreshingModels
+                    ? const SizedBox(width: 20, height: 20, child: CupertinoActivityIndicator())
+                    : const Text('立即同步'),
               ),
             ],
           ),
@@ -12720,161 +12067,161 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         CupertinoFormRow(
           prefix: const Text('启用思考'),
           child: CupertinoSwitch(
-            value: _overrideSupportsReasoning,
-            onChanged: (value) => setState(() => _overrideSupportsReasoning = value),
+            value: supportsReasoning,
+            onChanged: notifier.toggleReasoning,
           ),
         ),
         CupertinoFormRow(
           prefix: const Text('允许图片输入'),
           child: CupertinoSwitch(
-            value: _overrideSupportsVision,
-            onChanged: (value) => setState(() => _overrideSupportsVision = value),
+            value: supportsVision,
+            onChanged: notifier.toggleVision,
           ),
         ),
+        if (formState.modelsRefreshError != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              '同步错误：${formState.modelsRefreshError}',
+              style: const TextStyle(color: CupertinoColors.systemRed, fontSize: 12),
+            ),
+          ),
       ],
     );
   }
 
-  Widget _buildActionSection(AppConfig config) {
+  Widget _buildActionSection(SettingsFormState formState, SettingsFormNotifier notifier) {
     return CupertinoFormSection.insetGrouped(
       children: [
         CupertinoFormRow(
           child: CupertinoButton.filled(
-            onPressed: () async {
-              await _save(config);
-              if (mounted) await AppToast.show('设置已保存');
-            },
-            child: const Text('保存设置'),
+            onPressed: formState.isSaving
+                ? null
+                : () async {
+                    try {
+                      await notifier.save();
+                      if (mounted) await AppToast.show('设置已保存');
+                    } catch (e) {
+                      if (mounted) await AppToast.show('保存失败：$e');
+                    }
+                  },
+            child: formState.isSaving
+                ? const CupertinoActivityIndicator()
+                : const Text('保存设置'),
           ),
         ),
+        if (formState.error != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              formState.error!,
+              style: const TextStyle(color: CupertinoColors.systemRed, fontSize: 12),
+            ),
+          ),
       ],
     );
   }
 
-  void _showProfileManagementSheet(AppConfigStore store) {
+  // ------------------ 弹窗方法（略作简化，保留必要逻辑） ------------------
+  void _showApiModePicker(BuildContext context, SettingsFormNotifier notifier) {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (context) => CupertinoActionSheet(
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () { notifier.updateApiMode('chat_completions'); Navigator.pop(context); },
+            child: const Text('chat_completions'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () { notifier.updateApiMode('responses'); Navigator.pop(context); },
+            child: const Text('responses'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () { notifier.updateApiMode('google'); Navigator.pop(context); },
+            child: const Text('google'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+  }
+
+  void _showModelPicker(BuildContext context, List<ModelInfo> models, SettingsFormNotifier notifier) {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (context) => CupertinoActionSheet(
+        title: const Text('选择模型'),
+        actions: models.map((model) {
+          final label = (model.name ?? '').trim().isNotEmpty ? '${model.name} (${model.id})' : model.id;
+          return CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(context);
+              notifier.updateSelectedModel(model.id);
+            },
+            child: Text(label),
+          );
+        }).toList(),
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+  }
+
+  void _showProfileManagementSheet(
+    BuildContext context,
+    AppConfigStore store,
+    ConfigService configService,
+  ) {
     final activeProfile = store.profiles.firstWhere((p) => p.id == store.activeProfileId);
-
     showCupertinoModalPopup(
       context: context,
-      builder: (context) {
-        return CupertinoActionSheet(
-          title: const Text('配置存档管理'),
-          actions: [
-            // 切换配置
-            ...store.profiles.map((p) {
-              return CupertinoActionSheetAction(
-                onPressed: () {
-                  Navigator.pop(context);
-                  if (p.id != store.activeProfileId) {
-                    ref.read(configServiceProvider).switchProfile(p.id);
-                  }
-                },
-                isDefaultAction: p.id == store.activeProfileId,
-                child: Row(
-                  children: [
-                    Expanded(child: Text(p.name)),
-                    if (p.id == store.activeProfileId)
-                      const Icon(CupertinoIcons.check_mark, size: 18, color: CupertinoColors.systemBlue),
-                  ],
-                ),
-              );
-            }),
-            const SizedBox(height: 8),
-            // 操作按钮
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(context);
-                _showCreateProfileDialog();
-              },
-              child: const Text('新建配置'),
+      builder: (context) => CupertinoActionSheet(
+        title: const Text('配置存档管理'),
+        actions: [
+          ...store.profiles.map((p) => CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(context);
+              if (p.id != store.activeProfileId) configService.switchProfile(p.id);
+            },
+            isDefaultAction: p.id == store.activeProfileId,
+            child: Row(
+              children: [
+                Expanded(child: Text(p.name)),
+                if (p.id == store.activeProfileId)
+                  const Icon(CupertinoIcons.check_mark, size: 18, color: CupertinoColors.systemBlue),
+              ],
             ),
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(context);
-                _showRenameProfileDialog(activeProfile);
-              },
-              child: const Text('重命名当前配置'),
-            ),
-            if (store.profiles.length > 1)
-              CupertinoActionSheetAction(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _deleteProfile(activeProfile, store.profiles.length);
-                },
-                isDestructiveAction: true,
-                child: const Text('删除当前配置'),
-              ),
-          ],
-          cancelButton: CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+          )),
+          const SizedBox(height: 8),
+          CupertinoActionSheetAction(
+            onPressed: () { Navigator.pop(context); _showCreateProfileDialog(context, configService); },
+            child: const Text('新建配置'),
           ),
-        );
-      },
+          CupertinoActionSheetAction(
+            onPressed: () { Navigator.pop(context); _showRenameProfileDialog(context, activeProfile, configService); },
+            child: const Text('重命名当前配置'),
+          ),
+          if (store.profiles.length > 1)
+            CupertinoActionSheetAction(
+              onPressed: () { Navigator.pop(context); _deleteProfile(context, activeProfile, store.profiles.length, configService); },
+              isDestructiveAction: true,
+              child: const Text('删除当前配置'),
+            ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+      ),
     );
   }
 
-  void _showModelPicker(List<ModelInfo> models, AppConfig config) {
-    showCupertinoModalPopup(
-      context: context,
-      builder: (context) {
-        return CupertinoActionSheet(
-          title: const Text('选择模型'),
-          actions: models.map((model) {
-            final label = (model.name ?? '').trim().isNotEmpty ? '${model.name} (${model.id})' : model.id;
-            return CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(context);
-                _selectedModelController.text = model.id;
-                final m = _findModel(config, model.id);
-                setState(() {
-                  _overrideSupportsReasoning = m?.overrideSupportsReasoning ?? false;
-                  _overrideSupportsVision = m?.overrideSupportsVision ?? false;
-                });
-              },
-              child: Text(label),
-            );
-          }).toList(),
-          cancelButton: CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _refreshModels() async {
-    final currentConfig = ref.read(configProvider).valueOrNull;
-    if (currentConfig == null) return;
-    await _save(currentConfig);
-    try {
-      await ref.read(configServiceProvider).refreshModels();
-      await AppToast.show('模型列表已同步');
-    } catch (e) {
-      await AppToast.show('同步模型失败：$e');
-    }
-  }
-
-  Future<void> _confirmRestoreDefaults() async {
-    final confirmed = await showCupertinoDialog<bool>(
-          context: context,
-          builder: (ctx) => CupertinoAlertDialog(
-            title: const Text('恢复默认设置'),
-            content: const Text('确定要将当前配置存档恢复为默认设置吗？'),
-            actions: [
-              CupertinoDialogAction(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
-              CupertinoDialogAction(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('恢复默认')),
-            ],
-          ),
-        ) ??
-        false;
-
-    if (!confirmed) return;
-    await ref.read(configServiceProvider).saveConfig(AppConfig.defaultConfig());
-  }
-
-  Future<void> _showCreateProfileDialog() async {
+  Future<void> _showCreateProfileDialog(BuildContext context, ConfigService configService) async {
     final controller = TextEditingController();
     final result = await showCupertinoDialog<String>(
       context: context,
@@ -12887,12 +12234,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ],
       ),
     );
-
-    if (result == null || result.isEmpty) return;
-    await ref.read(configServiceProvider).createProfile(result);
+    if (result != null && result.isNotEmpty) await configService.createProfile(result);
   }
 
-  Future<void> _showRenameProfileDialog(ConfigProfile profile) async {
+  Future<void> _showRenameProfileDialog(BuildContext context, ConfigProfile profile, ConfigService configService) async {
     final controller = TextEditingController(text: profile.name);
     final result = await showCupertinoDialog<String>(
       context: context,
@@ -12905,17 +12250,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ],
       ),
     );
-
-    if (result == null || result.isEmpty) return;
-    await ref.read(configServiceProvider).renameProfile(profile.id, result);
+    if (result != null && result.isNotEmpty) await configService.renameProfile(profile.id, result);
   }
 
-  Future<void> _deleteProfile(ConfigProfile profile, int profileCount) async {
+  Future<void> _deleteProfile(BuildContext context, ConfigProfile profile, int profileCount, ConfigService configService) async {
     if (profileCount <= 1) {
       await AppToast.show('至少保留一个配置存档');
       return;
     }
-
     final confirmed = await showCupertinoDialog<bool>(
           context: context,
           builder: (ctx) => CupertinoAlertDialog(
@@ -12928,9 +12270,31 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
         ) ??
         false;
+    if (confirmed) await configService.deleteProfile(profile.id);
+  }
 
-    if (!confirmed) return;
-    await ref.read(configServiceProvider).deleteProfile(profile.id);
+  Future<void> _confirmRestoreDefaults(BuildContext context, SettingsFormNotifier notifier) async {
+    final confirmed = await showCupertinoDialog<bool>(
+          context: context,
+          builder: (ctx) => CupertinoAlertDialog(
+            title: const Text('恢复默认设置'),
+            content: const Text('确定要将当前配置存档恢复为默认设置吗？'),
+            actions: [
+              CupertinoDialogAction(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
+              CupertinoDialogAction(
+                onPressed: () => Navigator.of(ctx).pop(true), 
+                isDestructiveAction: true,
+                child: const Text('恢复默认'),
+                ),
+            ],
+          ),
+        ) ??
+        false;
+    if (confirmed) {
+      notifier.restoreDefaults();
+      await notifier.save();
+      if (mounted) await AppToast.show('已恢复默认设置');
+    }
   }
 }
 ```
@@ -13805,10 +13169,10 @@ class _PreviewLine extends StatelessWidget {
 
 ## File: lib/presentation/pages/branch_tree_page.dart
 ```dart
+import 'dart:math';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:graphview/GraphView.dart';
 import 'package:intl/intl.dart';
 
 import '../../di/providers.dart';
@@ -13818,12 +13182,11 @@ import '../providers/chat_notifier.dart' show chatTopologyProvider, roundDetailP
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_toast.dart';
 
-extension SpacedIterable on Iterable<Widget> {
-  List<Widget> spaced(double spacing) {
-    if (isEmpty) return [];
-    return expand((widget) => [widget, SizedBox(width: spacing)]).toList()..removeLast();
-  }
-}
+const double _nodeWidth = 300.0;
+const double _nodeHeight = 200.0;
+const double _levelSeparation = 120.0;
+const double _siblingSeparation = 40.0;
+const double _canvasPadding = 2000.0;
 
 class BranchTreePage extends ConsumerStatefulWidget {
   final String sessionId;
@@ -13840,25 +13203,10 @@ class BranchTreePage extends ConsumerStatefulWidget {
 }
 
 class _BranchTreePageState extends ConsumerState<BranchTreePage> {
-  final GlobalKey _viewerKey = GlobalKey();
-  final GlobalKey _targetNodeKey = GlobalKey();
   final TransformationController _transformationController = TransformationController();
-  
-  final BuchheimWalkerConfiguration _builder = BuchheimWalkerConfiguration()
-    ..siblingSeparation = 40
-    ..levelSeparation = 78
-    ..subtreeSeparation = 50
-    ..orientation = BuchheimWalkerConfiguration.ORIENTATION_TOP_BOTTOM;
-
+  final GlobalKey _viewerKey = GlobalKey();
+  final Map<String, double> _nodeWidthCache = {};
   bool _hasFocused = false;
-
-  @override
-  void didUpdateWidget(covariant BranchTreePage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.sessionId != widget.sessionId || oldWidget.initialFocusRoundId != widget.initialFocusRoundId) {
-      _hasFocused = false; // 切换文件/目标时重置聚焦状态
-    }
-  }
 
   @override
   void dispose() {
@@ -13866,38 +13214,137 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     super.dispose();
   }
 
-  String _buildGraphSignature(List<({String id, String? parentId})> topology) {
-    if (topology.isEmpty) return 'empty';
-    return topology.map((t) => '${t.id}:${t.parentId ?? 'root'}').join('|');
+  void _computeWidthsForTree(TreeNode root) {
+    void postOrder(TreeNode node) {
+      if (node.children.isEmpty) {
+        _nodeWidthCache[node.id] = _nodeWidth;
+        return;
+      }
+      double total = 0;
+      for (final child in node.children) {
+        postOrder(child);
+        total += _nodeWidthCache[child.id]!;
+      }
+      // 加上兄弟节点之间的间距
+      total += (node.children.length - 1) * _siblingSeparation;
+      _nodeWidthCache[node.id] = total;
+    }
+    postOrder(root);
+  }
+  // ==================== 布局算法 ====================
+
+  double _subtreeWidth(TreeNode node) {
+    return _nodeWidthCache[node.id] ?? _nodeWidth;
   }
 
-  void _onTargetLaidOut() {
-    if (_hasFocused) return;
-    
-    final targetCtx = _targetNodeKey.currentContext;
-    final viewerCtx = _viewerKey.currentContext;
-    if (targetCtx == null || viewerCtx == null) return;
+  void _layoutNode(TreeNode node, double x, double y, Map<String, Offset> positions) {
+    positions[node.id] = Offset(x, y);
+    if (node.children.isEmpty) return;
 
-    final targetBox = targetCtx.findRenderObject() as RenderBox?;
-    final viewerBox = viewerCtx.findRenderObject() as RenderBox?;
-    if (targetBox == null || viewerBox == null || !targetBox.hasSize || !viewerBox.hasSize) return;
-
-    final targetCenter = targetBox.localToGlobal(targetBox.size.center(Offset.zero), ancestor: viewerBox);
-    final viewerCenter = viewerBox.size.center(Offset.zero);
-
-    _transformationController.value = Matrix4.identity()
-      ..translate(viewerCenter.dx - targetCenter.dx, viewerCenter.dy - targetCenter.dy);
-
-    _hasFocused = true;
-    setState(() {});
+    final childWidths = node.children.map((c) => _subtreeWidth(c)).toList();
+    final totalChildrenWidth = childWidths.fold(0.0, (a, b) => a + b) +
+        (node.children.length - 1) * _siblingSeparation;
+    double startX = x + (_nodeWidth - totalChildrenWidth) / 2;
+    for (int i = 0; i < node.children.length; i++) {
+      final child = node.children[i];
+      final childWidth = childWidths[i];
+      final childX = startX + childWidth / 2 - _nodeWidth / 2;
+      _layoutNode(child, childX, y + _nodeHeight + _levelSeparation, positions);
+      startX += childWidth + _siblingSeparation;
+    }
   }
+
+  _TreeLayout _computeLayout(List<TreeNode> roots) {
+    _nodeWidthCache.clear();
+    for (final root in roots) {
+      _computeWidthsForTree(root);
+    }
+    final positions = <String, Offset>{};
+    double currentX = 0;
+    double maxHeight = 0;
+
+    for (final root in roots) {
+      final tempPositions = <String, Offset>{};
+      _layoutNode(root, currentX, 0, tempPositions);
+
+      double minX = double.infinity, maxX = -double.infinity;
+      double minY = double.infinity, maxY = -double.infinity;
+      for (final pos in tempPositions.values) {
+        minX = min(minX, pos.dx);
+        maxX = max(maxX, pos.dx + _nodeWidth);
+        minY = min(minY, pos.dy);
+        maxY = max(maxY, pos.dy + _nodeHeight);
+      }
+      final width = maxX - minX;
+      final height = maxY - minY;
+
+      final offsetX = currentX - minX;
+      for (final entry in tempPositions.entries) {
+        positions[entry.key] = Offset(entry.value.dx + offsetX, entry.value.dy);
+      }
+
+      currentX += width + _siblingSeparation;
+      maxHeight = max(maxHeight, height);
+    }
+
+    final canvasWidth = currentX + _canvasPadding * 2;
+    final canvasHeight = maxHeight + _canvasPadding * 2;
+    return _TreeLayout(positions: positions, canvasSize: Size(canvasWidth, canvasHeight));
+  }
+
+  // ==================== 连线 ====================
+
+  List<(Offset, Offset)> _buildParentChildPairs(List<TreeNode> roots, Map<String, Offset> positions) {
+    final pairs = <(Offset, Offset)>[];
+    void traverse(TreeNode node) {
+      final parentPos = positions[node.id];
+      if (parentPos == null) return;
+      for (final child in node.children) {
+        final childPos = positions[child.id];
+        if (childPos != null) {
+          pairs.add((parentPos, childPos));
+        }
+        traverse(child);
+      }
+    }
+    for (final root in roots) traverse(root);
+    return pairs;
+  }
+
+  // ==================== 节点构建 ====================
+
+  List<Widget> _buildAllNodeWidgets(List<TreeNode> roots, Map<String, Offset> positions) {
+    final widgets = <Widget>[];
+    void addNode(TreeNode node) {
+      final pos = positions[node.id];
+      if (pos != null) {
+        widgets.add(
+          Positioned(
+            left: pos.dx,
+            top: pos.dy,
+            child: _TreeNodeCard(
+              roundId: node.id,
+              onSwitch: () => Navigator.of(context).pop(node.id),
+              onDelete: () async {
+                if (await _confirmDelete()) await _deleteNode(node.id);
+              },
+            ),
+          ),
+        );
+      }
+      for (final child in node.children) addNode(child);
+    }
+    for (final root in roots) addNode(root);
+    return widgets;
+  }
+
+  // ==================== 删除逻辑 ====================
 
   Future<void> _deleteNode(String nodeId) async {
     final topology = await ref.read(chatTopologyProvider(widget.sessionId).future);
     final roots = buildTree(topology);
-    final target = _findIterative(roots, nodeId);
+    final target = _findNodeById(roots, nodeId);
     if (target == null) return;
-
     final ids = _collectSubtreeIds(target).toList();
     try {
       await ref.read(conversationRepositoryProvider)
@@ -13908,17 +13355,25 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   }
 
   Future<bool> _confirmDelete() async {
-    return await showDialog<bool>(
+    return await showCupertinoDialog<bool>(
           context: context,
-          builder: (ctx) => AlertDialog(
+          builder: (ctx) => CupertinoAlertDialog(
             title: const Text('删除节点'),
             content: const Text('确定删除这一轮及其后续全部分支吗？'),
             actions: [
-              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
-              FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('删除')),
+              CupertinoDialogAction(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('取消'),
+              ),
+              CupertinoDialogAction(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                isDestructiveAction: true,
+                child: const Text('删除'),
+              ),
             ],
           ),
-        ) ?? false;
+        ) ??
+        false;
   }
 
   Set<String> _collectSubtreeIds(TreeNode root) {
@@ -13932,7 +13387,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     return ids;
   }
 
-  TreeNode? _findIterative(List<TreeNode> roots, String targetId) {
+  TreeNode? _findNodeById(List<TreeNode> roots, String targetId) {
     final stack = [...roots];
     while (stack.isNotEmpty) {
       final node = stack.removeLast();
@@ -13942,189 +13397,167 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     return null;
   }
 
+  // ==================== 聚焦 ====================
+
+  void _focusOnNode(String nodeId, Map<String, Offset> positions) {
+    if (_hasFocused) return;
+    final nodePos = positions[nodeId];
+    if (nodePos == null) return;
+    final viewerBox = _viewerKey.currentContext?.findRenderObject() as RenderBox?;
+    if (viewerBox == null) return;
+    final viewerSize = viewerBox.size;
+    final nodeCenter = Offset(nodePos.dx + _nodeWidth / 2, nodePos.dy + _nodeHeight / 2);
+    final targetOffset = Offset(viewerSize.width / 2 - nodeCenter.dx, viewerSize.height / 2 - nodeCenter.dy);
+    _transformationController.value = Matrix4.identity()..translate(targetOffset.dx, targetOffset.dy);
+    _hasFocused = true;
+    setState(() {});
+  }
+
+  // ==================== 构建 ====================
+
   @override
   Widget build(BuildContext context) {
-    final topology = ref.watch(chatTopologyProvider(widget.sessionId)).valueOrNull ?? [];
-    final roots = buildTree(topology);
-    final graphSignature = _buildGraphSignature(topology);
-    final targetId = widget.initialFocusRoundId;
-
+    final topology = ref.watch(chatTopologyProvider(widget.sessionId));
     return AppPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        middle: Text('分支树')
-      ),
-      body: roots.isEmpty
-          ? const Center(child: Text('暂无分支结构'))
-          : InteractiveViewer(
-              key: _viewerKey,
-              constrained: false,
-              boundaryMargin: const EdgeInsets.all(1000),
-              minScale: 0.1,
-              maxScale: 3.0,
-              transformationController: _transformationController,
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: RepaintBoundary( // 🔑 隔离 setState 重建，保护 InteractiveViewer 手势状态
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: roots.map((root) => _RootTreeGroup(
-                      key: ValueKey('root-${root.id}-$graphSignature'),
-                      root: root,
-                      graphSignature: graphSignature,
-                      builderConfig: _builder,
-                      targetNodeId: targetId,
-                      targetNodeKey: _targetNodeKey,
-                      onTargetLaidOut: _onTargetLaidOut,
-                      onSwitch: (id) => Navigator.of(context).pop(id),
-                      onDelete: (id) async {
-                        if (await _confirmDelete()) await _deleteNode(id);
-                      },
-                    )).spaced(40),
+      navigationBar: CupertinoNavigationBar(middle: const Text('分支树')),
+      body: topology.when(
+        loading: () => const Center(child: CupertinoActivityIndicator()),
+        error: (err, _) => Center(child: Text('加载分支结构失败：$err')),
+        data: (topology) {
+          final roots = buildTree(topology);
+          if (roots.isEmpty) return const Center(child: Text('暂无分支结构'));
+          final layout = _computeLayout(roots);
+          final positions = layout.positions;
+          final canvasSize = layout.canvasSize;
+          final pairs = _buildParentChildPairs(roots, positions);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!_hasFocused) _focusOnNode(widget.initialFocusRoundId, positions);
+          });
+          return InteractiveViewer(
+            key: _viewerKey,
+            transformationController: _transformationController,
+            minScale: 0.2,
+            maxScale: 3.0,
+            constrained: false,
+            boundaryMargin: const EdgeInsets.all(_canvasPadding),
+            child: SizedBox(
+              width: canvasSize.width,
+              height: canvasSize.height,
+              child: Stack(
+                children: [
+                  CustomPaint(
+                    painter: _OrthogonalLinePainter(pairs: pairs),
+                    size: canvasSize,
                   ),
-                ),
+                  ..._buildAllNodeWidgets(roots, positions),
+                ],
               ),
             ),
+          );
+        },
+      ),
     );
   }
 }
 
-class _RootTreeGroup extends StatelessWidget {
-  final TreeNode root;
-  final String graphSignature;
-  final BuchheimWalkerConfiguration builderConfig;
-  final void Function(String id) onSwitch;
-  final void Function(String id) onDelete;
-  final String? targetNodeId;
-  final GlobalKey? targetNodeKey;
-  final VoidCallback? onTargetLaidOut;
+class _TreeLayout {
+  final Map<String, Offset> positions;
+  final Size canvasSize;
+  _TreeLayout({required this.positions, required this.canvasSize});
+}
 
-  const _RootTreeGroup({
-    super.key,
-    required this.root,
-    required this.graphSignature,
-    required this.builderConfig,
-    required this.onSwitch,
-    required this.onDelete,
-    this.targetNodeId,
-    this.targetNodeKey,
-    this.onTargetLaidOut,
-  });
+class _OrthogonalLinePainter extends CustomPainter {
+  final List<(Offset, Offset)> pairs;
+  _OrthogonalLinePainter({required this.pairs});
 
   @override
-  Widget build(BuildContext context) {
-    final graph = Graph()..isTree = true;
-    final nodeMap = <String, Node>{};
-    final graphToTree = <Node, TreeNode>{};
-    final stack = <TreeNode>[root];
-
-    while (stack.isNotEmpty) {
-      final node = stack.removeLast();
-      final gNode = Node.Id('${root.id}-${node.id}-$graphSignature');
-      nodeMap[node.id] = gNode;
-      graphToTree[gNode] = node;
-      graph.addNode(gNode);
-      if (node.parentId != null) {
-        final parent = nodeMap[node.parentId!];
-        if (parent != null) graph.addEdge(parent, gNode);
-      }
-      stack.addAll(node.children.reversed);
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = CupertinoColors.separator
+      ..strokeWidth = 1.6
+      ..style = PaintingStyle.stroke;
+    for (final pair in pairs) {
+      final parentCenter = Offset(pair.$1.dx + _nodeWidth / 2, pair.$1.dy + _nodeHeight / 2);
+      final childCenter = Offset(pair.$2.dx + _nodeWidth / 2, pair.$2.dy + _nodeHeight / 2);
+      final start = Offset(parentCenter.dx, parentCenter.dy + _nodeHeight / 2);
+      final end = Offset(childCenter.dx, childCenter.dy - _nodeHeight / 2);
+      final midY = (start.dy + end.dy) / 2;
+      final path = Path()
+        ..moveTo(start.dx, start.dy)
+        ..lineTo(start.dx, midY)
+        ..lineTo(end.dx, midY)
+        ..lineTo(end.dx, end.dy);
+      canvas.drawPath(path, paint);
     }
-
-    return GraphView(
-      key: ValueKey('graph-${root.id}-$graphSignature'),
-      graph: graph,
-      animated: false,
-      algorithm: BuchheimWalkerAlgorithm(builderConfig, TreeEdgeRenderer(builderConfig)),
-      paint: Paint()
-        ..color = Theme.of(context).dividerColor
-        ..strokeWidth = 1.6
-        ..style = PaintingStyle.stroke,
-      builder: (Node node) {
-        final tree = graphToTree[node];
-        if (tree == null) return const SizedBox.shrink();
-
-        final isTarget = targetNodeId != null && tree.id == targetNodeId;
-        final child = _GraphNodeShell(
-          roundId: tree.id,
-          onSwitch: () => onSwitch(tree.id),
-          onDelete: () => onDelete(tree.id),
-        );
-
-        return isTarget
-            ? _NodeAnchor(key: targetNodeKey, onLaidOut: onTargetLaidOut, child: child)
-            : child;
-      },
-    );
   }
-}
-
-class _NodeAnchor extends StatefulWidget {
-  final Widget child;
-  final VoidCallback? onLaidOut;
-  const _NodeAnchor({super.key, required this.child, this.onLaidOut});
 
   @override
-  State<_NodeAnchor> createState() => _NodeAnchorState();
+  bool shouldRepaint(covariant _OrthogonalLinePainter oldDelegate) => true;
 }
 
-class _NodeAnchorState extends State<_NodeAnchor> {
-  Size? _lastSize;
-  @override
-  Widget build(BuildContext context) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || widget.onLaidOut == null) return;
-      final box = context.findRenderObject() as RenderBox?;
-      if (box == null || !box.hasSize || box.size.isEmpty) return;
-      if (_lastSize == box.size) return;
-      _lastSize = box.size;
-      widget.onLaidOut!();
-    });
-    return widget.child;
-  }
-}
-
-class _GraphNodeShell extends ConsumerWidget {
+class _TreeNodeCard extends ConsumerWidget {
   final String roundId;
   final VoidCallback onSwitch;
   final VoidCallback onDelete;
 
-  const _GraphNodeShell({required this.roundId, required this.onSwitch, required this.onDelete});
+  const _TreeNodeCard({
+    required this.roundId,
+    required this.onSwitch,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final round = ref.watch(roundDetailProvider(roundId)).valueOrNull;
-    final dateText = round == null ? null : DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(round.createdAt));
+    final dateText = round == null
+        ? null
+        : DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(round.createdAt));
     final userText = round?.userContent;
-    final aiText = round == null ? null : ((round.assistantContent ?? '').trim().isEmpty ? '（等待回复）' : round.assistantContent!);
+    final aiText = round == null
+        ? null
+        : ((round.assistantContent ?? '').trim().isEmpty ? '（等待回复）' : round.assistantContent!);
 
     return Container(
-      color: CupertinoColors.systemBackground,
-      padding: const EdgeInsets.all(14),
-      child: SizedBox(
-        width: 290,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              height: 20,
-              child: dateText == null
-                  ? const _SkeletonBar(width: 160, height: 14)
-                  : Align(alignment: Alignment.centerLeft, child: Text(dateText, style: CupertinoTheme.of(context).textTheme.textStyle)),
-            ),
-            const SizedBox(height: 12),
-            _PreviewSlot(label: 'YOU', content: userText, loading: round == null),
-            const SizedBox(height: 8),
-            _PreviewSlot(label: 'AI', content: aiText, loading: round == null),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(child: CupertinoButton.filled(onPressed: onSwitch, child: const Text('切换到此分支'))),
-                CupertinoButton(onPressed: onDelete, child: const Icon(CupertinoIcons.delete)),
-              ],
-            ),
-          ],
-        ),
+      width: _nodeWidth,
+      height: _nodeHeight,
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemBackground,
+        border: Border.all(color: CupertinoColors.separator, width: 0.5),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            dateText ?? '加载中...',
+            style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(fontSize: 12),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 8),
+          Expanded(child: _PreviewSlot(label: 'YOU', content: userText, loading: round == null)),
+          const SizedBox(height: 4),
+          Expanded(child: _PreviewSlot(label: 'AI', content: aiText, loading: round == null)),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: CupertinoButton.filled(
+                  onPressed: onSwitch,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: const Text('切换到此分支'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              CupertinoButton(
+                onPressed: onDelete,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: const Icon(CupertinoIcons.delete),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -14134,56 +13567,147 @@ class _PreviewSlot extends StatelessWidget {
   final String label;
   final String? content;
   final bool loading;
-  const _PreviewSlot({required this.label, required this.content, required this.loading});
+
+  const _PreviewSlot({
+    required this.label,
+    required this.content,
+    required this.loading,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = CupertinoTheme.of(context).textTheme;
-    return SizedBox(
-      height: 78,
-      child: Container(
-        color: CupertinoColors.systemBackground,
-        padding: const EdgeInsets.all(10),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(width: 34, child: Text('$label ', style: textTheme.textStyle.copyWith(fontWeight: FontWeight.w700))),
-            Expanded(
-              child: loading
-                  ? const _PreviewSkeleton()
-                  : Text((content == null || content!.trim().isEmpty) ? '（空）' : content!, maxLines: 3, overflow: TextOverflow.ellipsis, style: textTheme.textStyle),
-            ),
-          ],
+    final style = CupertinoTheme.of(context).textTheme.textStyle;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 34,
+          child: Text('$label ', style: style.copyWith(fontWeight: FontWeight.w700)),
         ),
-      ),
+        Expanded(
+          child: loading
+              ? const Text('加载中...', maxLines: 2, overflow: TextOverflow.ellipsis)
+              : Text(
+                  (content == null || content!.trim().isEmpty) ? '（空）' : content!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: style,
+                ),
+        ),
+      ],
+    );
+  }
+}
+```
+
+## File: lib/presentation/providers/chat_notifier.dart
+```dart
+import 'dart:async';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/chat_round.dart';
+import '../../di/providers.dart';
+import '../../domain/services/attachment_preparer.dart';
+import 'chat_generation_provider.dart';
+import 'package:uuid/uuid.dart';
+
+final sessionTitleProvider = StreamProvider.family<String, String>((ref, sessionId) {
+  return ref.watch(conversationRepositoryProvider).watchSessionTitle(sessionId)
+      .map((title) => title ?? '对话');
+});
+
+final chatTopologyProvider =
+    StreamProvider.family<List<({String id, String? parentId})>, String>(
+  (ref, sessionId) {
+    return ref.watch(conversationRepositoryProvider).watchSessionTopology(sessionId);
+  },
+);
+
+final roundDetailProvider = StreamProvider.family<ChatRound?, String>((ref, roundId) {
+  return ref.watch(conversationRepositoryProvider).watchSingleRound(roundId);
+});
+
+final visibleRoundIdsProvider =
+    Provider.family<List<String>, ({String sessionId, String? roundId})>(
+  (ref, args) {
+    final topology = ref.watch(chatTopologyProvider(args.sessionId)).valueOrNull ?? [];
+    if (args.roundId == null) return const [];
+
+    final idToParent = {for (var t in topology) t.id: t.parentId};
+    final path = <String>[];
+    String? currentId = args.roundId;
+
+    while (currentId != null && idToParent.containsKey(currentId)) {
+      path.add(currentId);
+      currentId = idToParent[currentId];
+    }
+    return path.reversed.toList();
+  },
+);
+
+class ChatController {
+  final Ref ref;
+  final String sessionId;
+
+  ChatController(this.ref, this.sessionId);
+
+  Future<String> sendMessage({
+    required String content,
+    required String? parentRoundId,
+    List<dynamic>? attachments,
+  }) async {
+    final repository = ref.read(conversationRepositoryProvider);
+    final saved = await savePendingAttachments(
+      repository,
+      attachments?.cast() ?? [],
+    );
+
+    final newRound = ChatRound(
+      id: const Uuid().v4(),
+      parentId: parentRoundId,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+      userContent: content,
+      userAttachments: saved,
+      isIncomplete: true,
+      hasUnseenUpdate: false,
+    );
+
+    await repository.appendRound(sessionId, newRound);
+
+    ref.listen(
+      chatGenerationProvider(newRound.id),
+      (previous, next) {},
+    );
+
+    return newRound.id;
+  }
+
+  Future<String> retryFromRound(String roundId) async {
+    final source = await ref.read(roundDetailProvider(roundId).future);
+    if (source == null) throw Exception('找不到对应的对话轮次');
+
+    return sendMessage(
+      content: source.userContent,
+      parentRoundId: source.parentId,
+      attachments: source.userAttachments,
+    );
+  }
+
+  void stopGeneration(String roundId) {
+    ref.invalidate(chatGenerationProvider(roundId));
+  }
+
+  Future<void> markRoundSeen(ChatRound round) async {
+    await ref.read(conversationRepositoryProvider).updateRound(
+      roundId: round.id,
+      hasUnseenUpdate: false,
     );
   }
 }
 
-class _PreviewSkeleton extends StatelessWidget {
-  const _PreviewSkeleton();
-  @override
-  Widget build(BuildContext context) {
-    return const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _SkeletonBar(widthFactor: 0.92), SizedBox(height: 8), _SkeletonBar(widthFactor: 0.76), SizedBox(height: 8), _SkeletonBar(widthFactor: 0.58),
-    ]);
-  }
-}
-
-class _SkeletonBar extends StatelessWidget {
-  final double? width;
-  final double height;
-  final double? widthFactor;
-  const _SkeletonBar({this.width, this.height = 12, this.widthFactor});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme.surfaceContainerHighest;
-    Widget child = Container(width: width, height: height, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(6)));
-    if (widthFactor != null) child = FractionallySizedBox(widthFactor: widthFactor, alignment: Alignment.centerLeft, child: child);
-    return child;
-  }
-}
+final chatControllerProvider =
+    Provider.family<ChatController, String>((ref, sessionId) {
+  return ChatController(ref, sessionId);
+});
 ```
 
 ## File: lib/presentation/pages/chat_page.dart
@@ -14344,18 +13868,6 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
             _PaginationBar(
               currentIndex: currentIndex,
               totalPages: visibleRoundIds.length,
-              onPrev: (currentIndex > 0)
-                  ? () => _pageController?.previousPage(
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.easeOutCubic,
-                      )
-                  : null,
-              onNext: (currentIndex < visibleRoundIds.length - 1)
-                  ? () => _pageController?.nextPage(
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.easeOutCubic,
-                      )
-                  : null,
             ),
           Expanded(
             child: visibleRoundIds.isEmpty
@@ -14501,7 +14013,10 @@ class _UserSection extends ConsumerWidget {
           content: round.content,
           isUser: true,
           onEdit: null,
-          onCopy: () => Clipboard.setData(ClipboardData(text: round.content)),
+          onCopy: () {
+            Clipboard.setData(ClipboardData(text: round.content));
+            AppToast.show('已复制');
+          },
         ),
         if (round.attach.isNotEmpty) ...[
           const SizedBox(height: 8),
@@ -14571,7 +14086,10 @@ class _AiReplySection extends ConsumerWidget {
             content: ai.content!,
             isUser: false,
             onRetryReply: ai.isIncomplete ? null : onRetryReply,
-            onCopy: () => Clipboard.setData(ClipboardData(text: ai.content!)),
+            onCopy: () {
+              Clipboard.setData(ClipboardData(text: ai.content!));
+              AppToast.show('已复制');
+            },
           )
         else
           const Padding(
@@ -14585,13 +14103,10 @@ class _AiReplySection extends ConsumerWidget {
 
 class _PaginationBar extends StatelessWidget {
   final int currentIndex, totalPages;
-  final VoidCallback? onPrev, onNext;
 
   const _PaginationBar({
     required this.currentIndex,
     required this.totalPages,
-    this.onPrev,
-    this.onNext,
   });
 
   @override
@@ -14620,114 +14135,4 @@ class _PaginationBar extends StatelessWidget {
     );
   }
 }
-```
-
-## File: lib/presentation/providers/chat_notifier.dart
-```dart
-import 'dart:async';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/chat_round.dart';
-import '../../di/providers.dart';
-import '../../domain/services/attachment_preparer.dart';
-import 'chat_generation_provider.dart';
-import 'package:uuid/uuid.dart';
-
-final sessionTitleProvider = StreamProvider.family<String, String>((ref, sessionId) {
-  return ref.watch(conversationRepositoryProvider).watchSessionTitle(sessionId)
-      .map((title) => title ?? '对话');
-});
-
-final chatTopologyProvider =
-    StreamProvider.family<List<({String id, String? parentId})>, String>(
-  (ref, sessionId) {
-    return ref.watch(conversationRepositoryProvider).watchSessionTopology(sessionId);
-  },
-);
-
-final roundDetailProvider = StreamProvider.family<ChatRound?, String>((ref, roundId) {
-  return ref.watch(conversationRepositoryProvider).watchSingleRound(roundId);
-});
-
-final visibleRoundIdsProvider =
-    Provider.family<List<String>, ({String sessionId, String? roundId})>(
-  (ref, args) {
-    final topology = ref.watch(chatTopologyProvider(args.sessionId)).valueOrNull ?? [];
-    if (args.roundId == null) return const [];
-
-    final idToParent = {for (var t in topology) t.id: t.parentId};
-    final path = <String>[];
-    String? currentId = args.roundId;
-
-    while (currentId != null && idToParent.containsKey(currentId)) {
-      path.add(currentId);
-      currentId = idToParent[currentId];
-    }
-    return path.reversed.toList();
-  },
-);
-
-class ChatController {
-  final Ref ref;
-  final String sessionId;
-
-  ChatController(this.ref, this.sessionId);
-
-  Future<String> sendMessage({
-    required String content,
-    required String? parentRoundId,
-    List<dynamic>? attachments,
-  }) async {
-    final repository = ref.read(conversationRepositoryProvider);
-    final saved = await savePendingAttachments(
-      repository,
-      attachments?.cast() ?? [],
-    );
-
-    final newRound = ChatRound(
-      id: const Uuid().v4(),
-      parentId: parentRoundId,
-      createdAt: DateTime.now().millisecondsSinceEpoch,
-      userContent: content,
-      userAttachments: saved,
-      isIncomplete: true,
-      hasUnseenUpdate: false,
-    );
-
-    await repository.appendRound(sessionId, newRound);
-
-    ref.listen(
-      chatGenerationProvider(newRound.id),
-      (previous, next) {},
-    );
-
-    return newRound.id;
-  }
-
-  Future<String> retryFromRound(String roundId) async {
-    final source = await ref.read(roundDetailProvider(roundId).future);
-    if (source == null) throw Exception('找不到对应的对话轮次');
-
-    return sendMessage(
-      content: source.userContent,
-      parentRoundId: source.parentId,
-      attachments: source.userAttachments,
-    );
-  }
-
-  void stopGeneration(String roundId) {
-    ref.invalidate(chatGenerationProvider(roundId));
-  }
-
-  Future<void> markRoundSeen(ChatRound round) async {
-    await ref.read(conversationRepositoryProvider).updateRound(
-      roundId: round.id,
-      hasUnseenUpdate: false,
-    );
-  }
-}
-
-final chatControllerProvider =
-    Provider.family<ChatController, String>((ref, sessionId) {
-  return ChatController(ref, sessionId);
-});
 ```

@@ -77,7 +77,8 @@ class ConfigService{
   }
 
   Future<void> saveConfig(AppConfig config) async {
-    final activeId = await getActiveProfileId();
+    final store = await loadConfigStore();
+    final activeId = store.activeProfileId;
     await (_db.update(_db.dbConfigProfiles)..where((t) => t.id.equals(activeId)))
         .write(DbConfigProfilesCompanion(config: Value(config)));
   }
@@ -113,24 +114,6 @@ class ConfigService{
   Future<List<ConfigProfile>> getProfiles() async {
     final store = await loadConfigStore();
     return store.profiles;
-  }
-
-  Future<String> getActiveProfileId() async {
-    final storeRow = await _db.select(_db.dbConfigStore).getSingleOrNull();
-    var activeId = storeRow?.activeProfileId ?? 'default';
-
-    final profiles = await _db.select(_db.dbConfigProfiles).get();
-    if (!profiles.any((p) => p.id == activeId) && profiles.isNotEmpty) {
-      activeId = profiles.first.id;
-      await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
-        DbConfigStoreCompanion(
-          id: const Value(1),
-          activeProfileId: Value(activeId),
-        ),
-      );
-    }
-
-    return activeId;
   }
 
   Future<void> switchProfile(String profileId) async {

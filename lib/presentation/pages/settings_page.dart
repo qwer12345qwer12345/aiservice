@@ -99,7 +99,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           child: DeclarativeCupertinoTextField(
             value: formState.config.modelsPath,
             onChanged: notifier.updateModelsPath,
-            placeholder: _defaultModelsPathForApiMode(formState.config.apiMode),
           ),
         ),
         CupertinoFormRow(
@@ -107,7 +106,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           child: DeclarativeCupertinoTextField(
             value: formState.config.chatPath,
             onChanged: notifier.updateChatPath,
-            placeholder: _defaultChatPathForApiMode(formState.config.apiMode),
           ),
         ),
         CupertinoFormRow(
@@ -390,7 +388,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             content: const Text('确定要将当前配置存档恢复为默认设置吗？'),
             actions: [
               CupertinoDialogAction(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
-              CupertinoDialogAction(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('恢复默认')),
+              CupertinoDialogAction(
+                onPressed: () => Navigator.of(ctx).pop(true), 
+                isDestructiveAction: true,
+                child: const Text('恢复默认'),
+                ),
             ],
           ),
         ) ??
@@ -399,21 +401,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       notifier.restoreDefaults();
       await notifier.save();
       if (mounted) await AppToast.show('已恢复默认设置');
-    }
-  }
-
-  String _defaultModelsPathForApiMode(String apiMode) {
-    switch (apiMode) {
-      case 'google': return 'v1beta/models';
-      default: return 'v1/models';
-    }
-  }
-
-  String _defaultChatPathForApiMode(String apiMode) {
-    switch (apiMode) {
-      case 'google': return 'v1beta/models/{model}:streamGenerateContent';
-      case 'responses': return 'v1/responses';
-      default: return 'v1/chat/completions';
     }
   }
 }

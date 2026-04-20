@@ -43,10 +43,6 @@ dependencies:
   drift: ^2.14.0
   sqlite3_flutter_libs: ^0.5.0
 
-  flutter_client_sse: ^2.0.3
-
-  flutter_form_builder: ^10.3.0+2
-  mocktail: ^1.0.4
   collection: ^1.19.1
   rxdart: ^0.28.0
   flutter_localizations:
@@ -61,15 +57,10 @@ dev_dependencies:
   json_serializable: ^6.7.1
   riverpod_generator: ^2.3.9
 
-  # ========== 单元测试 Mock ==========
-  mockito: ^5.4.4
-
   # ========== 代码检查 ==========
   flutter_lints: ^6.0.0
 
   flutter_slidable: ^3.0.1
-
-  graphview: ^1.2.0
 
   intl: ^0.20.2
 
@@ -84,5 +75,3 @@ dev_dependencies:
   drift_dev: ^2.14.0
 
   dart_openai: ^6.1.1
-flutter:
-  uses-material-design: true

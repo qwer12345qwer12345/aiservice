@@ -154,18 +154,6 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
             _PaginationBar(
               currentIndex: currentIndex,
               totalPages: visibleRoundIds.length,
-              onPrev: (currentIndex > 0)
-                  ? () => _pageController?.previousPage(
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.easeOutCubic,
-                      )
-                  : null,
-              onNext: (currentIndex < visibleRoundIds.length - 1)
-                  ? () => _pageController?.nextPage(
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.easeOutCubic,
-                      )
-                  : null,
             ),
           Expanded(
             child: visibleRoundIds.isEmpty
@@ -311,7 +299,10 @@ class _UserSection extends ConsumerWidget {
           content: round.content,
           isUser: true,
           onEdit: null,
-          onCopy: () => Clipboard.setData(ClipboardData(text: round.content)),
+          onCopy: () {
+            Clipboard.setData(ClipboardData(text: round.content));
+            AppToast.show('已复制');
+          },
         ),
         if (round.attach.isNotEmpty) ...[
           const SizedBox(height: 8),
@@ -381,7 +372,10 @@ class _AiReplySection extends ConsumerWidget {
             content: ai.content!,
             isUser: false,
             onRetryReply: ai.isIncomplete ? null : onRetryReply,
-            onCopy: () => Clipboard.setData(ClipboardData(text: ai.content!)),
+            onCopy: () {
+              Clipboard.setData(ClipboardData(text: ai.content!));
+              AppToast.show('已复制');
+            },
           )
         else
           const Padding(
@@ -395,13 +389,10 @@ class _AiReplySection extends ConsumerWidget {
 
 class _PaginationBar extends StatelessWidget {
   final int currentIndex, totalPages;
-  final VoidCallback? onPrev, onNext;
 
   const _PaginationBar({
     required this.currentIndex,
     required this.totalPages,
-    this.onPrev,
-    this.onNext,
   });
 
   @override

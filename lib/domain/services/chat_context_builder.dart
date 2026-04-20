@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:aiservice/core/models/attachment.dart';
+
 import '../../core/models/api_message.dart';
 import '../../core/models/chat_round.dart';
 import '../../data/repositories/conversation_repository.dart';
@@ -74,32 +76,18 @@ bool _isOnlySingleTextPart(List<ApiMessageContentPart> parts) {
 }
 
 Future<List<ApiMessageContentPart>> _buildAttachmentParts(
-  dynamic attachment,
+  Attachment attachment,
   ConversationRepository repository,
 ) async {
-  final lowerName = attachment.name.toLowerCase();
-  final mime = (attachment.mimeType ?? '').toLowerCase();
-
-  final isTextFile = mime.startsWith('text/') ||
-      mime == 'application/json' ||
-      lowerName.endsWith('.md') ||
-      lowerName.endsWith('.txt') ||
-      lowerName.endsWith('.json') ||
-      lowerName.endsWith('.dart') ||
-      lowerName.endsWith('.yaml') ||
-      lowerName.endsWith('.yml');
-
   if (attachment.isImage) {
     final bytes = await repository.getAttachment(attachment.relativePath);
-    final mimeType = attachment.mimeType ?? 'image/png';
+    final mimeType = attachment.mimeType;
     final base64Data = base64Encode(bytes);
     return [ApiMessageContentPart.imageUrl(imageUrl: ApiImageUrl(url: 'data:$mimeType;base64,$base64Data'))];
-  }
-
-  if (isTextFile) {
+  } else {
+    // 上层保证非图片一定是可读文本文件
     final bytes = await repository.getAttachment(attachment.relativePath);
-    return [ApiMessageContentPart.text(text: utf8.decode(bytes, allowMalformed: true))];
+    final text = utf8.decode(bytes, allowMalformed: true);
+    return [ApiMessageContentPart.text(text: text)];
   }
-
-  return [ApiMessageContentPart.text(text: '[附件: ${attachment.name}]')];
 }

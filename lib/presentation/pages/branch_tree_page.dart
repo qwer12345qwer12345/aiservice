@@ -1,7 +1,7 @@
+import 'dart:math';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:graphview/GraphView.dart';
 import 'package:intl/intl.dart';
 
 import '../../di/providers.dart';
@@ -11,12 +11,11 @@ import '../providers/chat_notifier.dart' show chatTopologyProvider, roundDetailP
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_toast.dart';
 
-extension SpacedIterable on Iterable<Widget> {
-  List<Widget> spaced(double spacing) {
-    if (isEmpty) return [];
-    return expand((widget) => [widget, SizedBox(width: spacing)]).toList()..removeLast();
-  }
-}
+const double _nodeWidth = 300.0;
+const double _nodeHeight = 200.0;
+const double _levelSeparation = 120.0;
+const double _siblingSeparation = 40.0;
+const double _canvasPadding = 2000.0;
 
 class BranchTreePage extends ConsumerStatefulWidget {
   final String sessionId;
@@ -33,25 +32,10 @@ class BranchTreePage extends ConsumerStatefulWidget {
 }
 
 class _BranchTreePageState extends ConsumerState<BranchTreePage> {
-  final GlobalKey _viewerKey = GlobalKey();
-  final GlobalKey _targetNodeKey = GlobalKey();
   final TransformationController _transformationController = TransformationController();
-  
-  final BuchheimWalkerConfiguration _builder = BuchheimWalkerConfiguration()
-    ..siblingSeparation = 40
-    ..levelSeparation = 78
-    ..subtreeSeparation = 50
-    ..orientation = BuchheimWalkerConfiguration.ORIENTATION_TOP_BOTTOM;
-
+  final GlobalKey _viewerKey = GlobalKey();
+  final Map<String, double> _nodeWidthCache = {};
   bool _hasFocused = false;
-
-  @override
-  void didUpdateWidget(covariant BranchTreePage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.sessionId != widget.sessionId || oldWidget.initialFocusRoundId != widget.initialFocusRoundId) {
-      _hasFocused = false; // 切换文件/目标时重置聚焦状态
-    }
-  }
 
   @override
   void dispose() {
@@ -59,38 +43,137 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     super.dispose();
   }
 
-  String _buildGraphSignature(List<({String id, String? parentId})> topology) {
-    if (topology.isEmpty) return 'empty';
-    return topology.map((t) => '${t.id}:${t.parentId ?? 'root'}').join('|');
+  void _computeWidthsForTree(TreeNode root) {
+    void postOrder(TreeNode node) {
+      if (node.children.isEmpty) {
+        _nodeWidthCache[node.id] = _nodeWidth;
+        return;
+      }
+      double total = 0;
+      for (final child in node.children) {
+        postOrder(child);
+        total += _nodeWidthCache[child.id]!;
+      }
+      // 加上兄弟节点之间的间距
+      total += (node.children.length - 1) * _siblingSeparation;
+      _nodeWidthCache[node.id] = total;
+    }
+    postOrder(root);
+  }
+  // ==================== 布局算法 ====================
+
+  double _subtreeWidth(TreeNode node) {
+    return _nodeWidthCache[node.id] ?? _nodeWidth;
   }
 
-  void _onTargetLaidOut() {
-    if (_hasFocused) return;
-    
-    final targetCtx = _targetNodeKey.currentContext;
-    final viewerCtx = _viewerKey.currentContext;
-    if (targetCtx == null || viewerCtx == null) return;
+  void _layoutNode(TreeNode node, double x, double y, Map<String, Offset> positions) {
+    positions[node.id] = Offset(x, y);
+    if (node.children.isEmpty) return;
 
-    final targetBox = targetCtx.findRenderObject() as RenderBox?;
-    final viewerBox = viewerCtx.findRenderObject() as RenderBox?;
-    if (targetBox == null || viewerBox == null || !targetBox.hasSize || !viewerBox.hasSize) return;
-
-    final targetCenter = targetBox.localToGlobal(targetBox.size.center(Offset.zero), ancestor: viewerBox);
-    final viewerCenter = viewerBox.size.center(Offset.zero);
-
-    _transformationController.value = Matrix4.identity()
-      ..translate(viewerCenter.dx - targetCenter.dx, viewerCenter.dy - targetCenter.dy);
-
-    _hasFocused = true;
-    setState(() {});
+    final childWidths = node.children.map((c) => _subtreeWidth(c)).toList();
+    final totalChildrenWidth = childWidths.fold(0.0, (a, b) => a + b) +
+        (node.children.length - 1) * _siblingSeparation;
+    double startX = x + (_nodeWidth - totalChildrenWidth) / 2;
+    for (int i = 0; i < node.children.length; i++) {
+      final child = node.children[i];
+      final childWidth = childWidths[i];
+      final childX = startX + childWidth / 2 - _nodeWidth / 2;
+      _layoutNode(child, childX, y + _nodeHeight + _levelSeparation, positions);
+      startX += childWidth + _siblingSeparation;
+    }
   }
+
+  _TreeLayout _computeLayout(List<TreeNode> roots) {
+    _nodeWidthCache.clear();
+    for (final root in roots) {
+      _computeWidthsForTree(root);
+    }
+    final positions = <String, Offset>{};
+    double currentX = 0;
+    double maxHeight = 0;
+
+    for (final root in roots) {
+      final tempPositions = <String, Offset>{};
+      _layoutNode(root, currentX, 0, tempPositions);
+
+      double minX = double.infinity, maxX = -double.infinity;
+      double minY = double.infinity, maxY = -double.infinity;
+      for (final pos in tempPositions.values) {
+        minX = min(minX, pos.dx);
+        maxX = max(maxX, pos.dx + _nodeWidth);
+        minY = min(minY, pos.dy);
+        maxY = max(maxY, pos.dy + _nodeHeight);
+      }
+      final width = maxX - minX;
+      final height = maxY - minY;
+
+      final offsetX = currentX - minX;
+      for (final entry in tempPositions.entries) {
+        positions[entry.key] = Offset(entry.value.dx + offsetX, entry.value.dy);
+      }
+
+      currentX += width + _siblingSeparation;
+      maxHeight = max(maxHeight, height);
+    }
+
+    final canvasWidth = currentX + _canvasPadding * 2;
+    final canvasHeight = maxHeight + _canvasPadding * 2;
+    return _TreeLayout(positions: positions, canvasSize: Size(canvasWidth, canvasHeight));
+  }
+
+  // ==================== 连线 ====================
+
+  List<(Offset, Offset)> _buildParentChildPairs(List<TreeNode> roots, Map<String, Offset> positions) {
+    final pairs = <(Offset, Offset)>[];
+    void traverse(TreeNode node) {
+      final parentPos = positions[node.id];
+      if (parentPos == null) return;
+      for (final child in node.children) {
+        final childPos = positions[child.id];
+        if (childPos != null) {
+          pairs.add((parentPos, childPos));
+        }
+        traverse(child);
+      }
+    }
+    for (final root in roots) traverse(root);
+    return pairs;
+  }
+
+  // ==================== 节点构建 ====================
+
+  List<Widget> _buildAllNodeWidgets(List<TreeNode> roots, Map<String, Offset> positions) {
+    final widgets = <Widget>[];
+    void addNode(TreeNode node) {
+      final pos = positions[node.id];
+      if (pos != null) {
+        widgets.add(
+          Positioned(
+            left: pos.dx,
+            top: pos.dy,
+            child: _TreeNodeCard(
+              roundId: node.id,
+              onSwitch: () => Navigator.of(context).pop(node.id),
+              onDelete: () async {
+                if (await _confirmDelete()) await _deleteNode(node.id);
+              },
+            ),
+          ),
+        );
+      }
+      for (final child in node.children) addNode(child);
+    }
+    for (final root in roots) addNode(root);
+    return widgets;
+  }
+
+  // ==================== 删除逻辑 ====================
 
   Future<void> _deleteNode(String nodeId) async {
     final topology = await ref.read(chatTopologyProvider(widget.sessionId).future);
     final roots = buildTree(topology);
-    final target = _findIterative(roots, nodeId);
+    final target = _findNodeById(roots, nodeId);
     if (target == null) return;
-
     final ids = _collectSubtreeIds(target).toList();
     try {
       await ref.read(conversationRepositoryProvider)
@@ -101,17 +184,25 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
   }
 
   Future<bool> _confirmDelete() async {
-    return await showDialog<bool>(
+    return await showCupertinoDialog<bool>(
           context: context,
-          builder: (ctx) => AlertDialog(
+          builder: (ctx) => CupertinoAlertDialog(
             title: const Text('删除节点'),
             content: const Text('确定删除这一轮及其后续全部分支吗？'),
             actions: [
-              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
-              FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('删除')),
+              CupertinoDialogAction(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('取消'),
+              ),
+              CupertinoDialogAction(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                isDestructiveAction: true,
+                child: const Text('删除'),
+              ),
             ],
           ),
-        ) ?? false;
+        ) ??
+        false;
   }
 
   Set<String> _collectSubtreeIds(TreeNode root) {
@@ -125,7 +216,7 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     return ids;
   }
 
-  TreeNode? _findIterative(List<TreeNode> roots, String targetId) {
+  TreeNode? _findNodeById(List<TreeNode> roots, String targetId) {
     final stack = [...roots];
     while (stack.isNotEmpty) {
       final node = stack.removeLast();
@@ -135,189 +226,167 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     return null;
   }
 
+  // ==================== 聚焦 ====================
+
+  void _focusOnNode(String nodeId, Map<String, Offset> positions) {
+    if (_hasFocused) return;
+    final nodePos = positions[nodeId];
+    if (nodePos == null) return;
+    final viewerBox = _viewerKey.currentContext?.findRenderObject() as RenderBox?;
+    if (viewerBox == null) return;
+    final viewerSize = viewerBox.size;
+    final nodeCenter = Offset(nodePos.dx + _nodeWidth / 2, nodePos.dy + _nodeHeight / 2);
+    final targetOffset = Offset(viewerSize.width / 2 - nodeCenter.dx, viewerSize.height / 2 - nodeCenter.dy);
+    _transformationController.value = Matrix4.identity()..translate(targetOffset.dx, targetOffset.dy);
+    _hasFocused = true;
+    setState(() {});
+  }
+
+  // ==================== 构建 ====================
+
   @override
   Widget build(BuildContext context) {
-    final topology = ref.watch(chatTopologyProvider(widget.sessionId)).valueOrNull ?? [];
-    final roots = buildTree(topology);
-    final graphSignature = _buildGraphSignature(topology);
-    final targetId = widget.initialFocusRoundId;
-
+    final topology = ref.watch(chatTopologyProvider(widget.sessionId));
     return AppPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        middle: Text('分支树')
-      ),
-      body: roots.isEmpty
-          ? const Center(child: Text('暂无分支结构'))
-          : InteractiveViewer(
-              key: _viewerKey,
-              constrained: false,
-              boundaryMargin: const EdgeInsets.all(1000),
-              minScale: 0.1,
-              maxScale: 3.0,
-              transformationController: _transformationController,
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: RepaintBoundary( // 🔑 隔离 setState 重建，保护 InteractiveViewer 手势状态
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: roots.map((root) => _RootTreeGroup(
-                      key: ValueKey('root-${root.id}-$graphSignature'),
-                      root: root,
-                      graphSignature: graphSignature,
-                      builderConfig: _builder,
-                      targetNodeId: targetId,
-                      targetNodeKey: _targetNodeKey,
-                      onTargetLaidOut: _onTargetLaidOut,
-                      onSwitch: (id) => Navigator.of(context).pop(id),
-                      onDelete: (id) async {
-                        if (await _confirmDelete()) await _deleteNode(id);
-                      },
-                    )).spaced(40),
+      navigationBar: CupertinoNavigationBar(middle: const Text('分支树')),
+      body: topology.when(
+        loading: () => const Center(child: CupertinoActivityIndicator()),
+        error: (err, _) => Center(child: Text('加载分支结构失败：$err')),
+        data: (topology) {
+          final roots = buildTree(topology);
+          if (roots.isEmpty) return const Center(child: Text('暂无分支结构'));
+          final layout = _computeLayout(roots);
+          final positions = layout.positions;
+          final canvasSize = layout.canvasSize;
+          final pairs = _buildParentChildPairs(roots, positions);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!_hasFocused) _focusOnNode(widget.initialFocusRoundId, positions);
+          });
+          return InteractiveViewer(
+            key: _viewerKey,
+            transformationController: _transformationController,
+            minScale: 0.2,
+            maxScale: 3.0,
+            constrained: false,
+            boundaryMargin: const EdgeInsets.all(_canvasPadding),
+            child: SizedBox(
+              width: canvasSize.width,
+              height: canvasSize.height,
+              child: Stack(
+                children: [
+                  CustomPaint(
+                    painter: _OrthogonalLinePainter(pairs: pairs),
+                    size: canvasSize,
                   ),
-                ),
+                  ..._buildAllNodeWidgets(roots, positions),
+                ],
               ),
             ),
+          );
+        },
+      ),
     );
   }
 }
 
-class _RootTreeGroup extends StatelessWidget {
-  final TreeNode root;
-  final String graphSignature;
-  final BuchheimWalkerConfiguration builderConfig;
-  final void Function(String id) onSwitch;
-  final void Function(String id) onDelete;
-  final String? targetNodeId;
-  final GlobalKey? targetNodeKey;
-  final VoidCallback? onTargetLaidOut;
+class _TreeLayout {
+  final Map<String, Offset> positions;
+  final Size canvasSize;
+  _TreeLayout({required this.positions, required this.canvasSize});
+}
 
-  const _RootTreeGroup({
-    super.key,
-    required this.root,
-    required this.graphSignature,
-    required this.builderConfig,
-    required this.onSwitch,
-    required this.onDelete,
-    this.targetNodeId,
-    this.targetNodeKey,
-    this.onTargetLaidOut,
-  });
+class _OrthogonalLinePainter extends CustomPainter {
+  final List<(Offset, Offset)> pairs;
+  _OrthogonalLinePainter({required this.pairs});
 
   @override
-  Widget build(BuildContext context) {
-    final graph = Graph()..isTree = true;
-    final nodeMap = <String, Node>{};
-    final graphToTree = <Node, TreeNode>{};
-    final stack = <TreeNode>[root];
-
-    while (stack.isNotEmpty) {
-      final node = stack.removeLast();
-      final gNode = Node.Id('${root.id}-${node.id}-$graphSignature');
-      nodeMap[node.id] = gNode;
-      graphToTree[gNode] = node;
-      graph.addNode(gNode);
-      if (node.parentId != null) {
-        final parent = nodeMap[node.parentId!];
-        if (parent != null) graph.addEdge(parent, gNode);
-      }
-      stack.addAll(node.children.reversed);
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = CupertinoColors.separator
+      ..strokeWidth = 1.6
+      ..style = PaintingStyle.stroke;
+    for (final pair in pairs) {
+      final parentCenter = Offset(pair.$1.dx + _nodeWidth / 2, pair.$1.dy + _nodeHeight / 2);
+      final childCenter = Offset(pair.$2.dx + _nodeWidth / 2, pair.$2.dy + _nodeHeight / 2);
+      final start = Offset(parentCenter.dx, parentCenter.dy + _nodeHeight / 2);
+      final end = Offset(childCenter.dx, childCenter.dy - _nodeHeight / 2);
+      final midY = (start.dy + end.dy) / 2;
+      final path = Path()
+        ..moveTo(start.dx, start.dy)
+        ..lineTo(start.dx, midY)
+        ..lineTo(end.dx, midY)
+        ..lineTo(end.dx, end.dy);
+      canvas.drawPath(path, paint);
     }
-
-    return GraphView(
-      key: ValueKey('graph-${root.id}-$graphSignature'),
-      graph: graph,
-      animated: false,
-      algorithm: BuchheimWalkerAlgorithm(builderConfig, TreeEdgeRenderer(builderConfig)),
-      paint: Paint()
-        ..color = Theme.of(context).dividerColor
-        ..strokeWidth = 1.6
-        ..style = PaintingStyle.stroke,
-      builder: (Node node) {
-        final tree = graphToTree[node];
-        if (tree == null) return const SizedBox.shrink();
-
-        final isTarget = targetNodeId != null && tree.id == targetNodeId;
-        final child = _GraphNodeShell(
-          roundId: tree.id,
-          onSwitch: () => onSwitch(tree.id),
-          onDelete: () => onDelete(tree.id),
-        );
-
-        return isTarget
-            ? _NodeAnchor(key: targetNodeKey, onLaidOut: onTargetLaidOut, child: child)
-            : child;
-      },
-    );
   }
-}
-
-class _NodeAnchor extends StatefulWidget {
-  final Widget child;
-  final VoidCallback? onLaidOut;
-  const _NodeAnchor({super.key, required this.child, this.onLaidOut});
 
   @override
-  State<_NodeAnchor> createState() => _NodeAnchorState();
+  bool shouldRepaint(covariant _OrthogonalLinePainter oldDelegate) => true;
 }
 
-class _NodeAnchorState extends State<_NodeAnchor> {
-  Size? _lastSize;
-  @override
-  Widget build(BuildContext context) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || widget.onLaidOut == null) return;
-      final box = context.findRenderObject() as RenderBox?;
-      if (box == null || !box.hasSize || box.size.isEmpty) return;
-      if (_lastSize == box.size) return;
-      _lastSize = box.size;
-      widget.onLaidOut!();
-    });
-    return widget.child;
-  }
-}
-
-class _GraphNodeShell extends ConsumerWidget {
+class _TreeNodeCard extends ConsumerWidget {
   final String roundId;
   final VoidCallback onSwitch;
   final VoidCallback onDelete;
 
-  const _GraphNodeShell({required this.roundId, required this.onSwitch, required this.onDelete});
+  const _TreeNodeCard({
+    required this.roundId,
+    required this.onSwitch,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final round = ref.watch(roundDetailProvider(roundId)).valueOrNull;
-    final dateText = round == null ? null : DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(round.createdAt));
+    final dateText = round == null
+        ? null
+        : DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(round.createdAt));
     final userText = round?.userContent;
-    final aiText = round == null ? null : ((round.assistantContent ?? '').trim().isEmpty ? '（等待回复）' : round.assistantContent!);
+    final aiText = round == null
+        ? null
+        : ((round.assistantContent ?? '').trim().isEmpty ? '（等待回复）' : round.assistantContent!);
 
     return Container(
-      color: CupertinoColors.systemBackground,
-      padding: const EdgeInsets.all(14),
-      child: SizedBox(
-        width: 290,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              height: 20,
-              child: dateText == null
-                  ? const _SkeletonBar(width: 160, height: 14)
-                  : Align(alignment: Alignment.centerLeft, child: Text(dateText, style: CupertinoTheme.of(context).textTheme.textStyle)),
-            ),
-            const SizedBox(height: 12),
-            _PreviewSlot(label: 'YOU', content: userText, loading: round == null),
-            const SizedBox(height: 8),
-            _PreviewSlot(label: 'AI', content: aiText, loading: round == null),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(child: CupertinoButton.filled(onPressed: onSwitch, child: const Text('切换到此分支'))),
-                CupertinoButton(onPressed: onDelete, child: const Icon(CupertinoIcons.delete)),
-              ],
-            ),
-          ],
-        ),
+      width: _nodeWidth,
+      height: _nodeHeight,
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemBackground,
+        border: Border.all(color: CupertinoColors.separator, width: 0.5),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            dateText ?? '加载中...',
+            style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(fontSize: 12),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 8),
+          Expanded(child: _PreviewSlot(label: 'YOU', content: userText, loading: round == null)),
+          const SizedBox(height: 4),
+          Expanded(child: _PreviewSlot(label: 'AI', content: aiText, loading: round == null)),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: CupertinoButton.filled(
+                  onPressed: onSwitch,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: const Text('切换到此分支'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              CupertinoButton(
+                onPressed: onDelete,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: const Icon(CupertinoIcons.delete),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -327,53 +396,34 @@ class _PreviewSlot extends StatelessWidget {
   final String label;
   final String? content;
   final bool loading;
-  const _PreviewSlot({required this.label, required this.content, required this.loading});
+
+  const _PreviewSlot({
+    required this.label,
+    required this.content,
+    required this.loading,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = CupertinoTheme.of(context).textTheme;
-    return SizedBox(
-      height: 78,
-      child: Container(
-        color: CupertinoColors.systemBackground,
-        padding: const EdgeInsets.all(10),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(width: 34, child: Text('$label ', style: textTheme.textStyle.copyWith(fontWeight: FontWeight.w700))),
-            Expanded(
-              child: loading
-                  ? const _PreviewSkeleton()
-                  : Text((content == null || content!.trim().isEmpty) ? '（空）' : content!, maxLines: 3, overflow: TextOverflow.ellipsis, style: textTheme.textStyle),
-            ),
-          ],
+    final style = CupertinoTheme.of(context).textTheme.textStyle;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 34,
+          child: Text('$label ', style: style.copyWith(fontWeight: FontWeight.w700)),
         ),
-      ),
+        Expanded(
+          child: loading
+              ? const Text('加载中...', maxLines: 2, overflow: TextOverflow.ellipsis)
+              : Text(
+                  (content == null || content!.trim().isEmpty) ? '（空）' : content!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: style,
+                ),
+        ),
+      ],
     );
-  }
-}
-
-class _PreviewSkeleton extends StatelessWidget {
-  const _PreviewSkeleton();
-  @override
-  Widget build(BuildContext context) {
-    return const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _SkeletonBar(widthFactor: 0.92), SizedBox(height: 8), _SkeletonBar(widthFactor: 0.76), SizedBox(height: 8), _SkeletonBar(widthFactor: 0.58),
-    ]);
-  }
-}
-
-class _SkeletonBar extends StatelessWidget {
-  final double? width;
-  final double height;
-  final double? widthFactor;
-  const _SkeletonBar({this.width, this.height = 12, this.widthFactor});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme.surfaceContainerHighest;
-    Widget child = Container(width: width, height: height, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(6)));
-    if (widthFactor != null) child = FractionallySizedBox(widthFactor: widthFactor, alignment: Alignment.centerLeft, child: child);
-    return child;
   }
 }
