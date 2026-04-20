@@ -118,195 +118,6 @@ lib/presentation/widgets/thought_bubble.dart
 
 # Files
 
-## File: lib/presentation/providers/settings_form_notifier.dart
-```dart
-import 'package:aiservice/data/services/config_service.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/app_config.dart';
-import '../../core/models/model_info.dart';
-import '../../di/providers.dart';
-
-/// 设置表单的状态
-class SettingsFormState {
-  final AppConfig config;
-  final bool isSaving;
-  final String? error;
-
-  const SettingsFormState({
-    required this.config,
-    this.isSaving = false,
-    this.error,
-  });
-
-  SettingsFormState copyWith({
-    AppConfig? config,
-    bool? isSaving,
-    String? error,
-  }) {
-    return SettingsFormState(
-      config: config ?? this.config,
-      isSaving: isSaving ?? this.isSaving,
-      error: error,
-    );
-  }
-}
-
-/// 设置表单 Notifier
-///
-/// 职责：
-/// - 管理表单草稿状态
-/// - 提供字段更新方法
-/// - 处理保存逻辑
-class SettingsFormNotifier extends Notifier<SettingsFormState> {
-  late final ConfigService _configService;
-
-  @override
-  SettingsFormState build() {
-    _configService = ref.read(configServiceProvider);
-    // 初始状态为空配置，等待加载
-    return SettingsFormState(config: AppConfig.defaultConfig());
-  }
-
-  /// 从实际配置加载到草稿
-  void load(AppConfig config) {
-    state = state.copyWith(config: config, error: null);
-  }
-
-  /// 更新 Base URL
-  void updateBaseUrl(String value) {
-    state = state.copyWith(
-      config: state.config.copyWith(baseUrl: value),
-    );
-  }
-
-  /// 更新 API Key
-  void updateApiKey(String value) {
-    state = state.copyWith(
-      config: state.config.copyWith(apiKey: value),
-    );
-  }
-
-  /// 更新 Models Path
-  void updateModelsPath(String value) {
-    state = state.copyWith(
-      config: state.config.copyWith(modelsPath: value),
-    );
-  }
-
-  /// 更新 Chat Path
-  void updateChatPath(String value) {
-    state = state.copyWith(
-      config: state.config.copyWith(chatPath: value),
-    );
-  }
-
-  /// 更新 API Mode
-  void updateApiMode(String value) {
-    final defaults = _defaultPathsForMode(value);
-    state = state.copyWith(
-      config: state.config.copyWith(
-        apiMode: value,
-        modelsPath: defaults['models']!,
-        chatPath: defaults['chat']!,
-      ),
-    );
-  }
-
-  /// 更新选中的模型
-  void updateSelectedModel(String value) {
-    state = state.copyWith(
-      config: state.config.copyWith(selectedModel: value.isEmpty ? null : value),
-    );
-  }
-
-  /// 切换推理能力
-  void toggleReasoning(bool value) {
-    _updateModelCapability(
-      overrideSupportsReasoning: value,
-    );
-  }
-
-  /// 切换视觉能力
-  void toggleVision(bool value) {
-    _updateModelCapability(
-      overrideSupportsVision: value,
-    );
-  }
-
-  /// 内部方法：更新当前模型的能力覆盖
-  void _updateModelCapability({
-    bool? overrideSupportsReasoning,
-    bool? overrideSupportsVision,
-  }) {
-    final modelId = state.config.selectedModel;
-    if (modelId == null || modelId.isEmpty) return;
-
-    final models = [...(state.config.availableModels ?? const <ModelInfo>[])];
-    final index = models.indexWhere((m) => m.id == modelId);
-    final baseModel = index >= 0 ? models[index] : ModelInfo(id: modelId);
-
-    final updatedModel = baseModel.copyWith(
-      overrideSupportsReasoning: overrideSupportsReasoning ?? baseModel.overrideSupportsReasoning,
-      overrideSupportsVision: overrideSupportsVision ?? baseModel.overrideSupportsVision,
-    );
-
-    if (index >= 0) {
-      models[index] = updatedModel;
-    } else {
-      models.add(updatedModel);
-    }
-
-    state = state.copyWith(
-      config: state.config.copyWith(availableModels: models),
-    );
-  }
-
-  /// 保存配置
-  Future<void> save() async {
-    state = state.copyWith(isSaving: true, error: null);
-    try {
-      await _configService.saveConfig(state.config);
-      state = state.copyWith(isSaving: false);
-    } catch (e) {
-      state = state.copyWith(isSaving: false, error: e.toString());
-      rethrow;
-    }
-  }
-
-  /// 恢复默认配置
-  void restoreDefaults() {
-    state = state.copyWith(config: AppConfig.defaultConfig());
-  }
-
-  /// 辅助方法：根据 API Mode 获取默认路径
-  Map<String, String> _defaultPathsForMode(String apiMode) {
-    switch (apiMode) {
-      case 'google':
-        return {
-          'models': 'v1beta/models',
-          'chat': 'v1beta/models/{model}:streamGenerateContent',
-        };
-      case 'responses':
-        return {
-          'models': 'v1/models',
-          'chat': 'v1/responses',
-        };
-      case 'chat_completions':
-      default:
-        return {
-          'models': 'v1/models',
-          'chat': 'v1/chat/completions',
-        };
-    }
-  }
-}
-
-/// Provider
-final settingsFormProvider = NotifierProvider<SettingsFormNotifier, SettingsFormState>(
-  SettingsFormNotifier.new,
-);
-```
-
 ## File: lib/core/models/api_message.dart
 ```dart
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -7835,6 +7646,195 @@ class PendingAttachment {
 }
 ```
 
+## File: lib/presentation/providers/settings_form_notifier.dart
+```dart
+import 'package:aiservice/data/services/config_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/app_config.dart';
+import '../../core/models/model_info.dart';
+import '../../di/providers.dart';
+
+/// 设置表单的状态
+class SettingsFormState {
+  final AppConfig config;
+  final bool isSaving;
+  final String? error;
+
+  const SettingsFormState({
+    required this.config,
+    this.isSaving = false,
+    this.error,
+  });
+
+  SettingsFormState copyWith({
+    AppConfig? config,
+    bool? isSaving,
+    String? error,
+  }) {
+    return SettingsFormState(
+      config: config ?? this.config,
+      isSaving: isSaving ?? this.isSaving,
+      error: error,
+    );
+  }
+}
+
+/// 设置表单 Notifier
+///
+/// 职责：
+/// - 管理表单草稿状态
+/// - 提供字段更新方法
+/// - 处理保存逻辑
+class SettingsFormNotifier extends Notifier<SettingsFormState> {
+  late final ConfigService _configService;
+
+  @override
+  SettingsFormState build() {
+    _configService = ref.read(configServiceProvider);
+    // 初始状态为空配置，等待加载
+    return SettingsFormState(config: AppConfig.defaultConfig());
+  }
+
+  /// 从实际配置加载到草稿
+  void load(AppConfig config) {
+    state = state.copyWith(config: config, error: null);
+  }
+
+  /// 更新 Base URL
+  void updateBaseUrl(String value) {
+    state = state.copyWith(
+      config: state.config.copyWith(baseUrl: value),
+    );
+  }
+
+  /// 更新 API Key
+  void updateApiKey(String value) {
+    state = state.copyWith(
+      config: state.config.copyWith(apiKey: value),
+    );
+  }
+
+  /// 更新 Models Path
+  void updateModelsPath(String value) {
+    state = state.copyWith(
+      config: state.config.copyWith(modelsPath: value),
+    );
+  }
+
+  /// 更新 Chat Path
+  void updateChatPath(String value) {
+    state = state.copyWith(
+      config: state.config.copyWith(chatPath: value),
+    );
+  }
+
+  /// 更新 API Mode
+  void updateApiMode(String value) {
+    final defaults = _defaultPathsForMode(value);
+    state = state.copyWith(
+      config: state.config.copyWith(
+        apiMode: value,
+        modelsPath: defaults['models']!,
+        chatPath: defaults['chat']!,
+      ),
+    );
+  }
+
+  /// 更新选中的模型
+  void updateSelectedModel(String value) {
+    state = state.copyWith(
+      config: state.config.copyWith(selectedModel: value.isEmpty ? null : value),
+    );
+  }
+
+  /// 切换推理能力
+  void toggleReasoning(bool value) {
+    _updateModelCapability(
+      overrideSupportsReasoning: value,
+    );
+  }
+
+  /// 切换视觉能力
+  void toggleVision(bool value) {
+    _updateModelCapability(
+      overrideSupportsVision: value,
+    );
+  }
+
+  /// 内部方法：更新当前模型的能力覆盖
+  void _updateModelCapability({
+    bool? overrideSupportsReasoning,
+    bool? overrideSupportsVision,
+  }) {
+    final modelId = state.config.selectedModel;
+    if (modelId == null || modelId.isEmpty) return;
+
+    final models = [...(state.config.availableModels ?? const <ModelInfo>[])];
+    final index = models.indexWhere((m) => m.id == modelId);
+    final baseModel = index >= 0 ? models[index] : ModelInfo(id: modelId);
+
+    final updatedModel = baseModel.copyWith(
+      overrideSupportsReasoning: overrideSupportsReasoning ?? baseModel.overrideSupportsReasoning,
+      overrideSupportsVision: overrideSupportsVision ?? baseModel.overrideSupportsVision,
+    );
+
+    if (index >= 0) {
+      models[index] = updatedModel;
+    } else {
+      models.add(updatedModel);
+    }
+
+    state = state.copyWith(
+      config: state.config.copyWith(availableModels: models),
+    );
+  }
+
+  /// 保存配置
+  Future<void> save() async {
+    state = state.copyWith(isSaving: true, error: null);
+    try {
+      await _configService.saveConfig(state.config);
+      state = state.copyWith(isSaving: false);
+    } catch (e) {
+      state = state.copyWith(isSaving: false, error: e.toString());
+      rethrow;
+    }
+  }
+
+  /// 恢复默认配置
+  void restoreDefaults() {
+    state = state.copyWith(config: AppConfig.defaultConfig());
+  }
+
+  /// 辅助方法：根据 API Mode 获取默认路径
+  Map<String, String> _defaultPathsForMode(String apiMode) {
+    switch (apiMode) {
+      case 'google':
+        return {
+          'models': 'v1beta/models',
+          'chat': 'v1beta/models/{model}:streamGenerateContent',
+        };
+      case 'responses':
+        return {
+          'models': 'v1/models',
+          'chat': 'v1/responses',
+        };
+      case 'chat_completions':
+      default:
+        return {
+          'models': 'v1/models',
+          'chat': 'v1/chat/completions',
+        };
+    }
+  }
+}
+
+/// Provider
+final settingsFormProvider = NotifierProvider<SettingsFormNotifier, SettingsFormState>(
+  SettingsFormNotifier.new,
+);
+```
+
 ## File: lib/presentation/widgets/common/app_toast.dart
 ```dart
 import 'package:flutter/material.dart';
@@ -9638,64 +9638,6 @@ Future<List<ApiMessageContentPart>> _buildAttachmentParts(
 }
 ```
 
-## File: lib/presentation/pages/text_attachment_viewer_page.dart
-```dart
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import '../widgets/common/app_page_scaffold.dart';
-import '../widgets/common/app_toast.dart';
-
-class TextAttachmentViewerPage extends StatelessWidget {
-  final String title;
-  final String content;
-
-  const TextAttachmentViewerPage({
-    super.key,
-    required this.title,
-    required this.content,
-  });
-
-  Future<void> _copyAll() async {
-    await Clipboard.setData(ClipboardData(text: content));
-    await AppToast.show('全文已复制');
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return AppPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        middle: Text(
-          title,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: CupertinoButton(
-          onPressed: _copyAll,
-          child: const Icon(CupertinoIcons.doc_on_doc),
-        ),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Card(
-          margin: EdgeInsets.zero,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: SelectableText(
-              content,
-              style: textTheme.bodyMedium?.copyWith(
-                fontFamily: 'monospace',
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-```
-
 ## File: lib/presentation/providers/chat_generation_provider.dart
 ```dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9820,130 +9762,28 @@ final inputStateProvider =
     NotifierProvider<InputNotifier, InputState>(InputNotifier.new);
 ```
 
-## File: lib/presentation/themes/app_theme.dart
-```dart
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-
-class AppTheme {
-  static const Color _seedColor = Colors.blueGrey;
-
-  static ThemeData get lightTheme {
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: _seedColor,
-      brightness: Brightness.light,
-    );
-
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: colorScheme,
-      appBarTheme: const AppBarTheme(
-        systemOverlayStyle: SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.dark,
-          statusBarBrightness: Brightness.light,
-          systemNavigationBarIconBrightness: Brightness.dark,
-        ),
-      ),
-      cardTheme: const CardThemeData(
-        elevation: 0,
-      ),
-      inputDecorationTheme: const InputDecorationTheme(
-        border: OutlineInputBorder(),
-      ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(),
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(),
-      ),
-      textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(),
-      ),
-      snackBarTheme: const SnackBarThemeData(
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  static ThemeData get darkTheme {
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: _seedColor,
-      brightness: Brightness.dark,
-    );
-
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: colorScheme,
-      appBarTheme: const AppBarTheme(
-        systemOverlayStyle: SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.light,
-          statusBarBrightness: Brightness.dark,
-          systemNavigationBarIconBrightness: Brightness.light,
-        ),
-      ),
-      cardTheme: const CardThemeData(
-        elevation: 0,
-      ),
-      inputDecorationTheme: const InputDecorationTheme(
-        border: OutlineInputBorder(),
-      ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(),
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(),
-      ),
-      textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(),
-      ),
-      snackBarTheme: const SnackBarThemeData(
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  static CupertinoThemeData get cupertinoTheme {
-    return const CupertinoThemeData();
-  }
-}
-```
-
 ## File: lib/presentation/widgets/common/app_card.dart
 ```dart
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 
 class AppCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
   final EdgeInsetsGeometry? margin;
-  final Color? color;
-  final ShapeBorder? shape;
-  final double? elevation;
 
   const AppCard({
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(16),
     this.margin,
-    this.color,
-    this.shape,
-    this.elevation,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return Container(
       margin: margin,
-      color: color,
-      shape: shape,
-      elevation: elevation,
-      child: Padding(
-        padding: padding,
-        child: child,
-      ),
+      padding: padding,
+      child: child,
     );
   }
 }
@@ -9951,8 +9791,7 @@ class AppCard extends StatelessWidget {
 
 ## File: lib/presentation/widgets/common/app_section.dart
 ```dart
-import 'package:flutter/material.dart';
-import 'app_card.dart';
+import 'package:flutter/cupertino.dart';
 
 class AppSection extends StatelessWidget {
   final String title;
@@ -9970,21 +9809,14 @@ class AppSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final textTheme = CupertinoTheme.of(context).textTheme;
 
-    return AppCard(
+    return Container(
       margin: margin ?? const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: textTheme.titleMedium),
-          if (subtitle != null) ...[
-            const SizedBox(height: 8),
-            Text(subtitle!, style: textTheme.bodySmall),
-          ],
-          const SizedBox(height: 16),
-          ...children,
-        ],
+      child: CupertinoFormSection.insetGrouped(
+        header: Text(title, style: textTheme.navTitleTextStyle),
+        footer: subtitle != null ? Text(subtitle!, style: textTheme.tabLabelTextStyle) : null,
+        children: children,
       ),
     );
   }
@@ -10477,6 +10309,61 @@ abstract class _TreePath implements TreePath {
 }
 ```
 
+## File: lib/presentation/pages/text_attachment_viewer_page.dart
+```dart
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
+import '../widgets/common/app_page_scaffold.dart';
+import '../widgets/common/app_toast.dart';
+
+class TextAttachmentViewerPage extends StatelessWidget {
+  final String title;
+  final String content;
+
+  const TextAttachmentViewerPage({
+    super.key,
+    required this.title,
+    required this.content,
+  });
+
+  Future<void> _copyAll() async {
+    await Clipboard.setData(ClipboardData(text: content));
+    await AppToast.show('全文已复制');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = CupertinoTheme.of(context).textTheme;
+
+    return AppPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        middle: Text(
+          title,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: CupertinoButton(
+          onPressed: _copyAll,
+          child: const Icon(CupertinoIcons.doc_on_doc),
+        ),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Container(
+          color: CupertinoColors.systemBackground,
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            content,
+            style: textTheme.textStyle.copyWith(
+              fontFamily: 'monospace',
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+```
+
 ## File: lib/presentation/providers/attachment_bytes_provider.dart
 ```dart
 // presentation/providers/attachment_bytes_provider.dart
@@ -10493,6 +10380,17 @@ final attachmentBytesProvider =
     return repository.getAttachment(relativePath);
   },
 );
+```
+
+## File: lib/presentation/themes/app_theme.dart
+```dart
+import 'package:flutter/cupertino.dart';
+
+class AppTheme {
+  static CupertinoThemeData get cupertinoTheme {
+    return const CupertinoThemeData();
+  }
+}
 ```
 
 ## File: lib/presentation/themes/app_tokens.dart
@@ -10513,7 +10411,7 @@ abstract class AppTokens {
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -10593,32 +10491,26 @@ class _AttachmentActionHelper {
     BuildContext context,
     Uint8List bytes,
   ) async {
-    await showDialog(
+    await showCupertinoDialog(
       context: context,
       builder: (ctx) {
-        return Dialog(
-          child: Stack(
-            children: [
-              InteractiveViewer(
-                minScale: 0.5,
-                maxScale: 4,
-                child: Center(
-                  child: Image.memory(
-                    bytes,
-                    fit: BoxFit.contain,
-                  ),
-                ),
+        return CupertinoAlertDialog(
+          content: InteractiveViewer(
+            minScale: 0.5,
+            maxScale: 4,
+            child: Center(
+              child: Image.memory(
+                bytes,
+                fit: BoxFit.contain,
               ),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: IconButton(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  icon: const Icon(Icons.close),
-                ),
-              ),
-            ],
+            ),
           ),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('关闭'),
+            ),
+          ],
         );
       },
     );
@@ -10631,7 +10523,7 @@ class _AttachmentActionHelper {
   ) async {
     final text = utf8.decode(bytes, allowMalformed: true);
     await Navigator.of(context).push(
-      MaterialPageRoute(
+      CupertinoPageRoute(
         builder: (_) => TextAttachmentViewerPage(
           title: title,
           content: text,
@@ -10659,34 +10551,25 @@ class _ImageAttachmentThumb extends ConsumerWidget {
         width: 108,
         height: 108,
         child: Center(
-          child: CircularProgressIndicator(strokeWidth: 2),
+          child: CupertinoActivityIndicator(),
         ),
       ),
       error: (e, st) => const SizedBox(
         width: 108,
         height: 108,
         child: Center(
-          child: Icon(Icons.broken_image_outlined),
+          child: Icon(CupertinoIcons.exclamationmark_triangle),
         ),
       ),
       data: (bytes) {
-        return InkWell(
+        return GestureDetector(
           onTap: () => _AttachmentActionHelper.previewImage(context, bytes),
-          onLongPress: () =>
-              _AttachmentActionHelper.shareAttachmentFromBytes(
-            attachment,
-            bytes,
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
+          onLongPress: () => _AttachmentActionHelper.shareAttachmentFromBytes(attachment, bytes),
+          child: ClipRect(
             child: SizedBox(
               width: 108,
               height: 108,
-              child: Image.memory(
-                bytes,
-                fit: BoxFit.cover,
-                gaplessPlayback: true,
-              ),
+              child: Image.memory(bytes, fit: BoxFit.cover, gaplessPlayback: true),
             ),
           ),
         );
@@ -10710,27 +10593,47 @@ class _FileAttachmentChip extends ConsumerWidget {
       attachmentBytesProvider(attachment.relativePath),
     );
 
-    final leadingIcon =
-        isText ? Icons.description_outlined : Icons.attach_file_outlined;
+    final leadingIcon = isText ? CupertinoIcons.doc_text : CupertinoIcons.doc;
 
     return bytesAsync.when(
-      loading: () => Chip(
-        avatar: Icon(leadingIcon, size: 18),
-        label: Text(
-          attachment.name,
-          overflow: TextOverflow.ellipsis,
+      loading: () => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        color: CupertinoColors.systemGrey5,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(leadingIcon, size: 18),
+            const SizedBox(width: 6),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 180),
+              child: Text(
+                attachment.name,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
       ),
-      error: (e, st) => Chip(
-        avatar: const Icon(Icons.error_outline, size: 18),
-        label: Text(
-          attachment.name,
-          overflow: TextOverflow.ellipsis,
+      error: (e, st) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        color: CupertinoColors.systemGrey5,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(CupertinoIcons.exclamationmark_triangle, size: 18),
+            const SizedBox(width: 6),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 180),
+              child: Text(
+                attachment.name,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
       ),
       data: (bytes) {
-        return InkWell(
-          borderRadius: BorderRadius.circular(20),
+        return GestureDetector(
           onTap: () async {
             if (isText) {
               await _AttachmentActionHelper.openTextViewer(
@@ -10742,19 +10645,23 @@ class _FileAttachmentChip extends ConsumerWidget {
             }
             await AppToast.show('该文件暂不支持直接预览，请长按进行分享');
           },
-          onLongPress: () =>
-              _AttachmentActionHelper.shareAttachmentFromBytes(
-            attachment,
-            bytes,
-          ),
-          child: Chip(
-            avatar: Icon(leadingIcon, size: 18),
-            label: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 180),
-              child: Text(
-                attachment.name,
-                overflow: TextOverflow.ellipsis,
-              ),
+          onLongPress: () => _AttachmentActionHelper.shareAttachmentFromBytes(attachment, bytes),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            color: CupertinoColors.systemGrey5,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(leadingIcon, size: 18),
+                const SizedBox(width: 6),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 180),
+                  child: Text(
+                    attachment.name,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
           ),
         );
@@ -10764,52 +10671,9 @@ class _FileAttachmentChip extends ConsumerWidget {
 }
 ```
 
-## File: lib/presentation/widgets/common/app_page_scaffold.dart
-```dart
-import 'package:flutter/cupertino.dart';
-
-class AppPageScaffold extends StatelessWidget {
-  final ObstructingPreferredSizeWidget? navigationBar;
-  final Widget body;
-  final Widget? bottomNavigationBar;
-  final Color? backgroundColor;
-  final bool useSafeArea;
-
-  const AppPageScaffold({
-    super.key,
-    this.navigationBar,
-    required this.body,
-    this.bottomNavigationBar,
-    this.backgroundColor,
-    this.useSafeArea = true,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final content = useSafeArea ? SafeArea(child: body) : body;
-
-    return CupertinoPageScaffold(
-      backgroundColor: backgroundColor,
-      navigationBar: navigationBar,
-
-      child: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-        
-        child: Column(
-          children: [
-            Expanded(child: content),
-          ],
-        ),
-      ),
-    );
-  }
-}
-```
-
 ## File: lib/presentation/widgets/thought_bubble.dart
 ```dart
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 
 class ThoughtBubble extends StatefulWidget {
   final String content;
@@ -10824,7 +10688,6 @@ class ThoughtBubble extends StatefulWidget {
 }
 
 class _ThoughtBubbleState extends State<ThoughtBubble> {
-  // 默认折叠
   bool _isExpanded = false;
 
   @override
@@ -10832,71 +10695,49 @@ class _ThoughtBubbleState extends State<ThoughtBubble> {
     final text = widget.content.trim();
     if (text.isEmpty) return const SizedBox.shrink();
 
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final textTheme = CupertinoTheme.of(context).textTheme;
 
-    return Card(
-      color: colorScheme.surfaceContainerHigh,
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 可点击的标题栏
-            InkWell(
-              onTap: () => setState(() => _isExpanded = !_isExpanded),
-              borderRadius: BorderRadius.circular(8),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4.0),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.psychology_alt_outlined,
-                      size: 16,
-                      color: colorScheme.primary,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '推理过程',
-                      style: textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                    const Spacer(),
-                    Icon(
-                      _isExpanded ? Icons.expand_less : Icons.expand_more,
-                      size: 18,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ],
+    return CupertinoFormSection.insetGrouped(
+      children: [
+        CupertinoButton(
+          padding: const EdgeInsets.all(12),
+          onPressed: () => setState(() => _isExpanded = !_isExpanded),
+          child: Row(
+            children: [
+              Icon(
+                CupertinoIcons.lightbulb,
+                size: 16,
+                color: CupertinoTheme.of(context).primaryColor,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '推理过程',
+                style: textTheme.textStyle.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: CupertinoTheme.of(context).primaryColor,
                 ),
               ),
-            ),
-            // 内容折叠/展开动画
-            AnimatedCrossFade(
-              firstChild: const SizedBox.shrink(),
-              secondChild: Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: Text(
-                  text,
-                  style: textTheme.bodySmall?.copyWith(
-                    fontSize: 13,
-                    height: 1.65,
-                  ),
-                ),
+              const Spacer(),
+              Icon(
+                _isExpanded ? CupertinoIcons.chevron_up : CupertinoIcons.chevron_down,
+                size: 18,
+                color: CupertinoColors.systemGrey,
               ),
-              crossFadeState: _isExpanded
-                  ? CrossFadeState.showSecond
-                  : CrossFadeState.showFirst,
-              duration: const Duration(milliseconds: 200),
-              sizeCurve: Curves.easeInOut,
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
+        if (_isExpanded)
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Text(
+              text,
+              style: textTheme.textStyle.copyWith(
+                fontSize: 13,
+                height: 1.65,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -11033,6 +10874,49 @@ TreeNode _buildSubtreeIterative(
     );
   }
   return updatedMap[root.id]!;
+}
+```
+
+## File: lib/presentation/widgets/common/app_page_scaffold.dart
+```dart
+import 'package:flutter/cupertino.dart';
+
+class AppPageScaffold extends StatelessWidget {
+  final ObstructingPreferredSizeWidget? navigationBar;
+  final Widget body;
+  final Widget? bottomNavigationBar;
+  final Color? backgroundColor;
+  final bool useSafeArea;
+
+  const AppPageScaffold({
+    super.key,
+    this.navigationBar,
+    required this.body,
+    this.bottomNavigationBar,
+    this.backgroundColor,
+    this.useSafeArea = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final content = useSafeArea ? SafeArea(child: body) : body;
+
+    return CupertinoPageScaffold(
+      backgroundColor: backgroundColor,
+      navigationBar: navigationBar,
+
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        
+        child: Column(
+          children: [
+            Expanded(child: content),
+          ],
+        ),
+      ),
+    );
+  }
 }
 ```
 
@@ -11567,59 +11451,9 @@ abstract class _ChatState implements ChatState {
 }
 ```
 
-## File: lib/main.dart
-```dart
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'core/utils/app_route_observer.dart';
-import 'di/providers.dart'; // 仅导入 providers
-import 'presentation/pages/home_page.dart';
-import 'presentation/themes/app_theme.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  final container = ProviderContainer();
-  // ✅ 等待核心环境初始化完成（目录创建、依赖图预热）
-  await container.read(localFileSourceProvider.future);
-
-  runApp(
-    UncontrolledProviderScope(
-      container: container,
-      child: const MyApp(),
-    ),
-  );
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return CupertinoApp(
-      title: 'AI Chat',
-      theme: AppTheme.cupertinoTheme,
-      navigatorObservers: [appRouteObserver],
-      home: const HomePage(),
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: const [
-        Locale('en', 'US'),
-        Locale('zh', 'CN'),
-      ],
-    );
-  }
-}
-```
-
 ## File: lib/presentation/widgets/message_bubble.dart
 ```dart
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
 class MessageBubble extends StatelessWidget {
@@ -11639,11 +11473,7 @@ class MessageBubble extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final bubbleColor =
-        isUser ? colorScheme.secondaryContainer : colorScheme.surfaceContainerHigh;
-
+  Widget build(BuildContext context) {    
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -11652,44 +11482,39 @@ class MessageBubble extends StatelessWidget {
         ),
         margin: const EdgeInsets.symmetric(vertical: 4),
         child: Column(
-          crossAxisAlignment:
-              isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [ 
+          crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: bubbleColor,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: SelectionArea(
-                child: MarkdownBody(
+              color: isUser ? CupertinoColors.systemBlue : CupertinoColors.systemBackground,
+              child: MarkdownBody(
                   data: content,
                   selectable: true,
+                  styleSheet: MarkdownStyleSheet.fromCupertinoTheme(CupertinoTheme.of(context)),
                 ),
-              ),
             ),
             if (onCopy != null || onRetryReply != null || onEdit != null) ...[
               const SizedBox(height: 6),
-              Wrap(
-                spacing: 4,
+              Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   if (onCopy != null)
-                    IconButton(
-                      tooltip: '复制',
+                    CupertinoButton(
+                      padding: EdgeInsets.zero,
                       onPressed: onCopy,
-                      icon: const Icon(Icons.content_copy_outlined),
+                      child: const Icon(CupertinoIcons.doc_on_doc),
                     ),
                   if (onEdit != null)
-                    IconButton(
-                      tooltip: '编辑后发送',
+                    CupertinoButton(
+                      padding: EdgeInsets.zero,
                       onPressed: onEdit,
-                      icon: const Icon(Icons.edit_outlined),
+                      child: const Icon(CupertinoIcons.pencil),
                     ),
                   if (onRetryReply != null)
-                    IconButton(
-                      tooltip: '重新生成',
+                    CupertinoButton(
+                      padding: EdgeInsets.zero,
                       onPressed: onRetryReply,
-                      icon: const Icon(Icons.refresh_outlined),
+                      child: const Icon(CupertinoIcons.arrow_2_circlepath),
                     ),
                 ],
               ),
@@ -11736,6 +11561,55 @@ class ChatRoundFactory {
       userContent: sourceRound.userContent,
       userAttachments: sourceRound.userAttachments,
       isIncomplete: true,
+    );
+  }
+}
+```
+
+## File: lib/main.dart
+```dart
+import 'package:flutter/cupertino.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'core/utils/app_route_observer.dart';
+import 'di/providers.dart'; // 仅导入 providers
+import 'presentation/pages/home_page.dart';
+import 'presentation/themes/app_theme.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final container = ProviderContainer();
+  // ✅ 等待核心环境初始化完成（目录创建、依赖图预热）
+  await container.read(localFileSourceProvider.future);
+
+  runApp(
+    UncontrolledProviderScope(
+      container: container,
+      child: const MyApp(),
+    ),
+  );
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoApp(
+      title: 'AI Chat',
+      theme: AppTheme.cupertinoTheme,
+      navigatorObservers: [appRouteObserver],
+      home: const HomePage(),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en', 'US'),
+        Locale('zh', 'CN'),
+      ],
     );
   }
 }
@@ -11928,17 +11802,16 @@ class RemoteApiSource {
 ```dart
 import 'package:aiservice/presentation/models/input_state.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/pending_attachment.dart';
-import '../providers/input_notifier.dart'; // ✅ 导入新的 Provider
+import '../providers/input_notifier.dart';
 
 class InputBar extends ConsumerStatefulWidget {
-  final Future<void> Function(String text, List<PendingAttachment> attachments)
-      onSend;
+  final Future<void> Function(String text, List<PendingAttachment> attachments) onSend;
   final VoidCallback? onStop;
   final bool isIncomplete;
   final String hintText;
@@ -11964,7 +11837,6 @@ class _InputBarState extends ConsumerState<InputBar> {
   @override
   void initState() {
     super.initState();
-    // ✅ 仅初始化 Controller，不读取旧 Draft
     _controller = TextEditingController();
   }
 
@@ -11974,7 +11846,6 @@ class _InputBarState extends ConsumerState<InputBar> {
     super.dispose();
   }
 
-  // ✅ 辅助方法：判断是否为图片文件
   bool _isImageFile(String name) {
     final lower = name.toLowerCase();
     return lower.endsWith('.png') ||
@@ -11985,7 +11856,6 @@ class _InputBarState extends ConsumerState<InputBar> {
         lower.endsWith('.bmp');
   }
 
-  // ✅ 辅助方法：猜测 MIME 类型
   String? _guessMimeType(String name) {
     final lower = name.toLowerCase();
     if (lower.endsWith('.png')) return 'image/png';
@@ -12002,7 +11872,6 @@ class _InputBarState extends ConsumerState<InputBar> {
     return null;
   }
 
-  // ✅ 添加文件附件
   Future<void> _pickFileAttachment() async {
     final result = await FilePicker.platform.pickFiles(
       allowMultiple: false,
@@ -12023,11 +11892,9 @@ class _InputBarState extends ConsumerState<InputBar> {
       isImage: isImage,
       mimeType: mimeType,
     );
-    // ✅ 调用 Notifier 添加附件
     ref.read(inputStateProvider.notifier).addAttachment(attachment);
   }
 
-  // ✅ 添加图片附件
   Future<void> _pickImageFromGallery() async {
     final file = await _imagePicker.pickImage(
       source: ImageSource.gallery,
@@ -12042,45 +11909,40 @@ class _InputBarState extends ConsumerState<InputBar> {
       isImage: true,
       mimeType: _guessMimeType(name) ?? 'image/*',
     );
-    // ✅ 调用 Notifier 添加附件
     ref.read(inputStateProvider.notifier).addAttachment(attachment);
   }
 
-  // ✅ 移除附件
   void _removeAttachment(String id) {
     ref.read(inputStateProvider.notifier).removeAttachment(id);
   }
 
-  // ✅ 显示附件选择菜单
   Future<void> _showAddAttachmentSheet() async {
     FocusScope.of(context).unfocus();
     
-    await showModalBottomSheet<void>(
+    await showCupertinoModalPopup<void>(
       context: context,
-      showDragHandle: true,
       builder: (context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.attach_file_outlined),
-                title: const Text('文件'),
-                onTap: () async {
+        return CupertinoActionSheet(
+          actions: [
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _pickFileAttachment();
+              },
+              child: const Text('文件'),
+            ),
+            if (widget.allowImages)
+              CupertinoActionSheetAction(
+                onPressed: () {
                   Navigator.of(context).pop();
-                  await _pickFileAttachment();
+                  _pickImageFromGallery();
                 },
+                child: const Text('相册'),
               ),
-              if (widget.allowImages)
-                ListTile(
-                  leading: const Icon(Icons.photo_library_outlined),
-                  title: const Text('相册'),
-                  onTap: () async {
-                    Navigator.of(context).pop();
-                    await _pickImageFromGallery();
-                  },
-                ),
-            ],
+          ],
+          cancelButton: CupertinoActionSheetAction(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('取消'),
           ),
         );
       },
@@ -12103,11 +11965,9 @@ class _InputBarState extends ConsumerState<InputBar> {
 
   @override
   Widget build(BuildContext context) {
-    // ✅ 监听文本变化，单向同步到 Controller
     ref.listen<String>(
       inputStateProvider.select((s) => s.text),
       (previous, next) {
-        // 避免不必要的更新和光标跳动
         if (next != _controller.text) {
           _controller.value = TextEditingValue(
             text: next,
@@ -12118,7 +11978,6 @@ class _InputBarState extends ConsumerState<InputBar> {
       },
     );
 
-    // ✅ 读取状态
     final inputState = ref.watch(inputStateProvider);
     final attachments = inputState.attachments;
     final canSend = inputState.canSend;
@@ -12126,87 +11985,88 @@ class _InputBarState extends ConsumerState<InputBar> {
 
     return SafeArea(
       top: false,
-      child: Material(
-        elevation: 1,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (attachments.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: attachments.map((attachment) {
-                        return InputChip(
-                          avatar: Icon(
-                            attachment.isImage
-                                ? Icons.image_outlined
-                                : Icons.attach_file_outlined,
-                            size: 18,
-                          ),
-                          label: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 180),
-                            child: Text(
-                              attachment.name,
-                              overflow: TextOverflow.ellipsis,
+      child: Container(
+        color: CupertinoColors.systemBackground,
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (attachments.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: attachments.map((attachment) {
+                      return CupertinoButton(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        onPressed: () {},
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              attachment.isImage
+                                  ? CupertinoIcons.photo
+                                  : CupertinoIcons.doc,
+                              size: 18,
                             ),
-                          ),
-                          onDeleted: () => _removeAttachment(attachment.id),
-                        );
-                      }).toList(),
-                    ),
+                            const SizedBox(width: 6),
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 180),
+                              child: Text(
+                                attachment.name,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            GestureDetector(
+                              onTap: () => _removeAttachment(attachment.id),
+                              child: const Icon(CupertinoIcons.xmark_circle_fill, size: 18),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
                   ),
                 ),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  IconButton(
-                    tooltip: '添加附件',
-                    onPressed: _showAddAttachmentSheet, // ✅ 始终可点击
-                    icon: const Icon(Icons.add),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      minLines: 1,
-                      maxLines: 6,
-                      keyboardType: TextInputType.multiline,
-                      textInputAction: TextInputAction.newline,
-                      decoration: InputDecoration(
-                        hintText: widget.hintText,
-                        isDense: true,
-                      ),
-                      // ✅ 用户输入时更新 Provider
-                      onChanged: (value) {
-                        ref
-                            .read(inputStateProvider.notifier)
-                            .updateText(value);
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  if (showStopButton)
-                    IconButton.filledTonal(
-                      tooltip: '停止生成',
-                      onPressed: widget.onStop, // ✅ 停止按钮
-                      icon: const Icon(Icons.stop_rounded),
-                    )
-                  else
-                    IconButton.filled(
-                      tooltip: '发送',
-                      onPressed: canSend ? _handleSend : null, // ✅ 发送按钮
-                      icon: const Icon(Icons.arrow_upward_rounded),
-                    ),
-                ],
               ),
-            ],
-          ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: _showAddAttachmentSheet,
+                  child: const Icon(CupertinoIcons.add),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: CupertinoTextField(
+                    controller: _controller,
+                    minLines: 1,
+                    maxLines: 6,
+                    keyboardType: TextInputType.multiline,
+                    placeholder: widget.hintText,
+                    onChanged: (value) {
+                      ref.read(inputStateProvider.notifier).updateText(value);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (showStopButton)
+                  CupertinoButton.filled(
+                    onPressed: widget.onStop,
+                    child: const Icon(CupertinoIcons.stop_fill),
+                  )
+                else
+                  CupertinoButton.filled(
+                    onPressed: canSend ? _handleSend : null,
+                    child: const Icon(CupertinoIcons.arrow_up),
+                  ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -12532,8 +12392,6 @@ final sessionListControllerProvider = Provider<SessionListController>((ref) {
 ```dart
 import 'package:aiservice/di/providers.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/app_config.dart';
@@ -12541,7 +12399,6 @@ import '../../core/models/app_config_store.dart';
 import '../../core/models/model_info.dart';
 import '../providers/config_notifier.dart';
 import '../widgets/common/app_page_scaffold.dart';
-import '../widgets/common/app_section.dart';
 import '../widgets/common/app_toast.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
@@ -12552,11 +12409,38 @@ class SettingsPage extends ConsumerStatefulWidget {
 }
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
-  static const String _defaultModelsPath = 'v1/models';
+  final _formKey = GlobalKey<FormState>();
 
-  final _formKey = GlobalKey<FormBuilderState>();
-  bool _isPatching = false;
-  bool _isModelListExpanded = false;
+  // Controllers
+  late final TextEditingController _baseUrlController;
+  late final TextEditingController _apiKeyController;
+  late final TextEditingController _modelsPathController;
+  late final TextEditingController _chatPathController;
+  late final TextEditingController _selectedModelController;
+
+  String _selectedApiMode = 'chat_completions';
+  bool _overrideSupportsReasoning = false;
+  bool _overrideSupportsVision = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _baseUrlController = TextEditingController();
+    _apiKeyController = TextEditingController();
+    _modelsPathController = TextEditingController();
+    _chatPathController = TextEditingController();
+    _selectedModelController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _baseUrlController.dispose();
+    _apiKeyController.dispose();
+    _modelsPathController.dispose();
+    _chatPathController.dispose();
+    _selectedModelController.dispose();
+    super.dispose();
+  }
 
   String _defaultModelsPathForApiMode(String apiMode) {
     switch (apiMode) {
@@ -12587,67 +12471,35 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     return config.availableModels?.where((m) => m.id == id).firstOrNull;
   }
 
-  bool _effectiveReasoningSwitch(ModelInfo? model) => model?.overrideSupportsReasoning ?? false;
-  bool _effectiveVisionSwitch(ModelInfo? model) => model?.overrideSupportsVision ?? false;
+  void _updateFormFromConfig(AppConfig config) {
+    _baseUrlController.text = config.baseUrl;
+    _apiKeyController.text = config.apiKey;
+    _modelsPathController.text = config.modelsPath;
+    _chatPathController.text = config.chatPath;
+    _selectedApiMode = config.apiMode;
+    _selectedModelController.text = config.selectedModel ?? '';
 
-  void _patchForm(AppConfig config) {
-    final form = _formKey.currentState;
-    if (form == null) return;
+    final model = _findModel(config, config.selectedModel);
+    _overrideSupportsReasoning = model?.overrideSupportsReasoning ?? false;
+    _overrideSupportsVision = model?.overrideSupportsVision ?? false;
 
-    final selectedModelId = config.selectedModel ?? '';
-    final model = _findModel(config, selectedModelId);
-
-    _isPatching = true;
-    form.patchValue({
-      'baseUrl': config.baseUrl,
-      'apiKey': config.apiKey,
-      'modelsPath': config.modelsPath,
-      'chatPath': config.chatPath,
-      'apiMode': config.apiMode,
-      'selectedModel': selectedModelId,
-      'overrideSupportsReasoning': _effectiveReasoningSwitch(model),
-      'overrideSupportsVision': _effectiveVisionSwitch(model),
-    });
-    _isPatching = false;
-  }
-
-  void _patchModelCapabilityFields(AppConfig config, String? modelId) {
-    final form = _formKey.currentState;
-    if (form == null) return;
-
-    final model = _findModel(config, modelId);
-
-    _isPatching = true;
-    form.patchValue({
-      'overrideSupportsReasoning': _effectiveReasoningSwitch(model),
-      'overrideSupportsVision': _effectiveVisionSwitch(model),
-    });
-    _isPatching = false;
+    setState(() {});
   }
 
   Future<void> _save(AppConfig currentConfig) async {
-    final form = _formKey.currentState;
-    if (form == null) return;
-    if (!form.saveAndValidate()) return;
+    if (!_formKey.currentState!.validate()) return;
 
-    final values = form.value;
-
-    final selectedModelId = (values['selectedModel'] as String? ?? '').trim();
-    final overrideSupportsReasoning =
-        values['overrideSupportsReasoning'] as bool? ?? false;
-    final overrideSupportsVision =
-        values['overrideSupportsVision'] as bool? ?? false;
+    final selectedModelId = _selectedModelController.text.trim();
 
     final models = [...(currentConfig.availableModels ?? const <ModelInfo>[])];
 
     if (selectedModelId.isNotEmpty) {
       final index = models.indexWhere((m) => m.id == selectedModelId);
-      final baseModel =
-          index >= 0 ? models[index] : ModelInfo(id: selectedModelId);
+      final baseModel = index >= 0 ? models[index] : ModelInfo(id: selectedModelId);
 
       final updatedModel = baseModel.copyWith(
-        overrideSupportsReasoning: overrideSupportsReasoning,
-        overrideSupportsVision: overrideSupportsVision,
+        overrideSupportsReasoning: _overrideSupportsReasoning,
+        overrideSupportsVision: _overrideSupportsVision,
       );
 
       if (index >= 0) {
@@ -12657,23 +12509,69 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       }
     }
 
-    final nextApiMode = values['apiMode'] as String? ?? currentConfig.apiMode;
-    final rawModelsPath = (values['modelsPath'] as String? ?? '').trim();
-    final rawChatPath = (values['chatPath'] as String? ?? '').trim();
+    final rawModelsPath = _modelsPathController.text.trim();
+    final rawChatPath = _chatPathController.text.trim();
 
     final updatedConfig = currentConfig.copyWith(
-      baseUrl: (values['baseUrl'] as String? ?? '').trim(),
-      apiKey: (values['apiKey'] as String? ?? '').trim(),
-      modelsPath: rawModelsPath.isEmpty ? _defaultModelsPath : rawModelsPath,
-      chatPath: rawChatPath.isEmpty
-          ? _defaultChatPathForApiMode(nextApiMode)
-          : rawChatPath,
-      apiMode: nextApiMode,
+      baseUrl: _baseUrlController.text.trim(),
+      apiKey: _apiKeyController.text.trim(),
+      modelsPath: rawModelsPath.isEmpty ? _defaultModelsPathForApiMode(_selectedApiMode) : rawModelsPath,
+      chatPath: rawChatPath.isEmpty ? _defaultChatPathForApiMode(_selectedApiMode) : rawChatPath,
+      apiMode: _selectedApiMode,
       selectedModel: selectedModelId.isEmpty ? null : selectedModelId,
       availableModels: models,
     );
 
     await ref.read(configServiceProvider).saveConfig(updatedConfig);
+  }
+
+  void _showApiModePicker() {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (context) {
+        return CupertinoActionSheet(
+          actions: [
+            CupertinoActionSheetAction(
+              onPressed: () {
+                setState(() {
+                  _selectedApiMode = 'chat_completions';
+                  _modelsPathController.text = _defaultModelsPathForApiMode(_selectedApiMode);
+                  _chatPathController.text = _defaultChatPathForApiMode(_selectedApiMode);
+                });
+                Navigator.pop(context);
+              },
+              child: const Text('chat_completions'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () {
+                setState(() {
+                  _selectedApiMode = 'responses';
+                  _modelsPathController.text = _defaultModelsPathForApiMode(_selectedApiMode);
+                  _chatPathController.text = _defaultChatPathForApiMode(_selectedApiMode);
+                });
+                Navigator.pop(context);
+              },
+              child: const Text('responses'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () {
+                setState(() {
+                  _selectedApiMode = 'google';
+                  _modelsPathController.text = _defaultModelsPathForApiMode(_selectedApiMode);
+                  _chatPathController.text = _defaultChatPathForApiMode(_selectedApiMode);
+                });
+                Navigator.pop(context);
+              },
+              child: const Text('google'),
+            ),
+          ],
+          cancelButton: CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -12684,75 +12582,36 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
       next.whenData((config) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          _patchForm(config);
+          if (mounted) _updateFormFromConfig(config);
         });
       });
     });
 
     return AppPageScaffold(
       navigationBar: CupertinoNavigationBar(
-        middle: Text('设置'),
+        middle: const Text('设置'),
+        trailing: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: _confirmRestoreDefaults,
+          child: const Icon(CupertinoIcons.arrow_counterclockwise),
+        ),
       ),
       body: profilesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: CupertinoActivityIndicator()),
         error: (e, _) => Center(child: Text('加载配置存档失败：$e')),
         data: (store) {
           return configAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
+            loading: () => const Center(child: CupertinoActivityIndicator()),
             error: (e, _) => Center(child: Text('加载配置失败：$e')),
             data: (config) {
-              return FormBuilder(
+              return Form(
                 key: _formKey,
-                initialValue: {
-                  'baseUrl': config.baseUrl,
-                  'apiKey': config.apiKey,
-                  'modelsPath': config.modelsPath,
-                  'chatPath': config.chatPath,
-                  'apiMode': config.apiMode,
-                  'selectedModel': config.selectedModel ?? '',
-                  'overrideSupportsReasoning': _effectiveReasoningSwitch(
-                    _findModel(config, config.selectedModel),
-                  ),
-                  'overrideSupportsVision': _effectiveVisionSwitch(
-                    _findModel(config, config.selectedModel),
-                  ),
-                },
                 child: ListView(
-                  padding: const EdgeInsets.all(16),
                   children: [
                     _buildProfileSection(store),
-                    _buildConnectionSection(config),
+                    _buildConnectionSection(),
                     _buildModelSection(config),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => _patchForm(config),
-                            child: const Text('重置'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: () async {
-                              final config = configAsync.valueOrNull;
-                              if (config == null) return;
-                              
-                              await _save(config);
-                              if (mounted) await AppToast.show('设置已保存');
-                            },
-                            child: const Text('保存'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    OutlinedButton(
-                      onPressed: _confirmRestoreDefaults,
-                      child: const Text('恢复默认'),
-                    ),
+                    _buildActionSection(config),
                   ],
                 ),
               );
@@ -12764,112 +12623,55 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Widget _buildProfileSection(AppConfigStore store) {
-    return AppSection(
-      title: '配置存档',
-      subtitle: '切换后表单会刷新为该存档内容',
+    final activeProfile = store.profiles.firstWhere((p) => p.id == store.activeProfileId);
+
+    return CupertinoFormSection.insetGrouped(
+      header: const Text('配置存档'),
       children: [
-        DropdownButtonFormField<String>(
-          value: store.activeProfileId,
-          decoration: const InputDecoration(labelText: '当前配置存档'),
-          items: store.profiles
-              .map((p) => DropdownMenuItem(value: p.id, child: Text(p.name)))
-              .toList(),
-          onChanged: (value) async {
-            if (value == null) return;
-            await ref.read(configServiceProvider).switchProfile(value);
-          },
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 12,
-          children: [
-            OutlinedButton(
-              onPressed: _showCreateProfileDialog,
-              child: const Text('新建'),
-            ),
-            OutlinedButton(
-              onPressed: () {
-                final profile = store.profiles.firstWhere(
-                  (p) => p.id == store.activeProfileId,
-                );
-                _showRenameProfileDialog(profile);
-              },
-              child: const Text('重命名'),
-            ),
-            OutlinedButton(
-              onPressed: () {
-                final profile = store.profiles.firstWhere(
-                  (p) => p.id == store.activeProfileId,
-                );
-                _deleteProfile(profile, store.profiles.length);
-              },
-              child: const Text('删除'),
-            ),
-          ],
+        CupertinoFormRow(
+          prefix: const Text('当前配置'),
+          child: CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: () => _showProfileManagementSheet(store),
+            child: Text(activeProfile.name),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildConnectionSection(AppConfig config) {
-    return AppSection(
-      title: '连接配置',
+  Widget _buildConnectionSection() {
+    return CupertinoFormSection.insetGrouped(
+      header: const Text('连接配置'),
       children: [
-        FormBuilderTextField(
-          name: 'baseUrl',
-          decoration: const InputDecoration(
-            labelText: 'Base URL',
-            hintText: 'https://api.openai.com',
+        CupertinoTextFormFieldRow(
+          controller: _baseUrlController,
+          placeholder: 'https://api.openai.com',
+          prefix: const Text('Base URL'),
+          // 保持原逻辑：无验证，允许空值
+        ),
+        CupertinoTextFormFieldRow(
+          controller: _apiKeyController,
+          placeholder: 'API Key',
+          prefix: const Text('API Key'),
+        ),
+        CupertinoTextFormFieldRow(
+          controller: _modelsPathController,
+          placeholder: _defaultModelsPathForApiMode(_selectedApiMode),
+          prefix: const Text('Models Path'),
+        ),
+        CupertinoTextFormFieldRow(
+          controller: _chatPathController,
+          placeholder: _defaultChatPathForApiMode(_selectedApiMode),
+          prefix: const Text('Chat Path'),
+        ),
+        CupertinoFormRow(
+          prefix: const Text('API Mode'),
+          child: CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: _showApiModePicker,
+            child: Text(_selectedApiMode),
           ),
-        ),
-        const SizedBox(height: 12),
-        FormBuilderTextField(
-          name: 'apiKey',
-          decoration: const InputDecoration(labelText: 'API Key'),
-        ),
-        const SizedBox(height: 12),
-        FormBuilderTextField(
-          name: 'modelsPath',
-          decoration: const InputDecoration(
-            labelText: 'Models Path',
-            hintText: _defaultModelsPath,
-          ),
-        ),
-        const SizedBox(height: 12),
-        FormBuilderTextField(
-          name: 'chatPath',
-          decoration: InputDecoration(
-            labelText: 'Chat Path',
-            hintText: _defaultChatPathForApiMode(config.apiMode),
-          ),
-        ),
-        const SizedBox(height: 12),
-        FormBuilderDropdown<String>(
-          name: 'apiMode',
-          decoration: const InputDecoration(labelText: 'API Mode'),
-          items: const [
-            DropdownMenuItem(
-              value: 'chat_completions',
-              child: Text('chat_completions'),
-            ),
-            DropdownMenuItem(
-              value: 'responses',
-              child: Text('responses'),
-            ),
-            DropdownMenuItem(
-              value: 'google',
-              child: Text('google'),
-            ),
-          ],
-          onChanged: (value) {
-            if (_isPatching || value == null) return;
-            _isPatching = true;
-            _formKey.currentState?.patchValue({
-              'modelsPath': _defaultModelsPathForApiMode(value),
-              'chatPath': _defaultChatPathForApiMode(value),
-            });
-            _isPatching = false;
-          },
         ),
       ],
     );
@@ -12878,97 +12680,167 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget _buildModelSection(AppConfig config) {
     final models = config.availableModels ?? const <ModelInfo>[];
 
-    return AppSection(
-      title: '当前模型',
-      subtitle: '可直接输入自定义模型 ID，下方能力开关将保存到该模型',
+    return CupertinoFormSection.insetGrouped(
+      header: const Text('模型设置'),
       children: [
-        FormBuilderTextField(
-          name: 'selectedModel',
-          decoration: const InputDecoration(
-            labelText: '模型 ID',
-            hintText: '输入模型 ID',
-          ),
-          onChanged: (value) {
-            if (_isPatching) return;
-            _patchModelCapabilityFields(config, value);
-          },
-        ),
-        const SizedBox(height: 12),
-        if (models.isNotEmpty) ...[
-          InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () {
-              setState(() {
-                _isModelListExpanded = !_isModelListExpanded;
-              });
-            },
-            child: InputDecorator(
-              decoration: const InputDecoration(
-                labelText: '已同步模型快捷选择',
-                border: OutlineInputBorder(),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      _isModelListExpanded ? '点击收起模型列表' : '点击展开模型列表',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ),
-                  Icon(
-                    _isModelListExpanded
-                        ? Icons.expand_less
-                        : Icons.expand_more,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (_isModelListExpanded) ...[
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: models.map((model) {
-                final label = (model.name ?? '').trim().isNotEmpty
-                    ? '${model.name} (${model.id})'
-                    : model.id;
-                return ActionChip(
-                  label: Text(label),
-                  onPressed: () {
-                    _isPatching = true;
-                    _formKey.currentState?.patchValue({
-                      'selectedModel': model.id,
-                    });
-                    _isPatching = false;
-                    _patchModelCapabilityFields(config, model.id);
+        CupertinoFormRow(
+          prefix: const Text('模型 ID'),
+          child: Row(
+            children: [
+              Expanded(
+                child: CupertinoTextField(
+                  controller: _selectedModelController,
+                  placeholder: '输入模型 ID',
+                  onChanged: (value) {
+                    final model = _findModel(config, value);
                     setState(() {
-                      _isModelListExpanded = false;
+                      _overrideSupportsReasoning = model?.overrideSupportsReasoning ?? false;
+                      _overrideSupportsVision = model?.overrideSupportsVision ?? false;
                     });
                   },
-                );
-              }).toList(),
-            ),
-          ],
-          const SizedBox(height: 12),
-        ],
-        Align(
-          alignment: Alignment.centerLeft,
-          child: FilledButton(
-            onPressed: _refreshModels,
-            child: const Text('同步模型'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              CupertinoButton(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                minSize: 0,
+                onPressed: models.isNotEmpty ? () => _showModelPicker(models, config) : null,
+                child: const Text('从列表选择'),
+              ),
+              const SizedBox(width: 8),
+              CupertinoButton(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                minSize: 0,
+                onPressed: _refreshModels,
+                child: const Text('立即同步'),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 16),
-        FormBuilderSwitch(
-          name: 'overrideSupportsReasoning',
-          title: const Text('该模型启用思考'),
+        CupertinoFormRow(
+          prefix: const Text('启用思考'),
+          child: CupertinoSwitch(
+            value: _overrideSupportsReasoning,
+            onChanged: (value) => setState(() => _overrideSupportsReasoning = value),
+          ),
         ),
-        FormBuilderSwitch(
-          name: 'overrideSupportsVision',
-          title: const Text('该模型允许图片输入'),
+        CupertinoFormRow(
+          prefix: const Text('允许图片输入'),
+          child: CupertinoSwitch(
+            value: _overrideSupportsVision,
+            onChanged: (value) => setState(() => _overrideSupportsVision = value),
+          ),
         ),
       ],
+    );
+  }
+
+  Widget _buildActionSection(AppConfig config) {
+    return CupertinoFormSection.insetGrouped(
+      children: [
+        CupertinoFormRow(
+          child: CupertinoButton.filled(
+            onPressed: () async {
+              await _save(config);
+              if (mounted) await AppToast.show('设置已保存');
+            },
+            child: const Text('保存设置'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showProfileManagementSheet(AppConfigStore store) {
+    final activeProfile = store.profiles.firstWhere((p) => p.id == store.activeProfileId);
+
+    showCupertinoModalPopup(
+      context: context,
+      builder: (context) {
+        return CupertinoActionSheet(
+          title: const Text('配置存档管理'),
+          actions: [
+            // 切换配置
+            ...store.profiles.map((p) {
+              return CupertinoActionSheetAction(
+                onPressed: () {
+                  Navigator.pop(context);
+                  if (p.id != store.activeProfileId) {
+                    ref.read(configServiceProvider).switchProfile(p.id);
+                  }
+                },
+                isDefaultAction: p.id == store.activeProfileId,
+                child: Row(
+                  children: [
+                    Expanded(child: Text(p.name)),
+                    if (p.id == store.activeProfileId)
+                      const Icon(CupertinoIcons.check_mark, size: 18, color: CupertinoColors.systemBlue),
+                  ],
+                ),
+              );
+            }),
+            const SizedBox(height: 8),
+            // 操作按钮
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.pop(context);
+                _showCreateProfileDialog();
+              },
+              child: const Text('新建配置'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.pop(context);
+                _showRenameProfileDialog(activeProfile);
+              },
+              child: const Text('重命名当前配置'),
+            ),
+            if (store.profiles.length > 1)
+              CupertinoActionSheetAction(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _deleteProfile(activeProfile, store.profiles.length);
+                },
+                isDestructiveAction: true,
+                child: const Text('删除当前配置'),
+              ),
+          ],
+          cancelButton: CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showModelPicker(List<ModelInfo> models, AppConfig config) {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (context) {
+        return CupertinoActionSheet(
+          title: const Text('选择模型'),
+          actions: models.map((model) {
+            final label = (model.name ?? '').trim().isNotEmpty ? '${model.name} (${model.id})' : model.id;
+            return CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.pop(context);
+                _selectedModelController.text = model.id;
+                final m = _findModel(config, model.id);
+                setState(() {
+                  _overrideSupportsReasoning = m?.overrideSupportsReasoning ?? false;
+                  _overrideSupportsVision = m?.overrideSupportsVision ?? false;
+                });
+              },
+              child: Text(label),
+            );
+          }).toList(),
+          cancelButton: CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+        );
+      },
     );
   }
 
@@ -12985,50 +12857,33 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Future<void> _confirmRestoreDefaults() async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showCupertinoDialog<bool>(
           context: context,
-          builder: (ctx) => AlertDialog(
+          builder: (ctx) => CupertinoAlertDialog(
             title: const Text('恢复默认设置'),
             content: const Text('确定要将当前配置存档恢复为默认设置吗？'),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                child: const Text('恢复默认'),
-              ),
+              CupertinoDialogAction(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
+              CupertinoDialogAction(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('恢复默认')),
             ],
           ),
         ) ??
         false;
 
     if (!confirmed) return;
-
     await ref.read(configServiceProvider).saveConfig(AppConfig.defaultConfig());
   }
 
   Future<void> _showCreateProfileDialog() async {
     final controller = TextEditingController();
-    final result = await showDialog<String>(
+    final result = await showCupertinoDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => CupertinoAlertDialog(
         title: const Text('新建配置存档'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: '输入配置名称'),
-        ),
+        content: CupertinoTextField(controller: controller, autofocus: true, placeholder: '输入配置名称'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-            child: const Text('创建'),
-          ),
+          CupertinoDialogAction(onPressed: () => Navigator.of(ctx).pop(), child: const Text('取消')),
+          CupertinoDialogAction(onPressed: () => Navigator.of(ctx).pop(controller.text.trim()), child: const Text('创建')),
         ],
       ),
     );
@@ -13039,32 +12894,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Future<void> _showRenameProfileDialog(ConfigProfile profile) async {
     final controller = TextEditingController(text: profile.name);
-    final result = await showDialog<String>(
+    final result = await showCupertinoDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => CupertinoAlertDialog(
         title: const Text('重命名配置存档'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: '输入配置名称'),
-        ),
+        content: CupertinoTextField(controller: controller, autofocus: true, placeholder: '输入配置名称'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-            child: const Text('保存'),
-          ),
+          CupertinoDialogAction(onPressed: () => Navigator.of(ctx).pop(), child: const Text('取消')),
+          CupertinoDialogAction(onPressed: () => Navigator.of(ctx).pop(controller.text.trim()), child: const Text('保存')),
         ],
       ),
     );
 
     if (result == null || result.isEmpty) return;
-    await ref
-        .read(configServiceProvider)
-        .renameProfile(profile.id, result);
+    await ref.read(configServiceProvider).renameProfile(profile.id, result);
   }
 
   Future<void> _deleteProfile(ConfigProfile profile, int profileCount) async {
@@ -13073,20 +12916,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       return;
     }
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showCupertinoDialog<bool>(
           context: context,
-          builder: (ctx) => AlertDialog(
+          builder: (ctx) => CupertinoAlertDialog(
             title: const Text('删除配置存档'),
             content: Text('确定删除 "${profile.name}" 吗？'),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                child: const Text('删除'),
-              ),
+              CupertinoDialogAction(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
+              CupertinoDialogAction(onPressed: () => Navigator.of(ctx).pop(true), isDestructiveAction: true, child: const Text('删除')),
             ],
           ),
         ) ??
@@ -13094,505 +12931,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     if (!confirmed) return;
     await ref.read(configServiceProvider).deleteProfile(profile.id);
-  }
-}
-```
-
-## File: lib/presentation/pages/home_page.dart
-```dart
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_slidable/flutter_slidable.dart';
-import 'package:intl/intl.dart';
-import '../../domain/models/session_list_item.dart';
-import '../providers/config_notifier.dart';
-import '../providers/session_list_notifier.dart';
-import '../widgets/common/app_page_scaffold.dart';
-import '../widgets/input_bar.dart';
-import 'chat_page.dart';
-import 'settings_page.dart';
-
-class HomePage extends ConsumerWidget {
-  const HomePage({super.key});
-
-  Future<void> _showRenameDialog(
-    BuildContext context,
-    SessionListController controller,
-    SessionListItem item,
-  ) async {
-    final controllerText = TextEditingController(text: item.title);
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('重命名会话'),
-        content: TextField(
-          controller: controllerText,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: '输入新的会话名称',
-          ),
-          onSubmitted: (value) => Navigator.of(ctx).pop(value.trim()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(controllerText.text.trim()),
-            child: const Text('保存'),
-          ),
-        ],
-      ),
-    );
-    if (result != null && result.isNotEmpty && result != item.title) {
-      await controller.updateSessionTitle(item.id, result);
-    }
-  }
-
-  Future<void> _showDeleteConfirmDialog(
-    BuildContext context,
-    SessionListController controller,
-    SessionListItem item,
-  ) async {
-    final colorScheme = Theme.of(context).colorScheme;
-    final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('删除会话'),
-            content: Text('确定要删除 “${item.title}” 吗？\n此操作无法撤销。'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                style: FilledButton.styleFrom(
-                  backgroundColor: colorScheme.error,
-                  foregroundColor: colorScheme.onError,
-                ),
-                child: const Text('删除'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-
-    if (confirmed == true) {
-      await controller.deleteSession(item.id);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final sessionsAsync = ref.watch(sessionListProvider);
-    final controller = ref.read(sessionListControllerProvider);
-    final configAsync = ref.watch(configProvider);
-
-    final currentConfig = configAsync.valueOrNull;
-    final selectedModelId = currentConfig?.selectedModel;
-    final selectedModel = currentConfig?.availableModels
-        ?.where((m) => m.id == selectedModelId)
-        .firstOrNull;
-    final allowImages = selectedModel?.overrideSupportsVision == true;
-
-    return AppPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-      middle: const Text('AI Chat'),
-      trailing: CupertinoButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            CupertinoPageRoute(
-              builder: (_) => const SettingsPage(),
-            ),
-          );
-        },
-        child: const Icon(CupertinoIcons.settings),
-      ),
-    ),
-      body: Column(
-        children: [
-          Expanded(
-            child: sessionsAsync.when(
-              loading: () => const Center(
-                child: CircularProgressIndicator(),
-              ),
-              error: (e, st) => _HomeErrorState(
-                message: '加载会话失败：$e',
-                onRetry: () async {
-                  ref.invalidate(sessionListProvider);
-                },
-              ),
-              data: (items) {
-                if (items.isEmpty) {
-                  return const _HomeEmptyState();
-                }
-                return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                  itemCount: items.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final item = items[index];
-                    return _SessionCard(
-                      item: item,
-                      controller: controller,
-                      onRename: (item) =>
-                          _showRenameDialog(context, controller, item),
-                      onDelete: (item) =>
-                          _showDeleteConfirmDialog(context, controller, item),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-          InputBar(
-            hintText: '发送消息',
-            allowImages: allowImages,
-            onSend: (content, attachments) async {
-              final sessionId = await controller.createSession('新对话');
-              if (context.mounted) {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ChatPage(
-                      sessionId: sessionId,
-                      initialMessage: content,
-                      initialAttachments: attachments,
-                    ),
-                  ),
-                );
-              }
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HomeEmptyState extends StatelessWidget {
-  const _HomeEmptyState();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 360),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: const [
-                Icon(Icons.auto_awesome_outlined, size: 40),
-                SizedBox(height: 16),
-                Text(
-                  '开始你的第一段对话',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  '在下方输入问题，系统会自动创建一个新会话。\n你也可以附加图片或文件开始交流。',
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _HomeErrorState extends StatelessWidget {
-  final String message;
-  final Future<void> Function() onRetry;
-
-  const _HomeErrorState({
-    required this.message,
-    required this.onRetry,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Center(
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 360),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.error_outline,
-                  size: 40,
-                  color: colorScheme.error,
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  '出现了一点问题',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  message,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                FilledButton.icon(
-                  onPressed: onRetry,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('重试'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SessionCard extends ConsumerWidget {
-  final SessionListItem item;
-  final SessionListController controller;
-  final Future<void> Function(SessionListItem item) onRename;
-  final Future<void> Function(SessionListItem item) onDelete;
-
-  const _SessionCard({
-    required this.item,
-    required this.controller,
-    required this.onRename,
-    required this.onDelete,
-  });
-
-  Widget _buildMetaChip(String label, {IconData? icon}) {
-    return Chip(
-      avatar: icon == null ? null : Icon(icon, size: 16),
-      label: Text(label),
-      visualDensity: VisualDensity.compact,
-    );
-  }
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final sessionId = item.id;
-    final updatedAt = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(item.updatedAt));
-    final metaAsync = ref.watch(sessionCardMetaProvider(item.id));
-
-    return metaAsync.when(
-      loading: () {
-        return Card(
-          child: ListTile(
-            onTap: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ChatPage(sessionId: sessionId),
-                ),
-              );
-            },
-            leading: const Icon(Icons.forum_outlined),
-            title: Text(
-              item.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('加载中...'),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _buildMetaChip(updatedAt, icon: Icons.schedule_outlined),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            trailing: const Icon(Icons.chevron_right_rounded),
-          ),
-        );
-      },
-      error: (e, st) {
-        return Card(
-          child: ListTile(
-            onTap: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ChatPage(sessionId: sessionId),
-                ),
-              );
-            },
-            leading: const Icon(Icons.forum_outlined),
-            title: Text(
-              item.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('加载摘要失败'),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _buildMetaChip(updatedAt, icon: Icons.schedule_outlined),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            trailing: const Icon(Icons.chevron_right_rounded),
-          ),
-        );
-      },
-      data: (meta) {
-        return Slidable(
-          key: ValueKey(sessionId),
-          endActionPane: ActionPane(
-            motion: const DrawerMotion(),
-            extentRatio: 0.34,
-            children: [
-              CustomSlidableAction(
-                onPressed: (_) => onRename(item),
-                backgroundColor: Theme.of(context).colorScheme.secondary,
-                child: const Icon(
-                  Icons.edit_outlined,
-                  color: Colors.white,
-                ),
-              ),
-              CustomSlidableAction(
-                onPressed: (_) => onDelete(item),
-                backgroundColor: Theme.of(context).colorScheme.error,
-                child: Icon(
-                  Icons.delete_outline,
-                  color: Theme.of(context).colorScheme.onError,
-                ),
-              ),
-            ],
-          ),
-          child: Card(
-            child: ListTile(
-              onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ChatPage(
-                      sessionId: sessionId,
-                      initialRoundId: meta.previewRoundId,
-                    ),
-                  ),
-                );
-              },
-              leading: const Icon(Icons.forum_outlined),
-              title: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      item.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (meta.isStreaming) ...[
-                    const SizedBox(width: 8),
-                    _buildMetaChip('生成中', icon: Icons.bolt_outlined),
-                  ],
-                  if (meta.hasUnseen) ...[
-                    const SizedBox(width: 8),
-                    _buildMetaChip('未查看', icon: Icons.mark_chat_unread_outlined),
-                  ],
-                ],
-              ),
-              subtitle: Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _PreviewLine(
-                      label: 'YOU',
-                      text: meta.userPreview,
-                    ),
-                    const SizedBox(height: 4),
-                    _PreviewLine(
-                      label: 'AI',
-                      text: meta.aiPreview,
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _buildMetaChip(
-                          '${meta.roundCount} 轮',
-                          icon: Icons.chat_bubble_outline,
-                        ),
-                        _buildMetaChip(
-                          updatedAt,
-                          icon: Icons.schedule_outlined,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              trailing: const Icon(Icons.chevron_right_rounded),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _PreviewLine extends StatelessWidget {
-  final String label;
-  final String text;
-
-  const _PreviewLine({
-    required this.label,
-    required this.text,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '$label  ',
-          style: textTheme.bodySmall?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        Expanded(
-          child: Text(
-            text,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: textTheme.bodySmall,
-          ),
-        ),
-      ],
-    );
   }
 }
 ```
@@ -13995,6 +13333,476 @@ class ConversationRepository {
 }
 ```
 
+## File: lib/presentation/pages/home_page.dart
+```dart
+import 'package:flutter/cupertino.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
+import 'package:intl/intl.dart';
+import '../../domain/models/session_list_item.dart';
+import '../providers/config_notifier.dart';
+import '../providers/session_list_notifier.dart';
+import '../widgets/common/app_page_scaffold.dart';
+import '../widgets/input_bar.dart';
+import 'chat_page.dart';
+import 'settings_page.dart';
+
+class HomePage extends ConsumerWidget {
+  const HomePage({super.key});
+
+  Future<void> _showRenameDialog(
+    BuildContext context,
+    SessionListController controller,
+    SessionListItem item,
+  ) async {
+    final controllerText = TextEditingController(text: item.title);
+    final result = await showCupertinoDialog<String>(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: const Text('重命名会话'),
+        content: CupertinoTextField(
+          controller: controllerText,
+          autofocus: true,
+          placeholder: '输入新的会话名称',
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(ctx).pop(controllerText.text.trim()),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    if (result != null && result.isNotEmpty && result != item.title) {
+      await controller.updateSessionTitle(item.id, result);
+    }
+  }
+
+  Future<void> _showDeleteConfirmDialog(
+    BuildContext context,
+    SessionListController controller,
+    SessionListItem item,
+  ) async {
+    final confirmed = await showCupertinoDialog<bool>(
+          context: context,
+          builder: (ctx) => CupertinoAlertDialog(
+            title: const Text('删除会话'),
+            content: Text('确定要删除 "${item.title}" 吗？\n此操作无法撤销。'),
+            actions: [
+              CupertinoDialogAction(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('取消'),
+              ),
+              CupertinoDialogAction(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                isDestructiveAction: true,
+                child: const Text('删除'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (confirmed == true) {
+      await controller.deleteSession(item.id);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sessionsAsync = ref.watch(sessionListProvider);
+    final controller = ref.read(sessionListControllerProvider);
+    final configAsync = ref.watch(configProvider);
+
+    final currentConfig = configAsync.valueOrNull;
+    final selectedModelId = currentConfig?.selectedModel;
+    final selectedModel = currentConfig?.availableModels?.where((m) => m.id == selectedModelId).firstOrNull;
+    final allowImages = selectedModel?.overrideSupportsVision == true;
+
+    return AppPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        middle: const Text('AI Chat'),
+        trailing: CupertinoButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              CupertinoPageRoute(
+                builder: (_) => const SettingsPage(),
+              ),
+            );
+          },
+          child: const Icon(CupertinoIcons.settings),
+        ),
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: sessionsAsync.when(
+              loading: () => const Center(
+                child: CupertinoActivityIndicator(),
+              ),
+              error: (e, st) => _HomeErrorState(
+                message: '加载会话失败：$e',
+                onRetry: () async {
+                  ref.invalidate(sessionListProvider);
+                },
+              ),
+              data: (items) {
+                if (items.isEmpty) {
+                  return const _HomeEmptyState();
+                }
+                return ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                  itemCount: items.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    return _SessionCard(
+                      item: item,
+                      controller: controller,
+                      onRename: (item) => _showRenameDialog(context, controller, item),
+                      onDelete: (item) => _showDeleteConfirmDialog(context, controller, item),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+          InputBar(
+            hintText: '发送消息',
+            allowImages: allowImages,
+            onSend: (content, attachments) async {
+              final sessionId = await controller.createSession('新对话');
+              if (context.mounted) {
+                await Navigator.push(
+                  context,
+                  CupertinoPageRoute(
+                    builder: (_) => ChatPage(
+                      sessionId: sessionId,
+                      initialMessage: content,
+                      initialAttachments: attachments,
+                    ),
+                  ),
+                );
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeEmptyState extends StatelessWidget {
+  const _HomeEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(CupertinoIcons.sparkles, size: 40),
+              SizedBox(height: 16),
+              Text(
+                '开始你的第一段对话',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+              ),
+              SizedBox(height: 8),
+              Text(
+                '在下方输入问题，系统会自动创建一个新会话。\n你也可以附加图片或文件开始交流。',
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeErrorState extends StatelessWidget {
+  final String message;
+  final Future<void> Function() onRetry;
+
+  const _HomeErrorState({
+    required this.message,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                CupertinoIcons.exclamationmark_triangle,
+                size: 40,
+                color: CupertinoColors.systemRed,
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                '出现了一点问题',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              CupertinoButton.filled(
+                onPressed: onRetry,
+                child: const Text('重试'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SessionCard extends ConsumerWidget {
+  final SessionListItem item;
+  final SessionListController controller;
+  final Future<void> Function(SessionListItem item) onRename;
+  final Future<void> Function(SessionListItem item) onDelete;
+
+  const _SessionCard({
+    required this.item,
+    required this.controller,
+    required this.onRename,
+    required this.onDelete,
+  });
+
+  Widget _buildMetaChip(String label, {IconData? icon}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      color: CupertinoColors.systemGrey5,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 12),
+            const SizedBox(width: 4),
+          ],
+          Text(label, style: const TextStyle(fontSize: 12)),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sessionId = item.id;
+    final updatedAt = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(item.updatedAt));
+    final metaAsync = ref.watch(sessionCardMetaProvider(item.id));
+
+    return metaAsync.when(
+      loading: () {
+        return CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: () async {
+            await Navigator.push(
+              context,
+              CupertinoPageRoute(
+                builder: (_) => ChatPage(sessionId: sessionId),
+              ),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            color: CupertinoColors.systemBackground,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: CupertinoTheme.of(context).textTheme.textStyle,
+                ),
+                const SizedBox(height: 8),
+                const Text('加载中...'),
+                const SizedBox(height: 8),
+                _buildMetaChip(updatedAt, icon: CupertinoIcons.clock),
+              ],
+            ),
+          ),
+        );
+      },
+      error: (e, st) {
+        return CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: () async {
+            await Navigator.push(
+              context,
+              CupertinoPageRoute(
+                builder: (_) => ChatPage(sessionId: sessionId),
+              ),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            color: CupertinoColors.systemBackground,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+                const Text('加载摘要失败'),
+                const SizedBox(height: 8),
+                _buildMetaChip(updatedAt, icon: CupertinoIcons.clock),
+              ],
+            ),
+          ),
+        );
+      },
+      data: (meta) {
+        return Slidable(
+          key: ValueKey(sessionId),
+          endActionPane: ActionPane(
+            motion: const DrawerMotion(),
+            extentRatio: 0.34,
+            children: [
+              SlidableAction(
+                onPressed: (_) => onRename(item),
+                backgroundColor: CupertinoColors.systemBlue,
+                icon: CupertinoIcons.pencil,
+              ),
+              SlidableAction(
+                onPressed: (_) => onDelete(item),
+                backgroundColor: CupertinoColors.systemRed,
+                icon: CupertinoIcons.delete,
+              ),
+            ],
+          ),
+          child: CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                CupertinoPageRoute(
+                  builder: (_) => ChatPage(
+                    sessionId: sessionId,
+                    initialRoundId: meta.previewRoundId,
+                  ),
+                ),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              color: CupertinoColors.systemBackground,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (meta.isStreaming) ...[
+                        const SizedBox(width: 8),
+                        _buildMetaChip('生成中', icon: CupertinoIcons.bolt),
+                      ],
+                      if (meta.hasUnseen) ...[
+                        const SizedBox(width: 8),
+                        _buildMetaChip('未查看', icon: CupertinoIcons.chat_bubble_2),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  _PreviewLine(
+                    label: 'YOU',
+                    text: meta.userPreview,
+                  ),
+                  const SizedBox(height: 4),
+                  _PreviewLine(
+                    label: 'AI',
+                    text: meta.aiPreview,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildMetaChip(
+                        '${meta.roundCount} 轮',
+                        icon: CupertinoIcons.chat_bubble,
+                      ),
+                      _buildMetaChip(
+                        updatedAt,
+                        icon: CupertinoIcons.clock,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _PreviewLine extends StatelessWidget {
+  final String label;
+  final String text;
+
+  const _PreviewLine({
+    required this.label,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = CupertinoTheme.of(context).textTheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$label  ',
+          style: textTheme.textStyle.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.textStyle,
+          ),
+        ),
+      ],
+    );
+  }
+}
+```
+
 ## File: lib/presentation/pages/branch_tree_page.dart
 ```dart
 import 'package:flutter/cupertino.dart';
@@ -14290,34 +14098,32 @@ class _GraphNodeShell extends ConsumerWidget {
     final userText = round?.userContent;
     final aiText = round == null ? null : ((round.assistantContent ?? '').trim().isEmpty ? '（等待回复）' : round.assistantContent!);
 
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return Container(
+      color: CupertinoColors.systemBackground,
+      padding: const EdgeInsets.all(14),
       child: SizedBox(
         width: 290,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                height: 20,
-                child: dateText == null
-                    ? const _SkeletonBar(width: 160, height: 14)
-                    : Align(alignment: Alignment.centerLeft, child: Text(dateText, style: Theme.of(context).textTheme.bodySmall)),
-              ),
-              const SizedBox(height: 12),
-              _PreviewSlot(label: 'YOU', content: userText, loading: round == null),
-              const SizedBox(height: 8),
-              _PreviewSlot(label: 'AI', content: aiText, loading: round == null),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(child: FilledButton.tonal(onPressed: onSwitch, child: const Text('切换到此分支'))),
-                  IconButton(onPressed: onDelete, icon: const Icon(Icons.delete_outline)),
-                ],
-              ),
-            ],
-          ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              height: 20,
+              child: dateText == null
+                  ? const _SkeletonBar(width: 160, height: 14)
+                  : Align(alignment: Alignment.centerLeft, child: Text(dateText, style: CupertinoTheme.of(context).textTheme.textStyle)),
+            ),
+            const SizedBox(height: 12),
+            _PreviewSlot(label: 'YOU', content: userText, loading: round == null),
+            const SizedBox(height: 8),
+            _PreviewSlot(label: 'AI', content: aiText, loading: round == null),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(child: CupertinoButton.filled(onPressed: onSwitch, child: const Text('切换到此分支'))),
+                CupertinoButton(onPressed: onDelete, child: const Icon(CupertinoIcons.delete)),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -14332,24 +14138,22 @@ class _PreviewSlot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final textTheme = CupertinoTheme.of(context).textTheme;
     return SizedBox(
       height: 78,
-      child: Card(
-        margin: EdgeInsets.zero,
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(width: 34, child: Text('$label ', style: textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700))),
-              Expanded(
-                child: loading
-                    ? const _PreviewSkeleton()
-                    : Text((content == null || content!.trim().isEmpty) ? '（空）' : content!, maxLines: 3, overflow: TextOverflow.ellipsis, style: textTheme.bodySmall),
-              ),
-            ],
-          ),
+      child: Container(
+        color: CupertinoColors.systemBackground,
+        padding: const EdgeInsets.all(10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(width: 34, child: Text('$label ', style: textTheme.textStyle.copyWith(fontWeight: FontWeight.w700))),
+            Expanded(
+              child: loading
+                  ? const _PreviewSkeleton()
+                  : Text((content == null || content!.trim().isEmpty) ? '（空）' : content!, maxLines: 3, overflow: TextOverflow.ellipsis, style: textTheme.textStyle),
+            ),
+          ],
         ),
       ),
     );
@@ -14385,7 +14189,6 @@ class _SkeletonBar extends StatelessWidget {
 ## File: lib/presentation/pages/chat_page.dart
 ```dart
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/utils/app_route_observer.dart';
@@ -14446,12 +14249,11 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     _initialMessageHandled = true;
 
     try {
-      final newId =
-          await ref.read(chatControllerProvider(widget.sessionId)).sendMessage(
-                content: widget.initialMessage!,
-                parentRoundId: _currentRoundId,
-                attachments: widget.initialAttachments?.cast() ?? [],
-              );
+      final newId = await ref.read(chatControllerProvider(widget.sessionId)).sendMessage(
+            content: widget.initialMessage!,
+            parentRoundId: _currentRoundId,
+            attachments: widget.initialAttachments?.cast() ?? [],
+          );
       _updateBranch(newId);
     } catch (e) {
       AppToast.show('发送失败：$e');
@@ -14484,26 +14286,18 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
-    final sessionTitle =
-        ref.watch(sessionTitleProvider(widget.sessionId)).valueOrNull ?? '未加载';
+    final sessionTitle = ref.watch(sessionTitleProvider(widget.sessionId)).valueOrNull ?? '未加载';
     final currentRoundAsync = ref.watch(roundDetailProvider(_currentRoundId ?? ''));
     final isIncomplete = currentRoundAsync.valueOrNull?.isIncomplete ?? false;
     final configAsync = ref.watch(configProvider);
 
-    // ✅ 移除编辑模式相关状态
-    // final editSourceRoundId = ref.watch(globalEditSourceRoundIdProvider);
-    // final isEditMode = editSourceRoundId != null;
-
     final currentConfig = configAsync.valueOrNull;
     final selectedModelId = currentConfig?.selectedModel;
-    final selectedModel = currentConfig?.availableModels
-        ?.where((m) => m.id == selectedModelId)
-        .firstOrNull;
+    final selectedModel = currentConfig?.availableModels?.where((m) => m.id == selectedModelId).firstOrNull;
     final allowImages = selectedModel?.overrideSupportsVision == true;
 
     if (_branchLeafId == null) {
-      final topology =
-          ref.watch(chatTopologyProvider(widget.sessionId)).valueOrNull;
+      final topology = ref.watch(chatTopologyProvider(widget.sessionId)).valueOrNull;
       if (topology != null && topology.isNotEmpty) {
         _branchLeafId = topology.last.id;
         _currentRoundId = _branchLeafId;
@@ -14518,7 +14312,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     int currentIndex = visibleRoundIds.indexOf(_currentRoundId ?? '');
 
     if (currentIndex != -1) {
-      _pageController ??= PageController(initialPage: currentIndex);     
+      _pageController ??= PageController(initialPage: currentIndex);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _pageController!.jumpToPage(currentIndex);
       });
@@ -14587,12 +14381,9 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
             hintText: '发送消息',
             allowImages: allowImages,
             isIncomplete: isIncomplete,
-            onStop: () => ref
-                .read(chatControllerProvider(widget.sessionId))
-                .stopGeneration(_currentRoundId!),
+            onStop: () => ref.read(chatControllerProvider(widget.sessionId)).stopGeneration(_currentRoundId!),
             onSend: (text, attachments) async {
-              final controller =
-                  ref.read(chatControllerProvider(widget.sessionId));
+              final controller = ref.read(chatControllerProvider(widget.sessionId));
               final newId = await controller.sendMessage(
                 content: text,
                 parentRoundId: _currentRoundId,
@@ -14616,8 +14407,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
   }
 
   void _retry(String roundId) async {
-    final newId =
-        await ref.read(chatControllerProvider(widget.sessionId)).retryFromRound(roundId);
+    final newId = await ref.read(chatControllerProvider(widget.sessionId)).retryFromRound(roundId);
     _updateBranch(newId);
   }
 
@@ -14651,23 +14441,22 @@ class _ChatRoundPage extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _UserSection(
-                  roundId: roundId,
-                  onRetryReply: onRetryReply,
-                ),
-                _ThinkingSection(roundId: roundId),
-                _AiReplySection(
-                  roundId: roundId,
-                  onRetryReply: onRetryReply,
-                ),
-              ],
-            ),
+        Container(
+          color: CupertinoColors.systemBackground,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _UserSection(
+                roundId: roundId,
+                onRetryReply: onRetryReply,
+              ),
+              _ThinkingSection(roundId: roundId),
+              _AiReplySection(
+                roundId: roundId,
+                onRetryReply: onRetryReply,
+              ),
+            ],
           ),
         ),
       ],
@@ -14702,7 +14491,11 @@ class _UserSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Chip(label: Text(DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(round.time)))),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          color: CupertinoColors.systemGrey5,
+          child: Text(DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(round.time))),
+        ),
         const SizedBox(height: 12),
         MessageBubble(
           content: round.content,
@@ -14734,7 +14527,10 @@ class _ThinkingSection extends ConsumerWidget {
     }
     return Column(
       children: [
-        const Divider(height: 32),
+        Container(
+          height: 0.5,
+          color: CupertinoColors.separator,
+        ),
         ThoughtBubble(content: thinking),
       ],
     );
@@ -14766,7 +14562,10 @@ class _AiReplySection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Divider(height: 32),
+        Container(
+          height: 0.5,
+          color: CupertinoColors.separator,
+        ),
         if (ai.content != null)
           MessageBubble(
             content: ai.content!,
@@ -14777,7 +14576,7 @@ class _AiReplySection extends ConsumerWidget {
         else
           const Padding(
             padding: EdgeInsets.all(8),
-            child: CircularProgressIndicator(strokeWidth: 2),
+            child: CupertinoActivityIndicator(),
           ),
       ],
     );
@@ -14798,33 +14597,25 @@ class _PaginationBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final displayPage = currentIndex + 1;
-    final progress = totalPages == 0 ? 0.0 : displayPage.clamp(1, totalPages) / totalPages;
     final pageText = totalPages == 0 ? '0 / 0' : '$displayPage / $totalPages';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        border: Border(
-          bottom: BorderSide(color: Theme.of(context).dividerColor),
-        ),
-      ),
-      child: Row(
-        children: [
-          IconButton(onPressed: onPrev, icon: const Icon(Icons.chevron_left)),
-          Expanded(
-            child: Column(
-              children: [
-                Text(
-                  pageText,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 4),
-                LinearProgressIndicator(value: progress),
-              ],
+      color: CupertinoColors.systemBackground,
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: CupertinoColors.systemGrey5,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            pageText,
+            style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          IconButton(onPressed: onNext, icon: const Icon(Icons.chevron_right)),
-        ],
+        ),
       ),
     );
   }

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 
 class ThoughtBubble extends StatefulWidget {
   final String content;
@@ -13,7 +13,6 @@ class ThoughtBubble extends StatefulWidget {
 }
 
 class _ThoughtBubbleState extends State<ThoughtBubble> {
-  // 默认折叠
   bool _isExpanded = false;
 
   @override
@@ -21,71 +20,49 @@ class _ThoughtBubbleState extends State<ThoughtBubble> {
     final text = widget.content.trim();
     if (text.isEmpty) return const SizedBox.shrink();
 
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final textTheme = CupertinoTheme.of(context).textTheme;
 
-    return Card(
-      color: colorScheme.surfaceContainerHigh,
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 可点击的标题栏
-            InkWell(
-              onTap: () => setState(() => _isExpanded = !_isExpanded),
-              borderRadius: BorderRadius.circular(8),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4.0),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.psychology_alt_outlined,
-                      size: 16,
-                      color: colorScheme.primary,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '推理过程',
-                      style: textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                    const Spacer(),
-                    Icon(
-                      _isExpanded ? Icons.expand_less : Icons.expand_more,
-                      size: 18,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ],
+    return CupertinoFormSection.insetGrouped(
+      children: [
+        CupertinoButton(
+          padding: const EdgeInsets.all(12),
+          onPressed: () => setState(() => _isExpanded = !_isExpanded),
+          child: Row(
+            children: [
+              Icon(
+                CupertinoIcons.lightbulb,
+                size: 16,
+                color: CupertinoTheme.of(context).primaryColor,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '推理过程',
+                style: textTheme.textStyle.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: CupertinoTheme.of(context).primaryColor,
                 ),
               ),
-            ),
-            // 内容折叠/展开动画
-            AnimatedCrossFade(
-              firstChild: const SizedBox.shrink(),
-              secondChild: Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: Text(
-                  text,
-                  style: textTheme.bodySmall?.copyWith(
-                    fontSize: 13,
-                    height: 1.65,
-                  ),
-                ),
+              const Spacer(),
+              Icon(
+                _isExpanded ? CupertinoIcons.chevron_up : CupertinoIcons.chevron_down,
+                size: 18,
+                color: CupertinoColors.systemGrey,
               ),
-              crossFadeState: _isExpanded
-                  ? CrossFadeState.showSecond
-                  : CrossFadeState.showFirst,
-              duration: const Duration(milliseconds: 200),
-              sizeCurve: Curves.easeInOut,
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
+        if (_isExpanded)
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Text(
+              text,
+              style: textTheme.textStyle.copyWith(
+                fontSize: 13,
+                height: 1.65,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

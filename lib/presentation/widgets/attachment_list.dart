@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -81,32 +81,26 @@ class _AttachmentActionHelper {
     BuildContext context,
     Uint8List bytes,
   ) async {
-    await showDialog(
+    await showCupertinoDialog(
       context: context,
       builder: (ctx) {
-        return Dialog(
-          child: Stack(
-            children: [
-              InteractiveViewer(
-                minScale: 0.5,
-                maxScale: 4,
-                child: Center(
-                  child: Image.memory(
-                    bytes,
-                    fit: BoxFit.contain,
-                  ),
-                ),
+        return CupertinoAlertDialog(
+          content: InteractiveViewer(
+            minScale: 0.5,
+            maxScale: 4,
+            child: Center(
+              child: Image.memory(
+                bytes,
+                fit: BoxFit.contain,
               ),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: IconButton(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  icon: const Icon(Icons.close),
-                ),
-              ),
-            ],
+            ),
           ),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('关闭'),
+            ),
+          ],
         );
       },
     );
@@ -119,7 +113,7 @@ class _AttachmentActionHelper {
   ) async {
     final text = utf8.decode(bytes, allowMalformed: true);
     await Navigator.of(context).push(
-      MaterialPageRoute(
+      CupertinoPageRoute(
         builder: (_) => TextAttachmentViewerPage(
           title: title,
           content: text,
@@ -147,34 +141,25 @@ class _ImageAttachmentThumb extends ConsumerWidget {
         width: 108,
         height: 108,
         child: Center(
-          child: CircularProgressIndicator(strokeWidth: 2),
+          child: CupertinoActivityIndicator(),
         ),
       ),
       error: (e, st) => const SizedBox(
         width: 108,
         height: 108,
         child: Center(
-          child: Icon(Icons.broken_image_outlined),
+          child: Icon(CupertinoIcons.exclamationmark_triangle),
         ),
       ),
       data: (bytes) {
-        return InkWell(
+        return GestureDetector(
           onTap: () => _AttachmentActionHelper.previewImage(context, bytes),
-          onLongPress: () =>
-              _AttachmentActionHelper.shareAttachmentFromBytes(
-            attachment,
-            bytes,
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
+          onLongPress: () => _AttachmentActionHelper.shareAttachmentFromBytes(attachment, bytes),
+          child: ClipRect(
             child: SizedBox(
               width: 108,
               height: 108,
-              child: Image.memory(
-                bytes,
-                fit: BoxFit.cover,
-                gaplessPlayback: true,
-              ),
+              child: Image.memory(bytes, fit: BoxFit.cover, gaplessPlayback: true),
             ),
           ),
         );
@@ -198,27 +183,47 @@ class _FileAttachmentChip extends ConsumerWidget {
       attachmentBytesProvider(attachment.relativePath),
     );
 
-    final leadingIcon =
-        isText ? Icons.description_outlined : Icons.attach_file_outlined;
+    final leadingIcon = isText ? CupertinoIcons.doc_text : CupertinoIcons.doc;
 
     return bytesAsync.when(
-      loading: () => Chip(
-        avatar: Icon(leadingIcon, size: 18),
-        label: Text(
-          attachment.name,
-          overflow: TextOverflow.ellipsis,
+      loading: () => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        color: CupertinoColors.systemGrey5,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(leadingIcon, size: 18),
+            const SizedBox(width: 6),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 180),
+              child: Text(
+                attachment.name,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
       ),
-      error: (e, st) => Chip(
-        avatar: const Icon(Icons.error_outline, size: 18),
-        label: Text(
-          attachment.name,
-          overflow: TextOverflow.ellipsis,
+      error: (e, st) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        color: CupertinoColors.systemGrey5,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(CupertinoIcons.exclamationmark_triangle, size: 18),
+            const SizedBox(width: 6),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 180),
+              child: Text(
+                attachment.name,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
       ),
       data: (bytes) {
-        return InkWell(
-          borderRadius: BorderRadius.circular(20),
+        return GestureDetector(
           onTap: () async {
             if (isText) {
               await _AttachmentActionHelper.openTextViewer(
@@ -230,19 +235,23 @@ class _FileAttachmentChip extends ConsumerWidget {
             }
             await AppToast.show('该文件暂不支持直接预览，请长按进行分享');
           },
-          onLongPress: () =>
-              _AttachmentActionHelper.shareAttachmentFromBytes(
-            attachment,
-            bytes,
-          ),
-          child: Chip(
-            avatar: Icon(leadingIcon, size: 18),
-            label: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 180),
-              child: Text(
-                attachment.name,
-                overflow: TextOverflow.ellipsis,
-              ),
+          onLongPress: () => _AttachmentActionHelper.shareAttachmentFromBytes(attachment, bytes),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            color: CupertinoColors.systemGrey5,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(leadingIcon, size: 18),
+                const SizedBox(width: 6),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 180),
+                  child: Text(
+                    attachment.name,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
           ),
         );

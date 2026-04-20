@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:intl/intl.dart';
@@ -20,24 +19,21 @@ class HomePage extends ConsumerWidget {
     SessionListItem item,
   ) async {
     final controllerText = TextEditingController(text: item.title);
-    final result = await showDialog<String>(
+    final result = await showCupertinoDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => CupertinoAlertDialog(
         title: const Text('重命名会话'),
-        content: TextField(
+        content: CupertinoTextField(
           controller: controllerText,
           autofocus: true,
-          decoration: const InputDecoration(
-            hintText: '输入新的会话名称',
-          ),
-          onSubmitted: (value) => Navigator.of(ctx).pop(value.trim()),
+          placeholder: '输入新的会话名称',
         ),
         actions: [
-          TextButton(
+          CupertinoDialogAction(
             onPressed: () => Navigator.of(ctx).pop(),
             child: const Text('取消'),
           ),
-          FilledButton(
+          CupertinoDialogAction(
             onPressed: () => Navigator.of(ctx).pop(controllerText.text.trim()),
             child: const Text('保存'),
           ),
@@ -54,23 +50,19 @@ class HomePage extends ConsumerWidget {
     SessionListController controller,
     SessionListItem item,
   ) async {
-    final colorScheme = Theme.of(context).colorScheme;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showCupertinoDialog<bool>(
           context: context,
-          builder: (ctx) => AlertDialog(
+          builder: (ctx) => CupertinoAlertDialog(
             title: const Text('删除会话'),
-            content: Text('确定要删除 “${item.title}” 吗？\n此操作无法撤销。'),
+            content: Text('确定要删除 "${item.title}" 吗？\n此操作无法撤销。'),
             actions: [
-              TextButton(
+              CupertinoDialogAction(
                 onPressed: () => Navigator.of(ctx).pop(false),
                 child: const Text('取消'),
               ),
-              FilledButton(
+              CupertinoDialogAction(
                 onPressed: () => Navigator.of(ctx).pop(true),
-                style: FilledButton.styleFrom(
-                  backgroundColor: colorScheme.error,
-                  foregroundColor: colorScheme.onError,
-                ),
+                isDestructiveAction: true,
                 child: const Text('删除'),
               ),
             ],
@@ -91,32 +83,30 @@ class HomePage extends ConsumerWidget {
 
     final currentConfig = configAsync.valueOrNull;
     final selectedModelId = currentConfig?.selectedModel;
-    final selectedModel = currentConfig?.availableModels
-        ?.where((m) => m.id == selectedModelId)
-        .firstOrNull;
+    final selectedModel = currentConfig?.availableModels?.where((m) => m.id == selectedModelId).firstOrNull;
     final allowImages = selectedModel?.overrideSupportsVision == true;
 
     return AppPageScaffold(
       navigationBar: CupertinoNavigationBar(
-      middle: const Text('AI Chat'),
-      trailing: CupertinoButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            CupertinoPageRoute(
-              builder: (_) => const SettingsPage(),
-            ),
-          );
-        },
-        child: const Icon(CupertinoIcons.settings),
+        middle: const Text('AI Chat'),
+        trailing: CupertinoButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              CupertinoPageRoute(
+                builder: (_) => const SettingsPage(),
+              ),
+            );
+          },
+          child: const Icon(CupertinoIcons.settings),
+        ),
       ),
-    ),
       body: Column(
         children: [
           Expanded(
             child: sessionsAsync.when(
               loading: () => const Center(
-                child: CircularProgressIndicator(),
+                child: CupertinoActivityIndicator(),
               ),
               error: (e, st) => _HomeErrorState(
                 message: '加载会话失败：$e',
@@ -137,10 +127,8 @@ class HomePage extends ConsumerWidget {
                     return _SessionCard(
                       item: item,
                       controller: controller,
-                      onRename: (item) =>
-                          _showRenameDialog(context, controller, item),
-                      onDelete: (item) =>
-                          _showDeleteConfirmDialog(context, controller, item),
+                      onRename: (item) => _showRenameDialog(context, controller, item),
+                      onDelete: (item) => _showDeleteConfirmDialog(context, controller, item),
                     );
                   },
                 );
@@ -155,7 +143,7 @@ class HomePage extends ConsumerWidget {
               if (context.mounted) {
                 await Navigator.push(
                   context,
-                  MaterialPageRoute(
+                  CupertinoPageRoute(
                     builder: (_) => ChatPage(
                       sessionId: sessionId,
                       initialMessage: content,
@@ -178,27 +166,25 @@ class _HomeEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 360),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: const [
-                Icon(Icons.auto_awesome_outlined, size: 40),
-                SizedBox(height: 16),
-                Text(
-                  '开始你的第一段对话',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  '在下方输入问题，系统会自动创建一个新会话。\n你也可以附加图片或文件开始交流。',
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(CupertinoIcons.sparkles, size: 40),
+              SizedBox(height: 16),
+              Text(
+                '开始你的第一段对话',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+              ),
+              SizedBox(height: 8),
+              Text(
+                '在下方输入问题，系统会自动创建一个新会话。\n你也可以附加图片或文件开始交流。',
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
         ),
       ),
@@ -217,39 +203,35 @@ class _HomeErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     return Center(
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 360),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.error_outline,
-                  size: 40,
-                  color: colorScheme.error,
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  '出现了一点问题',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  message,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                FilledButton.icon(
-                  onPressed: onRetry,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('重试'),
-                ),
-              ],
-            ),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                CupertinoIcons.exclamationmark_triangle,
+                size: 40,
+                color: CupertinoColors.systemRed,
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                '出现了一点问题',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              CupertinoButton.filled(
+                onPressed: onRetry,
+                child: const Text('重试'),
+              ),
+            ],
           ),
         ),
       ),
@@ -271,10 +253,19 @@ class _SessionCard extends ConsumerWidget {
   });
 
   Widget _buildMetaChip(String label, {IconData? icon}) {
-    return Chip(
-      avatar: icon == null ? null : Icon(icon, size: 16),
-      label: Text(label),
-      visualDensity: VisualDensity.compact,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      color: CupertinoColors.systemGrey5,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 12),
+            const SizedBox(width: 4),
+          ],
+          Text(label, style: const TextStyle(fontSize: 12)),
+        ],
+      ),
     );
   }
 
@@ -286,78 +277,65 @@ class _SessionCard extends ConsumerWidget {
 
     return metaAsync.when(
       loading: () {
-        return Card(
-          child: ListTile(
-            onTap: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ChatPage(sessionId: sessionId),
-                ),
-              );
-            },
-            leading: const Icon(Icons.forum_outlined),
-            title: Text(
-              item.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('加载中...'),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _buildMetaChip(updatedAt, icon: Icons.schedule_outlined),
-                    ],
-                  ),
-                ],
+        return CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: () async {
+            await Navigator.push(
+              context,
+              CupertinoPageRoute(
+                builder: (_) => ChatPage(sessionId: sessionId),
               ),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            color: CupertinoColors.systemBackground,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: CupertinoTheme.of(context).textTheme.textStyle,
+                ),
+                const SizedBox(height: 8),
+                const Text('加载中...'),
+                const SizedBox(height: 8),
+                _buildMetaChip(updatedAt, icon: CupertinoIcons.clock),
+              ],
             ),
-            trailing: const Icon(Icons.chevron_right_rounded),
           ),
         );
       },
       error: (e, st) {
-        return Card(
-          child: ListTile(
-            onTap: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ChatPage(sessionId: sessionId),
-                ),
-              );
-            },
-            leading: const Icon(Icons.forum_outlined),
-            title: Text(
-              item.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('加载摘要失败'),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _buildMetaChip(updatedAt, icon: Icons.schedule_outlined),
-                    ],
-                  ),
-                ],
+        return CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: () async {
+            await Navigator.push(
+              context,
+              CupertinoPageRoute(
+                builder: (_) => ChatPage(sessionId: sessionId),
               ),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            color: CupertinoColors.systemBackground,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+                const Text('加载摘要失败'),
+                const SizedBox(height: 8),
+                _buildMetaChip(updatedAt, icon: CupertinoIcons.clock),
+              ],
             ),
-            trailing: const Icon(Icons.chevron_right_rounded),
           ),
         );
       },
@@ -368,90 +346,83 @@ class _SessionCard extends ConsumerWidget {
             motion: const DrawerMotion(),
             extentRatio: 0.34,
             children: [
-              CustomSlidableAction(
+              SlidableAction(
                 onPressed: (_) => onRename(item),
-                backgroundColor: Theme.of(context).colorScheme.secondary,
-                child: const Icon(
-                  Icons.edit_outlined,
-                  color: Colors.white,
-                ),
+                backgroundColor: CupertinoColors.systemBlue,
+                icon: CupertinoIcons.pencil,
               ),
-              CustomSlidableAction(
+              SlidableAction(
                 onPressed: (_) => onDelete(item),
-                backgroundColor: Theme.of(context).colorScheme.error,
-                child: Icon(
-                  Icons.delete_outline,
-                  color: Theme.of(context).colorScheme.onError,
-                ),
+                backgroundColor: CupertinoColors.systemRed,
+                icon: CupertinoIcons.delete,
               ),
             ],
           ),
-          child: Card(
-            child: ListTile(
-              onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ChatPage(
-                      sessionId: sessionId,
-                      initialRoundId: meta.previewRoundId,
-                    ),
+          child: CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                CupertinoPageRoute(
+                  builder: (_) => ChatPage(
+                    sessionId: sessionId,
+                    initialRoundId: meta.previewRoundId,
                   ),
-                );
-              },
-              leading: const Icon(Icons.forum_outlined),
-              title: Row(
+                ),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              color: CupertinoColors.systemBackground,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      item.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (meta.isStreaming) ...[
+                        const SizedBox(width: 8),
+                        _buildMetaChip('生成中', icon: CupertinoIcons.bolt),
+                      ],
+                      if (meta.hasUnseen) ...[
+                        const SizedBox(width: 8),
+                        _buildMetaChip('未查看', icon: CupertinoIcons.chat_bubble_2),
+                      ],
+                    ],
                   ),
-                  if (meta.isStreaming) ...[
-                    const SizedBox(width: 8),
-                    _buildMetaChip('生成中', icon: Icons.bolt_outlined),
-                  ],
-                  if (meta.hasUnseen) ...[
-                    const SizedBox(width: 8),
-                    _buildMetaChip('未查看', icon: Icons.mark_chat_unread_outlined),
-                  ],
+                  const SizedBox(height: 8),
+                  _PreviewLine(
+                    label: 'YOU',
+                    text: meta.userPreview,
+                  ),
+                  const SizedBox(height: 4),
+                  _PreviewLine(
+                    label: 'AI',
+                    text: meta.aiPreview,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildMetaChip(
+                        '${meta.roundCount} 轮',
+                        icon: CupertinoIcons.chat_bubble,
+                      ),
+                      _buildMetaChip(
+                        updatedAt,
+                        icon: CupertinoIcons.clock,
+                      ),
+                    ],
+                  ),
                 ],
               ),
-              subtitle: Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _PreviewLine(
-                      label: 'YOU',
-                      text: meta.userPreview,
-                    ),
-                    const SizedBox(height: 4),
-                    _PreviewLine(
-                      label: 'AI',
-                      text: meta.aiPreview,
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _buildMetaChip(
-                          '${meta.roundCount} 轮',
-                          icon: Icons.chat_bubble_outline,
-                        ),
-                        _buildMetaChip(
-                          updatedAt,
-                          icon: Icons.schedule_outlined,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              trailing: const Icon(Icons.chevron_right_rounded),
             ),
           ),
         );
@@ -471,13 +442,13 @@ class _PreviewLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final textTheme = CupertinoTheme.of(context).textTheme;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           '$label  ',
-          style: textTheme.bodySmall?.copyWith(
+          style: textTheme.textStyle.copyWith(
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -486,7 +457,7 @@ class _PreviewLine extends StatelessWidget {
             text,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: textTheme.bodySmall,
+            style: textTheme.textStyle,
           ),
         ),
       ],

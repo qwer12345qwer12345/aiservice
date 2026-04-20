@@ -291,34 +291,32 @@ class _GraphNodeShell extends ConsumerWidget {
     final userText = round?.userContent;
     final aiText = round == null ? null : ((round.assistantContent ?? '').trim().isEmpty ? '（等待回复）' : round.assistantContent!);
 
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return Container(
+      color: CupertinoColors.systemBackground,
+      padding: const EdgeInsets.all(14),
       child: SizedBox(
         width: 290,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                height: 20,
-                child: dateText == null
-                    ? const _SkeletonBar(width: 160, height: 14)
-                    : Align(alignment: Alignment.centerLeft, child: Text(dateText, style: Theme.of(context).textTheme.bodySmall)),
-              ),
-              const SizedBox(height: 12),
-              _PreviewSlot(label: 'YOU', content: userText, loading: round == null),
-              const SizedBox(height: 8),
-              _PreviewSlot(label: 'AI', content: aiText, loading: round == null),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(child: FilledButton.tonal(onPressed: onSwitch, child: const Text('切换到此分支'))),
-                  IconButton(onPressed: onDelete, icon: const Icon(Icons.delete_outline)),
-                ],
-              ),
-            ],
-          ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              height: 20,
+              child: dateText == null
+                  ? const _SkeletonBar(width: 160, height: 14)
+                  : Align(alignment: Alignment.centerLeft, child: Text(dateText, style: CupertinoTheme.of(context).textTheme.textStyle)),
+            ),
+            const SizedBox(height: 12),
+            _PreviewSlot(label: 'YOU', content: userText, loading: round == null),
+            const SizedBox(height: 8),
+            _PreviewSlot(label: 'AI', content: aiText, loading: round == null),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(child: CupertinoButton.filled(onPressed: onSwitch, child: const Text('切换到此分支'))),
+                CupertinoButton(onPressed: onDelete, child: const Icon(CupertinoIcons.delete)),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -333,24 +331,22 @@ class _PreviewSlot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final textTheme = CupertinoTheme.of(context).textTheme;
     return SizedBox(
       height: 78,
-      child: Card(
-        margin: EdgeInsets.zero,
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(width: 34, child: Text('$label ', style: textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700))),
-              Expanded(
-                child: loading
-                    ? const _PreviewSkeleton()
-                    : Text((content == null || content!.trim().isEmpty) ? '（空）' : content!, maxLines: 3, overflow: TextOverflow.ellipsis, style: textTheme.bodySmall),
-              ),
-            ],
-          ),
+      child: Container(
+        color: CupertinoColors.systemBackground,
+        padding: const EdgeInsets.all(10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(width: 34, child: Text('$label ', style: textTheme.textStyle.copyWith(fontWeight: FontWeight.w700))),
+            Expanded(
+              child: loading
+                  ? const _PreviewSkeleton()
+                  : Text((content == null || content!.trim().isEmpty) ? '（空）' : content!, maxLines: 3, overflow: TextOverflow.ellipsis, style: textTheme.textStyle),
+            ),
+          ],
         ),
       ),
     );

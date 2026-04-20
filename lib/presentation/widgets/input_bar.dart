@@ -1,16 +1,15 @@
 import 'package:aiservice/presentation/models/input_state.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/pending_attachment.dart';
-import '../providers/input_notifier.dart'; // ✅ 导入新的 Provider
+import '../providers/input_notifier.dart';
 
 class InputBar extends ConsumerStatefulWidget {
-  final Future<void> Function(String text, List<PendingAttachment> attachments)
-      onSend;
+  final Future<void> Function(String text, List<PendingAttachment> attachments) onSend;
   final VoidCallback? onStop;
   final bool isIncomplete;
   final String hintText;
@@ -36,7 +35,6 @@ class _InputBarState extends ConsumerState<InputBar> {
   @override
   void initState() {
     super.initState();
-    // ✅ 仅初始化 Controller，不读取旧 Draft
     _controller = TextEditingController();
   }
 
@@ -46,7 +44,6 @@ class _InputBarState extends ConsumerState<InputBar> {
     super.dispose();
   }
 
-  // ✅ 辅助方法：判断是否为图片文件
   bool _isImageFile(String name) {
     final lower = name.toLowerCase();
     return lower.endsWith('.png') ||
@@ -57,7 +54,6 @@ class _InputBarState extends ConsumerState<InputBar> {
         lower.endsWith('.bmp');
   }
 
-  // ✅ 辅助方法：猜测 MIME 类型
   String? _guessMimeType(String name) {
     final lower = name.toLowerCase();
     if (lower.endsWith('.png')) return 'image/png';
@@ -74,7 +70,6 @@ class _InputBarState extends ConsumerState<InputBar> {
     return null;
   }
 
-  // ✅ 添加文件附件
   Future<void> _pickFileAttachment() async {
     final result = await FilePicker.platform.pickFiles(
       allowMultiple: false,
@@ -95,11 +90,9 @@ class _InputBarState extends ConsumerState<InputBar> {
       isImage: isImage,
       mimeType: mimeType,
     );
-    // ✅ 调用 Notifier 添加附件
     ref.read(inputStateProvider.notifier).addAttachment(attachment);
   }
 
-  // ✅ 添加图片附件
   Future<void> _pickImageFromGallery() async {
     final file = await _imagePicker.pickImage(
       source: ImageSource.gallery,
@@ -114,45 +107,40 @@ class _InputBarState extends ConsumerState<InputBar> {
       isImage: true,
       mimeType: _guessMimeType(name) ?? 'image/*',
     );
-    // ✅ 调用 Notifier 添加附件
     ref.read(inputStateProvider.notifier).addAttachment(attachment);
   }
 
-  // ✅ 移除附件
   void _removeAttachment(String id) {
     ref.read(inputStateProvider.notifier).removeAttachment(id);
   }
 
-  // ✅ 显示附件选择菜单
   Future<void> _showAddAttachmentSheet() async {
     FocusScope.of(context).unfocus();
     
-    await showModalBottomSheet<void>(
+    await showCupertinoModalPopup<void>(
       context: context,
-      showDragHandle: true,
       builder: (context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.attach_file_outlined),
-                title: const Text('文件'),
-                onTap: () async {
+        return CupertinoActionSheet(
+          actions: [
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _pickFileAttachment();
+              },
+              child: const Text('文件'),
+            ),
+            if (widget.allowImages)
+              CupertinoActionSheetAction(
+                onPressed: () {
                   Navigator.of(context).pop();
-                  await _pickFileAttachment();
+                  _pickImageFromGallery();
                 },
+                child: const Text('相册'),
               ),
-              if (widget.allowImages)
-                ListTile(
-                  leading: const Icon(Icons.photo_library_outlined),
-                  title: const Text('相册'),
-                  onTap: () async {
-                    Navigator.of(context).pop();
-                    await _pickImageFromGallery();
-                  },
-                ),
-            ],
+          ],
+          cancelButton: CupertinoActionSheetAction(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('取消'),
           ),
         );
       },
@@ -175,11 +163,9 @@ class _InputBarState extends ConsumerState<InputBar> {
 
   @override
   Widget build(BuildContext context) {
-    // ✅ 监听文本变化，单向同步到 Controller
     ref.listen<String>(
       inputStateProvider.select((s) => s.text),
       (previous, next) {
-        // 避免不必要的更新和光标跳动
         if (next != _controller.text) {
           _controller.value = TextEditingValue(
             text: next,
@@ -190,7 +176,6 @@ class _InputBarState extends ConsumerState<InputBar> {
       },
     );
 
-    // ✅ 读取状态
     final inputState = ref.watch(inputStateProvider);
     final attachments = inputState.attachments;
     final canSend = inputState.canSend;
@@ -198,87 +183,88 @@ class _InputBarState extends ConsumerState<InputBar> {
 
     return SafeArea(
       top: false,
-      child: Material(
-        elevation: 1,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (attachments.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: attachments.map((attachment) {
-                        return InputChip(
-                          avatar: Icon(
-                            attachment.isImage
-                                ? Icons.image_outlined
-                                : Icons.attach_file_outlined,
-                            size: 18,
-                          ),
-                          label: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 180),
-                            child: Text(
-                              attachment.name,
-                              overflow: TextOverflow.ellipsis,
+      child: Container(
+        color: CupertinoColors.systemBackground,
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (attachments.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: attachments.map((attachment) {
+                      return CupertinoButton(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        onPressed: () {},
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              attachment.isImage
+                                  ? CupertinoIcons.photo
+                                  : CupertinoIcons.doc,
+                              size: 18,
                             ),
-                          ),
-                          onDeleted: () => _removeAttachment(attachment.id),
-                        );
-                      }).toList(),
-                    ),
+                            const SizedBox(width: 6),
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 180),
+                              child: Text(
+                                attachment.name,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            GestureDetector(
+                              onTap: () => _removeAttachment(attachment.id),
+                              child: const Icon(CupertinoIcons.xmark_circle_fill, size: 18),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
                   ),
                 ),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  IconButton(
-                    tooltip: '添加附件',
-                    onPressed: _showAddAttachmentSheet, // ✅ 始终可点击
-                    icon: const Icon(Icons.add),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      minLines: 1,
-                      maxLines: 6,
-                      keyboardType: TextInputType.multiline,
-                      textInputAction: TextInputAction.newline,
-                      decoration: InputDecoration(
-                        hintText: widget.hintText,
-                        isDense: true,
-                      ),
-                      // ✅ 用户输入时更新 Provider
-                      onChanged: (value) {
-                        ref
-                            .read(inputStateProvider.notifier)
-                            .updateText(value);
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  if (showStopButton)
-                    IconButton.filledTonal(
-                      tooltip: '停止生成',
-                      onPressed: widget.onStop, // ✅ 停止按钮
-                      icon: const Icon(Icons.stop_rounded),
-                    )
-                  else
-                    IconButton.filled(
-                      tooltip: '发送',
-                      onPressed: canSend ? _handleSend : null, // ✅ 发送按钮
-                      icon: const Icon(Icons.arrow_upward_rounded),
-                    ),
-                ],
               ),
-            ],
-          ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: _showAddAttachmentSheet,
+                  child: const Icon(CupertinoIcons.add),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: CupertinoTextField(
+                    controller: _controller,
+                    minLines: 1,
+                    maxLines: 6,
+                    keyboardType: TextInputType.multiline,
+                    placeholder: widget.hintText,
+                    onChanged: (value) {
+                      ref.read(inputStateProvider.notifier).updateText(value);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (showStopButton)
+                  CupertinoButton.filled(
+                    onPressed: widget.onStop,
+                    child: const Icon(CupertinoIcons.stop_fill),
+                  )
+                else
+                  CupertinoButton.filled(
+                    onPressed: canSend ? _handleSend : null,
+                    child: const Icon(CupertinoIcons.arrow_up),
+                  ),
+              ],
+            ),
+          ],
         ),
       ),
     );

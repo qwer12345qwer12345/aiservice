@@ -1,5 +1,4 @@
-import 'package:flutter/material.dart';
-import 'app_card.dart';
+import 'package:flutter/cupertino.dart';
 
 class AppSection extends StatelessWidget {
   final String title;
@@ -17,21 +16,14 @@ class AppSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final textTheme = CupertinoTheme.of(context).textTheme;
 
-    return AppCard(
+    return Container(
       margin: margin ?? const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: textTheme.titleMedium),
-          if (subtitle != null) ...[
-            const SizedBox(height: 8),
-            Text(subtitle!, style: textTheme.bodySmall),
-          ],
-          const SizedBox(height: 16),
-          ...children,
-        ],
+      child: CupertinoFormSection.insetGrouped(
+        header: Text(title, style: textTheme.navTitleTextStyle),
+        footer: subtitle != null ? Text(subtitle!, style: textTheme.tabLabelTextStyle) : null,
+        children: children,
       ),
     );
   }

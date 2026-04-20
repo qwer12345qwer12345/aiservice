@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_toast.dart';
@@ -21,7 +20,7 @@ class TextAttachmentViewerPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final textTheme = CupertinoTheme.of(context).textTheme;
 
     return AppPageScaffold(
       navigationBar: CupertinoNavigationBar(
@@ -36,15 +35,13 @@ class TextAttachmentViewerPage extends StatelessWidget {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: Card(
-          margin: EdgeInsets.zero,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: SelectableText(
-              content,
-              style: textTheme.bodyMedium?.copyWith(
-                fontFamily: 'monospace',
-              ),
+        child: Container(
+          color: CupertinoColors.systemBackground,
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            content,
+            style: textTheme.textStyle.copyWith(
+              fontFamily: 'monospace',
             ),
           ),
         ),

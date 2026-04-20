@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
 class MessageBubble extends StatelessWidget {
@@ -18,11 +18,7 @@ class MessageBubble extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final bubbleColor =
-        isUser ? colorScheme.secondaryContainer : colorScheme.surfaceContainerHigh;
-
+  Widget build(BuildContext context) {    
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -31,44 +27,39 @@ class MessageBubble extends StatelessWidget {
         ),
         margin: const EdgeInsets.symmetric(vertical: 4),
         child: Column(
-          crossAxisAlignment:
-              isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [ 
+          crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: bubbleColor,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: SelectionArea(
-                child: MarkdownBody(
+              color: isUser ? CupertinoColors.systemBlue : CupertinoColors.systemBackground,
+              child: MarkdownBody(
                   data: content,
                   selectable: true,
+                  styleSheet: MarkdownStyleSheet.fromCupertinoTheme(CupertinoTheme.of(context)),
                 ),
-              ),
             ),
             if (onCopy != null || onRetryReply != null || onEdit != null) ...[
               const SizedBox(height: 6),
-              Wrap(
-                spacing: 4,
+              Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   if (onCopy != null)
-                    IconButton(
-                      tooltip: '复制',
+                    CupertinoButton(
+                      padding: EdgeInsets.zero,
                       onPressed: onCopy,
-                      icon: const Icon(Icons.content_copy_outlined),
+                      child: const Icon(CupertinoIcons.doc_on_doc),
                     ),
                   if (onEdit != null)
-                    IconButton(
-                      tooltip: '编辑后发送',
+                    CupertinoButton(
+                      padding: EdgeInsets.zero,
                       onPressed: onEdit,
-                      icon: const Icon(Icons.edit_outlined),
+                      child: const Icon(CupertinoIcons.pencil),
                     ),
                   if (onRetryReply != null)
-                    IconButton(
-                      tooltip: '重新生成',
+                    CupertinoButton(
+                      padding: EdgeInsets.zero,
                       onPressed: onRetryReply,
-                      icon: const Icon(Icons.refresh_outlined),
+                      child: const Icon(CupertinoIcons.arrow_2_circlepath),
                     ),
                 ],
               ),

@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/utils/app_route_observer.dart';
@@ -60,12 +59,11 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     _initialMessageHandled = true;
 
     try {
-      final newId =
-          await ref.read(chatControllerProvider(widget.sessionId)).sendMessage(
-                content: widget.initialMessage!,
-                parentRoundId: _currentRoundId,
-                attachments: widget.initialAttachments?.cast() ?? [],
-              );
+      final newId = await ref.read(chatControllerProvider(widget.sessionId)).sendMessage(
+            content: widget.initialMessage!,
+            parentRoundId: _currentRoundId,
+            attachments: widget.initialAttachments?.cast() ?? [],
+          );
       _updateBranch(newId);
     } catch (e) {
       AppToast.show('发送失败：$e');
@@ -98,26 +96,18 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
-    final sessionTitle =
-        ref.watch(sessionTitleProvider(widget.sessionId)).valueOrNull ?? '未加载';
+    final sessionTitle = ref.watch(sessionTitleProvider(widget.sessionId)).valueOrNull ?? '未加载';
     final currentRoundAsync = ref.watch(roundDetailProvider(_currentRoundId ?? ''));
     final isIncomplete = currentRoundAsync.valueOrNull?.isIncomplete ?? false;
     final configAsync = ref.watch(configProvider);
 
-    // ✅ 移除编辑模式相关状态
-    // final editSourceRoundId = ref.watch(globalEditSourceRoundIdProvider);
-    // final isEditMode = editSourceRoundId != null;
-
     final currentConfig = configAsync.valueOrNull;
     final selectedModelId = currentConfig?.selectedModel;
-    final selectedModel = currentConfig?.availableModels
-        ?.where((m) => m.id == selectedModelId)
-        .firstOrNull;
+    final selectedModel = currentConfig?.availableModels?.where((m) => m.id == selectedModelId).firstOrNull;
     final allowImages = selectedModel?.overrideSupportsVision == true;
 
     if (_branchLeafId == null) {
-      final topology =
-          ref.watch(chatTopologyProvider(widget.sessionId)).valueOrNull;
+      final topology = ref.watch(chatTopologyProvider(widget.sessionId)).valueOrNull;
       if (topology != null && topology.isNotEmpty) {
         _branchLeafId = topology.last.id;
         _currentRoundId = _branchLeafId;
@@ -132,7 +122,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     int currentIndex = visibleRoundIds.indexOf(_currentRoundId ?? '');
 
     if (currentIndex != -1) {
-      _pageController ??= PageController(initialPage: currentIndex);     
+      _pageController ??= PageController(initialPage: currentIndex);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _pageController!.jumpToPage(currentIndex);
       });
@@ -201,12 +191,9 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
             hintText: '发送消息',
             allowImages: allowImages,
             isIncomplete: isIncomplete,
-            onStop: () => ref
-                .read(chatControllerProvider(widget.sessionId))
-                .stopGeneration(_currentRoundId!),
+            onStop: () => ref.read(chatControllerProvider(widget.sessionId)).stopGeneration(_currentRoundId!),
             onSend: (text, attachments) async {
-              final controller =
-                  ref.read(chatControllerProvider(widget.sessionId));
+              final controller = ref.read(chatControllerProvider(widget.sessionId));
               final newId = await controller.sendMessage(
                 content: text,
                 parentRoundId: _currentRoundId,
@@ -230,8 +217,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
   }
 
   void _retry(String roundId) async {
-    final newId =
-        await ref.read(chatControllerProvider(widget.sessionId)).retryFromRound(roundId);
+    final newId = await ref.read(chatControllerProvider(widget.sessionId)).retryFromRound(roundId);
     _updateBranch(newId);
   }
 
@@ -265,23 +251,22 @@ class _ChatRoundPage extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _UserSection(
-                  roundId: roundId,
-                  onRetryReply: onRetryReply,
-                ),
-                _ThinkingSection(roundId: roundId),
-                _AiReplySection(
-                  roundId: roundId,
-                  onRetryReply: onRetryReply,
-                ),
-              ],
-            ),
+        Container(
+          color: CupertinoColors.systemBackground,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _UserSection(
+                roundId: roundId,
+                onRetryReply: onRetryReply,
+              ),
+              _ThinkingSection(roundId: roundId),
+              _AiReplySection(
+                roundId: roundId,
+                onRetryReply: onRetryReply,
+              ),
+            ],
           ),
         ),
       ],
@@ -316,7 +301,11 @@ class _UserSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Chip(label: Text(DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(round.time)))),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          color: CupertinoColors.systemGrey5,
+          child: Text(DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(round.time))),
+        ),
         const SizedBox(height: 12),
         MessageBubble(
           content: round.content,
@@ -348,7 +337,10 @@ class _ThinkingSection extends ConsumerWidget {
     }
     return Column(
       children: [
-        const Divider(height: 32),
+        Container(
+          height: 0.5,
+          color: CupertinoColors.separator,
+        ),
         ThoughtBubble(content: thinking),
       ],
     );
@@ -380,7 +372,10 @@ class _AiReplySection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Divider(height: 32),
+        Container(
+          height: 0.5,
+          color: CupertinoColors.separator,
+        ),
         if (ai.content != null)
           MessageBubble(
             content: ai.content!,
@@ -391,7 +386,7 @@ class _AiReplySection extends ConsumerWidget {
         else
           const Padding(
             padding: EdgeInsets.all(8),
-            child: CircularProgressIndicator(strokeWidth: 2),
+            child: CupertinoActivityIndicator(),
           ),
       ],
     );
@@ -412,33 +407,25 @@ class _PaginationBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final displayPage = currentIndex + 1;
-    final progress = totalPages == 0 ? 0.0 : displayPage.clamp(1, totalPages) / totalPages;
     final pageText = totalPages == 0 ? '0 / 0' : '$displayPage / $totalPages';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        border: Border(
-          bottom: BorderSide(color: Theme.of(context).dividerColor),
-        ),
-      ),
-      child: Row(
-        children: [
-          IconButton(onPressed: onPrev, icon: const Icon(Icons.chevron_left)),
-          Expanded(
-            child: Column(
-              children: [
-                Text(
-                  pageText,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 4),
-                LinearProgressIndicator(value: progress),
-              ],
+      color: CupertinoColors.systemBackground,
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: CupertinoColors.systemGrey5,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            pageText,
+            style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          IconButton(onPressed: onNext, icon: const Icon(Icons.chevron_right)),
-        ],
+        ),
       ),
     );
   }
