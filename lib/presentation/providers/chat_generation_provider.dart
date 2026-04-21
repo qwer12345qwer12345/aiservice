@@ -1,3 +1,4 @@
+import 'package:aiservice/presentation/providers/character_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/generation_event.dart';
@@ -14,7 +15,12 @@ final chatGenerationProvider =
 
       // 1. 构建上下文
       final contextRounds = await repository.getContextRounds(roundId);
-      final apiContext = await buildApiContextFromRounds(contextRounds, repository);
+      final character = ref.read(currentCharacterProvider);
+      final apiContext = await buildApiContextFromRounds(
+        contextRounds,
+        repository,
+        character,   // 传递角色信息
+      );
 
       // 2. 加载配置
       final config = await configService.loadConfig();

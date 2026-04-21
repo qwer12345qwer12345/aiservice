@@ -91,13 +91,6 @@ class ChatController {
   void stopGeneration(String roundId) {
     ref.invalidate(chatGenerationProvider(roundId));
   }
-
-  Future<void> markRoundSeen(ChatRound round) async {
-    await ref.read(conversationRepositoryProvider).updateRound(
-      roundId: round.id,
-      hasUnseenUpdate: false,
-    );
-  }
 }
 
 final chatControllerProvider =

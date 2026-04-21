@@ -1,4 +1,6 @@
+import 'package:aiservice/domain/services/character_card_parser.dart';
 import 'package:aiservice/presentation/models/input_state.dart';
+import 'package:aiservice/presentation/providers/character_provider.dart';
 import 'package:aiservice/presentation/widgets/common/app_toast.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
@@ -14,7 +16,6 @@ class InputBar extends ConsumerStatefulWidget {
   final VoidCallback? onStop;
   final bool isIncomplete;
   final String hintText;
-  final bool allowImages;
 
   const InputBar({
     super.key,
@@ -22,7 +23,6 @@ class InputBar extends ConsumerStatefulWidget {
     this.onStop,
     this.isIncomplete = false,
     this.hintText = '输入消息...',
-    this.allowImages = false,
   });
 
   @override
@@ -150,6 +150,30 @@ class _InputBarState extends ConsumerState<InputBar> {
     ref.read(inputStateProvider.notifier).removeAttachment(id);
   }
 
+  Future<void> _importCharacterCard() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['png', 'json'],
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.single;
+    final bytes = file.bytes;
+    if (bytes == null) {
+      await AppToast.show('无法读取文件');
+      return;
+    }
+    try {
+      final character = await CharacterCardParser.parseFile(bytes, file.name);
+      // 将角色保存到全局 provider
+      ref.read(currentCharacterProvider.notifier).state = character;
+      // 重置开场白发送标记
+      ref.read(characterGreetingSentProvider.notifier).state = false;
+      await AppToast.show('已导入角色：${character.name}');
+    } catch (e) {
+      await AppToast.show('导入失败：$e');
+    }
+  }
+
   Future<void> _showAddAttachmentSheet() async {
     FocusScope.of(context).unfocus();
     
@@ -161,18 +185,24 @@ class _InputBarState extends ConsumerState<InputBar> {
             CupertinoActionSheetAction(
               onPressed: () {
                 Navigator.of(context).pop();
+                _importCharacterCard();
+              },
+              child: const Text('酒馆角色卡'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.of(context).pop();
                 _pickFileAttachment();
               },
               child: const Text('文件'),
             ),
-            if (widget.allowImages)
-              CupertinoActionSheetAction(
+            CupertinoActionSheetAction(
                 onPressed: () {
                   Navigator.of(context).pop();
                   _pickImageFromGallery();
                 },
                 child: const Text('相册'),
-              ),
+              ),              
           ],
           cancelButton: CupertinoActionSheetAction(
             onPressed: () => Navigator.of(context).pop(),

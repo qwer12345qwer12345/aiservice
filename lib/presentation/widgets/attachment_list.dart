@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:aiservice/presentation/pages/image_attachment_viewer_page.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
@@ -77,32 +78,11 @@ class _AttachmentActionHelper {
     }
   }
 
-  static Future<void> previewImage(
-    BuildContext context,
-    Uint8List bytes,
-  ) async {
-    await showCupertinoDialog(
-      context: context,
-      builder: (ctx) {
-        return CupertinoAlertDialog(
-          content: InteractiveViewer(
-            minScale: 0.5,
-            maxScale: 4,
-            child: Center(
-              child: Image.memory(
-                bytes,
-                fit: BoxFit.contain,
-              ),
-            ),
-          ),
-          actions: [
-            CupertinoDialogAction(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('关闭'),
-            ),
-          ],
-        );
-      },
+  static Future<void> previewImage(BuildContext context, Uint8List bytes) async {
+    await Navigator.of(context).push(
+      CupertinoPageRoute(
+        builder: (_) => ImageAttachmentViewerPage(imageBytes: bytes),
+      ),
     );
   }
 

@@ -1,10 +1,10 @@
+import 'package:aiservice/di/providers.dart';
+import 'package:aiservice/domain/services/character_card_parser.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/utils/app_route_observer.dart';
 import 'package:intl/intl.dart';
 import '../providers/chat_notifier.dart';
-import '../providers/config_notifier.dart';
 import '../widgets/attachment_list.dart';
 import '../widgets/input_bar.dart';
 import '../widgets/message_bubble.dart';
@@ -12,6 +12,7 @@ import '../widgets/thought_bubble.dart';
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_toast.dart';
 import 'branch_tree_page.dart';
+import '../providers/character_provider.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   final String sessionId;
@@ -31,26 +32,56 @@ class ChatPage extends ConsumerStatefulWidget {
   ConsumerState<ChatPage> createState() => _ChatPageState();
 }
 
-class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
+class _ChatPageState extends ConsumerState<ChatPage> {
   PageController? _pageController;
   bool _initialMessageHandled = false;
-  bool _isRouteVisible = false;
-  ModalRoute<dynamic>? _route;
 
   String? _branchLeafId;
   String? _currentRoundId;
-
+  
   @override
   void initState() {
     super.initState();
     _branchLeafId = widget.initialRoundId;
     _currentRoundId = widget.initialRoundId;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _ensureInitialRoundId();
+    });
+  }
+
+  Future<void> _ensureInitialRoundId() async {
+    if (_branchLeafId != null) return;
+    final topology = await ref.read(chatTopologyProvider(widget.sessionId).future);
+    if (topology.isNotEmpty && mounted) {
+      setState(() {
+        _branchLeafId = topology.last.id;
+        _currentRoundId = _branchLeafId;
+      });
+    }
+  }
+
+  Future<void> _maybeSendGreeting() async {
+    final character = ref.read(currentCharacterProvider);
+    final greetingSent = ref.read(characterGreetingSentProvider);
+    
+    if (character != null && !greetingSent && character.firstMes.isNotEmpty) {
+      // 标记已发送，防止重复
+      ref.read(characterGreetingSentProvider.notifier).state = true;
+      
+      final controller = ref.read(chatControllerProvider(widget.sessionId));
+      final newId = await controller.sendMessage(
+        content: character.firstMes,
+        parentRoundId: _currentRoundId,
+        attachments: [],
+      );
+      _updateBranch(newId);
+    }
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _subscribeRoute();
     _handleInitialMessage();
   }
 
@@ -70,18 +101,8 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     }
   }
 
-  void _subscribeRoute() {
-    final route = ModalRoute.of(context);
-    if (route != _route && route is PageRoute) {
-      if (_route != null) appRouteObserver.unsubscribe(this);
-      _route = route;
-      appRouteObserver.subscribe(this, route);
-    }
-  }
-
   @override
   void dispose() {
-    appRouteObserver.unsubscribe(this);
     _pageController?.dispose();
     super.dispose();
   }
@@ -96,23 +117,39 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
+    final hasUnseen = ref.watch(
+      roundDetailProvider(_currentRoundId ?? '').select(
+        (round) => round.valueOrNull?.hasUnseenUpdate ?? false,
+      ),
+    );
+
+    if (hasUnseen && ModalRoute.of(context)?.isCurrent == true) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ref.read(conversationRepositoryProvider).updateRound(
+                roundId: _currentRoundId!,
+                hasUnseenUpdate: false,
+              );
+        }
+      });
+    }
+
+
     final sessionTitle = ref.watch(sessionTitleProvider(widget.sessionId)).valueOrNull ?? '未加载';
     final currentRoundAsync = ref.watch(roundDetailProvider(_currentRoundId ?? ''));
     final isIncomplete = currentRoundAsync.valueOrNull?.isIncomplete ?? false;
-    final configAsync = ref.watch(configProvider);
+    ref.listen<CharacterData?>(
+      currentCharacterProvider,
+      (previous, next) {
+        if (previous?.name != next?.name) {
+          ref.read(characterGreetingSentProvider.notifier).state = false;
+        }
+      },
+    );
 
-    final currentConfig = configAsync.valueOrNull;
-    final selectedModelId = currentConfig?.selectedModel;
-    final selectedModel = currentConfig?.availableModels?.where((m) => m.id == selectedModelId).firstOrNull;
-    final allowImages = selectedModel?.overrideSupportsVision == true;
-
-    if (_branchLeafId == null) {
-      final topology = ref.watch(chatTopologyProvider(widget.sessionId)).valueOrNull;
-      if (topology != null && topology.isNotEmpty) {
-        _branchLeafId = topology.last.id;
-        _currentRoundId = _branchLeafId;
-      }
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeSendGreeting();
+    });
 
     final visibleRoundIds = ref.watch(visibleRoundIdsProvider((
       sessionId: widget.sessionId,
@@ -165,7 +202,6 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
                     onPageChanged: (index) {
                       final targetId = visibleRoundIds[index];
                       setState(() => _currentRoundId = targetId);
-                      _markAsSeen(targetId);
                     },
                     itemBuilder: (_, index) => _ChatRoundPage(
                       key: ValueKey(visibleRoundIds[index]),
@@ -177,7 +213,6 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
           ),
           InputBar(
             hintText: '发送消息',
-            allowImages: allowImages,
             isIncomplete: isIncomplete,
             onStop: () => ref.read(chatControllerProvider(widget.sessionId)).stopGeneration(_currentRoundId!),
             onSend: (text, attachments) async {
@@ -195,31 +230,10 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     );
   }
 
-  void _markAsSeen(String roundId) {
-    if (!_isRouteVisible) return;
-    final roundAsync = ref.read(roundDetailProvider(roundId));
-    final round = roundAsync.valueOrNull;
-    if (round?.hasUnseenUpdate == true) {
-      ref.read(chatControllerProvider(widget.sessionId)).markRoundSeen(round!);
-    }
-  }
-
   void _retry(String roundId) async {
     final newId = await ref.read(chatControllerProvider(widget.sessionId)).retryFromRound(roundId);
     _updateBranch(newId);
   }
-
-  @override
-  void didPush() => _isRouteVisible = true;
-
-  @override
-  void didPopNext() {
-    _isRouteVisible = true;
-    if (_currentRoundId != null) _markAsSeen(_currentRoundId!);
-  }
-
-  @override
-  void didPushNext() => _isRouteVisible = false;
 }
 
 class _ChatRoundPage extends StatelessWidget {

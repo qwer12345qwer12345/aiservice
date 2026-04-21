@@ -364,6 +364,19 @@ class _TreeNodeCard extends ConsumerWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
+          if (round != null && (round.isIncomplete || round.hasUnseenUpdate))
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                if (round.isIncomplete)
+                  const Text('生成中', style: TextStyle(color: CupertinoColors.systemOrange, fontSize: 12)),
+                if (round.hasUnseenUpdate && round.isIncomplete) const SizedBox(width: 8),
+                if (round.hasUnseenUpdate)
+                  const Text('未查看', style: TextStyle(color: CupertinoColors.systemBlue, fontSize: 12)),
+              ],
+            ),
+          ),
           const SizedBox(height: 8),
           Expanded(child: _PreviewSlot(label: 'YOU', content: userText, loading: round == null)),
           const SizedBox(height: 4),

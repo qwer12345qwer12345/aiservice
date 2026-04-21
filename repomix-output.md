@@ -84,6 +84,7 @@ lib/domain/models/tree_node.dart
 lib/domain/models/tree_node.freezed.dart
 lib/domain/models/tree_node.g.dart
 lib/domain/services/attachment_preparer.dart
+lib/domain/services/character_card_parser.dart
 lib/domain/services/chat_context_builder.dart
 lib/domain/services/stream_processor.dart
 lib/domain/services/tree_builder.dart
@@ -94,9 +95,11 @@ lib/presentation/models/pending_attachment.dart
 lib/presentation/pages/branch_tree_page.dart
 lib/presentation/pages/chat_page.dart
 lib/presentation/pages/home_page.dart
+lib/presentation/pages/image_attachment_viewer_page.dart
 lib/presentation/pages/settings_page.dart
 lib/presentation/pages/text_attachment_viewer_page.dart
 lib/presentation/providers/attachment_bytes_provider.dart
+lib/presentation/providers/character_provider.dart
 lib/presentation/providers/chat_generation_provider.dart
 lib/presentation/providers/chat_notifier.dart
 lib/presentation/providers/config_notifier.dart
@@ -116,112 +119,231 @@ lib/presentation/widgets/thought_bubble.dart
 
 # Files
 
-## File: lib/data/data_sources/api_builders/local_api_builder.dart
+## File: lib/domain/services/character_card_parser.dart
 ```dart
-import 'dart:async';
-import '../../../core/models/api_message.dart';
-import 'package:flutter_llama/flutter_llama.dart';
-import 'api_request_builder.dart';
-import '../../../core/models/chat_chunk.dart';
-import '../../../core/models/model_info.dart';
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:png_chunks_extract/png_chunks_extract.dart' as pngExtract;
 
-class LocalApiBuilder implements ApiRequestBuilder {
-  static final FlutterLlama _llama = FlutterLlama.instance;
-  static String? _loadedModelPath;
-  static bool _isLoaded = false;
+/// 解析后的角色数据结构（支持 V2/V3）
+class CharacterData {
+  final String name;
+  final String description;
+  final String personality;
+  final String scenario;
+  final String firstMes;
+  final String mesExample;
+  final String systemPrompt;
+  final String postHistoryInstructions;
+  final List<String> alternateGreetings;
+  final Map<String, dynamic>? characterBook;
+  final Map<String, dynamic>? extensions;
 
-  @override
-  Map<String, String> buildHeaders(ApiBuildContext ctx) => {};
+  CharacterData({
+    required this.name,
+    required this.description,
+    required this.personality,
+    required this.scenario,
+    required this.firstMes,
+    required this.mesExample,
+    required this.systemPrompt,
+    required this.postHistoryInstructions,
+    required this.alternateGreetings,
+    this.characterBook,
+    this.extensions,
+  });
 
-  @override
-  Uri buildUri(ApiBuildContext ctx) => Uri();
-
-  @override
-  Uri buildModelsUri(ApiBuildContext ctx) => Uri();
-
-  @override
-  Map<String, dynamic> buildRequestBody(ApiBuildContext ctx) => {};
-
-  @override
-  List<ModelInfo> parseModelsResponse(Map<String, dynamic> json) => [];
-
-  /// 将历史消息列表格式化为带轮次编号的 prompt
-  String _buildPromptFromContext(List<ApiMessage> context) {
+  /// 生成系统提示词（供模型使用）
+  String buildSystemPrompt() {
     final buffer = StringBuffer();
-    int round = 0;
-    for (final msg in context) {
-      if (msg.role == 'user') {
-        round++;
-        // 提取用户消息文本
-        String text = msg.content ?? '';
-        if (text.isEmpty && msg.parts.isNotEmpty) {
-          // 从 parts 中提取所有文本部分
-          final textParts = msg.parts.whereType<ApiMessageTextPart>();
-          text = textParts.map((p) => p.text).join('\n');
-        }
-        if (text.isNotEmpty) {
-          buffer.writeln('User $round: $text');
-        }
-      } else if (msg.role == 'assistant') {
-        String text = msg.content ?? '';
-        if (text.isNotEmpty) {
-          buffer.writeln('Assistant $round: $text');
-        }
-      }
+    buffer.writeln('# 角色设定');
+    buffer.writeln('你是 $name。\n');
+
+    if (description.isNotEmpty) {
+      buffer.writeln('## 外貌与背景');
+      buffer.writeln(description);
+      buffer.writeln();
     }
-    // 添加下一轮的引导标记
-    buffer.write('Assistant $round: ');
+
+    if (personality.isNotEmpty) {
+      buffer.writeln('## 性格特点');
+      buffer.writeln(personality);
+      buffer.writeln();
+    }
+
+    if (scenario.isNotEmpty) {
+      buffer.writeln('## 当前场景');
+      buffer.writeln(scenario);
+      buffer.writeln();
+    }
+
+    if (systemPrompt.isNotEmpty) {
+      buffer.writeln('## 核心指令');
+      buffer.writeln(systemPrompt);
+      buffer.writeln();
+    }
+
+    buffer.writeln('## 对话要求');
+    buffer.writeln('- 请严格按照以上设定进行角色扮演');
+    buffer.writeln('- 保持角色性格和语气的一致性');
+    buffer.writeln('- 根据对话历史适当推进情节');
+
+    if (mesExample.isNotEmpty) {
+      buffer.writeln('\n## 对话范例参考');
+      buffer.writeln(mesExample);
+    }
+
     return buffer.toString();
   }
+}
 
-  Stream<ChatChunk> generateStream(ApiBuildContext ctx) async* {
-    final modelPath = ctx.model;
-    if (modelPath.isEmpty) {
-      yield const ChatChunk(isDone: true, error: '未选择本地模型');
-      return;
-    }
-
-    // 构建包含完整历史且带轮次编号的 prompt
-    final prompt = _buildPromptFromContext(ctx.context);
-
-    // 加载模型（如果已加载且路径相同则跳过）
-    if (!_isLoaded || _loadedModelPath != modelPath) {
-      if (_isLoaded) await _llama.unloadModel();
-      try {
-        final loadConfig = LlamaConfig(
-          modelPath: modelPath,
-          nThreads: 4,
-          nGpuLayers: -1,
-          contextSize: 262144,
-          batchSize: 512,
-          useGpu: true,
-          verbose: false,
-        );
-        final success = await _llama.loadModel(loadConfig);
-        if (!success) {
-          yield const ChatChunk(isDone: true, error: '模型加载失败');
-          return;
-        }
-        _isLoaded = true;
-        _loadedModelPath = modelPath;
-      } catch (e) {
-        yield ChatChunk(isDone: true, error: '加载模型异常：$e');
-        return;
-      }
-    }
-
-    final params = GenerationParams(prompt: prompt);
-
-    try {
-      await for (final token in _llama.generateStream(params)) {
-        yield ChatChunk(content: token, isDone: false);
-      }
-      yield const ChatChunk(isDone: true);
-    } catch (e) {
-      yield ChatChunk(isDone: true, error: '生成失败：$e');
+/// 角色卡解析器
+class CharacterCardParser {
+  /// 解析文件（支持 PNG 和 JSON）
+  static Future<CharacterData> parseFile(Uint8List bytes, String fileName) async {
+    final lowerName = fileName.toLowerCase();
+    if (lowerName.endsWith('.png')) {
+      return _parsePngCard(bytes);
+    } else if (lowerName.endsWith('.json')) {
+      return _parseJsonCard(bytes);
+    } else {
+      throw Exception('不支持的文件格式，请使用 PNG 或 JSON 文件');
     }
   }
+
+  /// 解析 PNG 角色卡（V2/V3）
+  static CharacterData _parsePngCard(Uint8List bytes) {
+    final chunks = pngExtract.extractChunks(bytes);
+    
+    String? base64Data;
+    for (final chunk in chunks) {
+      final chunkName = chunk['name'] as String;
+      if (chunkName == 'tEXt') {
+        final dataBytes = chunk['data'] as List<int>;
+        // 解析 tEXt 块：keyword + 0x00 + text
+        final zeroIndex = dataBytes.indexOf(0);
+        if (zeroIndex == -1) continue;
+        final keyword = utf8.decode(dataBytes.sublist(0, zeroIndex));
+        final textBytes = dataBytes.sublist(zeroIndex + 1);
+        final text = utf8.decode(textBytes);
+        
+        if (keyword == 'ccv3') {
+          base64Data = text;
+          break;
+        } else if (keyword == 'chara' && base64Data == null) {
+          base64Data = text;
+        }
+      }
+    }
+    
+    if (base64Data == null) {
+      throw Exception('未找到角色数据块（ccv3/chara）');
+    }
+    
+    final jsonString = utf8.decode(base64.decode(base64Data));
+    return _parseJsonString(jsonString);
+  }
+
+  /// 解析 JSON 角色卡
+  static CharacterData _parseJsonCard(Uint8List bytes) {
+    final jsonString = utf8.decode(bytes);
+    return _parseJsonString(jsonString);
+  }
+
+  static CharacterData _parseJsonString(String jsonString) {
+    final Map<String, dynamic> json = jsonDecode(jsonString);
+    final spec = json['spec'] as String?;
+    
+    if (spec == 'chara_card_v3') {
+      return _parseV3(json);
+    } else if (spec == 'chara_card_v2') {
+      return _parseV2(json);
+    } else {
+      // 兼容旧格式
+      return _parseV2({'data': json});
+    }
+  }
+
+  static CharacterData _parseV3(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>;
+    return CharacterData(
+      name: data['name'] ?? '',
+      description: data['description'] ?? '',
+      personality: data['personality'] ?? '',
+      scenario: data['scenario'] ?? '',
+      firstMes: data['first_mes'] ?? '',
+      mesExample: data['mes_example'] ?? '',
+      systemPrompt: data['system_prompt'] ?? '',
+      postHistoryInstructions: data['post_history_instructions'] ?? '',
+      alternateGreetings: (data['alternate_greetings'] as List?)?.cast<String>() ?? [],
+      characterBook: data['character_book'],
+      extensions: data['extensions'],
+    );
+  }
+
+  static CharacterData _parseV2(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>? ?? json;
+    return CharacterData(
+      name: data['name'] ?? '',
+      description: data['description'] ?? '',
+      personality: data['personality'] ?? '',
+      scenario: data['scenario'] ?? '',
+      firstMes: data['first_mes'] ?? '',
+      mesExample: data['mes_example'] ?? '',
+      systemPrompt: data['system_prompt'] ?? '',
+      postHistoryInstructions: data['post_history_instructions'] ?? '',
+      alternateGreetings: (data['alternate_greetings'] as List?)?.cast<String>() ?? [],
+      characterBook: data['character_book'],
+      extensions: data['extensions'],
+    );
+  }
 }
+```
+
+## File: lib/presentation/pages/image_attachment_viewer_page.dart
+```dart
+import 'dart:typed_data';
+import 'package:flutter/cupertino.dart';
+
+class ImageAttachmentViewerPage extends StatelessWidget {
+  final Uint8List imageBytes;
+
+  const ImageAttachmentViewerPage({super.key, required this.imageBytes});
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoPageScaffold(
+      navigationBar: const CupertinoNavigationBar(
+        middle: Text('图片预览'),
+        automaticallyImplyLeading: true, // 自动返回按钮
+      ),
+      child: SafeArea(
+        child: InteractiveViewer(
+          minScale: 0.5,
+          maxScale: 4.0,
+          child: Center(
+            child: Image.memory(
+              imageBytes,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+```
+
+## File: lib/presentation/providers/character_provider.dart
+```dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../domain/services/character_card_parser.dart';
+
+/// 当前会话激活的角色（可为 null）
+final currentCharacterProvider = StateProvider<CharacterData?>((ref) => null);
+
+/// 角色开场白是否已发送（避免重复发送）
+final characterGreetingSentProvider = StateProvider<bool>((ref) => false);
 ```
 
 ## File: lib/core/models/api_message.dart
@@ -3517,147 +3639,110 @@ abstract class ApiRequestBuilder {
 }
 ```
 
-## File: lib/data/data_sources/api_builders/google_api_builder.dart
+## File: lib/data/data_sources/api_builders/local_api_builder.dart
 ```dart
-import 'api_request_builder.dart';
+import 'dart:async';
 import '../../../core/models/api_message.dart';
+import 'package:flutter_llama/flutter_llama.dart';
+import 'api_request_builder.dart';
+import '../../../core/models/chat_chunk.dart';
 import '../../../core/models/model_info.dart';
 
-class GoogleApiBuilder implements ApiRequestBuilder {
-  @override
-  Map<String, String> buildHeaders(ApiBuildContext ctx) {
-    return {
-      'x-goog-api-key': ctx.apiKey,
-      'Content-Type': 'application/json',
-    };
-  }
+class LocalApiBuilder implements ApiRequestBuilder {
+  static final FlutterLlama _llama = FlutterLlama.instance;
+  static String? _loadedModelPath;
+  static bool _isLoaded = false;
 
   @override
-  Uri buildUri(ApiBuildContext ctx) {
-    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.modelsPath).replace(
-      queryParameters: {'alt': 'sse'},
-    );
-  }
+  Map<String, String> buildHeaders(ApiBuildContext ctx) => {};
 
   @override
-  Uri buildModelsUri(ApiBuildContext ctx) {
-    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.modelsPath);
-  }
+  Uri buildUri(ApiBuildContext ctx) => Uri();
 
   @override
-  Map<String, dynamic> buildRequestBody(ApiBuildContext ctx) {
-    return {
-      'contents': _buildGoogleContents(ctx.context),
-      'generationConfig': {},
-      'safetySettings': [
-        {'category': 'HARM_CATEGORY_HARASSMENT', 'threshold': 'BLOCK_NONE'},
-        {'category': 'HARM_CATEGORY_HATE_SPEECH', 'threshold': 'BLOCK_NONE'},
-        {'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'threshold': 'BLOCK_NONE'},
-        {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold': 'BLOCK_NONE'},
-      ],
-    };
-  }
+  Uri buildModelsUri(ApiBuildContext ctx) => Uri();
 
   @override
-  List<ModelInfo> parseModelsResponse(Map<String, dynamic> json) {
-    final models = json['models'] as List<dynamic>?;
-    if (models == null) return [];
+  Map<String, dynamic> buildRequestBody(ApiBuildContext ctx) => {};
 
-    return models.map((e) {
-      final m = e as Map<String, dynamic>;
-      final name = (m['name'] ?? '').toString();
-      final id = name.startsWith('models/') ? name.substring(7) : name;
+  @override
+  List<ModelInfo> parseModelsResponse(Map<String, dynamic> json) => [];
 
-      final methods = m['supportedGenerationMethods'] as List<dynamic>?;
-      if (methods != null && !methods.contains('generateContent')) {
-        return null;
-      }
-
-      return ModelInfo(
-        id: id,
-      );
-    }).whereType<ModelInfo>().toList();
-  }
-
-  List<Map<String, dynamic>> _buildGoogleContents(List<ApiMessage> context) {
-    return context.map((message) {
-      final role = message.role == 'assistant' ? 'model' : message.role;
-      final parts = <Map<String, dynamic>>[];
-
-      if (message.parts.isEmpty) {
-        final text = message.content?.trim() ?? '';
+  /// 将历史消息列表格式化为带轮次编号的 prompt
+  String _buildPromptFromContext(List<ApiMessage> context) {
+    final buffer = StringBuffer();
+    int round = 0;
+    for (final msg in context) {
+      if (msg.role == 'user') {
+        round++;
+        // 提取用户消息文本
+        String text = msg.content ?? '';
+        if (text.isEmpty && msg.parts.isNotEmpty) {
+          // 从 parts 中提取所有文本部分
+          final textParts = msg.parts.whereType<ApiMessageTextPart>();
+          text = textParts.map((p) => p.text).join('\n');
+        }
         if (text.isNotEmpty) {
-          parts.add({'text': text});
+          buffer.writeln('User $round: $text');
         }
-      } else {
-        for (final part in message.parts) {
-          parts.addAll(part.when(
-            text: (type, text) => [{'text': text}],
-            imageUrl: (type, imageUrl) {
-              final url = imageUrl.url;
-              if (url.startsWith('data:')) {
-                final commaIndex = url.indexOf(',');
-                if (commaIndex != -1) {
-                  final mime = url.substring(5, commaIndex);
-                  final base64Data = url.substring(commaIndex + 1);
-                  return [
-                    {
-                      'inlineData': {
-                        'mimeType': mime,
-                        'data': base64Data,
-                      }
-                    }
-                  ];
-                }
-              }
-              return [{'text': '[Image: $url]'}];
-            },
-          ));
+      } else if (msg.role == 'assistant') {
+        String text = msg.content ?? '';
+        if (text.isNotEmpty) {
+          buffer.writeln('Assistant $round: $text');
         }
       }
-
-      if (parts.isEmpty) return null;
-      return {'role': role, 'parts': parts};
-    }).whereType<Map<String, dynamic>>().toList();
-  }
-}
-```
-
-## File: lib/data/data_sources/api_builders/model_info_parser.dart
-```dart
-// lib/data/data_sources/api_builders/model_info_parser.dart
-import '../../../core/models/model_info.dart';
-
-class ModelInfoParser {
-  /// 从 /v1/models 或 /v1/responses 等标准 OpenAI 风格响应中解析模型列表
-  static List<ModelInfo> parseModelsResponse(Map<String, dynamic> json) {
-    final data = json['data'] as List<dynamic>? ?? [];
-    return data.map((e) => _parseModelInfo(e as Map<String, dynamic>)).toList();
+    }
+    // 添加下一轮的引导标记
+    buffer.write('Assistant $round: ');
+    return buffer.toString();
   }
 
-  static ModelInfo _parseModelInfo(Map<String, dynamic> json) {
-    bool? readBool(Map<String, dynamic> json, List<String> keys) {
-      for (final key in keys) {
-        if (!json.containsKey(key)) continue;
-        final value = json[key];
-        if (value is bool) return value;
-        if (value is num) return value != 0;
-        if (value is String) {
-          final lower = value.toLowerCase();
-          if (lower == 'true' || lower == '1' || lower == 'yes') return true;
-          if (lower == 'false' || lower == '0' || lower == 'no') return false;
-        }
-      }
-      return null;
+  Stream<ChatChunk> generateStream(ApiBuildContext ctx) async* {
+    final modelPath = ctx.model;
+    if (modelPath.isEmpty) {
+      yield const ChatChunk(isDone: true, error: '未选择本地模型');
+      return;
     }
 
-    return ModelInfo(
-      id: (json['id'] ?? '').toString(),
-      overrideSupportsReasoning:
-          readBool(json, ['overrideSupportsReasoning', 'override_supports_reasoning']),
-      overrideSupportsVision:
-          readBool(json, ['overrideSupportsVision', 'override_supports_vision']),
-    );
+    // 构建包含完整历史且带轮次编号的 prompt
+    final prompt = _buildPromptFromContext(ctx.context);
+
+    // 加载模型（如果已加载且路径相同则跳过）
+    if (!_isLoaded || _loadedModelPath != modelPath) {
+      if (_isLoaded) await _llama.unloadModel();
+      try {
+        final loadConfig = LlamaConfig(
+          modelPath: modelPath,
+          nThreads: 4,
+          nGpuLayers: -1,
+          contextSize: 262144,
+          batchSize: 512,
+          useGpu: true,
+          verbose: false,
+        );
+        final success = await _llama.loadModel(loadConfig);
+        if (!success) {
+          yield const ChatChunk(isDone: true, error: '模型加载失败');
+          return;
+        }
+        _isLoaded = true;
+        _loadedModelPath = modelPath;
+      } catch (e) {
+        yield ChatChunk(isDone: true, error: '加载模型异常：$e');
+        return;
+      }
+    }
+
+    final params = GenerationParams(prompt: prompt);
+
+    try {
+      await for (final token in _llama.generateStream(params)) {
+        yield ChatChunk(content: token, isDone: false);
+      }
+      yield const ChatChunk(isDone: true);
+    } catch (e) {
+      yield ChatChunk(isDone: true, error: '生成失败：$e');
+    }
   }
 }
 ```
@@ -8103,283 +8188,6 @@ Map<String, dynamic> _$$ChatRoundImplToJson(_$ChatRoundImpl instance) =>
     };
 ```
 
-## File: lib/core/models/model_info.dart
-```dart
-import 'package:freezed_annotation/freezed_annotation.dart';
-
-part 'model_info.freezed.dart';
-part 'model_info.g.dart';
-
-@freezed
-class ModelInfo with _$ModelInfo {
-  const factory ModelInfo({
-    required String id,
-
-    bool? overrideSupportsReasoning,
-    bool? overrideSupportsVision,
-  }) = _ModelInfo;
-
-  factory ModelInfo.fromJson(Map<String, dynamic> json) =>
-      _$ModelInfoFromJson(json);
-}
-```
-
-## File: lib/core/models/model_info.freezed.dart
-```dart
-// coverage:ignore-file
-// GENERATED CODE - DO NOT MODIFY BY HAND
-// ignore_for_file: type=lint
-// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
-
-part of 'model_info.dart';
-
-// **************************************************************************
-// FreezedGenerator
-// **************************************************************************
-
-T _$identity<T>(T value) => value;
-
-final _privateConstructorUsedError = UnsupportedError(
-  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
-);
-
-ModelInfo _$ModelInfoFromJson(Map<String, dynamic> json) {
-  return _ModelInfo.fromJson(json);
-}
-
-/// @nodoc
-mixin _$ModelInfo {
-  String get id => throw _privateConstructorUsedError;
-  bool? get overrideSupportsReasoning => throw _privateConstructorUsedError;
-  bool? get overrideSupportsVision => throw _privateConstructorUsedError;
-
-  /// Serializes this ModelInfo to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-
-  /// Create a copy of ModelInfo
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $ModelInfoCopyWith<ModelInfo> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-abstract class $ModelInfoCopyWith<$Res> {
-  factory $ModelInfoCopyWith(ModelInfo value, $Res Function(ModelInfo) then) =
-      _$ModelInfoCopyWithImpl<$Res, ModelInfo>;
-  @useResult
-  $Res call({
-    String id,
-    bool? overrideSupportsReasoning,
-    bool? overrideSupportsVision,
-  });
-}
-
-/// @nodoc
-class _$ModelInfoCopyWithImpl<$Res, $Val extends ModelInfo>
-    implements $ModelInfoCopyWith<$Res> {
-  _$ModelInfoCopyWithImpl(this._value, this._then);
-
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-
-  /// Create a copy of ModelInfo
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? id = null,
-    Object? overrideSupportsReasoning = freezed,
-    Object? overrideSupportsVision = freezed,
-  }) {
-    return _then(
-      _value.copyWith(
-            id: null == id
-                ? _value.id
-                : id // ignore: cast_nullable_to_non_nullable
-                      as String,
-            overrideSupportsReasoning: freezed == overrideSupportsReasoning
-                ? _value.overrideSupportsReasoning
-                : overrideSupportsReasoning // ignore: cast_nullable_to_non_nullable
-                      as bool?,
-            overrideSupportsVision: freezed == overrideSupportsVision
-                ? _value.overrideSupportsVision
-                : overrideSupportsVision // ignore: cast_nullable_to_non_nullable
-                      as bool?,
-          )
-          as $Val,
-    );
-  }
-}
-
-/// @nodoc
-abstract class _$$ModelInfoImplCopyWith<$Res>
-    implements $ModelInfoCopyWith<$Res> {
-  factory _$$ModelInfoImplCopyWith(
-    _$ModelInfoImpl value,
-    $Res Function(_$ModelInfoImpl) then,
-  ) = __$$ModelInfoImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({
-    String id,
-    bool? overrideSupportsReasoning,
-    bool? overrideSupportsVision,
-  });
-}
-
-/// @nodoc
-class __$$ModelInfoImplCopyWithImpl<$Res>
-    extends _$ModelInfoCopyWithImpl<$Res, _$ModelInfoImpl>
-    implements _$$ModelInfoImplCopyWith<$Res> {
-  __$$ModelInfoImplCopyWithImpl(
-    _$ModelInfoImpl _value,
-    $Res Function(_$ModelInfoImpl) _then,
-  ) : super(_value, _then);
-
-  /// Create a copy of ModelInfo
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? id = null,
-    Object? overrideSupportsReasoning = freezed,
-    Object? overrideSupportsVision = freezed,
-  }) {
-    return _then(
-      _$ModelInfoImpl(
-        id: null == id
-            ? _value.id
-            : id // ignore: cast_nullable_to_non_nullable
-                  as String,
-        overrideSupportsReasoning: freezed == overrideSupportsReasoning
-            ? _value.overrideSupportsReasoning
-            : overrideSupportsReasoning // ignore: cast_nullable_to_non_nullable
-                  as bool?,
-        overrideSupportsVision: freezed == overrideSupportsVision
-            ? _value.overrideSupportsVision
-            : overrideSupportsVision // ignore: cast_nullable_to_non_nullable
-                  as bool?,
-      ),
-    );
-  }
-}
-
-/// @nodoc
-@JsonSerializable()
-class _$ModelInfoImpl implements _ModelInfo {
-  const _$ModelInfoImpl({
-    required this.id,
-    this.overrideSupportsReasoning,
-    this.overrideSupportsVision,
-  });
-
-  factory _$ModelInfoImpl.fromJson(Map<String, dynamic> json) =>
-      _$$ModelInfoImplFromJson(json);
-
-  @override
-  final String id;
-  @override
-  final bool? overrideSupportsReasoning;
-  @override
-  final bool? overrideSupportsVision;
-
-  @override
-  String toString() {
-    return 'ModelInfo(id: $id, overrideSupportsReasoning: $overrideSupportsReasoning, overrideSupportsVision: $overrideSupportsVision)';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$ModelInfoImpl &&
-            (identical(other.id, id) || other.id == id) &&
-            (identical(
-                  other.overrideSupportsReasoning,
-                  overrideSupportsReasoning,
-                ) ||
-                other.overrideSupportsReasoning == overrideSupportsReasoning) &&
-            (identical(other.overrideSupportsVision, overrideSupportsVision) ||
-                other.overrideSupportsVision == overrideSupportsVision));
-  }
-
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  int get hashCode => Object.hash(
-    runtimeType,
-    id,
-    overrideSupportsReasoning,
-    overrideSupportsVision,
-  );
-
-  /// Create a copy of ModelInfo
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$ModelInfoImplCopyWith<_$ModelInfoImpl> get copyWith =>
-      __$$ModelInfoImplCopyWithImpl<_$ModelInfoImpl>(this, _$identity);
-
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$ModelInfoImplToJson(this);
-  }
-}
-
-abstract class _ModelInfo implements ModelInfo {
-  const factory _ModelInfo({
-    required final String id,
-    final bool? overrideSupportsReasoning,
-    final bool? overrideSupportsVision,
-  }) = _$ModelInfoImpl;
-
-  factory _ModelInfo.fromJson(Map<String, dynamic> json) =
-      _$ModelInfoImpl.fromJson;
-
-  @override
-  String get id;
-  @override
-  bool? get overrideSupportsReasoning;
-  @override
-  bool? get overrideSupportsVision;
-
-  /// Create a copy of ModelInfo
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$ModelInfoImplCopyWith<_$ModelInfoImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-```
-
-## File: lib/core/models/model_info.g.dart
-```dart
-// GENERATED CODE - DO NOT MODIFY BY HAND
-
-part of 'model_info.dart';
-
-// **************************************************************************
-// JsonSerializableGenerator
-// **************************************************************************
-
-_$ModelInfoImpl _$$ModelInfoImplFromJson(Map<String, dynamic> json) =>
-    _$ModelInfoImpl(
-      id: json['id'] as String,
-      overrideSupportsReasoning: json['overrideSupportsReasoning'] as bool?,
-      overrideSupportsVision: json['overrideSupportsVision'] as bool?,
-    );
-
-Map<String, dynamic> _$$ModelInfoImplToJson(_$ModelInfoImpl instance) =>
-    <String, dynamic>{
-      'id': instance.id,
-      'overrideSupportsReasoning': instance.overrideSupportsReasoning,
-      'overrideSupportsVision': instance.overrideSupportsVision,
-    };
-```
-
 ## File: lib/core/models/session.dart
 ```dart
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -9080,6 +8888,151 @@ class ChatCompletionsApiBuilder implements ApiRequestBuilder {
 }
 ```
 
+## File: lib/data/data_sources/api_builders/google_api_builder.dart
+```dart
+import 'api_request_builder.dart';
+import '../../../core/models/api_message.dart';
+import '../../../core/models/model_info.dart';
+
+class GoogleApiBuilder implements ApiRequestBuilder {
+  @override
+  Map<String, String> buildHeaders(ApiBuildContext ctx) {
+    return {
+      'x-goog-api-key': ctx.apiKey,
+      'Content-Type': 'application/json',
+    };
+  }
+
+  @override
+  Uri buildUri(ApiBuildContext ctx) {
+    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.modelsPath).replace(
+      queryParameters: {'alt': 'sse'},
+    );
+  }
+
+  @override
+  Uri buildModelsUri(ApiBuildContext ctx) {
+    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.modelsPath);
+  }
+
+  @override
+  Map<String, dynamic> buildRequestBody(ApiBuildContext ctx) {
+    return {
+      'contents': _buildGoogleContents(ctx.context),
+      'generationConfig': {},
+      'safetySettings': [
+        {'category': 'HARM_CATEGORY_HARASSMENT', 'threshold': 'BLOCK_NONE'},
+        {'category': 'HARM_CATEGORY_HATE_SPEECH', 'threshold': 'BLOCK_NONE'},
+        {'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'threshold': 'BLOCK_NONE'},
+        {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold': 'BLOCK_NONE'},
+      ],
+    };
+  }
+
+  @override
+  List<ModelInfo> parseModelsResponse(Map<String, dynamic> json) {
+    final models = json['models'] as List<dynamic>?;
+    if (models == null) return [];
+
+    return models.map((e) {
+      final m = e as Map<String, dynamic>;
+      final name = (m['name'] ?? '').toString();
+      final id = name.startsWith('models/') ? name.substring(7) : name;
+
+      final methods = m['supportedGenerationMethods'] as List<dynamic>?;
+      if (methods != null && !methods.contains('generateContent')) {
+        return null;
+      }
+
+      return ModelInfo(
+        id: id,
+      );
+    }).whereType<ModelInfo>().toList();
+  }
+
+  List<Map<String, dynamic>> _buildGoogleContents(List<ApiMessage> context) {
+    return context.map((message) {
+      final role = message.role == 'assistant' ? 'model' : message.role;
+      final parts = <Map<String, dynamic>>[];
+
+      if (message.parts.isEmpty) {
+        final text = message.content?.trim() ?? '';
+        if (text.isNotEmpty) {
+          parts.add({'text': text});
+        }
+      } else {
+        for (final part in message.parts) {
+          parts.addAll(part.when(
+            text: (type, text) => [{'text': text}],
+            imageUrl: (type, imageUrl) {
+              final url = imageUrl.url;
+              if (url.startsWith('data:')) {
+                final commaIndex = url.indexOf(',');
+                if (commaIndex != -1) {
+                  final mime = url.substring(5, commaIndex);
+                  final base64Data = url.substring(commaIndex + 1);
+                  return [
+                    {
+                      'inlineData': {
+                        'mimeType': mime,
+                        'data': base64Data,
+                      }
+                    }
+                  ];
+                }
+              }
+              return [{'text': '[Image: $url]'}];
+            },
+          ));
+        }
+      }
+
+      if (parts.isEmpty) return null;
+      return {'role': role, 'parts': parts};
+    }).whereType<Map<String, dynamic>>().toList();
+  }
+}
+```
+
+## File: lib/data/data_sources/api_builders/model_info_parser.dart
+```dart
+// lib/data/data_sources/api_builders/model_info_parser.dart
+import '../../../core/models/model_info.dart';
+
+class ModelInfoParser {
+  /// 从 /v1/models 或 /v1/responses 等标准 OpenAI 风格响应中解析模型列表
+  static List<ModelInfo> parseModelsResponse(Map<String, dynamic> json) {
+    final data = json['data'] as List<dynamic>? ?? [];
+    return data.map((e) => _parseModelInfo(e as Map<String, dynamic>)).toList();
+  }
+
+  static ModelInfo _parseModelInfo(Map<String, dynamic> json) {
+    bool? readBool(Map<String, dynamic> json, List<String> keys) {
+      for (final key in keys) {
+        if (!json.containsKey(key)) continue;
+        final value = json[key];
+        if (value is bool) return value;
+        if (value is num) return value != 0;
+        if (value is String) {
+          final lower = value.toLowerCase();
+          if (lower == 'true' || lower == '1' || lower == 'yes') return true;
+          if (lower == 'false' || lower == '0' || lower == 'no') return false;
+        }
+      }
+      return null;
+    }
+
+    return ModelInfo(
+      id: (json['id'] ?? '').toString(),
+      overrideSupportsReasoning:
+          readBool(json, ['overrideSupportsReasoning', 'override_supports_reasoning']),
+      overrideSupportsVision:
+          readBool(json, ['overrideSupportsVision', 'override_supports_vision']),
+    );
+  }
+}
+```
+
 ## File: lib/data/data_sources/api_builders/responses_api_builder.dart
 ```dart
 import 'package:aiservice/data/data_sources/api_builders/model_info_parser.dart';
@@ -9448,6 +9401,7 @@ Future<List<Attachment>> savePendingAttachments(
 
 ## File: lib/presentation/providers/chat_generation_provider.dart
 ```dart
+import 'package:aiservice/presentation/providers/character_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/generation_event.dart';
@@ -9464,7 +9418,12 @@ final chatGenerationProvider =
 
       // 1. 构建上下文
       final contextRounds = await repository.getContextRounds(roundId);
-      final apiContext = await buildApiContextFromRounds(contextRounds, repository);
+      final character = ref.read(currentCharacterProvider);
+      final apiContext = await buildApiContextFromRounds(
+        contextRounds,
+        repository,
+        character,   // 传递角色信息
+      );
 
       // 2. 加载配置
       final config = await configService.loadConfig();
@@ -9570,225 +9529,281 @@ final inputStateProvider =
     NotifierProvider<InputNotifier, InputState>(InputNotifier.new);
 ```
 
-## File: lib/presentation/providers/settings_form_notifier.dart
+## File: lib/core/models/model_info.dart
 ```dart
-// lib/presentation/providers/settings_form_notifier.dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/app_config.dart';
-import '../../core/models/model_info.dart';
-import '../../data/services/config_service.dart';
-import '../../di/providers.dart';
-import 'config_notifier.dart'; // 导入 configProvider
-import 'package:file_picker/file_picker.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 
-/// 设置表单的状态
-class SettingsFormState {
-  final AppConfig config;
-  final bool isSaving;
-  final String? error;
-  final bool isRefreshingModels;
-  final String? modelsRefreshError;
+part 'model_info.freezed.dart';
+part 'model_info.g.dart';
 
-  const SettingsFormState({
-    required this.config,
-    this.isSaving = false,
-    this.error,
-    this.isRefreshingModels = false,
-    this.modelsRefreshError,
+@freezed
+class ModelInfo with _$ModelInfo {
+  const factory ModelInfo({
+    required String id,
+
+    bool? overrideSupportsReasoning,
+    bool? overrideSupportsVision,
+  }) = _ModelInfo;
+
+  factory ModelInfo.fromJson(Map<String, dynamic> json) =>
+      _$ModelInfoFromJson(json);
+}
+```
+
+## File: lib/core/models/model_info.freezed.dart
+```dart
+// coverage:ignore-file
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint
+// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
+
+part of 'model_info.dart';
+
+// **************************************************************************
+// FreezedGenerator
+// **************************************************************************
+
+T _$identity<T>(T value) => value;
+
+final _privateConstructorUsedError = UnsupportedError(
+  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
+);
+
+ModelInfo _$ModelInfoFromJson(Map<String, dynamic> json) {
+  return _ModelInfo.fromJson(json);
+}
+
+/// @nodoc
+mixin _$ModelInfo {
+  String get id => throw _privateConstructorUsedError;
+  bool? get overrideSupportsReasoning => throw _privateConstructorUsedError;
+  bool? get overrideSupportsVision => throw _privateConstructorUsedError;
+
+  /// Serializes this ModelInfo to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+
+  /// Create a copy of ModelInfo
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $ModelInfoCopyWith<ModelInfo> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $ModelInfoCopyWith<$Res> {
+  factory $ModelInfoCopyWith(ModelInfo value, $Res Function(ModelInfo) then) =
+      _$ModelInfoCopyWithImpl<$Res, ModelInfo>;
+  @useResult
+  $Res call({
+    String id,
+    bool? overrideSupportsReasoning,
+    bool? overrideSupportsVision,
+  });
+}
+
+/// @nodoc
+class _$ModelInfoCopyWithImpl<$Res, $Val extends ModelInfo>
+    implements $ModelInfoCopyWith<$Res> {
+  _$ModelInfoCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of ModelInfo
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? overrideSupportsReasoning = freezed,
+    Object? overrideSupportsVision = freezed,
+  }) {
+    return _then(
+      _value.copyWith(
+            id: null == id
+                ? _value.id
+                : id // ignore: cast_nullable_to_non_nullable
+                      as String,
+            overrideSupportsReasoning: freezed == overrideSupportsReasoning
+                ? _value.overrideSupportsReasoning
+                : overrideSupportsReasoning // ignore: cast_nullable_to_non_nullable
+                      as bool?,
+            overrideSupportsVision: freezed == overrideSupportsVision
+                ? _value.overrideSupportsVision
+                : overrideSupportsVision // ignore: cast_nullable_to_non_nullable
+                      as bool?,
+          )
+          as $Val,
+    );
+  }
+}
+
+/// @nodoc
+abstract class _$$ModelInfoImplCopyWith<$Res>
+    implements $ModelInfoCopyWith<$Res> {
+  factory _$$ModelInfoImplCopyWith(
+    _$ModelInfoImpl value,
+    $Res Function(_$ModelInfoImpl) then,
+  ) = __$$ModelInfoImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({
+    String id,
+    bool? overrideSupportsReasoning,
+    bool? overrideSupportsVision,
+  });
+}
+
+/// @nodoc
+class __$$ModelInfoImplCopyWithImpl<$Res>
+    extends _$ModelInfoCopyWithImpl<$Res, _$ModelInfoImpl>
+    implements _$$ModelInfoImplCopyWith<$Res> {
+  __$$ModelInfoImplCopyWithImpl(
+    _$ModelInfoImpl _value,
+    $Res Function(_$ModelInfoImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of ModelInfo
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? overrideSupportsReasoning = freezed,
+    Object? overrideSupportsVision = freezed,
+  }) {
+    return _then(
+      _$ModelInfoImpl(
+        id: null == id
+            ? _value.id
+            : id // ignore: cast_nullable_to_non_nullable
+                  as String,
+        overrideSupportsReasoning: freezed == overrideSupportsReasoning
+            ? _value.overrideSupportsReasoning
+            : overrideSupportsReasoning // ignore: cast_nullable_to_non_nullable
+                  as bool?,
+        overrideSupportsVision: freezed == overrideSupportsVision
+            ? _value.overrideSupportsVision
+            : overrideSupportsVision // ignore: cast_nullable_to_non_nullable
+                  as bool?,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+@JsonSerializable()
+class _$ModelInfoImpl implements _ModelInfo {
+  const _$ModelInfoImpl({
+    required this.id,
+    this.overrideSupportsReasoning,
+    this.overrideSupportsVision,
   });
 
-  SettingsFormState copyWith({
-    AppConfig? config,
-    bool? isSaving,
-    String? error,
-    bool? isRefreshingModels,
-    String? modelsRefreshError,
-  }) {
-    return SettingsFormState(
-      config: config ?? this.config,
-      isSaving: isSaving ?? this.isSaving,
-      error: error,
-      isRefreshingModels: isRefreshingModels ?? this.isRefreshingModels,
-      modelsRefreshError: modelsRefreshError,
-    );
-  }
-}
-
-/// 设置表单 Notifier
-class SettingsFormNotifier extends Notifier<SettingsFormState> {
-  late final ConfigService _configService;
-  AppConfig? _lastLoadedConfig;
+  factory _$ModelInfoImpl.fromJson(Map<String, dynamic> json) =>
+      _$$ModelInfoImplFromJson(json);
 
   @override
-  SettingsFormState build() {
-    _configService = ref.read(configServiceProvider);
+  final String id;
+  @override
+  final bool? overrideSupportsReasoning;
+  @override
+  final bool? overrideSupportsVision;
 
-    // 1. 尝试获取初始值（如果已经加载）
-    final initialConfig = ref.read(configProvider).valueOrNull;
-    if (initialConfig != null) {
-      _lastLoadedConfig = initialConfig;
-      state = SettingsFormState(config: initialConfig);
-    } else {
-      state = SettingsFormState(config: AppConfig.defaultConfig());
-    }
-
-    // 2. 监听全局配置变化，自动同步
-    ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
-      next.whenData((config) {
-        if (_lastLoadedConfig != config) {
-          _lastLoadedConfig = config;
-          _load(config);
-        }
-      });
-    });
-
-    return state;
+  @override
+  String toString() {
+    return 'ModelInfo(id: $id, overrideSupportsReasoning: $overrideSupportsReasoning, overrideSupportsVision: $overrideSupportsVision)';
   }
 
-  void _load(AppConfig config) {
-    state = state.copyWith(config: config, error: null);
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$ModelInfoImpl &&
+            (identical(other.id, id) || other.id == id) &&
+            (identical(
+                  other.overrideSupportsReasoning,
+                  overrideSupportsReasoning,
+                ) ||
+                other.overrideSupportsReasoning == overrideSupportsReasoning) &&
+            (identical(other.overrideSupportsVision, overrideSupportsVision) ||
+                other.overrideSupportsVision == overrideSupportsVision));
   }
 
-  void updateBaseUrl(String value) {
-    state = state.copyWith(config: state.config.copyWith(baseUrl: value));
-  }
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(
+    runtimeType,
+    id,
+    overrideSupportsReasoning,
+    overrideSupportsVision,
+  );
 
-  void updateApiKey(String value) {
-    state = state.copyWith(config: state.config.copyWith(apiKey: value));
-  }
+  /// Create a copy of ModelInfo
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$ModelInfoImplCopyWith<_$ModelInfoImpl> get copyWith =>
+      __$$ModelInfoImplCopyWithImpl<_$ModelInfoImpl>(this, _$identity);
 
-  void updateModelsPath(String value) {
-    state = state.copyWith(config: state.config.copyWith(modelsPath: value));
-  }
-
-  void updateChatPath(String value) {
-    state = state.copyWith(config: state.config.copyWith(chatPath: value));
-  }
-
-  void updateApiMode(String value) {
-    final defaults = _defaultPathsForMode(value);
-    state = state.copyWith(
-      config: state.config.copyWith(
-        apiMode: value,
-        modelsPath: defaults['models']!,
-        chatPath: defaults['chat']!,
-      ),
-    );
-  }
-
-  void updateSelectedModel(String value) {
-    state = state.copyWith(
-      config: state.config.copyWith(selectedModel: value.isEmpty ? null : value),
-    );
-  }
-
-  void toggleReasoning(bool value) {
-    _updateModelCapability(overrideSupportsReasoning: value);
-  }
-
-  void toggleVision(bool value) {
-    _updateModelCapability(overrideSupportsVision: value);
-  }
-
-  void _updateModelCapability({bool? overrideSupportsReasoning, bool? overrideSupportsVision}) {
-    final modelId = state.config.selectedModel;
-    if (modelId == null || modelId.isEmpty) return;
-
-    final models = [...(state.config.availableModels ?? const <ModelInfo>[])];
-    final index = models.indexWhere((m) => m.id == modelId);
-    final baseModel = index >= 0 ? models[index] : ModelInfo(id: modelId);
-
-    final updatedModel = baseModel.copyWith(
-      overrideSupportsReasoning: overrideSupportsReasoning ?? baseModel.overrideSupportsReasoning,
-      overrideSupportsVision: overrideSupportsVision ?? baseModel.overrideSupportsVision,
-    );
-
-    if (index >= 0) {
-      models[index] = updatedModel;
-    } else {
-      models.add(updatedModel);
-    }
-
-    state = state.copyWith(config: state.config.copyWith(availableModels: models));
-  }
-
-  Future<void> save() async {
-    state = state.copyWith(isSaving: true, error: null);
-    try {
-      await _configService.saveConfig(state.config);
-      state = state.copyWith(isSaving: false);
-    } catch (e) {
-      state = state.copyWith(isSaving: false, error: e.toString());
-      rethrow;
-    }
-  }
-
-  void restoreDefaults() {
-    state = state.copyWith(config: AppConfig.defaultConfig());
-  }
-
-  Future<void> refreshModels() async {
-    if (state.isRefreshingModels) return;
-    if (state.config.apiMode == 'local') {
-      await addLocalModel();
-      return;
-    }
-
-    state = state.copyWith(isRefreshingModels: true, modelsRefreshError: null);
-    try {
-      await _configService.refreshModels();
-      state = state.copyWith(isRefreshingModels: false);
-    } catch (e) {
-      state = state.copyWith(
-        isRefreshingModels: false,
-        modelsRefreshError: e.toString(),
-      );
-      rethrow;
-    }
-  }
-
-  Future<void> addLocalModel() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['gguf'],
-    );
-    if (result == null || result.files.single.path == null) return;
-
-    final path = result.files.single.path!;
-
-    final newModel = ModelInfo(id: path);
-
-    final currentModels = List<ModelInfo>.from(state.config.availableModels ?? []);
-    if (currentModels.any((m) => m.id == path)) {
-      // 已存在则直接选中
-      state = state.copyWith(config: state.config.copyWith(selectedModel: path));
-      return;
-    }
-
-    currentModels.add(newModel);
-    state = state.copyWith(
-      config: state.config.copyWith(
-        availableModels: currentModels,
-        selectedModel: path,
-      ),
-    );
-  }
-
-  Map<String, String> _defaultPathsForMode(String apiMode) {
-    switch (apiMode) {
-      case 'google':
-        return {'models': 'v1beta/models', 'chat': 'v1beta/models/{model}:streamGenerateContent'};
-      case 'responses':
-        return {'models': 'v1/models', 'chat': 'v1/responses'};
-      default:
-        return {'models': 'v1/models', 'chat': 'v1/chat/completions'};
-    }
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$ModelInfoImplToJson(this);
   }
 }
 
-final settingsFormProvider = NotifierProvider<SettingsFormNotifier, SettingsFormState>(
-  SettingsFormNotifier.new,
-);
+abstract class _ModelInfo implements ModelInfo {
+  const factory _ModelInfo({
+    required final String id,
+    final bool? overrideSupportsReasoning,
+    final bool? overrideSupportsVision,
+  }) = _$ModelInfoImpl;
+
+  factory _ModelInfo.fromJson(Map<String, dynamic> json) =
+      _$ModelInfoImpl.fromJson;
+
+  @override
+  String get id;
+  @override
+  bool? get overrideSupportsReasoning;
+  @override
+  bool? get overrideSupportsVision;
+
+  /// Create a copy of ModelInfo
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$ModelInfoImplCopyWith<_$ModelInfoImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+```
+
+## File: lib/core/models/model_info.g.dart
+```dart
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+part of 'model_info.dart';
+
+// **************************************************************************
+// JsonSerializableGenerator
+// **************************************************************************
+
+_$ModelInfoImpl _$$ModelInfoImplFromJson(Map<String, dynamic> json) =>
+    _$ModelInfoImpl(
+      id: json['id'] as String,
+      overrideSupportsReasoning: json['overrideSupportsReasoning'] as bool?,
+      overrideSupportsVision: json['overrideSupportsVision'] as bool?,
+    );
+
+Map<String, dynamic> _$$ModelInfoImplToJson(_$ModelInfoImpl instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'overrideSupportsReasoning': instance.overrideSupportsReasoning,
+      'overrideSupportsVision': instance.overrideSupportsVision,
+    };
 ```
 
 ## File: lib/core/models/sse_event.dart
@@ -10297,6 +10312,7 @@ abstract class _TreePath implements TreePath {
 ```dart
 import 'dart:convert';
 import 'package:aiservice/core/models/attachment.dart';
+import 'package:aiservice/domain/services/character_card_parser.dart';
 
 import '../../core/models/api_message.dart';
 import '../../core/models/chat_round.dart';
@@ -10305,8 +10321,17 @@ import '../../data/repositories/conversation_repository.dart';
 Future<List<ApiMessage>> buildApiContextFromRounds(
   List<ChatRound> rounds,
   ConversationRepository repository,
+  CharacterData? character,
 ) async {
   final result = <ApiMessage>[];
+
+  if (character != null) {
+    final systemPrompt = character.buildSystemPrompt();
+    result.add(ApiMessage(
+      role: 'system',
+      content: systemPrompt,
+    ));
+  }
 
   for (final round in rounds) {
     final userMessage = await _buildUserMessage(round, repository);
@@ -10405,6 +10430,227 @@ final attachmentBytesProvider =
     final repository = ref.read(conversationRepositoryProvider);
     return repository.getAttachment(relativePath);
   },
+);
+```
+
+## File: lib/presentation/providers/settings_form_notifier.dart
+```dart
+// lib/presentation/providers/settings_form_notifier.dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/app_config.dart';
+import '../../core/models/model_info.dart';
+import '../../data/services/config_service.dart';
+import '../../di/providers.dart';
+import 'config_notifier.dart'; // 导入 configProvider
+import 'package:file_picker/file_picker.dart';
+
+/// 设置表单的状态
+class SettingsFormState {
+  final AppConfig config;
+  final bool isSaving;
+  final String? error;
+  final bool isRefreshingModels;
+  final String? modelsRefreshError;
+
+  const SettingsFormState({
+    required this.config,
+    this.isSaving = false,
+    this.error,
+    this.isRefreshingModels = false,
+    this.modelsRefreshError,
+  });
+
+  SettingsFormState copyWith({
+    AppConfig? config,
+    bool? isSaving,
+    String? error,
+    bool? isRefreshingModels,
+    String? modelsRefreshError,
+  }) {
+    return SettingsFormState(
+      config: config ?? this.config,
+      isSaving: isSaving ?? this.isSaving,
+      error: error,
+      isRefreshingModels: isRefreshingModels ?? this.isRefreshingModels,
+      modelsRefreshError: modelsRefreshError,
+    );
+  }
+}
+
+/// 设置表单 Notifier
+class SettingsFormNotifier extends Notifier<SettingsFormState> {
+  late final ConfigService _configService;
+  AppConfig? _lastLoadedConfig;
+
+  @override
+  SettingsFormState build() {
+    _configService = ref.read(configServiceProvider);
+
+    // 1. 尝试获取初始值（如果已经加载）
+    final initialConfig = ref.read(configProvider).valueOrNull;
+    if (initialConfig != null) {
+      _lastLoadedConfig = initialConfig;
+      state = SettingsFormState(config: initialConfig);
+    } else {
+      state = SettingsFormState(config: AppConfig.defaultConfig());
+    }
+
+    // 2. 监听全局配置变化，自动同步
+    ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
+      next.whenData((config) {
+        if (_lastLoadedConfig != config) {
+          _lastLoadedConfig = config;
+          _load(config);
+        }
+      });
+    });
+
+    return state;
+  }
+
+  void _load(AppConfig config) {
+    state = state.copyWith(config: config, error: null);
+  }
+
+  void updateBaseUrl(String value) {
+    state = state.copyWith(config: state.config.copyWith(baseUrl: value));
+  }
+
+  void updateApiKey(String value) {
+    state = state.copyWith(config: state.config.copyWith(apiKey: value));
+  }
+
+  void updateModelsPath(String value) {
+    state = state.copyWith(config: state.config.copyWith(modelsPath: value));
+  }
+
+  void updateChatPath(String value) {
+    state = state.copyWith(config: state.config.copyWith(chatPath: value));
+  }
+
+  void updateApiMode(String value) {
+    final defaults = _defaultPathsForMode(value);
+    state = state.copyWith(
+      config: state.config.copyWith(
+        apiMode: value,
+        modelsPath: defaults['models']!,
+        chatPath: defaults['chat']!,
+      ),
+    );
+  }
+
+  void updateSelectedModel(String value) {
+    state = state.copyWith(
+      config: state.config.copyWith(selectedModel: value.isEmpty ? null : value),
+    );
+  }
+
+  void toggleReasoning(bool value) {
+    _updateModelCapability(overrideSupportsReasoning: value);
+  }
+
+  void toggleVision(bool value) {
+    _updateModelCapability(overrideSupportsVision: value);
+  }
+
+  void _updateModelCapability({bool? overrideSupportsReasoning, bool? overrideSupportsVision}) {
+    final modelId = state.config.selectedModel;
+    if (modelId == null || modelId.isEmpty) return;
+
+    final models = [...(state.config.availableModels ?? const <ModelInfo>[])];
+    final index = models.indexWhere((m) => m.id == modelId);
+    final baseModel = index >= 0 ? models[index] : ModelInfo(id: modelId);
+
+    final updatedModel = baseModel.copyWith(
+      overrideSupportsReasoning: overrideSupportsReasoning ?? baseModel.overrideSupportsReasoning,
+      overrideSupportsVision: overrideSupportsVision ?? baseModel.overrideSupportsVision,
+    );
+
+    if (index >= 0) {
+      models[index] = updatedModel;
+    } else {
+      models.add(updatedModel);
+    }
+
+    state = state.copyWith(config: state.config.copyWith(availableModels: models));
+  }
+
+  Future<void> save() async {
+    state = state.copyWith(isSaving: true, error: null);
+    try {
+      await _configService.saveConfig(state.config);
+      state = state.copyWith(isSaving: false);
+    } catch (e) {
+      state = state.copyWith(isSaving: false, error: e.toString());
+      rethrow;
+    }
+  }
+
+  void restoreDefaults() {
+    state = state.copyWith(config: AppConfig.defaultConfig());
+  }
+
+  Future<void> refreshModels() async {
+    if (state.isRefreshingModels) return;
+    if (state.config.apiMode == 'local') {
+      await addLocalModel();
+      return;
+    }
+
+    state = state.copyWith(isRefreshingModels: true, modelsRefreshError: null);
+    try {
+      await _configService.refreshModels();
+      state = state.copyWith(isRefreshingModels: false);
+    } catch (e) {
+      state = state.copyWith(
+        isRefreshingModels: false,
+        modelsRefreshError: e.toString(),
+      );
+      rethrow;
+    }
+  }
+
+  Future<void> addLocalModel() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['gguf'],
+    );
+    if (result == null || result.files.single.path == null) return;
+
+    final path = result.files.single.path!;
+
+    final newModel = ModelInfo(id: path);
+
+    final currentModels = List<ModelInfo>.from(state.config.availableModels ?? []);
+    if (currentModels.any((m) => m.id == path)) {
+      // 已存在则直接选中
+      state = state.copyWith(config: state.config.copyWith(selectedModel: path));
+      return;
+    }
+
+    currentModels.add(newModel);
+    state = state.copyWith(
+      config: state.config.copyWith(
+        availableModels: currentModels,
+        selectedModel: path,
+      ),
+    );
+  }
+
+  Map<String, String> _defaultPathsForMode(String apiMode) {
+    switch (apiMode) {
+      case 'google':
+        return {'models': 'v1beta/models', 'chat': 'v1beta/models/{model}:streamGenerateContent'};
+      case 'responses':
+        return {'models': 'v1/models', 'chat': 'v1/responses'};
+      default:
+        return {'models': 'v1/models', 'chat': 'v1/chat/completions'};
+    }
+  }
+}
+
+final settingsFormProvider = NotifierProvider<SettingsFormNotifier, SettingsFormState>(
+  SettingsFormNotifier.new,
 );
 ```
 
@@ -10647,6 +10893,7 @@ class AppTheme {
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:aiservice/presentation/pages/image_attachment_viewer_page.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
@@ -10723,32 +10970,11 @@ class _AttachmentActionHelper {
     }
   }
 
-  static Future<void> previewImage(
-    BuildContext context,
-    Uint8List bytes,
-  ) async {
-    await showCupertinoDialog(
-      context: context,
-      builder: (ctx) {
-        return CupertinoAlertDialog(
-          content: InteractiveViewer(
-            minScale: 0.5,
-            maxScale: 4,
-            child: Center(
-              child: Image.memory(
-                bytes,
-                fit: BoxFit.contain,
-              ),
-            ),
-          ),
-          actions: [
-            CupertinoDialogAction(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('关闭'),
-            ),
-          ],
-        );
-      },
+  static Future<void> previewImage(BuildContext context, Uint8List bytes) async {
+    await Navigator.of(context).push(
+      CupertinoPageRoute(
+        builder: (_) => ImageAttachmentViewerPage(imageBytes: bytes),
+      ),
     );
   }
 
@@ -11715,7 +11941,9 @@ class ConfigService{
 
 ## File: lib/presentation/widgets/input_bar.dart
 ```dart
+import 'package:aiservice/domain/services/character_card_parser.dart';
 import 'package:aiservice/presentation/models/input_state.dart';
+import 'package:aiservice/presentation/providers/character_provider.dart';
 import 'package:aiservice/presentation/widgets/common/app_toast.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
@@ -11731,7 +11959,6 @@ class InputBar extends ConsumerStatefulWidget {
   final VoidCallback? onStop;
   final bool isIncomplete;
   final String hintText;
-  final bool allowImages;
 
   const InputBar({
     super.key,
@@ -11739,7 +11966,6 @@ class InputBar extends ConsumerStatefulWidget {
     this.onStop,
     this.isIncomplete = false,
     this.hintText = '输入消息...',
-    this.allowImages = false,
   });
 
   @override
@@ -11867,6 +12093,30 @@ class _InputBarState extends ConsumerState<InputBar> {
     ref.read(inputStateProvider.notifier).removeAttachment(id);
   }
 
+  Future<void> _importCharacterCard() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['png', 'json'],
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.single;
+    final bytes = file.bytes;
+    if (bytes == null) {
+      await AppToast.show('无法读取文件');
+      return;
+    }
+    try {
+      final character = await CharacterCardParser.parseFile(bytes, file.name);
+      // 将角色保存到全局 provider
+      ref.read(currentCharacterProvider.notifier).state = character;
+      // 重置开场白发送标记
+      ref.read(characterGreetingSentProvider.notifier).state = false;
+      await AppToast.show('已导入角色：${character.name}');
+    } catch (e) {
+      await AppToast.show('导入失败：$e');
+    }
+  }
+
   Future<void> _showAddAttachmentSheet() async {
     FocusScope.of(context).unfocus();
     
@@ -11878,18 +12128,24 @@ class _InputBarState extends ConsumerState<InputBar> {
             CupertinoActionSheetAction(
               onPressed: () {
                 Navigator.of(context).pop();
+                _importCharacterCard();
+              },
+              child: const Text('酒馆角色卡'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.of(context).pop();
                 _pickFileAttachment();
               },
               child: const Text('文件'),
             ),
-            if (widget.allowImages)
-              CupertinoActionSheetAction(
+            CupertinoActionSheetAction(
                 onPressed: () {
                   Navigator.of(context).pop();
                   _pickImageFromGallery();
                 },
                 child: const Text('相册'),
-              ),
+              ),              
           ],
           cancelButton: CupertinoActionSheetAction(
             onPressed: () => Navigator.of(context).pop(),
@@ -12475,23 +12731,18 @@ class ConversationRepository {
   }
 
   Stream<SessionCardMeta> watchSessionCardMeta(String sessionId) {
-    // 1. 仅查询最后一条 Round (倒序 + limit 1)
     final lastRoundStream = (_db.select(_db.dbChatRounds)
           ..where((t) => t.sessionId.equals(sessionId))
           ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
           ..limit(1))
         .watchSingleOrNull();
 
-    // 2. 仅查询 Round 总数 (Count 聚合，不加载数据)
-    final countStream = (
-      _db.selectOnly(_db.dbChatRounds)
-        ..addColumns([countAll()])
-        ..where(_db.dbChatRounds.sessionId.equals(sessionId))
-      )
-      .watchSingle()
-      .map((row) => row.read(countAll()) ?? 0);
+    final countStream = (_db.selectOnly(_db.dbChatRounds)
+          ..addColumns([countAll()])
+          ..where(_db.dbChatRounds.sessionId.equals(sessionId)))
+        .watchSingle()
+        .map((row) => row.read(countAll()) ?? 0);
 
-    // 3. 检查是否存在未读更新 (limit 1 短路查询)
     final hasUnseenStream = (_db.select(_db.dbChatRounds)
           ..where((t) => t.sessionId.equals(sessionId))
           ..where((t) => t.hasUnseenUpdate.equals(true))
@@ -12499,18 +12750,14 @@ class ConversationRepository {
         .watchSingleOrNull()
         .map((row) => row != null);
 
-    // 4. 合并流
     return Rx.combineLatest3(lastRoundStream, countStream, hasUnseenStream,
         (lastRound, count, hasUnseen) {
       final previewRound = lastRound;
-      
-      // 预览文本逻辑保持不变，但基于单个对象计算
       final userPreview = previewRound == null
           ? '点击开始新的对话'
           : previewRound.userContent.trim().isEmpty
               ? '（空输入）'
               : previewRound.userContent.trim();
-              
       final aiPreview = previewRound == null
           ? '（等待回复）'
           : (previewRound.assistantContent?.trim().isNotEmpty ?? false)
@@ -12527,61 +12774,62 @@ class ConversationRepository {
       );
     });
   }
+
   // ========== 细粒度监听（新增） ==========
 
-  /// 仅监听会话的拓扑结构（ID 与父子关系）
-  /// 只有在增删消息时触发，AI 说话时不触发
   Stream<List<({String id, String? parentId})>> watchSessionTopology(String sessionId) {
     final query = _db.selectOnly(_db.dbChatRounds)
       ..addColumns([_db.dbChatRounds.id, _db.dbChatRounds.parentId])
       ..where(_db.dbChatRounds.sessionId.equals(sessionId))
       ..orderBy([OrderingTerm.asc(_db.dbChatRounds.createdAt)]);
-      
     return query.watch().map((rows) => rows.map((r) => (
       id: r.read(_db.dbChatRounds.id)!,
       parentId: r.read(_db.dbChatRounds.parentId)
     )).toList());
   }
 
-  /// 仅监听单条消息的完整详情（含附件）
+  /// 仅监听单条消息的完整详情（含附件）- 改用 rxdart 组合两个独立查询
   Stream<ChatRound?> watchSingleRound(String roundId) {
-    final query = _db.select(_db.dbChatRounds).join([
-      leftOuterJoin(
-        _db.dbAttachments,
-        _db.dbAttachments.roundId.equalsExp(_db.dbChatRounds.id),
-      ),
-    ])..where(_db.dbChatRounds.id.equals(roundId));
+    final roundStream = (_db.select(_db.dbChatRounds)
+          ..where((t) => t.id.equals(roundId)))
+        .watchSingleOrNull();
 
-    return query.watch().map((rows) {
-      if (rows.isEmpty) return null;
-      final roundRow = rows.first.readTable(_db.dbChatRounds);
-      final attachments = rows
-          .where((row) => row.readTableOrNull(_db.dbAttachments) != null)
-          .map((row) {
-            final a = row.readTable(_db.dbAttachments);
-            return Attachment(
+    final attachmentsStream = (_db.select(_db.dbAttachments)
+          ..where((t) => t.roundId.equals(roundId)))
+        .watch()
+        .map((rows) => rows.map((a) => Attachment(
               id: a.id,
               name: a.name,
               relativePath: a.relativePath,
               isImage: a.isImage,
               mimeType: a.mimeType,
-            );
-          }).toList();
-      return _mapToChatRound(roundRow, attachments);
+            )).toList());
+
+    return Rx.combineLatest2(roundStream, attachmentsStream,
+        (DbChatRound? round, List<Attachment> attachments) {
+      if (round == null) return null;
+      return ChatRound(
+        id: round.id,
+        parentId: round.parentId,
+        createdAt: round.createdAt,
+        userContent: round.userContent,
+        userAttachments: attachments,
+        assistantThinking: round.assistantThinking,
+        assistantContent: round.assistantContent,
+        isIncomplete: round.isIncomplete,
+        hasUnseenUpdate: round.hasUnseenUpdate,
+      );
     });
   }
 
   Future<List<ChatRound>> getContextRounds(String roundId) async {
-    // 1. 使用递归 CTE 直接查询从目标节点到根的路径（数据库层按时间正序返回）
     final roundsQuery = _db.customSelect(
       '''
       WITH RECURSIVE ctx_chain AS (
-        -- 基础情况：目标节点
         SELECT id, session_id, parent_id, created_at, user_content,
               assistant_thinking, assistant_content, is_incomplete, has_unseen_update
         FROM db_chat_rounds WHERE id = :roundId
         UNION ALL
-        -- 递归情况：向上查找父节点
         SELECT r.id, r.session_id, r.parent_id, r.created_at, r.user_content,
               r.assistant_thinking, r.assistant_content, r.is_incomplete, r.has_unseen_update
         FROM db_chat_rounds r
@@ -12609,13 +12857,11 @@ class ConversationRepository {
 
     if (dbRounds.isEmpty) return [];
 
-    // 2. 批量查询链路上所有轮次的附件
     final roundIds = dbRounds.map((r) => r.id).toList();
     final dbAttachments = await (_db.select(_db.dbAttachments)
           ..where((t) => t.roundId.isIn(roundIds)))
         .get();
 
-    // 3. 按 roundId 分组附件
     final attachmentMap = <String, List<Attachment>>{};
     for (final att in dbAttachments) {
       attachmentMap.putIfAbsent(att.roundId, () => []).add(
@@ -12629,7 +12875,6 @@ class ConversationRepository {
       );
     }
 
-    // 4. 组装返回（CTE 已按 created_at ASC 排序，无需 reversed）
     return dbRounds.map((round) => _mapToChatRound(round, attachmentMap[round.id] ?? [])).toList();
   }
 
@@ -12668,8 +12913,7 @@ class ConversationRepository {
     for (final path in orphanPaths) {
       try {
         await _fileService.deleteAttachment(path);
-      } catch (_) {
-      }
+      } catch (_) {}
     }
   }
 
@@ -12681,20 +12925,14 @@ class ConversationRepository {
   ) async {
     if (roundIds.isEmpty) return;
 
-    // 1. 收集候选附件路径
-    final candidatePaths = (await (_db.select(_db.dbAttachments).join([
-      innerJoin(
-        _db.dbChatRounds,
-        _db.dbChatRounds.id.equalsExp(_db.dbAttachments.roundId),
-      ),
-    ])
-          ..where(_db.dbChatRounds.sessionId.equals(sessionId))
-          ..where(_db.dbChatRounds.id.isIn(roundIds)))
+    // 1. 收集候选附件路径（改用直接查询，不用 join）
+    final candidatePaths = (await (_db.select(_db.dbAttachments)
+          ..where((t) => t.roundId.isIn(roundIds)))
         .get())
-        .map((row) => row.readTable(_db.dbAttachments).relativePath)
+        .map((a) => a.relativePath)
         .toSet();
 
-    // 2. 提交数据库变更 (级联删除会自动清理 dbAttachments)
+    // 2. 提交数据库变更
     await _db.transaction(() async {
       await (_db.delete(_db.dbChatRounds)
             ..where((t) => t.sessionId.equals(sessionId) & t.id.isIn(roundIds)))
@@ -12712,17 +12950,19 @@ class ConversationRepository {
   }
 
   Future<void> deleteSession(String sessionId) async {
-    // 1. 收集候选附件路径
-    final candidatePaths = (await (_db.select(_db.dbAttachments).join([
-      innerJoin(
-        _db.dbChatRounds,
-        _db.dbChatRounds.id.equalsExp(_db.dbAttachments.roundId),
-      ),
-    ])
-          ..where(_db.dbChatRounds.sessionId.equals(sessionId)))
-        .get())
-        .map((row) => row.readTable(_db.dbAttachments).relativePath)
-        .toSet();
+    // 1. 收集候选附件路径（先查出所有 round id，再查附件）
+    final roundIds = await (_db.select(_db.dbChatRounds)
+          ..where((t) => t.sessionId.equals(sessionId)))
+        .map((r) => r.id)
+        .get();
+
+    final candidatePaths = <String>{};
+    if (roundIds.isNotEmpty) {
+      final attachments = await (_db.select(_db.dbAttachments)
+            ..where((t) => t.roundId.isIn(roundIds)))
+          .get();
+      candidatePaths.addAll(attachments.map((a) => a.relativePath));
+    }
 
     // 2. 提交数据库变更
     await (_db.delete(_db.dbSessions)..where((t) => t.id.equals(sessionId))).go();
@@ -12822,7 +13062,6 @@ class ConversationRepository {
               ? Value(hasUnseenUpdate)
               : const Value.absent(),
         ));
-    // ✅ 不再更新 Session 的 updatedAt
   }
 
   // ========== 附件读写接口保留 ==========
@@ -12844,7 +13083,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:intl/intl.dart';
 import '../../domain/models/session_list_item.dart';
-import '../providers/config_notifier.dart';
 import '../providers/session_list_notifier.dart';
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/input_bar.dart';
@@ -12920,12 +13158,7 @@ class HomePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final sessionsAsync = ref.watch(sessionListProvider);
     final controller = ref.read(sessionListControllerProvider);
-    final configAsync = ref.watch(configProvider);
 
-    final currentConfig = configAsync.valueOrNull;
-    final selectedModelId = currentConfig?.selectedModel;
-    final selectedModel = currentConfig?.availableModels?.where((m) => m.id == selectedModelId).firstOrNull;
-    final allowImages = selectedModel?.overrideSupportsVision == true;
 
     return AppPageScaffold(
       navigationBar: CupertinoNavigationBar(
@@ -12978,7 +13211,6 @@ class HomePage extends ConsumerWidget {
           ),
           InputBar(
             hintText: '发送消息',
-            allowImages: allowImages,
             onSend: (content, attachments) async {
               final sessionId = await controller.createSession('新对话');
               if (context.mounted) {
@@ -13675,6 +13907,19 @@ class _TreeNodeCard extends ConsumerWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
+          if (round != null && (round.isIncomplete || round.hasUnseenUpdate))
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                if (round.isIncomplete)
+                  const Text('生成中', style: TextStyle(color: CupertinoColors.systemOrange, fontSize: 12)),
+                if (round.hasUnseenUpdate && round.isIncomplete) const SizedBox(width: 8),
+                if (round.hasUnseenUpdate)
+                  const Text('未查看', style: TextStyle(color: CupertinoColors.systemBlue, fontSize: 12)),
+              ],
+            ),
+          ),
           const SizedBox(height: 8),
           Expanded(child: _PreviewSlot(label: 'YOU', content: userText, loading: round == null)),
           const SizedBox(height: 4),
@@ -13852,13 +14097,13 @@ final chatControllerProvider =
 
 ## File: lib/presentation/pages/chat_page.dart
 ```dart
+import 'package:aiservice/core/models/chat_round.dart';
+import 'package:aiservice/domain/services/character_card_parser.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/utils/app_route_observer.dart';
 import 'package:intl/intl.dart';
 import '../providers/chat_notifier.dart';
-import '../providers/config_notifier.dart';
 import '../widgets/attachment_list.dart';
 import '../widgets/input_bar.dart';
 import '../widgets/message_bubble.dart';
@@ -13866,6 +14111,7 @@ import '../widgets/thought_bubble.dart';
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_toast.dart';
 import 'branch_tree_page.dart';
+import '../providers/character_provider.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   final String sessionId;
@@ -13885,26 +14131,56 @@ class ChatPage extends ConsumerStatefulWidget {
   ConsumerState<ChatPage> createState() => _ChatPageState();
 }
 
-class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
+class _ChatPageState extends ConsumerState<ChatPage> {
   PageController? _pageController;
   bool _initialMessageHandled = false;
-  bool _isRouteVisible = false;
-  ModalRoute<dynamic>? _route;
 
   String? _branchLeafId;
   String? _currentRoundId;
-
+  
   @override
   void initState() {
     super.initState();
     _branchLeafId = widget.initialRoundId;
     _currentRoundId = widget.initialRoundId;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _ensureInitialRoundId();
+    });
+  }
+
+  Future<void> _ensureInitialRoundId() async {
+    if (_branchLeafId != null) return;
+    final topology = await ref.read(chatTopologyProvider(widget.sessionId).future);
+    if (topology.isNotEmpty && mounted) {
+      setState(() {
+        _branchLeafId = topology.last.id;
+        _currentRoundId = _branchLeafId;
+      });
+    }
+  }
+
+  Future<void> _maybeSendGreeting() async {
+    final character = ref.read(currentCharacterProvider);
+    final greetingSent = ref.read(characterGreetingSentProvider);
+    
+    if (character != null && !greetingSent && character.firstMes.isNotEmpty) {
+      // 标记已发送，防止重复
+      ref.read(characterGreetingSentProvider.notifier).state = true;
+      
+      final controller = ref.read(chatControllerProvider(widget.sessionId));
+      final newId = await controller.sendMessage(
+        content: character.firstMes,
+        parentRoundId: _currentRoundId,
+        attachments: [],
+      );
+      _updateBranch(newId);
+    }
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _subscribeRoute();
     _handleInitialMessage();
   }
 
@@ -13924,18 +14200,8 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     }
   }
 
-  void _subscribeRoute() {
-    final route = ModalRoute.of(context);
-    if (route != _route && route is PageRoute) {
-      if (_route != null) appRouteObserver.unsubscribe(this);
-      _route = route;
-      appRouteObserver.subscribe(this, route);
-    }
-  }
-
   @override
   void dispose() {
-    appRouteObserver.unsubscribe(this);
     _pageController?.dispose();
     super.dispose();
   }
@@ -13953,20 +14219,28 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     final sessionTitle = ref.watch(sessionTitleProvider(widget.sessionId)).valueOrNull ?? '未加载';
     final currentRoundAsync = ref.watch(roundDetailProvider(_currentRoundId ?? ''));
     final isIncomplete = currentRoundAsync.valueOrNull?.isIncomplete ?? false;
-    final configAsync = ref.watch(configProvider);
+    ref.listen<CharacterData?>(
+      currentCharacterProvider,
+      (previous, next) {
+        if (previous?.name != next?.name) {
+          ref.read(characterGreetingSentProvider.notifier).state = false;
+        }
+      },
+    );
 
-    final currentConfig = configAsync.valueOrNull;
-    final selectedModelId = currentConfig?.selectedModel;
-    final selectedModel = currentConfig?.availableModels?.where((m) => m.id == selectedModelId).firstOrNull;
-    final allowImages = selectedModel?.overrideSupportsVision == true;
+    ref.listen<AsyncValue<ChatRound?>>(
+      roundDetailProvider(_currentRoundId ?? ''),
+      (previous, next) {
+        final round = next.valueOrNull;
+        if (round?.hasUnseenUpdate == true && ModalRoute.of(context)?.isCurrent == true) {
+          ref.read(chatControllerProvider(widget.sessionId)).markRoundSeen(round!);
+        }
+      },
+    );
 
-    if (_branchLeafId == null) {
-      final topology = ref.watch(chatTopologyProvider(widget.sessionId)).valueOrNull;
-      if (topology != null && topology.isNotEmpty) {
-        _branchLeafId = topology.last.id;
-        _currentRoundId = _branchLeafId;
-      }
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeSendGreeting();
+    });
 
     final visibleRoundIds = ref.watch(visibleRoundIdsProvider((
       sessionId: widget.sessionId,
@@ -14019,7 +14293,6 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
                     onPageChanged: (index) {
                       final targetId = visibleRoundIds[index];
                       setState(() => _currentRoundId = targetId);
-                      _markAsSeen(targetId);
                     },
                     itemBuilder: (_, index) => _ChatRoundPage(
                       key: ValueKey(visibleRoundIds[index]),
@@ -14031,7 +14304,6 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
           ),
           InputBar(
             hintText: '发送消息',
-            allowImages: allowImages,
             isIncomplete: isIncomplete,
             onStop: () => ref.read(chatControllerProvider(widget.sessionId)).stopGeneration(_currentRoundId!),
             onSend: (text, attachments) async {
@@ -14049,31 +14321,10 @@ class _ChatPageState extends ConsumerState<ChatPage> with RouteAware {
     );
   }
 
-  void _markAsSeen(String roundId) {
-    if (!_isRouteVisible) return;
-    final roundAsync = ref.read(roundDetailProvider(roundId));
-    final round = roundAsync.valueOrNull;
-    if (round?.hasUnseenUpdate == true) {
-      ref.read(chatControllerProvider(widget.sessionId)).markRoundSeen(round!);
-    }
-  }
-
   void _retry(String roundId) async {
     final newId = await ref.read(chatControllerProvider(widget.sessionId)).retryFromRound(roundId);
     _updateBranch(newId);
   }
-
-  @override
-  void didPush() => _isRouteVisible = true;
-
-  @override
-  void didPopNext() {
-    _isRouteVisible = true;
-    if (_currentRoundId != null) _markAsSeen(_currentRoundId!);
-  }
-
-  @override
-  void didPushNext() => _isRouteVisible = false;
 }
 
 class _ChatRoundPage extends StatelessWidget {

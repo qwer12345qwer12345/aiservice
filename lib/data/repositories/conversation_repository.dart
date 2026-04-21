@@ -32,23 +32,18 @@ class ConversationRepository {
   }
 
   Stream<SessionCardMeta> watchSessionCardMeta(String sessionId) {
-    // 1. 仅查询最后一条 Round (倒序 + limit 1)
     final lastRoundStream = (_db.select(_db.dbChatRounds)
           ..where((t) => t.sessionId.equals(sessionId))
           ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
           ..limit(1))
         .watchSingleOrNull();
 
-    // 2. 仅查询 Round 总数 (Count 聚合，不加载数据)
-    final countStream = (
-      _db.selectOnly(_db.dbChatRounds)
-        ..addColumns([countAll()])
-        ..where(_db.dbChatRounds.sessionId.equals(sessionId))
-      )
-      .watchSingle()
-      .map((row) => row.read(countAll()) ?? 0);
+    final countStream = (_db.selectOnly(_db.dbChatRounds)
+          ..addColumns([countAll()])
+          ..where(_db.dbChatRounds.sessionId.equals(sessionId)))
+        .watchSingle()
+        .map((row) => row.read(countAll()) ?? 0);
 
-    // 3. 检查是否存在未读更新 (limit 1 短路查询)
     final hasUnseenStream = (_db.select(_db.dbChatRounds)
           ..where((t) => t.sessionId.equals(sessionId))
           ..where((t) => t.hasUnseenUpdate.equals(true))
@@ -56,18 +51,14 @@ class ConversationRepository {
         .watchSingleOrNull()
         .map((row) => row != null);
 
-    // 4. 合并流
     return Rx.combineLatest3(lastRoundStream, countStream, hasUnseenStream,
         (lastRound, count, hasUnseen) {
       final previewRound = lastRound;
-      
-      // 预览文本逻辑保持不变，但基于单个对象计算
       final userPreview = previewRound == null
           ? '点击开始新的对话'
           : previewRound.userContent.trim().isEmpty
               ? '（空输入）'
               : previewRound.userContent.trim();
-              
       final aiPreview = previewRound == null
           ? '（等待回复）'
           : (previewRound.assistantContent?.trim().isNotEmpty ?? false)
@@ -84,61 +75,62 @@ class ConversationRepository {
       );
     });
   }
+
   // ========== 细粒度监听（新增） ==========
 
-  /// 仅监听会话的拓扑结构（ID 与父子关系）
-  /// 只有在增删消息时触发，AI 说话时不触发
   Stream<List<({String id, String? parentId})>> watchSessionTopology(String sessionId) {
     final query = _db.selectOnly(_db.dbChatRounds)
       ..addColumns([_db.dbChatRounds.id, _db.dbChatRounds.parentId])
       ..where(_db.dbChatRounds.sessionId.equals(sessionId))
       ..orderBy([OrderingTerm.asc(_db.dbChatRounds.createdAt)]);
-      
     return query.watch().map((rows) => rows.map((r) => (
       id: r.read(_db.dbChatRounds.id)!,
       parentId: r.read(_db.dbChatRounds.parentId)
     )).toList());
   }
 
-  /// 仅监听单条消息的完整详情（含附件）
+  /// 仅监听单条消息的完整详情（含附件）- 改用 rxdart 组合两个独立查询
   Stream<ChatRound?> watchSingleRound(String roundId) {
-    final query = _db.select(_db.dbChatRounds).join([
-      leftOuterJoin(
-        _db.dbAttachments,
-        _db.dbAttachments.roundId.equalsExp(_db.dbChatRounds.id),
-      ),
-    ])..where(_db.dbChatRounds.id.equals(roundId));
+    final roundStream = (_db.select(_db.dbChatRounds)
+          ..where((t) => t.id.equals(roundId)))
+        .watchSingleOrNull();
 
-    return query.watch().map((rows) {
-      if (rows.isEmpty) return null;
-      final roundRow = rows.first.readTable(_db.dbChatRounds);
-      final attachments = rows
-          .where((row) => row.readTableOrNull(_db.dbAttachments) != null)
-          .map((row) {
-            final a = row.readTable(_db.dbAttachments);
-            return Attachment(
+    final attachmentsStream = (_db.select(_db.dbAttachments)
+          ..where((t) => t.roundId.equals(roundId)))
+        .watch()
+        .map((rows) => rows.map((a) => Attachment(
               id: a.id,
               name: a.name,
               relativePath: a.relativePath,
               isImage: a.isImage,
               mimeType: a.mimeType,
-            );
-          }).toList();
-      return _mapToChatRound(roundRow, attachments);
+            )).toList());
+
+    return Rx.combineLatest2(roundStream, attachmentsStream,
+        (DbChatRound? round, List<Attachment> attachments) {
+      if (round == null) return null;
+      return ChatRound(
+        id: round.id,
+        parentId: round.parentId,
+        createdAt: round.createdAt,
+        userContent: round.userContent,
+        userAttachments: attachments,
+        assistantThinking: round.assistantThinking,
+        assistantContent: round.assistantContent,
+        isIncomplete: round.isIncomplete,
+        hasUnseenUpdate: round.hasUnseenUpdate,
+      );
     });
   }
 
   Future<List<ChatRound>> getContextRounds(String roundId) async {
-    // 1. 使用递归 CTE 直接查询从目标节点到根的路径（数据库层按时间正序返回）
     final roundsQuery = _db.customSelect(
       '''
       WITH RECURSIVE ctx_chain AS (
-        -- 基础情况：目标节点
         SELECT id, session_id, parent_id, created_at, user_content,
               assistant_thinking, assistant_content, is_incomplete, has_unseen_update
         FROM db_chat_rounds WHERE id = :roundId
         UNION ALL
-        -- 递归情况：向上查找父节点
         SELECT r.id, r.session_id, r.parent_id, r.created_at, r.user_content,
               r.assistant_thinking, r.assistant_content, r.is_incomplete, r.has_unseen_update
         FROM db_chat_rounds r
@@ -166,13 +158,11 @@ class ConversationRepository {
 
     if (dbRounds.isEmpty) return [];
 
-    // 2. 批量查询链路上所有轮次的附件
     final roundIds = dbRounds.map((r) => r.id).toList();
     final dbAttachments = await (_db.select(_db.dbAttachments)
           ..where((t) => t.roundId.isIn(roundIds)))
         .get();
 
-    // 3. 按 roundId 分组附件
     final attachmentMap = <String, List<Attachment>>{};
     for (final att in dbAttachments) {
       attachmentMap.putIfAbsent(att.roundId, () => []).add(
@@ -186,7 +176,6 @@ class ConversationRepository {
       );
     }
 
-    // 4. 组装返回（CTE 已按 created_at ASC 排序，无需 reversed）
     return dbRounds.map((round) => _mapToChatRound(round, attachmentMap[round.id] ?? [])).toList();
   }
 
@@ -225,8 +214,7 @@ class ConversationRepository {
     for (final path in orphanPaths) {
       try {
         await _fileService.deleteAttachment(path);
-      } catch (_) {
-      }
+      } catch (_) {}
     }
   }
 
@@ -238,20 +226,14 @@ class ConversationRepository {
   ) async {
     if (roundIds.isEmpty) return;
 
-    // 1. 收集候选附件路径
-    final candidatePaths = (await (_db.select(_db.dbAttachments).join([
-      innerJoin(
-        _db.dbChatRounds,
-        _db.dbChatRounds.id.equalsExp(_db.dbAttachments.roundId),
-      ),
-    ])
-          ..where(_db.dbChatRounds.sessionId.equals(sessionId))
-          ..where(_db.dbChatRounds.id.isIn(roundIds)))
+    // 1. 收集候选附件路径（改用直接查询，不用 join）
+    final candidatePaths = (await (_db.select(_db.dbAttachments)
+          ..where((t) => t.roundId.isIn(roundIds)))
         .get())
-        .map((row) => row.readTable(_db.dbAttachments).relativePath)
+        .map((a) => a.relativePath)
         .toSet();
 
-    // 2. 提交数据库变更 (级联删除会自动清理 dbAttachments)
+    // 2. 提交数据库变更
     await _db.transaction(() async {
       await (_db.delete(_db.dbChatRounds)
             ..where((t) => t.sessionId.equals(sessionId) & t.id.isIn(roundIds)))
@@ -269,17 +251,19 @@ class ConversationRepository {
   }
 
   Future<void> deleteSession(String sessionId) async {
-    // 1. 收集候选附件路径
-    final candidatePaths = (await (_db.select(_db.dbAttachments).join([
-      innerJoin(
-        _db.dbChatRounds,
-        _db.dbChatRounds.id.equalsExp(_db.dbAttachments.roundId),
-      ),
-    ])
-          ..where(_db.dbChatRounds.sessionId.equals(sessionId)))
-        .get())
-        .map((row) => row.readTable(_db.dbAttachments).relativePath)
-        .toSet();
+    // 1. 收集候选附件路径（先查出所有 round id，再查附件）
+    final roundIds = await (_db.select(_db.dbChatRounds)
+          ..where((t) => t.sessionId.equals(sessionId)))
+        .map((r) => r.id)
+        .get();
+
+    final candidatePaths = <String>{};
+    if (roundIds.isNotEmpty) {
+      final attachments = await (_db.select(_db.dbAttachments)
+            ..where((t) => t.roundId.isIn(roundIds)))
+          .get();
+      candidatePaths.addAll(attachments.map((a) => a.relativePath));
+    }
 
     // 2. 提交数据库变更
     await (_db.delete(_db.dbSessions)..where((t) => t.id.equals(sessionId))).go();
@@ -379,7 +363,6 @@ class ConversationRepository {
               ? Value(hasUnseenUpdate)
               : const Value.absent(),
         ));
-    // ✅ 不再更新 Session 的 updatedAt
   }
 
   // ========== 附件读写接口保留 ==========

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:aiservice/core/models/attachment.dart';
+import 'package:aiservice/domain/services/character_card_parser.dart';
 
 import '../../core/models/api_message.dart';
 import '../../core/models/chat_round.dart';
@@ -8,8 +9,17 @@ import '../../data/repositories/conversation_repository.dart';
 Future<List<ApiMessage>> buildApiContextFromRounds(
   List<ChatRound> rounds,
   ConversationRepository repository,
+  CharacterData? character,
 ) async {
   final result = <ApiMessage>[];
+
+  if (character != null) {
+    final systemPrompt = character.buildSystemPrompt();
+    result.add(ApiMessage(
+      role: 'system',
+      content: systemPrompt,
+    ));
+  }
 
   for (final round in rounds) {
     final userMessage = await _buildUserMessage(round, repository);
