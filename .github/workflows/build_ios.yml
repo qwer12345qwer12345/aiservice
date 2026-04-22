@@ -8,11 +8,9 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
@@ -23,19 +21,15 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # 关键：解决 llama.cpp 缺失问题
-      - name: Provide llama.cpp for flutter_llama
+      # ★★★ 关键修复：提供 llama.cpp 头文件 ★★★
+      - name: Fix missing llama.h for flutter_llama
         run: |
-          if [ ! -d "llama.cpp" ]; then
-            echo "Cloning llama.cpp into project root..."
-            git clone https://github.com/ggerganov/llama.cpp.git
-          else
-            echo "llama.cpp already exists"
-          fi
-          # 验证头文件存在（可选）
-          ls -la llama.cpp/include/llama.h || echo "Warning: llama.h not found"
+          mkdir -p llama.cpp/include
+          curl -L -o llama.cpp/include/llama.h https://raw.githubusercontent.com/ggerganov/llama.cpp/master/llama.h
+          curl -L -o llama.cpp/include/ggml.h https://raw.githubusercontent.com/ggerganov/llama.cpp/master/ggml.h
+          # 如果后续还报错缺少其他头文件，同样方式补充
 
-      - name: Install CocoaPods dependencies
+      - name: Install CocoaPods
         run: |
           cd ios
           pod install --repo-update
@@ -47,12 +41,11 @@ jobs:
         run: |
           APP_PATH="build/ios/iphoneos/Runner.app"
           [ -d "$APP_PATH" ] || APP_PATH="build/ios/Release-iphoneos/Runner.app"
-          mkdir -p Payload
+          mkdir Payload
           cp -r "$APP_PATH" Payload/
           zip -r app.ipa Payload
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: ios-ipa
           path: app.ipa
