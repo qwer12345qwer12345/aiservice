@@ -21,13 +21,31 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # ★★★ 关键修复：提供 llama.cpp 头文件 ★★★
-      - name: Fix missing llama.h for flutter_llama
+      # ★★★ 正确修复：在插件目录中克隆 llama.cpp ★★★
+      - name: Provide llama.cpp inside flutter_llama plugin
         run: |
-          mkdir -p llama.cpp/include
-          curl -L -o llama.cpp/include/llama.h https://raw.githubusercontent.com/ggerganov/llama.cpp/master/llama.h
-          curl -L -o llama.cpp/include/ggml.h https://raw.githubusercontent.com/ggerganov/llama.cpp/master/ggml.h
-          # 如果后续还报错缺少其他头文件，同样方式补充
+          PLUGIN_DIR="$HOME/.pub-cache/hosted/pub.dev/flutter_llama-1.1.2"
+          if [ ! -d "$PLUGIN_DIR" ]; then
+            echo "Plugin directory not found. Trying alternative location..."
+            # 可能版本号有差异，使用通配符查找
+            PLUGIN_DIR=$(find $HOME/.pub-cache/hosted -type d -name "flutter_llama-1.1.2" | head -1)
+            if [ -z "$PLUGIN_DIR" ]; then
+              echo "Failed to find flutter_llama plugin directory"
+              exit 1
+            fi
+          fi
+          echo "Plugin directory: $PLUGIN_DIR"
+          cd "$PLUGIN_DIR"
+          # 删除可能已存在的 llama.cpp（避免冲突）
+          rm -rf llama.cpp
+          git clone https://github.com/ggerganov/llama.cpp.git
+          # 验证头文件存在
+          if [ -f "llama.cpp/include/llama.h" ]; then
+            echo "✅ llama.h successfully placed in plugin directory"
+          else
+            echo "❌ Failed to place llama.h"
+            exit 1
+          fi
 
       - name: Install CocoaPods
         run: |
