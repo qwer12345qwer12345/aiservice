@@ -22,47 +22,58 @@ class _ThoughtBubbleState extends State<ThoughtBubble> {
 
     final textTheme = CupertinoTheme.of(context).textTheme;
 
-    return CupertinoFormSection.insetGrouped(
-      children: [
-        CupertinoButton(
-          padding: const EdgeInsets.all(12),
-          onPressed: () => setState(() => _isExpanded = !_isExpanded),
-          child: Row(
-            children: [
-              Icon(
-                CupertinoIcons.lightbulb,
-                size: 16,
-                color: CupertinoTheme.of(context).primaryColor,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '推理过程',
-                style: textTheme.textStyle.copyWith(
-                  fontWeight: FontWeight.w700,
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemBackground,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            onPressed: () => setState(() => _isExpanded = !_isExpanded),
+            child: Row(
+              children: [
+                Icon(
+                  CupertinoIcons.lightbulb,
+                  size: 16,
                   color: CupertinoTheme.of(context).primaryColor,
                 ),
-              ),
-              const Spacer(),
-              Icon(
-                _isExpanded ? CupertinoIcons.chevron_up : CupertinoIcons.chevron_down,
-                size: 18,
-                color: CupertinoColors.systemGrey,
-              ),
-            ],
-          ),
-        ),
-        if (_isExpanded)
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Text(
-              text,
-              style: textTheme.textStyle.copyWith(
-                fontSize: 13,
-                height: 1.65,
-              ),
+                const SizedBox(width: 6),
+                Text(
+                  '推理过程',
+                  style: textTheme.textStyle.copyWith(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: CupertinoTheme.of(context).primaryColor,
+                  ),
+                ),
+                const Spacer(),
+                Icon(
+                  _isExpanded ? CupertinoIcons.chevron_up : CupertinoIcons.chevron_down,
+                  size: 18,
+                  color: CupertinoColors.systemGrey,
+                ),
+              ],
             ),
           ),
-      ],
+          if (_isExpanded)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: Text(
+                text,
+                style: textTheme.textStyle.copyWith(
+                  fontSize: 13,
+                  height: 1.5,
+                  color: CupertinoColors.label,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

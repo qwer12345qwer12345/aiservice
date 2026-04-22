@@ -17,54 +17,62 @@ class MessageBubble extends StatelessWidget {
     this.onEdit,
   });
 
-  @override
-  Widget build(BuildContext context) {    
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.88,
+  void _showActionSheet(BuildContext context) {
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (context) => CupertinoActionSheet(
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(context);
+              onCopy?.call();
+            },
+            child: const Text('复制'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(context);
+              onRetryReply?.call();
+            },
+            child: const Text('重试回复'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
         ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bubbleColor = isUser
+        ? CupertinoColors.systemBlue
+        : CupertinoColors.systemBackground; // AI 消息白色背景
+
+    final textColor = isUser
+        ? CupertinoColors.white
+        : CupertinoColors.label;
+
+    return GestureDetector(
+      onLongPress: () => _showActionSheet(context),
+      child: Container(
+        width: isUser ? null : double.infinity,
         margin: const EdgeInsets.symmetric(vertical: 4),
-        child: Column(
-          crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              color: isUser ? CupertinoColors.systemBlue : CupertinoColors.systemBackground,
-              child: MarkdownBody(
-                  data: content,
-                  selectable: true,
-                  styleSheet: MarkdownStyleSheet.fromCupertinoTheme(CupertinoTheme.of(context)),
-                ),
-            ),
-            if (onCopy != null || onRetryReply != null || onEdit != null) ...[
-              const SizedBox(height: 6),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (onCopy != null)
-                    CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: onCopy,
-                      child: const Icon(CupertinoIcons.doc_on_doc),
-                    ),
-                  if (onEdit != null)
-                    CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: onEdit,
-                      child: const Icon(CupertinoIcons.pencil),
-                    ),
-                  if (onRetryReply != null)
-                    CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: onRetryReply,
-                      child: const Icon(CupertinoIcons.arrow_2_circlepath),
-                    ),
-                ],
-              ),
-            ],
-          ],
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: bubbleColor,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: MarkdownBody(
+          data: content,
+          selectable: true,
+          styleSheet: MarkdownStyleSheet.fromCupertinoTheme(
+            CupertinoTheme.of(context),
+          ).copyWith(
+            p: TextStyle(color: textColor),
+          ),
         ),
       ),
     );

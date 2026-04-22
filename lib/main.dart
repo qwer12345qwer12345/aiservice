@@ -1,9 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'core/utils/app_route_observer.dart';
 import 'di/providers.dart'; // 仅导入 providers
 import 'presentation/pages/home_page.dart';
-import 'presentation/themes/app_theme.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 void main() async {
@@ -28,8 +26,6 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return CupertinoApp(
       title: 'AI Chat',
-      theme: AppTheme.cupertinoTheme,
-      navigatorObservers: [appRouteObserver],
       home: const HomePage(),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,

@@ -50,6 +50,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     });
   }
 
+  String _getTitleWithPage(String sessionTitle, List<String> visibleRoundIds, String? currentRoundId) {
+    final total = visibleRoundIds.length;
+    final currentIndex = visibleRoundIds.indexOf(currentRoundId ?? '');
+    if (currentIndex == -1) return sessionTitle;
+    return '$sessionTitle (${currentIndex + 1}/$total)';
+  }
+
   Future<void> _ensureInitialRoundId() async {
     if (_branchLeafId != null) return;
     final topology = await ref.read(chatTopologyProvider(widget.sessionId).future);
@@ -66,7 +73,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final greetingSent = ref.read(characterGreetingSentProvider);
     
     if (character != null && !greetingSent && character.firstMes.isNotEmpty) {
-      // 标记已发送，防止重复
       ref.read(characterGreetingSentProvider.notifier).state = true;
       
       final controller = ref.read(chatControllerProvider(widget.sessionId));
@@ -134,7 +140,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       });
     }
 
-
     final sessionTitle = ref.watch(sessionTitleProvider(widget.sessionId)).valueOrNull ?? '未加载';
     final currentRoundAsync = ref.watch(roundDetailProvider(_currentRoundId ?? ''));
     final isIncomplete = currentRoundAsync.valueOrNull?.isIncomplete ?? false;
@@ -169,7 +174,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
     return AppPageScaffold(
       navigationBar: CupertinoNavigationBar(
-        middle: Text(sessionTitle),
+        middle: Text(_getTitleWithPage(sessionTitle, visibleRoundIds, _currentRoundId)),
         trailing: CupertinoButton(
           onPressed: () async {
             final selectedId = await Navigator.of(context).push<String>(
@@ -187,11 +192,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       ),
       body: Column(
         children: [
-          if (visibleRoundIds.isNotEmpty)
-            _PaginationBar(
-              currentIndex: currentIndex,
-              totalPages: visibleRoundIds.length,
-            ),
           Expanded(
             child: visibleRoundIds.isEmpty
                 ? const Center(child: Text('加载中'))
@@ -253,23 +253,19 @@ class _ChatRoundPage extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Container(
-          color: CupertinoColors.systemBackground,
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _UserSection(
-                roundId: roundId,
-                onRetryReply: onRetryReply,
-              ),
-              _ThinkingSection(roundId: roundId),
-              _AiReplySection(
-                roundId: roundId,
-                onRetryReply: onRetryReply,
-              ),
-            ],
-          ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _UserSection(
+              roundId: roundId,
+              onRetryReply: onRetryReply,
+            ),
+            _ThinkingSection(roundId: roundId),
+            _AiReplySection(
+              roundId: roundId,
+              onRetryReply: onRetryReply,
+            ),
+          ],
         ),
       ],
     );
@@ -303,20 +299,29 @@ class _UserSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          color: CupertinoColors.systemGrey5,
-          child: Text(DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(round.time))),
+        Center(
+          child: Text(
+            DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(round.time)),
+            style: const TextStyle(fontSize: 12, color: CupertinoColors.systemGrey),
+          ),
         ),
         const SizedBox(height: 12),
-        MessageBubble(
-          content: round.content,
-          isUser: true,
-          onEdit: null,
-          onCopy: () {
-            Clipboard.setData(ClipboardData(text: round.content));
-            AppToast.show('已复制');
-          },
+        Align(
+          alignment: Alignment.centerRight,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.88,
+            ),
+            child: MessageBubble(
+              content: round.content,
+              isUser: true,
+              onCopy: () {
+                Clipboard.setData(ClipboardData(text: round.content));
+                AppToast.show('已复制');
+              },
+              onRetryReply: onRetryReply,
+            ),
+          ),
         ),
         if (round.attach.isNotEmpty) ...[
           const SizedBox(height: 8),
@@ -340,14 +345,14 @@ class _ThinkingSection extends ConsumerWidget {
     if (thinking == null || thinking.trim().isEmpty) {
       return const SizedBox.shrink();
     }
-    return Column(
-      children: [
-        Container(
-          height: 0.5,
-          color: CupertinoColors.separator,
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.88,
         ),
-        ThoughtBubble(content: thinking),
-      ],
+        child: ThoughtBubble(content: thinking),
+      ),
     );
   }
 }
@@ -377,19 +382,23 @@ class _AiReplySection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          height: 0.5,
-          color: CupertinoColors.separator,
-        ),
         if (ai.content != null)
-          MessageBubble(
-            content: ai.content!,
-            isUser: false,
-            onRetryReply: ai.isIncomplete ? null : onRetryReply,
-            onCopy: () {
-              Clipboard.setData(ClipboardData(text: ai.content!));
-              AppToast.show('已复制');
-            },
+          Align(
+            alignment: Alignment.centerLeft,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.88,
+              ),
+              child: MessageBubble(
+                content: ai.content!,
+                isUser: false,
+                onCopy: () {
+                  Clipboard.setData(ClipboardData(text: ai.content!));
+                  AppToast.show('已复制');
+                },
+                onRetryReply: ai.isIncomplete ? null : onRetryReply,
+              ),
+            ),
           )
         else
           const Padding(
@@ -397,41 +406,6 @@ class _AiReplySection extends ConsumerWidget {
             child: CupertinoActivityIndicator(),
           ),
       ],
-    );
-  }
-}
-
-class _PaginationBar extends StatelessWidget {
-  final int currentIndex, totalPages;
-
-  const _PaginationBar({
-    required this.currentIndex,
-    required this.totalPages,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final displayPage = currentIndex + 1;
-    final pageText = totalPages == 0 ? '0 / 0' : '$displayPage / $totalPages';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      color: CupertinoColors.systemBackground,
-      child: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: CupertinoColors.systemGrey5,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            pageText,
-            style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

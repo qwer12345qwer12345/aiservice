@@ -135,7 +135,8 @@ class _ImageAttachmentThumb extends ConsumerWidget {
         return GestureDetector(
           onTap: () => _AttachmentActionHelper.previewImage(context, bytes),
           onLongPress: () => _AttachmentActionHelper.shareAttachmentFromBytes(attachment, bytes),
-          child: ClipRect(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
             child: SizedBox(
               width: 108,
               height: 108,
@@ -168,11 +169,14 @@ class _FileAttachmentChip extends ConsumerWidget {
     return bytesAsync.when(
       loading: () => Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        color: CupertinoColors.systemGrey5,
+        decoration: BoxDecoration(
+          color: CupertinoColors.systemGrey5,
+          borderRadius: BorderRadius.circular(12),
+        ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(leadingIcon, size: 18),
+            Icon(leadingIcon, size: 16),
             const SizedBox(width: 6),
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 180),
@@ -186,11 +190,14 @@ class _FileAttachmentChip extends ConsumerWidget {
       ),
       error: (e, st) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        color: CupertinoColors.systemGrey5,
+        decoration: BoxDecoration(
+          color: CupertinoColors.systemGrey5,
+          borderRadius: BorderRadius.circular(12),
+        ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(CupertinoIcons.exclamationmark_triangle, size: 18),
+            const Icon(CupertinoIcons.exclamationmark_triangle, size: 16),
             const SizedBox(width: 6),
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 180),
@@ -218,11 +225,14 @@ class _FileAttachmentChip extends ConsumerWidget {
           onLongPress: () => _AttachmentActionHelper.shareAttachmentFromBytes(attachment, bytes),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            color: CupertinoColors.systemGrey5,
+            decoration: BoxDecoration(
+              color: CupertinoColors.systemGrey5,
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(leadingIcon, size: 18),
+                Icon(leadingIcon, size: 16),
                 const SizedBox(width: 6),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 180),

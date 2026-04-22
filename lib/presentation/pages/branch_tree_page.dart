@@ -54,13 +54,11 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
         postOrder(child);
         total += _nodeWidthCache[child.id]!;
       }
-      // 加上兄弟节点之间的间距
       total += (node.children.length - 1) * _siblingSeparation;
       _nodeWidthCache[node.id] = total;
     }
     postOrder(root);
   }
-  // ==================== 布局算法 ====================
 
   double _subtreeWidth(TreeNode node) {
     return _nodeWidthCache[node.id] ?? _nodeWidth;
@@ -121,8 +119,6 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     return _TreeLayout(positions: positions, canvasSize: Size(canvasWidth, canvasHeight));
   }
 
-  // ==================== 连线 ====================
-
   List<(Offset, Offset)> _buildParentChildPairs(List<TreeNode> roots, Map<String, Offset> positions) {
     final pairs = <(Offset, Offset)>[];
     void traverse(TreeNode node) {
@@ -139,8 +135,6 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     for (final root in roots) traverse(root);
     return pairs;
   }
-
-  // ==================== 节点构建 ====================
 
   List<Widget> _buildAllNodeWidgets(List<TreeNode> roots, Map<String, Offset> positions) {
     final widgets = <Widget>[];
@@ -166,8 +160,6 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     for (final root in roots) addNode(root);
     return widgets;
   }
-
-  // ==================== 删除逻辑 ====================
 
   Future<void> _deleteNode(String nodeId) async {
     final topology = await ref.read(chatTopologyProvider(widget.sessionId).future);
@@ -226,8 +218,6 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     return null;
   }
 
-  // ==================== 聚焦 ====================
-
   void _focusOnNode(String nodeId, Map<String, Offset> positions) {
     if (_hasFocused) return;
     final nodePos = positions[nodeId];
@@ -241,8 +231,6 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     _hasFocused = true;
     setState(() {});
   }
-
-  // ==================== 构建 ====================
 
   @override
   Widget build(BuildContext context) {
@@ -303,7 +291,7 @@ class _OrthogonalLinePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = CupertinoColors.separator
-      ..strokeWidth = 1.6
+      ..strokeWidth = 1.2
       ..style = PaintingStyle.stroke;
     for (final pair in pairs) {
       final parentCenter = Offset(pair.$1.dx + _nodeWidth / 2, pair.$1.dy + _nodeHeight / 2);
@@ -335,6 +323,30 @@ class _TreeNodeCard extends ConsumerWidget {
     required this.onDelete,
   });
 
+  Widget _buildStatusDot({required bool isStreaming, required bool hasUnseen}) {
+    if (isStreaming) {
+      return Container(
+        width: 8,
+        height: 8,
+        decoration: const BoxDecoration(
+          color: CupertinoColors.systemOrange,
+          shape: BoxShape.circle,
+        ),
+      );
+    }
+    if (hasUnseen) {
+      return Container(
+        width: 8,
+        height: 8,
+        decoration: const BoxDecoration(
+          color: CupertinoColors.systemBlue,
+          shape: BoxShape.circle,
+        ),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final round = ref.watch(roundDetailProvider(roundId)).valueOrNull;
@@ -351,41 +363,43 @@ class _TreeNodeCard extends ConsumerWidget {
       height: _nodeHeight,
       decoration: BoxDecoration(
         color: CupertinoColors.systemBackground,
-        border: Border.all(color: CupertinoColors.separator, width: 0.5),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: CupertinoColors.separator.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            dateText ?? '加载中...',
-            style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(fontSize: 12),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  dateText ?? '加载中...',
+                  style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (round != null && (round.isIncomplete || round.hasUnseenUpdate))
+                _buildStatusDot(isStreaming: round.isIncomplete, hasUnseen: round.hasUnseenUpdate),
+            ],
           ),
-          if (round != null && (round.isIncomplete || round.hasUnseenUpdate))
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              children: [
-                if (round.isIncomplete)
-                  const Text('生成中', style: TextStyle(color: CupertinoColors.systemOrange, fontSize: 12)),
-                if (round.hasUnseenUpdate && round.isIncomplete) const SizedBox(width: 8),
-                if (round.hasUnseenUpdate)
-                  const Text('未查看', style: TextStyle(color: CupertinoColors.systemBlue, fontSize: 12)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Expanded(child: _PreviewSlot(label: 'YOU', content: userText, loading: round == null)),
           const SizedBox(height: 4),
           Expanded(child: _PreviewSlot(label: 'AI', content: aiText, loading: round == null)),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
                 child: CupertinoButton.filled(
+                  borderRadius: BorderRadius.circular(12),
                   onPressed: onSwitch,
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: const Text('切换到此分支'),
@@ -393,6 +407,7 @@ class _TreeNodeCard extends ConsumerWidget {
               ),
               const SizedBox(width: 8),
               CupertinoButton(
+                borderRadius: BorderRadius.circular(12),
                 onPressed: onDelete,
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 child: const Icon(CupertinoIcons.delete),

@@ -119,233 +119,6 @@ lib/presentation/widgets/thought_bubble.dart
 
 # Files
 
-## File: lib/domain/services/character_card_parser.dart
-```dart
-import 'dart:convert';
-import 'dart:typed_data';
-import 'package:png_chunks_extract/png_chunks_extract.dart' as pngExtract;
-
-/// 解析后的角色数据结构（支持 V2/V3）
-class CharacterData {
-  final String name;
-  final String description;
-  final String personality;
-  final String scenario;
-  final String firstMes;
-  final String mesExample;
-  final String systemPrompt;
-  final String postHistoryInstructions;
-  final List<String> alternateGreetings;
-  final Map<String, dynamic>? characterBook;
-  final Map<String, dynamic>? extensions;
-
-  CharacterData({
-    required this.name,
-    required this.description,
-    required this.personality,
-    required this.scenario,
-    required this.firstMes,
-    required this.mesExample,
-    required this.systemPrompt,
-    required this.postHistoryInstructions,
-    required this.alternateGreetings,
-    this.characterBook,
-    this.extensions,
-  });
-
-  /// 生成系统提示词（供模型使用）
-  String buildSystemPrompt() {
-    final buffer = StringBuffer();
-    buffer.writeln('# 角色设定');
-    buffer.writeln('你是 $name。\n');
-
-    if (description.isNotEmpty) {
-      buffer.writeln('## 外貌与背景');
-      buffer.writeln(description);
-      buffer.writeln();
-    }
-
-    if (personality.isNotEmpty) {
-      buffer.writeln('## 性格特点');
-      buffer.writeln(personality);
-      buffer.writeln();
-    }
-
-    if (scenario.isNotEmpty) {
-      buffer.writeln('## 当前场景');
-      buffer.writeln(scenario);
-      buffer.writeln();
-    }
-
-    if (systemPrompt.isNotEmpty) {
-      buffer.writeln('## 核心指令');
-      buffer.writeln(systemPrompt);
-      buffer.writeln();
-    }
-
-    buffer.writeln('## 对话要求');
-    buffer.writeln('- 请严格按照以上设定进行角色扮演');
-    buffer.writeln('- 保持角色性格和语气的一致性');
-    buffer.writeln('- 根据对话历史适当推进情节');
-
-    if (mesExample.isNotEmpty) {
-      buffer.writeln('\n## 对话范例参考');
-      buffer.writeln(mesExample);
-    }
-
-    return buffer.toString();
-  }
-}
-
-/// 角色卡解析器
-class CharacterCardParser {
-  /// 解析文件（支持 PNG 和 JSON）
-  static Future<CharacterData> parseFile(Uint8List bytes, String fileName) async {
-    final lowerName = fileName.toLowerCase();
-    if (lowerName.endsWith('.png')) {
-      return _parsePngCard(bytes);
-    } else if (lowerName.endsWith('.json')) {
-      return _parseJsonCard(bytes);
-    } else {
-      throw Exception('不支持的文件格式，请使用 PNG 或 JSON 文件');
-    }
-  }
-
-  /// 解析 PNG 角色卡（V2/V3）
-  static CharacterData _parsePngCard(Uint8List bytes) {
-    final chunks = pngExtract.extractChunks(bytes);
-    
-    String? base64Data;
-    for (final chunk in chunks) {
-      final chunkName = chunk['name'] as String;
-      if (chunkName == 'tEXt') {
-        final dataBytes = chunk['data'] as List<int>;
-        // 解析 tEXt 块：keyword + 0x00 + text
-        final zeroIndex = dataBytes.indexOf(0);
-        if (zeroIndex == -1) continue;
-        final keyword = utf8.decode(dataBytes.sublist(0, zeroIndex));
-        final textBytes = dataBytes.sublist(zeroIndex + 1);
-        final text = utf8.decode(textBytes);
-        
-        if (keyword == 'ccv3') {
-          base64Data = text;
-          break;
-        } else if (keyword == 'chara' && base64Data == null) {
-          base64Data = text;
-        }
-      }
-    }
-    
-    if (base64Data == null) {
-      throw Exception('未找到角色数据块（ccv3/chara）');
-    }
-    
-    final jsonString = utf8.decode(base64.decode(base64Data));
-    return _parseJsonString(jsonString);
-  }
-
-  /// 解析 JSON 角色卡
-  static CharacterData _parseJsonCard(Uint8List bytes) {
-    final jsonString = utf8.decode(bytes);
-    return _parseJsonString(jsonString);
-  }
-
-  static CharacterData _parseJsonString(String jsonString) {
-    final Map<String, dynamic> json = jsonDecode(jsonString);
-    final spec = json['spec'] as String?;
-    
-    if (spec == 'chara_card_v3') {
-      return _parseV3(json);
-    } else if (spec == 'chara_card_v2') {
-      return _parseV2(json);
-    } else {
-      // 兼容旧格式
-      return _parseV2({'data': json});
-    }
-  }
-
-  static CharacterData _parseV3(Map<String, dynamic> json) {
-    final data = json['data'] as Map<String, dynamic>;
-    return CharacterData(
-      name: data['name'] ?? '',
-      description: data['description'] ?? '',
-      personality: data['personality'] ?? '',
-      scenario: data['scenario'] ?? '',
-      firstMes: data['first_mes'] ?? '',
-      mesExample: data['mes_example'] ?? '',
-      systemPrompt: data['system_prompt'] ?? '',
-      postHistoryInstructions: data['post_history_instructions'] ?? '',
-      alternateGreetings: (data['alternate_greetings'] as List?)?.cast<String>() ?? [],
-      characterBook: data['character_book'],
-      extensions: data['extensions'],
-    );
-  }
-
-  static CharacterData _parseV2(Map<String, dynamic> json) {
-    final data = json['data'] as Map<String, dynamic>? ?? json;
-    return CharacterData(
-      name: data['name'] ?? '',
-      description: data['description'] ?? '',
-      personality: data['personality'] ?? '',
-      scenario: data['scenario'] ?? '',
-      firstMes: data['first_mes'] ?? '',
-      mesExample: data['mes_example'] ?? '',
-      systemPrompt: data['system_prompt'] ?? '',
-      postHistoryInstructions: data['post_history_instructions'] ?? '',
-      alternateGreetings: (data['alternate_greetings'] as List?)?.cast<String>() ?? [],
-      characterBook: data['character_book'],
-      extensions: data['extensions'],
-    );
-  }
-}
-```
-
-## File: lib/presentation/pages/image_attachment_viewer_page.dart
-```dart
-import 'dart:typed_data';
-import 'package:flutter/cupertino.dart';
-
-class ImageAttachmentViewerPage extends StatelessWidget {
-  final Uint8List imageBytes;
-
-  const ImageAttachmentViewerPage({super.key, required this.imageBytes});
-
-  @override
-  Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('图片预览'),
-        automaticallyImplyLeading: true, // 自动返回按钮
-      ),
-      child: SafeArea(
-        child: InteractiveViewer(
-          minScale: 0.5,
-          maxScale: 4.0,
-          child: Center(
-            child: Image.memory(
-              imageBytes,
-              fit: BoxFit.contain,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-```
-
-## File: lib/presentation/providers/character_provider.dart
-```dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../domain/services/character_card_parser.dart';
-
-/// 当前会话激活的角色（可为 null）
-final currentCharacterProvider = StateProvider<CharacterData?>((ref) => null);
-
-/// 角色开场白是否已发送（避免重复发送）
-final characterGreetingSentProvider = StateProvider<bool>((ref) => false);
-```
-
 ## File: lib/core/models/api_message.dart
 ```dart
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -7328,6 +7101,187 @@ class $AppDatabaseManager {
 }
 ```
 
+## File: lib/domain/services/character_card_parser.dart
+```dart
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:png_chunks_extract/png_chunks_extract.dart' as pngExtract;
+
+/// 解析后的角色数据结构（支持 V2/V3）
+class CharacterData {
+  final String name;
+  final String description;
+  final String personality;
+  final String scenario;
+  final String firstMes;
+  final String mesExample;
+  final String systemPrompt;
+  final String postHistoryInstructions;
+  final List<String> alternateGreetings;
+  final Map<String, dynamic>? characterBook;
+  final Map<String, dynamic>? extensions;
+
+  CharacterData({
+    required this.name,
+    required this.description,
+    required this.personality,
+    required this.scenario,
+    required this.firstMes,
+    required this.mesExample,
+    required this.systemPrompt,
+    required this.postHistoryInstructions,
+    required this.alternateGreetings,
+    this.characterBook,
+    this.extensions,
+  });
+
+  /// 生成系统提示词（供模型使用）
+  String buildSystemPrompt() {
+    final buffer = StringBuffer();
+    buffer.writeln('# 角色设定');
+    buffer.writeln('你是 $name。\n');
+
+    if (description.isNotEmpty) {
+      buffer.writeln('## 外貌与背景');
+      buffer.writeln(description);
+      buffer.writeln();
+    }
+
+    if (personality.isNotEmpty) {
+      buffer.writeln('## 性格特点');
+      buffer.writeln(personality);
+      buffer.writeln();
+    }
+
+    if (scenario.isNotEmpty) {
+      buffer.writeln('## 当前场景');
+      buffer.writeln(scenario);
+      buffer.writeln();
+    }
+
+    if (systemPrompt.isNotEmpty) {
+      buffer.writeln('## 核心指令');
+      buffer.writeln(systemPrompt);
+      buffer.writeln();
+    }
+
+    buffer.writeln('## 对话要求');
+    buffer.writeln('- 请严格按照以上设定进行角色扮演');
+    buffer.writeln('- 保持角色性格和语气的一致性');
+    buffer.writeln('- 根据对话历史适当推进情节');
+
+    if (mesExample.isNotEmpty) {
+      buffer.writeln('\n## 对话范例参考');
+      buffer.writeln(mesExample);
+    }
+
+    return buffer.toString();
+  }
+}
+
+/// 角色卡解析器
+class CharacterCardParser {
+  /// 解析文件（支持 PNG 和 JSON）
+  static Future<CharacterData> parseFile(Uint8List bytes, String fileName) async {
+    final lowerName = fileName.toLowerCase();
+    if (lowerName.endsWith('.png')) {
+      return _parsePngCard(bytes);
+    } else if (lowerName.endsWith('.json')) {
+      return _parseJsonCard(bytes);
+    } else {
+      throw Exception('不支持的文件格式，请使用 PNG 或 JSON 文件');
+    }
+  }
+
+  /// 解析 PNG 角色卡（V2/V3）
+  static CharacterData _parsePngCard(Uint8List bytes) {
+    final chunks = pngExtract.extractChunks(bytes);
+    
+    String? base64Data;
+    for (final chunk in chunks) {
+      final chunkName = chunk['name'] as String;
+      if (chunkName == 'tEXt') {
+        final dataBytes = chunk['data'] as List<int>;
+        // 解析 tEXt 块：keyword + 0x00 + text
+        final zeroIndex = dataBytes.indexOf(0);
+        if (zeroIndex == -1) continue;
+        final keyword = utf8.decode(dataBytes.sublist(0, zeroIndex));
+        final textBytes = dataBytes.sublist(zeroIndex + 1);
+        final text = utf8.decode(textBytes);
+        
+        if (keyword == 'ccv3') {
+          base64Data = text;
+          break;
+        } else if (keyword == 'chara' && base64Data == null) {
+          base64Data = text;
+        }
+      }
+    }
+    
+    if (base64Data == null) {
+      throw Exception('未找到角色数据块（ccv3/chara）');
+    }
+    
+    final jsonString = utf8.decode(base64.decode(base64Data));
+    return _parseJsonString(jsonString);
+  }
+
+  /// 解析 JSON 角色卡
+  static CharacterData _parseJsonCard(Uint8List bytes) {
+    final jsonString = utf8.decode(bytes);
+    return _parseJsonString(jsonString);
+  }
+
+  static CharacterData _parseJsonString(String jsonString) {
+    final Map<String, dynamic> json = jsonDecode(jsonString);
+    final spec = json['spec'] as String?;
+    
+    if (spec == 'chara_card_v3') {
+      return _parseV3(json);
+    } else if (spec == 'chara_card_v2') {
+      return _parseV2(json);
+    } else {
+      // 兼容旧格式
+      return _parseV2({'data': json});
+    }
+  }
+
+  static CharacterData _parseV3(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>;
+    return CharacterData(
+      name: data['name'] ?? '',
+      description: data['description'] ?? '',
+      personality: data['personality'] ?? '',
+      scenario: data['scenario'] ?? '',
+      firstMes: data['first_mes'] ?? '',
+      mesExample: data['mes_example'] ?? '',
+      systemPrompt: data['system_prompt'] ?? '',
+      postHistoryInstructions: data['post_history_instructions'] ?? '',
+      alternateGreetings: (data['alternate_greetings'] as List?)?.cast<String>() ?? [],
+      characterBook: data['character_book'],
+      extensions: data['extensions'],
+    );
+  }
+
+  static CharacterData _parseV2(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>? ?? json;
+    return CharacterData(
+      name: data['name'] ?? '',
+      description: data['description'] ?? '',
+      personality: data['personality'] ?? '',
+      scenario: data['scenario'] ?? '',
+      firstMes: data['first_mes'] ?? '',
+      mesExample: data['mes_example'] ?? '',
+      systemPrompt: data['system_prompt'] ?? '',
+      postHistoryInstructions: data['post_history_instructions'] ?? '',
+      alternateGreetings: (data['alternate_greetings'] as List?)?.cast<String>() ?? [],
+      characterBook: data['character_book'],
+      extensions: data['extensions'],
+    );
+  }
+}
+```
+
 ## File: lib/domain/services/stream_processor.dart
 ```dart
 import 'dart:async';
@@ -7651,6 +7605,52 @@ class PendingAttachment {
     this.mimeType,
   });
 }
+```
+
+## File: lib/presentation/pages/image_attachment_viewer_page.dart
+```dart
+import 'dart:typed_data';
+import 'package:flutter/cupertino.dart';
+
+class ImageAttachmentViewerPage extends StatelessWidget {
+  final Uint8List imageBytes;
+
+  const ImageAttachmentViewerPage({super.key, required this.imageBytes});
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoPageScaffold(
+      navigationBar: const CupertinoNavigationBar(
+        middle: Text('图片预览'),
+        automaticallyImplyLeading: true, // 自动返回按钮
+      ),
+      child: SafeArea(
+        child: InteractiveViewer(
+          minScale: 0.5,
+          maxScale: 4.0,
+          child: Center(
+            child: Image.memory(
+              imageBytes,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+```
+
+## File: lib/presentation/providers/character_provider.dart
+```dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../domain/services/character_card_parser.dart';
+
+/// 当前会话激活的角色（可为 null）
+final currentCharacterProvider = StateProvider<CharacterData?>((ref) => null);
+
+/// 角色开场白是否已发送（避免重复发送）
+final characterGreetingSentProvider = StateProvider<bool>((ref) => false);
 ```
 
 ## File: lib/presentation/widgets/common/app_toast.dart
@@ -9399,86 +9399,6 @@ Future<List<Attachment>> savePendingAttachments(
 }
 ```
 
-## File: lib/presentation/providers/chat_generation_provider.dart
-```dart
-import 'package:aiservice/presentation/providers/character_provider.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import '../../core/models/generation_event.dart';
-import '../../di/providers.dart';
-import '../../domain/services/chat_context_builder.dart';
-import '../../domain/services/stream_processor.dart';
-
-final chatGenerationProvider =
-  StreamProvider.family<void, String>((ref, roundId) {
-    Stream<GenerationEvent> runTask() async* {
-      final repository = ref.read(conversationRepositoryProvider);     
-      final configService = ref.read(configServiceProvider);
-      final apiSource = ref.read(remoteApiSourceProvider);
-
-      // 1. 构建上下文
-      final contextRounds = await repository.getContextRounds(roundId);
-      final character = ref.read(currentCharacterProvider);
-      final apiContext = await buildApiContextFromRounds(
-        contextRounds,
-        repository,
-        character,   // 传递角色信息
-      );
-
-      // 2. 加载配置
-      final config = await configService.loadConfig();
-
-      // 3. 发起请求
-      final stream = apiSource.chatStream(
-        loadConfig: () async => config,
-        context: apiContext,
-      );
-
-      // 4. 处理流
-      final processor = StreamProcessor();
-      yield* processor.process(stream);
-    }
-
-    void handleEvent(GenerationEvent event) {
-      final repository = ref.read(conversationRepositoryProvider);
-
-      event.when(
-        partial: (content, reasoning) {
-          repository.updateRound(
-            roundId: roundId,
-            assistantContent: content,
-            assistantThinking: reasoning,
-            isIncomplete: true,
-          );
-        },
-        completed: (content, reasoning) {
-          repository.updateRound(
-            roundId: roundId,
-            assistantContent: content,
-            assistantThinking: reasoning,
-            isIncomplete: false,
-            hasUnseenUpdate: true,
-          );
-        },
-        failed: (error) {
-          repository.updateRound(
-            roundId: roundId,
-            assistantContent: '[错误]\n$error',
-            assistantThinking: '',
-            isIncomplete: false,
-            hasUnseenUpdate: true,
-          );
-        },
-      );
-    }
-
-    return runTask().asyncMap((event) {
-      handleEvent(event);
-    });
-  }
-);
-```
-
 ## File: lib/presentation/providers/input_notifier.dart
 ```dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10308,113 +10228,6 @@ abstract class _TreePath implements TreePath {
 }
 ```
 
-## File: lib/domain/services/chat_context_builder.dart
-```dart
-import 'dart:convert';
-import 'package:aiservice/core/models/attachment.dart';
-import 'package:aiservice/domain/services/character_card_parser.dart';
-
-import '../../core/models/api_message.dart';
-import '../../core/models/chat_round.dart';
-import '../../data/repositories/conversation_repository.dart';
-
-Future<List<ApiMessage>> buildApiContextFromRounds(
-  List<ChatRound> rounds,
-  ConversationRepository repository,
-  CharacterData? character,
-) async {
-  final result = <ApiMessage>[];
-
-  if (character != null) {
-    final systemPrompt = character.buildSystemPrompt();
-    result.add(ApiMessage(
-      role: 'system',
-      content: systemPrompt,
-    ));
-  }
-
-  for (final round in rounds) {
-    final userMessage = await _buildUserMessage(round, repository);
-    result.add(userMessage);
-
-    final assistantMessage = _buildAssistantMessage(round);
-    if (assistantMessage != null) {
-      result.add(assistantMessage);
-    }
-  }
-
-  return result;
-}
-
-ApiMessage? _buildAssistantMessage(ChatRound round) {
-  final thinking = round.assistantThinking?.trim() ?? '';
-  final content = round.assistantContent?.trim() ?? '';
-
-  if (thinking.isEmpty && content.isEmpty) return null;
-
-  return ApiMessage(
-    role: 'assistant',
-    content: content.isEmpty ? null : content,
-    reasoning: thinking.isEmpty ? null : thinking,
-  );
-}
-
-Future<ApiMessage> _buildUserMessage(
-  ChatRound round,
-  ConversationRepository repository,
-) async {
-  final parts = <ApiMessageContentPart>[];
-
-  if (round.userContent.trim().isNotEmpty) {
-    parts.add(ApiMessageContentPart.text(text: round.userContent.trim()));
-  }
-
-  for (final attachment in round.userAttachments) {
-    final attachmentParts = await _buildAttachmentParts(attachment, repository);
-    parts.addAll(attachmentParts);
-  }
-
-  if (parts.isEmpty) {
-    return const ApiMessage(role: 'user', content: '');
-  }
-
-  if (_isOnlySingleTextPart(parts)) {
-    final text = parts.first.maybeWhen(
-      text: (_, text) => text,
-      orElse: () => '',
-    );
-    return ApiMessage(role: 'user', content: text);
-  }
-
-  return ApiMessage(role: 'user', parts: parts);
-}
-
-bool _isOnlySingleTextPart(List<ApiMessageContentPart> parts) {
-  if (parts.length != 1) return false;
-  return parts.first.maybeWhen(
-    text: (_, text) => true,
-    orElse: () => false,
-  );
-}
-
-Future<List<ApiMessageContentPart>> _buildAttachmentParts(
-  Attachment attachment,
-  ConversationRepository repository,
-) async {
-  if (attachment.isImage) {
-    final bytes = await repository.getAttachment(attachment.relativePath);
-    final mimeType = attachment.mimeType;
-    final base64Data = base64Encode(bytes);
-    return [ApiMessageContentPart.imageUrl(imageUrl: ApiImageUrl(url: 'data:$mimeType;base64,$base64Data'))];
-  } else {
-    // 上层保证非图片一定是可读文本文件
-    final bytes = await repository.getAttachment(attachment.relativePath);
-    final text = utf8.decode(bytes, allowMalformed: true);
-    return [ApiMessageContentPart.text(text: text)];
-  }
-}
-```
-
 ## File: lib/presentation/providers/attachment_bytes_provider.dart
 ```dart
 // presentation/providers/attachment_bytes_provider.dart
@@ -10430,6 +10243,86 @@ final attachmentBytesProvider =
     final repository = ref.read(conversationRepositoryProvider);
     return repository.getAttachment(relativePath);
   },
+);
+```
+
+## File: lib/presentation/providers/chat_generation_provider.dart
+```dart
+import 'package:aiservice/presentation/providers/character_provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/models/generation_event.dart';
+import '../../di/providers.dart';
+import '../../domain/services/chat_context_builder.dart';
+import '../../domain/services/stream_processor.dart';
+
+final chatGenerationProvider =
+  StreamProvider.family<void, String>((ref, roundId) {
+    Stream<GenerationEvent> runTask() async* {
+      final repository = ref.read(conversationRepositoryProvider);     
+      final configService = ref.read(configServiceProvider);
+      final apiSource = ref.read(remoteApiSourceProvider);
+
+      // 1. 构建上下文
+      final contextRounds = await repository.getContextRounds(roundId);
+      final character = ref.read(currentCharacterProvider);
+      final apiContext = await buildApiContextFromRounds(
+        contextRounds,
+        repository,
+        character,   // 传递角色信息
+      );
+
+      // 2. 加载配置
+      final config = await configService.loadConfig();
+
+      // 3. 发起请求
+      final stream = apiSource.chatStream(
+        loadConfig: () async => config,
+        context: apiContext,
+      );
+
+      // 4. 处理流
+      final processor = StreamProcessor();
+      yield* processor.process(stream);
+    }
+
+    void handleEvent(GenerationEvent event) {
+      final repository = ref.read(conversationRepositoryProvider);
+
+      event.when(
+        partial: (content, reasoning) {
+          repository.updateRound(
+            roundId: roundId,
+            assistantContent: content,
+            assistantThinking: reasoning,
+            isIncomplete: true,
+          );
+        },
+        completed: (content, reasoning) {
+          repository.updateRound(
+            roundId: roundId,
+            assistantContent: content,
+            assistantThinking: reasoning,
+            isIncomplete: false,
+            hasUnseenUpdate: true,
+          );
+        },
+        failed: (error) {
+          repository.updateRound(
+            roundId: roundId,
+            assistantContent: '[错误]\n$error',
+            assistantThinking: '',
+            isIncomplete: false,
+            hasUnseenUpdate: true,
+          );
+        },
+      );
+    }
+
+    return runTask().asyncMap((event) {
+      handleEvent(event);
+    });
+  }
 );
 ```
 
@@ -10753,6 +10646,113 @@ final conversationRepositoryProvider = Provider<ConversationRepository>((ref) {
 });
 ```
 
+## File: lib/domain/services/chat_context_builder.dart
+```dart
+import 'dart:convert';
+import 'package:aiservice/core/models/attachment.dart';
+import 'package:aiservice/domain/services/character_card_parser.dart';
+
+import '../../core/models/api_message.dart';
+import '../../core/models/chat_round.dart';
+import '../../data/repositories/conversation_repository.dart';
+
+Future<List<ApiMessage>> buildApiContextFromRounds(
+  List<ChatRound> rounds,
+  ConversationRepository repository,
+  CharacterData? character,
+) async {
+  final result = <ApiMessage>[];
+
+  if (character != null) {
+    final systemPrompt = character.buildSystemPrompt();
+    result.add(ApiMessage(
+      role: 'system',
+      content: systemPrompt,
+    ));
+  }
+
+  for (final round in rounds) {
+    final userMessage = await _buildUserMessage(round, repository);
+    result.add(userMessage);
+
+    final assistantMessage = _buildAssistantMessage(round);
+    if (assistantMessage != null) {
+      result.add(assistantMessage);
+    }
+  }
+
+  return result;
+}
+
+ApiMessage? _buildAssistantMessage(ChatRound round) {
+  final thinking = round.assistantThinking?.trim() ?? '';
+  final content = round.assistantContent?.trim() ?? '';
+
+  if (thinking.isEmpty && content.isEmpty) return null;
+
+  return ApiMessage(
+    role: 'assistant',
+    content: content.isEmpty ? null : content,
+    reasoning: thinking.isEmpty ? null : thinking,
+  );
+}
+
+Future<ApiMessage> _buildUserMessage(
+  ChatRound round,
+  ConversationRepository repository,
+) async {
+  final parts = <ApiMessageContentPart>[];
+
+  if (round.userContent.trim().isNotEmpty) {
+    parts.add(ApiMessageContentPart.text(text: round.userContent.trim()));
+  }
+
+  for (final attachment in round.userAttachments) {
+    final attachmentParts = await _buildAttachmentParts(attachment, repository);
+    parts.addAll(attachmentParts);
+  }
+
+  if (parts.isEmpty) {
+    return const ApiMessage(role: 'user', content: '');
+  }
+
+  if (_isOnlySingleTextPart(parts)) {
+    final text = parts.first.maybeWhen(
+      text: (_, text) => text,
+      orElse: () => '',
+    );
+    return ApiMessage(role: 'user', content: text);
+  }
+
+  return ApiMessage(role: 'user', parts: parts);
+}
+
+bool _isOnlySingleTextPart(List<ApiMessageContentPart> parts) {
+  if (parts.length != 1) return false;
+  return parts.first.maybeWhen(
+    text: (_, text) => true,
+    orElse: () => false,
+  );
+}
+
+Future<List<ApiMessageContentPart>> _buildAttachmentParts(
+  Attachment attachment,
+  ConversationRepository repository,
+) async {
+  if (attachment.isImage) {
+    final bytes = await repository.getAttachment(attachment.relativePath);
+    final mimeType = attachment.mimeType;
+    final base64Data = base64Encode(bytes);
+    return [ApiMessageContentPart.imageUrl(imageUrl: ApiImageUrl(url: 'data:$mimeType;base64,$base64Data'))];
+  } else {
+    // 上层保证非图片一定是可读文本文件
+    final bytes = await repository.getAttachment(attachment.relativePath);
+    final text = utf8.decode(bytes, allowMalformed: true);
+    return [ApiMessageContentPart.text(text: text)];
+  }
+}
+```
+
 ## File: lib/domain/services/tree_builder.dart
 ```dart
 import '../models/tree_node.dart';
@@ -10884,6 +10884,198 @@ import 'package:flutter/cupertino.dart';
 class AppTheme {
   static CupertinoThemeData get cupertinoTheme {
     return const CupertinoThemeData();
+  }
+}
+```
+
+## File: lib/presentation/widgets/common/app_page_scaffold.dart
+```dart
+import 'package:flutter/cupertino.dart';
+
+class AppPageScaffold extends StatelessWidget {
+  final ObstructingPreferredSizeWidget? navigationBar;
+  final Widget body;
+  final Widget? bottomNavigationBar;
+  final Color? backgroundColor;
+  final bool useSafeArea;
+
+  const AppPageScaffold({
+    super.key,
+    this.navigationBar,
+    required this.body,
+    this.bottomNavigationBar,
+    this.backgroundColor,
+    this.useSafeArea = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final content = useSafeArea ? SafeArea(child: body) : body;
+
+    return CupertinoPageScaffold(
+      backgroundColor: backgroundColor,
+      navigationBar: navigationBar,
+
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        
+        child: Column(
+          children: [
+            Expanded(child: content),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+
+## File: lib/presentation/widgets/thought_bubble.dart
+```dart
+import 'package:flutter/cupertino.dart';
+
+class ThoughtBubble extends StatefulWidget {
+  final String content;
+
+  const ThoughtBubble({
+    super.key,
+    required this.content,
+  });
+
+  @override
+  State<ThoughtBubble> createState() => _ThoughtBubbleState();
+}
+
+class _ThoughtBubbleState extends State<ThoughtBubble> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = widget.content.trim();
+    if (text.isEmpty) return const SizedBox.shrink();
+
+    final textTheme = CupertinoTheme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemBackground,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            onPressed: () => setState(() => _isExpanded = !_isExpanded),
+            child: Row(
+              children: [
+                Icon(
+                  CupertinoIcons.lightbulb,
+                  size: 16,
+                  color: CupertinoTheme.of(context).primaryColor,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '推理过程',
+                  style: textTheme.textStyle.copyWith(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: CupertinoTheme.of(context).primaryColor,
+                  ),
+                ),
+                const Spacer(),
+                Icon(
+                  _isExpanded ? CupertinoIcons.chevron_up : CupertinoIcons.chevron_down,
+                  size: 18,
+                  color: CupertinoColors.systemGrey,
+                ),
+              ],
+            ),
+          ),
+          if (_isExpanded)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: Text(
+                text,
+                style: textTheme.textStyle.copyWith(
+                  fontSize: 13,
+                  height: 1.5,
+                  color: CupertinoColors.label,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+```
+
+## File: lib/data/data_sources/local_file_source.dart
+```dart
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:crypto/crypto.dart';
+import 'package:path/path.dart' as path;
+import '../../core/constants/app_constants.dart';
+
+class LocalFileSource{
+  final String _baseDir;
+  final Directory _directory;
+
+  LocalFileSource(this._baseDir) : _directory = Directory(_baseDir);
+
+  Future<String> get basePath async => _baseDir;
+
+  Future<void> initDirectories() async {
+    await _directory.create(recursive: true);
+    await Directory(path.join(_baseDir, AppConstants.dirAttachments))
+      .create(recursive: true);
+  }
+
+  Future<void> deleteAttachment(String relativePath) async {
+    try {
+      final file = File(path.join(_baseDir, relativePath));
+      if (await file.exists()) {
+        await file.delete();
+       }
+    } on FileSystemException catch (e) {
+      throw Exception('删除文件失败：${e.message}');
+    }
+  }
+
+  Future<String> saveAttachment(Uint8List data, String fileName) async {
+    try {
+      final ext = path.extension(fileName).toLowerCase();
+      final hash = sha256.convert(data).toString();
+       final hashedFileName = '$hash$ext';
+      final relativePath = '${AppConstants.dirAttachments}/$hashedFileName';
+      final filePath = path.join(_baseDir, relativePath);
+       final file = File(filePath);
+
+      if (!await file.exists()) {
+        await file.writeAsBytes(data, flush: true);
+      }
+
+      return relativePath;
+    } on FileSystemException catch (e) {
+      throw Exception('保存附件失败：${e.message}');
+    }
+  }
+
+  Future<Uint8List> readAttachment(String relativePath) async {
+    try {
+      final file = File(path.join(_baseDir, relativePath));
+      if (!await file.exists()) {
+        throw Exception('附件不存在');
+      }
+      return await file.readAsBytes();
+    } on FileSystemException catch (e) {
+      throw Exception('读取附件失败：${e.message}');
+    }
   }
 }
 ```
@@ -11027,7 +11219,8 @@ class _ImageAttachmentThumb extends ConsumerWidget {
         return GestureDetector(
           onTap: () => _AttachmentActionHelper.previewImage(context, bytes),
           onLongPress: () => _AttachmentActionHelper.shareAttachmentFromBytes(attachment, bytes),
-          child: ClipRect(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
             child: SizedBox(
               width: 108,
               height: 108,
@@ -11060,11 +11253,14 @@ class _FileAttachmentChip extends ConsumerWidget {
     return bytesAsync.when(
       loading: () => Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        color: CupertinoColors.systemGrey5,
+        decoration: BoxDecoration(
+          color: CupertinoColors.systemGrey5,
+          borderRadius: BorderRadius.circular(12),
+        ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(leadingIcon, size: 18),
+            Icon(leadingIcon, size: 16),
             const SizedBox(width: 6),
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 180),
@@ -11078,11 +11274,14 @@ class _FileAttachmentChip extends ConsumerWidget {
       ),
       error: (e, st) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        color: CupertinoColors.systemGrey5,
+        decoration: BoxDecoration(
+          color: CupertinoColors.systemGrey5,
+          borderRadius: BorderRadius.circular(12),
+        ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(CupertinoIcons.exclamationmark_triangle, size: 18),
+            const Icon(CupertinoIcons.exclamationmark_triangle, size: 16),
             const SizedBox(width: 6),
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 180),
@@ -11110,11 +11309,14 @@ class _FileAttachmentChip extends ConsumerWidget {
           onLongPress: () => _AttachmentActionHelper.shareAttachmentFromBytes(attachment, bytes),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            color: CupertinoColors.systemGrey5,
+            decoration: BoxDecoration(
+              color: CupertinoColors.systemGrey5,
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(leadingIcon, size: 18),
+                Icon(leadingIcon, size: 16),
                 const SizedBox(width: 6),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 180),
@@ -11129,187 +11331,6 @@ class _FileAttachmentChip extends ConsumerWidget {
         );
       },
     );
-  }
-}
-```
-
-## File: lib/presentation/widgets/common/app_page_scaffold.dart
-```dart
-import 'package:flutter/cupertino.dart';
-
-class AppPageScaffold extends StatelessWidget {
-  final ObstructingPreferredSizeWidget? navigationBar;
-  final Widget body;
-  final Widget? bottomNavigationBar;
-  final Color? backgroundColor;
-  final bool useSafeArea;
-
-  const AppPageScaffold({
-    super.key,
-    this.navigationBar,
-    required this.body,
-    this.bottomNavigationBar,
-    this.backgroundColor,
-    this.useSafeArea = true,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final content = useSafeArea ? SafeArea(child: body) : body;
-
-    return CupertinoPageScaffold(
-      backgroundColor: backgroundColor,
-      navigationBar: navigationBar,
-
-      child: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-        
-        child: Column(
-          children: [
-            Expanded(child: content),
-          ],
-        ),
-      ),
-    );
-  }
-}
-```
-
-## File: lib/presentation/widgets/thought_bubble.dart
-```dart
-import 'package:flutter/cupertino.dart';
-
-class ThoughtBubble extends StatefulWidget {
-  final String content;
-
-  const ThoughtBubble({
-    super.key,
-    required this.content,
-  });
-
-  @override
-  State<ThoughtBubble> createState() => _ThoughtBubbleState();
-}
-
-class _ThoughtBubbleState extends State<ThoughtBubble> {
-  bool _isExpanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = widget.content.trim();
-    if (text.isEmpty) return const SizedBox.shrink();
-
-    final textTheme = CupertinoTheme.of(context).textTheme;
-
-    return CupertinoFormSection.insetGrouped(
-      children: [
-        CupertinoButton(
-          padding: const EdgeInsets.all(12),
-          onPressed: () => setState(() => _isExpanded = !_isExpanded),
-          child: Row(
-            children: [
-              Icon(
-                CupertinoIcons.lightbulb,
-                size: 16,
-                color: CupertinoTheme.of(context).primaryColor,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '推理过程',
-                style: textTheme.textStyle.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: CupertinoTheme.of(context).primaryColor,
-                ),
-              ),
-              const Spacer(),
-              Icon(
-                _isExpanded ? CupertinoIcons.chevron_up : CupertinoIcons.chevron_down,
-                size: 18,
-                color: CupertinoColors.systemGrey,
-              ),
-            ],
-          ),
-        ),
-        if (_isExpanded)
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Text(
-              text,
-              style: textTheme.textStyle.copyWith(
-                fontSize: 13,
-                height: 1.65,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-```
-
-## File: lib/data/data_sources/local_file_source.dart
-```dart
-import 'dart:io';
-import 'dart:typed_data';
-import 'package:crypto/crypto.dart';
-import 'package:path/path.dart' as path;
-import '../../core/constants/app_constants.dart';
-
-class LocalFileSource{
-  final String _baseDir;
-  final Directory _directory;
-
-  LocalFileSource(this._baseDir) : _directory = Directory(_baseDir);
-
-  Future<String> get basePath async => _baseDir;
-
-  Future<void> initDirectories() async {
-    await _directory.create(recursive: true);
-    await Directory(path.join(_baseDir, AppConstants.dirAttachments))
-      .create(recursive: true);
-  }
-
-  Future<void> deleteAttachment(String relativePath) async {
-    try {
-      final file = File(path.join(_baseDir, relativePath));
-      if (await file.exists()) {
-        await file.delete();
-       }
-    } on FileSystemException catch (e) {
-      throw Exception('删除文件失败：${e.message}');
-    }
-  }
-
-  Future<String> saveAttachment(Uint8List data, String fileName) async {
-    try {
-      final ext = path.extension(fileName).toLowerCase();
-      final hash = sha256.convert(data).toString();
-       final hashedFileName = '$hash$ext';
-      final relativePath = '${AppConstants.dirAttachments}/$hashedFileName';
-      final filePath = path.join(_baseDir, relativePath);
-       final file = File(filePath);
-
-      if (!await file.exists()) {
-        await file.writeAsBytes(data, flush: true);
-      }
-
-      return relativePath;
-    } on FileSystemException catch (e) {
-      throw Exception('保存附件失败：${e.message}');
-    }
-  }
-
-  Future<Uint8List> readAttachment(String relativePath) async {
-    try {
-      final file = File(path.join(_baseDir, relativePath));
-      if (!await file.exists()) {
-        throw Exception('附件不存在');
-      }
-      return await file.readAsBytes();
-    } on FileSystemException catch (e) {
-      throw Exception('读取附件失败：${e.message}');
-    }
   }
 }
 ```
@@ -11353,54 +11374,62 @@ class MessageBubble extends StatelessWidget {
     this.onEdit,
   });
 
-  @override
-  Widget build(BuildContext context) {    
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.88,
+  void _showActionSheet(BuildContext context) {
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (context) => CupertinoActionSheet(
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(context);
+              onCopy?.call();
+            },
+            child: const Text('复制'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(context);
+              onRetryReply?.call();
+            },
+            child: const Text('重试回复'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
         ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bubbleColor = isUser
+        ? CupertinoColors.systemBlue
+        : CupertinoColors.systemBackground; // AI 消息白色背景
+
+    final textColor = isUser
+        ? CupertinoColors.white
+        : CupertinoColors.label;
+
+    return GestureDetector(
+      onLongPress: () => _showActionSheet(context),
+      child: Container(
+        width: isUser ? null : double.infinity,
         margin: const EdgeInsets.symmetric(vertical: 4),
-        child: Column(
-          crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              color: isUser ? CupertinoColors.systemBlue : CupertinoColors.systemBackground,
-              child: MarkdownBody(
-                  data: content,
-                  selectable: true,
-                  styleSheet: MarkdownStyleSheet.fromCupertinoTheme(CupertinoTheme.of(context)),
-                ),
-            ),
-            if (onCopy != null || onRetryReply != null || onEdit != null) ...[
-              const SizedBox(height: 6),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (onCopy != null)
-                    CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: onCopy,
-                      child: const Icon(CupertinoIcons.doc_on_doc),
-                    ),
-                  if (onEdit != null)
-                    CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: onEdit,
-                      child: const Icon(CupertinoIcons.pencil),
-                    ),
-                  if (onRetryReply != null)
-                    CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: onRetryReply,
-                      child: const Icon(CupertinoIcons.arrow_2_circlepath),
-                    ),
-                ],
-              ),
-            ],
-          ],
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: bubbleColor,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: MarkdownBody(
+          data: content,
+          selectable: true,
+          styleSheet: MarkdownStyleSheet.fromCupertinoTheme(
+            CupertinoTheme.of(context),
+          ).copyWith(
+            p: TextStyle(color: textColor),
+          ),
         ),
       ),
     );
@@ -12033,7 +12062,7 @@ class _InputBarState extends ConsumerState<InputBar> {
     if (lower.endsWith('.gif')) return 'image/gif';
     if (lower.endsWith('.webp')) return 'image/webp';
     if (lower.endsWith('.bmp')) return 'image/bmp';
-    return 'image/png'; // 默认
+    return 'image/png';
   }
 
   String _mimeForText(String fileName) {
@@ -12078,7 +12107,6 @@ class _InputBarState extends ConsumerState<InputBar> {
     );
     if (file == null) return;
 
-    // 优先使用 XFile 提供的 mimeType，否则根据文件名后缀猜测
     final mimeType = file.mimeType ?? _mimeForImage(file.name);
 
     _addPendingAttachment(
@@ -12107,9 +12135,7 @@ class _InputBarState extends ConsumerState<InputBar> {
     }
     try {
       final character = await CharacterCardParser.parseFile(bytes, file.name);
-      // 将角色保存到全局 provider
       ref.read(currentCharacterProvider.notifier).state = character;
-      // 重置开场白发送标记
       ref.read(characterGreetingSentProvider.notifier).state = false;
       await AppToast.show('已导入角色：${character.name}');
     } catch (e) {
@@ -12194,7 +12220,7 @@ class _InputBarState extends ConsumerState<InputBar> {
       top: false,
       child: Container(
         color: CupertinoColors.systemBackground,
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -12209,6 +12235,8 @@ class _InputBarState extends ConsumerState<InputBar> {
                     children: attachments.map((attachment) {
                       return CupertinoButton(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        borderRadius: BorderRadius.circular(8),
+                        color: CupertinoColors.systemGrey5,
                         onPressed: () {},
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -12217,7 +12245,7 @@ class _InputBarState extends ConsumerState<InputBar> {
                               attachment.isImage
                                   ? CupertinoIcons.photo
                                   : CupertinoIcons.doc,
-                              size: 18,
+                              size: 16,
                             ),
                             const SizedBox(width: 6),
                             ConstrainedBox(
@@ -12230,7 +12258,7 @@ class _InputBarState extends ConsumerState<InputBar> {
                             const SizedBox(width: 6),
                             GestureDetector(
                               onTap: () => _removeAttachment(attachment.id),
-                              child: const Icon(CupertinoIcons.xmark_circle_fill, size: 18),
+                              child: const Icon(CupertinoIcons.xmark_circle_fill, size: 16),
                             ),
                           ],
                         ),
@@ -12249,27 +12277,41 @@ class _InputBarState extends ConsumerState<InputBar> {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: CupertinoTextField(
-                    controller: _controller,
-                    minLines: 1,
-                    maxLines: 6,
-                    keyboardType: TextInputType.multiline,
-                    placeholder: widget.hintText,
-                    onChanged: (value) {
-                      ref.read(inputStateProvider.notifier).updateText(value);
-                    },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: CupertinoColors.systemGrey6,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: CupertinoTextField(
+                      controller: _controller,
+                      minLines: 1,
+                      maxLines: 6,
+                      keyboardType: TextInputType.multiline,
+                      placeholder: widget.hintText,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      onChanged: (value) {
+                        ref.read(inputStateProvider.notifier).updateText(value);
+                      },
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 if (showStopButton)
                   CupertinoButton.filled(
+                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                    borderRadius: BorderRadius.circular(8),
                     onPressed: widget.onStop,
-                    child: const Icon(CupertinoIcons.stop_fill),
+                    child: const Icon(CupertinoIcons.stop_fill, size: 20),
                   )
                 else
                   CupertinoButton.filled(
+                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                    borderRadius: BorderRadius.circular(8),
                     onPressed: canSend ? _handleSend : null,
-                    child: const Icon(CupertinoIcons.arrow_up),
+                    child: const Icon(CupertinoIcons.arrow_up, size: 20),
                   ),
               ],
             ),
@@ -12345,6 +12387,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final activeProfile = store.profiles.firstWhere((p) => p.id == store.activeProfileId);
     return CupertinoFormSection.insetGrouped(
       header: const Text('配置存档'),
+      margin: const EdgeInsets.only(top: 16, left: 16, right: 16, bottom: 16),
       children: [
         CupertinoFormRow(
           prefix: const Text('当前配置'),
@@ -12361,10 +12404,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget _buildConnectionSection(SettingsFormState formState, SettingsFormNotifier notifier) {
     return CupertinoFormSection.insetGrouped(
       header: const Text('连接配置'),
+      margin: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
       children: [
         CupertinoFormRow(
           prefix: const Text('Base URL'),
-          child: DeclarativeCupertinoTextField(
+          child: _buildStyledTextField(
             value: formState.config.baseUrl,
             onChanged: notifier.updateBaseUrl,
             placeholder: 'https://api.openai.com',
@@ -12372,7 +12416,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ),
         CupertinoFormRow(
           prefix: const Text('API Key'),
-          child: DeclarativeCupertinoTextField(
+          child: _buildStyledTextField(
             value: formState.config.apiKey,
             onChanged: notifier.updateApiKey,
             placeholder: 'API Key',
@@ -12381,14 +12425,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ),
         CupertinoFormRow(
           prefix: const Text('Models Path'),
-          child: DeclarativeCupertinoTextField(
+          child: _buildStyledTextField(
             value: formState.config.modelsPath,
             onChanged: notifier.updateModelsPath,
           ),
         ),
         CupertinoFormRow(
           prefix: const Text('Chat Path'),
-          child: DeclarativeCupertinoTextField(
+          child: _buildStyledTextField(
             value: formState.config.chatPath,
             onChanged: notifier.updateChatPath,
           ),
@@ -12416,13 +12460,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     return CupertinoFormSection.insetGrouped(
       header: const Text('模型设置'),
+      margin: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
       children: [
         CupertinoFormRow(
           prefix: const Text('模型 ID'),
           child: Row(
             children: [
               Expanded(
-                child: DeclarativeCupertinoTextField(
+                child: _buildStyledTextField(
                   value: currentModelId ?? '',
                   onChanged: notifier.updateSelectedModel,
                   placeholder: '输入模型 ID',
@@ -12430,8 +12475,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
               const SizedBox(width: 8),
               CupertinoButton(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                minSize: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                borderRadius: BorderRadius.circular(12),
                 onPressed: models.isNotEmpty
                     ? () => _showModelPicker(context, models, notifier)
                     : null,
@@ -12439,8 +12484,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
               const SizedBox(width: 8),
               CupertinoButton(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                minSize: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                borderRadius: BorderRadius.circular(12),
                 onPressed: () async {
                   try {
                     await notifier.refreshModels();
@@ -12484,9 +12529,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Widget _buildActionSection(SettingsFormState formState, SettingsFormNotifier notifier) {
     return CupertinoFormSection.insetGrouped(
+      margin: const EdgeInsets.only(left: 16, right: 16, bottom: 32),
       children: [
         CupertinoFormRow(
           child: CupertinoButton.filled(
+            borderRadius: BorderRadius.circular(12),
             onPressed: formState.isSaving
                 ? null
                 : () async {
@@ -12514,7 +12561,27 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
-  // ------------------ 弹窗方法（略作简化，保留必要逻辑） ------------------
+  Widget _buildStyledTextField({
+    required String value,
+    required ValueChanged<String> onChanged,
+    String? placeholder,
+    bool obscureText = false,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemGrey6,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: DeclarativeCupertinoTextField(
+        value: value,
+        onChanged: onChanged,
+        placeholder: placeholder,
+        obscureText: obscureText,
+      ),
+    );
+  }
+
+  // ------------------ 弹窗方法 ------------------
   void _showApiModePicker(BuildContext context, SettingsFormNotifier notifier) {
     showCupertinoModalPopup(
       context: context,
@@ -12681,7 +12748,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 onPressed: () => Navigator.of(ctx).pop(true), 
                 isDestructiveAction: true,
                 child: const Text('恢复默认'),
-                ),
+              ),
             ],
           ),
         ) ??
@@ -13080,7 +13147,6 @@ class ConversationRepository {
 ```dart
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:intl/intl.dart';
 import '../../domain/models/session_list_item.dart';
 import '../providers/session_list_notifier.dart';
@@ -13159,8 +13225,8 @@ class HomePage extends ConsumerWidget {
     final sessionsAsync = ref.watch(sessionListProvider);
     final controller = ref.read(sessionListControllerProvider);
 
-
     return AppPageScaffold(
+      backgroundColor: CupertinoColors.systemGroupedBackground,
       navigationBar: CupertinoNavigationBar(
         middle: const Text('AI Chat'),
         trailing: CupertinoButton(
@@ -13179,9 +13245,7 @@ class HomePage extends ConsumerWidget {
         children: [
           Expanded(
             child: sessionsAsync.when(
-              loading: () => const Center(
-                child: CupertinoActivityIndicator(),
-              ),
+              loading: () => const Center(child: CupertinoActivityIndicator()),
               error: (e, st) => _HomeErrorState(
                 message: '加载会话失败：$e',
                 onRetry: () async {
@@ -13312,6 +13376,63 @@ class _HomeErrorState extends StatelessWidget {
   }
 }
 
+class _BlueDot extends StatelessWidget {
+  const _BlueDot();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 8,
+      height: 8,
+      decoration: const BoxDecoration(
+        color: CupertinoColors.systemBlue,
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+}
+
+class _BlinkingDot extends StatefulWidget {
+  const _BlinkingDot();
+
+  @override
+  State<_BlinkingDot> createState() => _BlinkingDotState();
+}
+
+class _BlinkingDotState extends State<_BlinkingDot> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _controller,
+      child: Container(
+        width: 8,
+        height: 8,
+        decoration: const BoxDecoration(
+          color: CupertinoColors.systemOrange,
+          shape: BoxShape.circle,
+        ),
+      ),
+    );
+  }
+}
+
 class _SessionCard extends ConsumerWidget {
   final SessionListItem item;
   final SessionListController controller;
@@ -13326,18 +13447,43 @@ class _SessionCard extends ConsumerWidget {
   });
 
   Widget _buildMetaChip(String label, {IconData? icon}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      color: CupertinoColors.systemGrey5,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 12),
-            const SizedBox(width: 4),
-          ],
-          Text(label, style: const TextStyle(fontSize: 12)),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (icon != null) ...[
+          Icon(icon, size: 12),
+          const SizedBox(width: 4),
         ],
+        Text(label, style: const TextStyle(fontSize: 12)),
+      ],
+    );
+  }
+
+  void _showLongPressMenu(BuildContext context) {
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (ctx) => CupertinoActionSheet(
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(ctx);
+              onRename(item);
+            },
+            child: const Text('重命名'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(ctx);
+              onDelete(item);
+            },
+            isDestructiveAction: true,
+            child: const Text('删除'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('取消'),
+        ),
       ),
     );
   }
@@ -13348,158 +13494,96 @@ class _SessionCard extends ConsumerWidget {
     final updatedAt = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(item.updatedAt));
     final metaAsync = ref.watch(sessionCardMetaProvider(item.id));
 
-    return metaAsync.when(
-      loading: () {
-        return CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: () async {
-            await Navigator.push(
-              context,
-              CupertinoPageRoute(
-                builder: (_) => ChatPage(sessionId: sessionId),
-              ),
-            );
-          },
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            color: CupertinoColors.systemBackground,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: CupertinoTheme.of(context).textTheme.textStyle,
-                ),
-                const SizedBox(height: 8),
-                const Text('加载中...'),
-                const SizedBox(height: 8),
-                _buildMetaChip(updatedAt, icon: CupertinoIcons.clock),
-              ],
-            ),
+    return GestureDetector(
+      onTap: () async {
+        await Navigator.push(
+          context,
+          CupertinoPageRoute(
+            builder: (_) => ChatPage(sessionId: sessionId),
           ),
         );
       },
-      error: (e, st) {
-        return CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: () async {
-            await Navigator.push(
-              context,
-              CupertinoPageRoute(
-                builder: (_) => ChatPage(sessionId: sessionId),
-              ),
-            );
-          },
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            color: CupertinoColors.systemBackground,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
-                const Text('加载摘要失败'),
-                const SizedBox(height: 8),
-                _buildMetaChip(updatedAt, icon: CupertinoIcons.clock),
-              ],
+      onLongPress: () => _showLongPressMenu(context),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: CupertinoColors.systemBackground,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: CupertinoColors.separator.withOpacity(0.2),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
             ),
-          ),
-        );
-      },
-      data: (meta) {
-        return Slidable(
-          key: ValueKey(sessionId),
-          endActionPane: ActionPane(
-            motion: const DrawerMotion(),
-            extentRatio: 0.34,
+          ],
+        ),
+        child: metaAsync.when(
+          loading: () => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SlidableAction(
-                onPressed: (_) => onRename(item),
-                backgroundColor: CupertinoColors.systemBlue,
-                icon: CupertinoIcons.pencil,
+              Text(
+                item.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              SlidableAction(
-                onPressed: (_) => onDelete(item),
-                backgroundColor: CupertinoColors.systemRed,
-                icon: CupertinoIcons.delete,
-              ),
+              const SizedBox(height: 8),
+              const Text('加载中...'),
+              const SizedBox(height: 8),
+              _buildMetaChip(updatedAt, icon: CupertinoIcons.clock),
             ],
           ),
-          child: CupertinoButton(
-            padding: EdgeInsets.zero,
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                CupertinoPageRoute(
-                  builder: (_) => ChatPage(
-                    sessionId: sessionId,
-                    initialRoundId: meta.previewRoundId,
-                  ),
-                ),
-              );
-            },
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              color: CupertinoColors.systemBackground,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          error: (e, st) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 8),
+              const Text('加载摘要失败'),
+              const SizedBox(height: 8),
+              _buildMetaChip(updatedAt, icon: CupertinoIcons.clock),
+            ],
+          ),
+          data: (meta) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          item.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (meta.isStreaming) ...[
-                        const SizedBox(width: 8),
-                        _buildMetaChip('生成中', icon: CupertinoIcons.bolt),
-                      ],
-                      if (meta.hasUnseen) ...[
-                        const SizedBox(width: 8),
-                        _buildMetaChip('未查看', icon: CupertinoIcons.chat_bubble_2),
-                      ],
-                    ],
+                  Expanded(
+                    child: Text(
+                      item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  _PreviewLine(
-                    label: 'YOU',
-                    text: meta.userPreview,
-                  ),
-                  const SizedBox(height: 4),
-                  _PreviewLine(
-                    label: 'AI',
-                    text: meta.aiPreview,
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _buildMetaChip(
-                        '${meta.roundCount} 轮',
-                        icon: CupertinoIcons.chat_bubble,
-                      ),
-                      _buildMetaChip(
-                        updatedAt,
-                        icon: CupertinoIcons.clock,
-                      ),
-                    ],
-                  ),
+                  if (meta.isStreaming) ...[
+                    const SizedBox(width: 8),
+                    const _BlinkingDot(),
+                  ],
+                  if (meta.hasUnseen) ...[
+                    const SizedBox(width: 8),
+                    const _BlueDot(),
+                  ],
                 ],
               ),
-            ),
+              const SizedBox(height: 8),
+              _PreviewLine(
+                label: 'YOU',
+                text: meta.userPreview,
+              ),
+              const SizedBox(height: 4),
+              _PreviewLine(
+                label: 'AI',
+                text: meta.aiPreview,
+              ),
+              const SizedBox(height: 8),
+              _buildMetaChip(updatedAt, icon: CupertinoIcons.clock),
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
@@ -13597,13 +13681,11 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
         postOrder(child);
         total += _nodeWidthCache[child.id]!;
       }
-      // 加上兄弟节点之间的间距
       total += (node.children.length - 1) * _siblingSeparation;
       _nodeWidthCache[node.id] = total;
     }
     postOrder(root);
   }
-  // ==================== 布局算法 ====================
 
   double _subtreeWidth(TreeNode node) {
     return _nodeWidthCache[node.id] ?? _nodeWidth;
@@ -13664,8 +13746,6 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     return _TreeLayout(positions: positions, canvasSize: Size(canvasWidth, canvasHeight));
   }
 
-  // ==================== 连线 ====================
-
   List<(Offset, Offset)> _buildParentChildPairs(List<TreeNode> roots, Map<String, Offset> positions) {
     final pairs = <(Offset, Offset)>[];
     void traverse(TreeNode node) {
@@ -13682,8 +13762,6 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     for (final root in roots) traverse(root);
     return pairs;
   }
-
-  // ==================== 节点构建 ====================
 
   List<Widget> _buildAllNodeWidgets(List<TreeNode> roots, Map<String, Offset> positions) {
     final widgets = <Widget>[];
@@ -13709,8 +13787,6 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     for (final root in roots) addNode(root);
     return widgets;
   }
-
-  // ==================== 删除逻辑 ====================
 
   Future<void> _deleteNode(String nodeId) async {
     final topology = await ref.read(chatTopologyProvider(widget.sessionId).future);
@@ -13769,8 +13845,6 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     return null;
   }
 
-  // ==================== 聚焦 ====================
-
   void _focusOnNode(String nodeId, Map<String, Offset> positions) {
     if (_hasFocused) return;
     final nodePos = positions[nodeId];
@@ -13785,13 +13859,12 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     setState(() {});
   }
 
-  // ==================== 构建 ====================
-
   @override
   Widget build(BuildContext context) {
     final topology = ref.watch(chatTopologyProvider(widget.sessionId));
     return AppPageScaffold(
       navigationBar: CupertinoNavigationBar(middle: const Text('分支树')),
+      backgroundColor: CupertinoColors.systemGroupedBackground,
       body: topology.when(
         loading: () => const Center(child: CupertinoActivityIndicator()),
         error: (err, _) => Center(child: Text('加载分支结构失败：$err')),
@@ -13846,7 +13919,7 @@ class _OrthogonalLinePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = CupertinoColors.separator
-      ..strokeWidth = 1.6
+      ..strokeWidth = 1.2
       ..style = PaintingStyle.stroke;
     for (final pair in pairs) {
       final parentCenter = Offset(pair.$1.dx + _nodeWidth / 2, pair.$1.dy + _nodeHeight / 2);
@@ -13878,6 +13951,30 @@ class _TreeNodeCard extends ConsumerWidget {
     required this.onDelete,
   });
 
+  Widget _buildStatusDot({required bool isStreaming, required bool hasUnseen}) {
+    if (isStreaming) {
+      return Container(
+        width: 8,
+        height: 8,
+        decoration: const BoxDecoration(
+          color: CupertinoColors.systemOrange,
+          shape: BoxShape.circle,
+        ),
+      );
+    }
+    if (hasUnseen) {
+      return Container(
+        width: 8,
+        height: 8,
+        decoration: const BoxDecoration(
+          color: CupertinoColors.systemBlue,
+          shape: BoxShape.circle,
+        ),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final round = ref.watch(roundDetailProvider(roundId)).valueOrNull;
@@ -13894,41 +13991,43 @@ class _TreeNodeCard extends ConsumerWidget {
       height: _nodeHeight,
       decoration: BoxDecoration(
         color: CupertinoColors.systemBackground,
-        border: Border.all(color: CupertinoColors.separator, width: 0.5),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: CupertinoColors.separator.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            dateText ?? '加载中...',
-            style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(fontSize: 12),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  dateText ?? '加载中...',
+                  style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (round != null && (round.isIncomplete || round.hasUnseenUpdate))
+                _buildStatusDot(isStreaming: round.isIncomplete, hasUnseen: round.hasUnseenUpdate),
+            ],
           ),
-          if (round != null && (round.isIncomplete || round.hasUnseenUpdate))
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              children: [
-                if (round.isIncomplete)
-                  const Text('生成中', style: TextStyle(color: CupertinoColors.systemOrange, fontSize: 12)),
-                if (round.hasUnseenUpdate && round.isIncomplete) const SizedBox(width: 8),
-                if (round.hasUnseenUpdate)
-                  const Text('未查看', style: TextStyle(color: CupertinoColors.systemBlue, fontSize: 12)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Expanded(child: _PreviewSlot(label: 'YOU', content: userText, loading: round == null)),
           const SizedBox(height: 4),
           Expanded(child: _PreviewSlot(label: 'AI', content: aiText, loading: round == null)),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
                 child: CupertinoButton.filled(
+                  borderRadius: BorderRadius.circular(12),
                   onPressed: onSwitch,
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: const Text('切换到此分支'),
@@ -13936,6 +14035,7 @@ class _TreeNodeCard extends ConsumerWidget {
               ),
               const SizedBox(width: 8),
               CupertinoButton(
+                borderRadius: BorderRadius.circular(12),
                 onPressed: onDelete,
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 child: const Icon(CupertinoIcons.delete),
@@ -14080,13 +14180,6 @@ class ChatController {
   void stopGeneration(String roundId) {
     ref.invalidate(chatGenerationProvider(roundId));
   }
-
-  Future<void> markRoundSeen(ChatRound round) async {
-    await ref.read(conversationRepositoryProvider).updateRound(
-      roundId: round.id,
-      hasUnseenUpdate: false,
-    );
-  }
 }
 
 final chatControllerProvider =
@@ -14097,7 +14190,7 @@ final chatControllerProvider =
 
 ## File: lib/presentation/pages/chat_page.dart
 ```dart
-import 'package:aiservice/core/models/chat_round.dart';
+import 'package:aiservice/di/providers.dart';
 import 'package:aiservice/domain/services/character_card_parser.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
@@ -14165,7 +14258,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final greetingSent = ref.read(characterGreetingSentProvider);
     
     if (character != null && !greetingSent && character.firstMes.isNotEmpty) {
-      // 标记已发送，防止重复
       ref.read(characterGreetingSentProvider.notifier).state = true;
       
       final controller = ref.read(chatControllerProvider(widget.sessionId));
@@ -14216,6 +14308,23 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
+    final hasUnseen = ref.watch(
+      roundDetailProvider(_currentRoundId ?? '').select(
+        (round) => round.valueOrNull?.hasUnseenUpdate ?? false,
+      ),
+    );
+
+    if (hasUnseen && ModalRoute.of(context)?.isCurrent == true) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ref.read(conversationRepositoryProvider).updateRound(
+                roundId: _currentRoundId!,
+                hasUnseenUpdate: false,
+              );
+        }
+      });
+    }
+
     final sessionTitle = ref.watch(sessionTitleProvider(widget.sessionId)).valueOrNull ?? '未加载';
     final currentRoundAsync = ref.watch(roundDetailProvider(_currentRoundId ?? ''));
     final isIncomplete = currentRoundAsync.valueOrNull?.isIncomplete ?? false;
@@ -14224,16 +14333,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       (previous, next) {
         if (previous?.name != next?.name) {
           ref.read(characterGreetingSentProvider.notifier).state = false;
-        }
-      },
-    );
-
-    ref.listen<AsyncValue<ChatRound?>>(
-      roundDetailProvider(_currentRoundId ?? ''),
-      (previous, next) {
-        final round = next.valueOrNull;
-        if (round?.hasUnseenUpdate == true && ModalRoute.of(context)?.isCurrent == true) {
-          ref.read(chatControllerProvider(widget.sessionId)).markRoundSeen(round!);
         }
       },
     );
@@ -14259,6 +14358,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     }
 
     return AppPageScaffold(
+      backgroundColor: CupertinoColors.systemGroupedBackground,
       navigationBar: CupertinoNavigationBar(
         middle: Text(sessionTitle),
         trailing: CupertinoButton(
@@ -14344,23 +14444,19 @@ class _ChatRoundPage extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Container(
-          color: CupertinoColors.systemBackground,
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _UserSection(
-                roundId: roundId,
-                onRetryReply: onRetryReply,
-              ),
-              _ThinkingSection(roundId: roundId),
-              _AiReplySection(
-                roundId: roundId,
-                onRetryReply: onRetryReply,
-              ),
-            ],
-          ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _UserSection(
+              roundId: roundId,
+              onRetryReply: onRetryReply,
+            ),
+            _ThinkingSection(roundId: roundId),
+            _AiReplySection(
+              roundId: roundId,
+              onRetryReply: onRetryReply,
+            ),
+          ],
         ),
       ],
     );
@@ -14394,20 +14490,29 @@ class _UserSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          color: CupertinoColors.systemGrey5,
-          child: Text(DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(round.time))),
+        Center(
+          child: Text(
+            DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(round.time)),
+            style: const TextStyle(fontSize: 12, color: CupertinoColors.systemGrey),
+          ),
         ),
         const SizedBox(height: 12),
-        MessageBubble(
-          content: round.content,
-          isUser: true,
-          onEdit: null,
-          onCopy: () {
-            Clipboard.setData(ClipboardData(text: round.content));
-            AppToast.show('已复制');
-          },
+        Align(
+          alignment: Alignment.centerRight,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.88,
+            ),
+            child: MessageBubble(
+              content: round.content,
+              isUser: true,
+              onCopy: () {
+                Clipboard.setData(ClipboardData(text: round.content));
+                AppToast.show('已复制');
+              },
+              onRetryReply: onRetryReply,
+            ),
+          ),
         ),
         if (round.attach.isNotEmpty) ...[
           const SizedBox(height: 8),
@@ -14431,14 +14536,14 @@ class _ThinkingSection extends ConsumerWidget {
     if (thinking == null || thinking.trim().isEmpty) {
       return const SizedBox.shrink();
     }
-    return Column(
-      children: [
-        Container(
-          height: 0.5,
-          color: CupertinoColors.separator,
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.88,
         ),
-        ThoughtBubble(content: thinking),
-      ],
+        child: ThoughtBubble(content: thinking),
+      ),
     );
   }
 }
@@ -14468,19 +14573,23 @@ class _AiReplySection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          height: 0.5,
-          color: CupertinoColors.separator,
-        ),
         if (ai.content != null)
-          MessageBubble(
-            content: ai.content!,
-            isUser: false,
-            onRetryReply: ai.isIncomplete ? null : onRetryReply,
-            onCopy: () {
-              Clipboard.setData(ClipboardData(text: ai.content!));
-              AppToast.show('已复制');
-            },
+          Align(
+            alignment: Alignment.centerLeft,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.88,
+              ),
+              child: MessageBubble(
+                content: ai.content!,
+                isUser: false,
+                onCopy: () {
+                  Clipboard.setData(ClipboardData(text: ai.content!));
+                  AppToast.show('已复制');
+                },
+                onRetryReply: ai.isIncomplete ? null : onRetryReply,
+              ),
+            ),
           )
         else
           const Padding(
@@ -14504,9 +14613,8 @@ class _PaginationBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final displayPage = currentIndex + 1;
     final pageText = totalPages == 0 ? '0 / 0' : '$displayPage / $totalPages';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      color: CupertinoColors.systemBackground,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Center(
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

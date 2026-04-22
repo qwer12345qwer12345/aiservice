@@ -60,6 +60,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final activeProfile = store.profiles.firstWhere((p) => p.id == store.activeProfileId);
     return CupertinoFormSection.insetGrouped(
       header: const Text('配置存档'),
+      margin: const EdgeInsets.only(top: 16, left: 16, right: 16, bottom: 16),
       children: [
         CupertinoFormRow(
           prefix: const Text('当前配置'),
@@ -76,10 +77,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget _buildConnectionSection(SettingsFormState formState, SettingsFormNotifier notifier) {
     return CupertinoFormSection.insetGrouped(
       header: const Text('连接配置'),
+      margin: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
       children: [
         CupertinoFormRow(
           prefix: const Text('Base URL'),
-          child: DeclarativeCupertinoTextField(
+          child: _buildStyledTextField(
             value: formState.config.baseUrl,
             onChanged: notifier.updateBaseUrl,
             placeholder: 'https://api.openai.com',
@@ -87,7 +89,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ),
         CupertinoFormRow(
           prefix: const Text('API Key'),
-          child: DeclarativeCupertinoTextField(
+          child: _buildStyledTextField(
             value: formState.config.apiKey,
             onChanged: notifier.updateApiKey,
             placeholder: 'API Key',
@@ -96,14 +98,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ),
         CupertinoFormRow(
           prefix: const Text('Models Path'),
-          child: DeclarativeCupertinoTextField(
+          child: _buildStyledTextField(
             value: formState.config.modelsPath,
             onChanged: notifier.updateModelsPath,
           ),
         ),
         CupertinoFormRow(
           prefix: const Text('Chat Path'),
-          child: DeclarativeCupertinoTextField(
+          child: _buildStyledTextField(
             value: formState.config.chatPath,
             onChanged: notifier.updateChatPath,
           ),
@@ -131,13 +133,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     return CupertinoFormSection.insetGrouped(
       header: const Text('模型设置'),
+      margin: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
       children: [
         CupertinoFormRow(
           prefix: const Text('模型 ID'),
           child: Row(
             children: [
               Expanded(
-                child: DeclarativeCupertinoTextField(
+                child: _buildStyledTextField(
                   value: currentModelId ?? '',
                   onChanged: notifier.updateSelectedModel,
                   placeholder: '输入模型 ID',
@@ -145,8 +148,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
               const SizedBox(width: 8),
               CupertinoButton(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                minSize: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                borderRadius: BorderRadius.circular(12),
                 onPressed: models.isNotEmpty
                     ? () => _showModelPicker(context, models, notifier)
                     : null,
@@ -154,8 +157,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
               const SizedBox(width: 8),
               CupertinoButton(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                minSize: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                borderRadius: BorderRadius.circular(12),
                 onPressed: () async {
                   try {
                     await notifier.refreshModels();
@@ -199,9 +202,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Widget _buildActionSection(SettingsFormState formState, SettingsFormNotifier notifier) {
     return CupertinoFormSection.insetGrouped(
+      margin: const EdgeInsets.only(left: 16, right: 16, bottom: 32),
       children: [
         CupertinoFormRow(
           child: CupertinoButton.filled(
+            borderRadius: BorderRadius.circular(12),
             onPressed: formState.isSaving
                 ? null
                 : () async {
@@ -229,7 +234,27 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
-  // ------------------ 弹窗方法（略作简化，保留必要逻辑） ------------------
+  Widget _buildStyledTextField({
+    required String value,
+    required ValueChanged<String> onChanged,
+    String? placeholder,
+    bool obscureText = false,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemGrey6,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: DeclarativeCupertinoTextField(
+        value: value,
+        onChanged: onChanged,
+        placeholder: placeholder,
+        obscureText: obscureText,
+      ),
+    );
+  }
+
+  // ------------------ 弹窗方法 ------------------
   void _showApiModePicker(BuildContext context, SettingsFormNotifier notifier) {
     showCupertinoModalPopup(
       context: context,
@@ -396,7 +421,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 onPressed: () => Navigator.of(ctx).pop(true), 
                 isDestructiveAction: true,
                 child: const Text('恢复默认'),
-                ),
+              ),
             ],
           ),
         ) ??

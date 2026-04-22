@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:aiservice/presentation/widgets/common/app_page_scaffold.dart';
 import 'package:flutter/cupertino.dart';
 
 class ImageAttachmentViewerPage extends StatelessWidget {
@@ -8,20 +9,15 @@ class ImageAttachmentViewerPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('图片预览'),
-        automaticallyImplyLeading: true, // 自动返回按钮
-      ),
-      child: SafeArea(
-        child: InteractiveViewer(
-          minScale: 0.5,
-          maxScale: 4.0,
-          child: Center(
-            child: Image.memory(
-              imageBytes,
-              fit: BoxFit.contain,
-            ),
+    return AppPageScaffold(
+      navigationBar: const CupertinoNavigationBar(middle: Text('图片预览')),      
+      body: InteractiveViewer(
+        minScale: 0.5,
+        maxScale: 4.0,
+        child: Center(
+          child: Image.memory(
+            imageBytes,
+            fit: BoxFit.contain,
           ),
         ),
       ),

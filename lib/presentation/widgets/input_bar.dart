@@ -90,7 +90,7 @@ class _InputBarState extends ConsumerState<InputBar> {
     if (lower.endsWith('.gif')) return 'image/gif';
     if (lower.endsWith('.webp')) return 'image/webp';
     if (lower.endsWith('.bmp')) return 'image/bmp';
-    return 'image/png'; // 默认
+    return 'image/png';
   }
 
   String _mimeForText(String fileName) {
@@ -135,7 +135,6 @@ class _InputBarState extends ConsumerState<InputBar> {
     );
     if (file == null) return;
 
-    // 优先使用 XFile 提供的 mimeType，否则根据文件名后缀猜测
     final mimeType = file.mimeType ?? _mimeForImage(file.name);
 
     _addPendingAttachment(
@@ -164,9 +163,7 @@ class _InputBarState extends ConsumerState<InputBar> {
     }
     try {
       final character = await CharacterCardParser.parseFile(bytes, file.name);
-      // 将角色保存到全局 provider
       ref.read(currentCharacterProvider.notifier).state = character;
-      // 重置开场白发送标记
       ref.read(characterGreetingSentProvider.notifier).state = false;
       await AppToast.show('已导入角色：${character.name}');
     } catch (e) {
@@ -251,7 +248,7 @@ class _InputBarState extends ConsumerState<InputBar> {
       top: false,
       child: Container(
         color: CupertinoColors.systemBackground,
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -266,6 +263,8 @@ class _InputBarState extends ConsumerState<InputBar> {
                     children: attachments.map((attachment) {
                       return CupertinoButton(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        borderRadius: BorderRadius.circular(8),
+                        color: CupertinoColors.systemGrey5,
                         onPressed: () {},
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -274,7 +273,7 @@ class _InputBarState extends ConsumerState<InputBar> {
                               attachment.isImage
                                   ? CupertinoIcons.photo
                                   : CupertinoIcons.doc,
-                              size: 18,
+                              size: 16,
                             ),
                             const SizedBox(width: 6),
                             ConstrainedBox(
@@ -287,7 +286,7 @@ class _InputBarState extends ConsumerState<InputBar> {
                             const SizedBox(width: 6),
                             GestureDetector(
                               onTap: () => _removeAttachment(attachment.id),
-                              child: const Icon(CupertinoIcons.xmark_circle_fill, size: 18),
+                              child: const Icon(CupertinoIcons.xmark_circle_fill, size: 16),
                             ),
                           ],
                         ),
@@ -306,27 +305,41 @@ class _InputBarState extends ConsumerState<InputBar> {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: CupertinoTextField(
-                    controller: _controller,
-                    minLines: 1,
-                    maxLines: 6,
-                    keyboardType: TextInputType.multiline,
-                    placeholder: widget.hintText,
-                    onChanged: (value) {
-                      ref.read(inputStateProvider.notifier).updateText(value);
-                    },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: CupertinoColors.systemGrey6,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: CupertinoTextField(
+                      controller: _controller,
+                      minLines: 1,
+                      maxLines: 6,
+                      keyboardType: TextInputType.multiline,
+                      placeholder: widget.hintText,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      onChanged: (value) {
+                        ref.read(inputStateProvider.notifier).updateText(value);
+                      },
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 if (showStopButton)
                   CupertinoButton.filled(
+                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                    borderRadius: BorderRadius.circular(8),
                     onPressed: widget.onStop,
-                    child: const Icon(CupertinoIcons.stop_fill),
+                    child: const Icon(CupertinoIcons.stop_fill, size: 20),
                   )
                 else
                   CupertinoButton.filled(
+                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                    borderRadius: BorderRadius.circular(8),
                     onPressed: canSend ? _handleSend : null,
-                    child: const Icon(CupertinoIcons.arrow_up),
+                    child: const Icon(CupertinoIcons.arrow_up, size: 20),
                   ),
               ],
             ),

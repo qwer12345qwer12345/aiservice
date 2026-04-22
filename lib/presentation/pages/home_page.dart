@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:intl/intl.dart';
 import '../../domain/models/session_list_item.dart';
 import '../providers/session_list_notifier.dart';
@@ -79,7 +78,6 @@ class HomePage extends ConsumerWidget {
     final sessionsAsync = ref.watch(sessionListProvider);
     final controller = ref.read(sessionListControllerProvider);
 
-
     return AppPageScaffold(
       navigationBar: CupertinoNavigationBar(
         middle: const Text('AI Chat'),
@@ -99,9 +97,7 @@ class HomePage extends ConsumerWidget {
         children: [
           Expanded(
             child: sessionsAsync.when(
-              loading: () => const Center(
-                child: CupertinoActivityIndicator(),
-              ),
+              loading: () => const Center(child: CupertinoActivityIndicator()),
               error: (e, st) => _HomeErrorState(
                 message: '加载会话失败：$e',
                 onRetry: () async {
@@ -232,6 +228,63 @@ class _HomeErrorState extends StatelessWidget {
   }
 }
 
+class _BlueDot extends StatelessWidget {
+  const _BlueDot();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 8,
+      height: 8,
+      decoration: const BoxDecoration(
+        color: CupertinoColors.systemBlue,
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+}
+
+class _BlinkingDot extends StatefulWidget {
+  const _BlinkingDot();
+
+  @override
+  State<_BlinkingDot> createState() => _BlinkingDotState();
+}
+
+class _BlinkingDotState extends State<_BlinkingDot> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _controller,
+      child: Container(
+        width: 8,
+        height: 8,
+        decoration: const BoxDecoration(
+          color: CupertinoColors.systemOrange,
+          shape: BoxShape.circle,
+        ),
+      ),
+    );
+  }
+}
+
 class _SessionCard extends ConsumerWidget {
   final SessionListItem item;
   final SessionListController controller;
@@ -246,18 +299,43 @@ class _SessionCard extends ConsumerWidget {
   });
 
   Widget _buildMetaChip(String label, {IconData? icon}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      color: CupertinoColors.systemGrey5,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 12),
-            const SizedBox(width: 4),
-          ],
-          Text(label, style: const TextStyle(fontSize: 12)),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (icon != null) ...[
+          Icon(icon, size: 12),
+          const SizedBox(width: 4),
         ],
+        Text(label, style: const TextStyle(fontSize: 12)),
+      ],
+    );
+  }
+
+  void _showLongPressMenu(BuildContext context) {
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (ctx) => CupertinoActionSheet(
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(ctx);
+              onRename(item);
+            },
+            child: const Text('重命名'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(ctx);
+              onDelete(item);
+            },
+            isDestructiveAction: true,
+            child: const Text('删除'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('取消'),
+        ),
       ),
     );
   }
@@ -268,158 +346,96 @@ class _SessionCard extends ConsumerWidget {
     final updatedAt = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(item.updatedAt));
     final metaAsync = ref.watch(sessionCardMetaProvider(item.id));
 
-    return metaAsync.when(
-      loading: () {
-        return CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: () async {
-            await Navigator.push(
-              context,
-              CupertinoPageRoute(
-                builder: (_) => ChatPage(sessionId: sessionId),
-              ),
-            );
-          },
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            color: CupertinoColors.systemBackground,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: CupertinoTheme.of(context).textTheme.textStyle,
-                ),
-                const SizedBox(height: 8),
-                const Text('加载中...'),
-                const SizedBox(height: 8),
-                _buildMetaChip(updatedAt, icon: CupertinoIcons.clock),
-              ],
-            ),
+    return GestureDetector(
+      onTap: () async {
+        await Navigator.push(
+          context,
+          CupertinoPageRoute(
+            builder: (_) => ChatPage(sessionId: sessionId),
           ),
         );
       },
-      error: (e, st) {
-        return CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: () async {
-            await Navigator.push(
-              context,
-              CupertinoPageRoute(
-                builder: (_) => ChatPage(sessionId: sessionId),
-              ),
-            );
-          },
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            color: CupertinoColors.systemBackground,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
-                const Text('加载摘要失败'),
-                const SizedBox(height: 8),
-                _buildMetaChip(updatedAt, icon: CupertinoIcons.clock),
-              ],
+      onLongPress: () => _showLongPressMenu(context),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: CupertinoColors.systemBackground,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: CupertinoColors.separator.withOpacity(0.2),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
             ),
-          ),
-        );
-      },
-      data: (meta) {
-        return Slidable(
-          key: ValueKey(sessionId),
-          endActionPane: ActionPane(
-            motion: const DrawerMotion(),
-            extentRatio: 0.34,
+          ],
+        ),
+        child: metaAsync.when(
+          loading: () => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SlidableAction(
-                onPressed: (_) => onRename(item),
-                backgroundColor: CupertinoColors.systemBlue,
-                icon: CupertinoIcons.pencil,
+              Text(
+                item.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              SlidableAction(
-                onPressed: (_) => onDelete(item),
-                backgroundColor: CupertinoColors.systemRed,
-                icon: CupertinoIcons.delete,
-              ),
+              const SizedBox(height: 8),
+              const Text('加载中...'),
+              const SizedBox(height: 8),
+              _buildMetaChip(updatedAt, icon: CupertinoIcons.clock),
             ],
           ),
-          child: CupertinoButton(
-            padding: EdgeInsets.zero,
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                CupertinoPageRoute(
-                  builder: (_) => ChatPage(
-                    sessionId: sessionId,
-                    initialRoundId: meta.previewRoundId,
-                  ),
-                ),
-              );
-            },
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              color: CupertinoColors.systemBackground,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          error: (e, st) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 8),
+              const Text('加载摘要失败'),
+              const SizedBox(height: 8),
+              _buildMetaChip(updatedAt, icon: CupertinoIcons.clock),
+            ],
+          ),
+          data: (meta) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          item.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (meta.isStreaming) ...[
-                        const SizedBox(width: 8),
-                        _buildMetaChip('生成中', icon: CupertinoIcons.bolt),
-                      ],
-                      if (meta.hasUnseen) ...[
-                        const SizedBox(width: 8),
-                        _buildMetaChip('未查看', icon: CupertinoIcons.chat_bubble_2),
-                      ],
-                    ],
+                  Expanded(
+                    child: Text(
+                      item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  _PreviewLine(
-                    label: 'YOU',
-                    text: meta.userPreview,
-                  ),
-                  const SizedBox(height: 4),
-                  _PreviewLine(
-                    label: 'AI',
-                    text: meta.aiPreview,
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _buildMetaChip(
-                        '${meta.roundCount} 轮',
-                        icon: CupertinoIcons.chat_bubble,
-                      ),
-                      _buildMetaChip(
-                        updatedAt,
-                        icon: CupertinoIcons.clock,
-                      ),
-                    ],
-                  ),
+                  if (meta.isStreaming) ...[
+                    const SizedBox(width: 8),
+                    const _BlinkingDot(),
+                  ],
+                  if (meta.hasUnseen) ...[
+                    const SizedBox(width: 8),
+                    const _BlueDot(),
+                  ],
                 ],
               ),
-            ),
+              const SizedBox(height: 8),
+              _PreviewLine(
+                label: 'YOU',
+                text: meta.userPreview,
+              ),
+              const SizedBox(height: 4),
+              _PreviewLine(
+                label: 'AI',
+                text: meta.aiPreview,
+              ),
+              const SizedBox(height: 8),
+              _buildMetaChip(updatedAt, icon: CupertinoIcons.clock),
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
