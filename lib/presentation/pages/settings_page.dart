@@ -162,9 +162,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 onPressed: () async {
                   try {
                     await notifier.refreshModels();
-                    if (mounted) await AppToast.show('模型列表已同步');
+                    if (mounted) AppToast.show('模型列表已同步');
                   } catch (e) {
-                    if (mounted) await AppToast.show('同步模型失败：$e');
+                    if (mounted) AppToast.show('同步模型失败：$e');
                   }
                 },
                 child: formState.isRefreshingModels
@@ -212,9 +212,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 : () async {
                     try {
                       await notifier.save();
-                      if (mounted) await AppToast.show('设置已保存');
+                      if (mounted) AppToast.show('设置已保存');
                     } catch (e) {
-                      if (mounted) await AppToast.show('保存失败：$e');
+                      if (mounted) AppToast.show('保存失败：$e');
                     }
                   },
             child: formState.isSaving
@@ -391,7 +391,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Future<void> _deleteProfile(BuildContext context, ConfigProfile profile, int profileCount, ConfigService configService) async {
     if (profileCount <= 1) {
-      await AppToast.show('至少保留一个配置存档');
+      AppToast.show('至少保留一个配置存档');
       return;
     }
     final confirmed = await showCupertinoDialog<bool>(
@@ -429,7 +429,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (confirmed) {
       notifier.restoreDefaults();
       await notifier.save();
-      if (mounted) await AppToast.show('已恢复默认设置');
+      if (mounted) AppToast.show('已恢复默认设置');
     }
   }
 }

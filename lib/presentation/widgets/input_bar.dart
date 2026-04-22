@@ -113,7 +113,7 @@ class _InputBarState extends ConsumerState<InputBar> {
 
     if (!isImage && !isText) {
       if (mounted) {
-        await AppToast.show('仅支持图片和文本文件（.txt, .md, .json, .dart, .yaml 等）');
+        AppToast.show('仅支持图片和文本文件（.txt, .md, .json, .dart, .yaml 等）');
       }
       return;
     }
@@ -158,16 +158,16 @@ class _InputBarState extends ConsumerState<InputBar> {
     final file = result.files.single;
     final bytes = file.bytes;
     if (bytes == null) {
-      await AppToast.show('无法读取文件');
+      AppToast.show('无法读取文件');
       return;
     }
     try {
       final character = await CharacterCardParser.parseFile(bytes, file.name);
       ref.read(currentCharacterProvider.notifier).state = character;
       ref.read(characterGreetingSentProvider.notifier).state = false;
-      await AppToast.show('已导入角色：${character.name}');
+      AppToast.show('已导入角色：${character.name}');
     } catch (e) {
-      await AppToast.show('导入失败：$e');
+      AppToast.show('导入失败：$e');
     }
   }
 

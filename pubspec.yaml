@@ -71,8 +71,4 @@ dev_dependencies:
 
   crypto: ^3.0.3
 
-  fluttertoast: ^8.2.6
-
   drift_dev: ^2.14.0
-
-  dart_openai: ^6.1.1

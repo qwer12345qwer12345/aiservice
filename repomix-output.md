@@ -62,7 +62,6 @@ lib/core/models/session.dart
 lib/core/models/session.freezed.dart
 lib/core/models/session.g.dart
 lib/core/models/sse_event.dart
-lib/core/utils/app_route_observer.dart
 lib/core/utils/sse_parser.dart
 lib/data/data_sources/api_builders/api_request_builder.dart
 lib/data/data_sources/api_builders/chat_completions_api_builder.dart
@@ -106,10 +105,8 @@ lib/presentation/providers/config_notifier.dart
 lib/presentation/providers/input_notifier.dart
 lib/presentation/providers/session_list_notifier.dart
 lib/presentation/providers/settings_form_notifier.dart
-lib/presentation/themes/app_theme.dart
 lib/presentation/widgets/attachment_list.dart
 lib/presentation/widgets/common/app_page_scaffold.dart
-lib/presentation/widgets/common/app_section.dart
 lib/presentation/widgets/common/app_toast.dart
 lib/presentation/widgets/common/declarative_text_field.dart
 lib/presentation/widgets/input_bar.dart
@@ -3241,14 +3238,6 @@ abstract class FailedGeneration implements GenerationEvent {
   _$$FailedGenerationImplCopyWith<_$FailedGenerationImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }
-```
-
-## File: lib/core/utils/app_route_observer.dart
-```dart
-import 'package:flutter/material.dart';
-
-final RouteObserver<ModalRoute<void>> appRouteObserver =
-    RouteObserver<ModalRoute<void>>();
 ```
 
 ## File: lib/core/utils/sse_parser.dart
@@ -7607,40 +7596,6 @@ class PendingAttachment {
 }
 ```
 
-## File: lib/presentation/pages/image_attachment_viewer_page.dart
-```dart
-import 'dart:typed_data';
-import 'package:flutter/cupertino.dart';
-
-class ImageAttachmentViewerPage extends StatelessWidget {
-  final Uint8List imageBytes;
-
-  const ImageAttachmentViewerPage({super.key, required this.imageBytes});
-
-  @override
-  Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('图片预览'),
-        automaticallyImplyLeading: true, // 自动返回按钮
-      ),
-      child: SafeArea(
-        child: InteractiveViewer(
-          minScale: 0.5,
-          maxScale: 4.0,
-          child: Center(
-            child: Image.memory(
-              imageBytes,
-              fit: BoxFit.contain,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-```
-
 ## File: lib/presentation/providers/character_provider.dart
 ```dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7655,27 +7610,43 @@ final characterGreetingSentProvider = StateProvider<bool>((ref) => false);
 
 ## File: lib/presentation/widgets/common/app_toast.dart
 ```dart
-import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+// lib/presentation/widgets/common/app_toast.dart
+import 'package:flutter/cupertino.dart';
+import '../../../main.dart'; // 全局 navigatorKey
 
 abstract class AppToast {
-  static Future<void> show(
-    String message, {
-    ToastGravity gravity = ToastGravity.CENTER,
-    Toast toastLength = Toast.LENGTH_SHORT,
-    Color backgroundColor = const Color(0xE6111827),
-    Color textColor = Colors.white,
-    double fontSize = 14,
-  }) async {
-    await Fluttertoast.cancel();
-    await Fluttertoast.showToast(
-      msg: message,
-      toastLength: toastLength,
-      gravity: gravity,
-      backgroundColor: backgroundColor,
-      textColor: textColor,
-      fontSize: fontSize,
+  static OverlayEntry? _entry;
+
+  static void show(String message, {Duration duration = const Duration(seconds: 1)}) {
+    _entry?.remove();
+    final overlay = navigatorKey.currentState?.overlay;
+    if (overlay == null) return;
+
+    _entry = OverlayEntry(
+      builder: (context) => Positioned.fill(
+        child: IgnorePointer(
+          child: Center(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                color: const Color(0xE6111827),
+                child: Text(
+                  message,
+                  style: const TextStyle(color: CupertinoColors.white, fontSize: 14),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
+
+    overlay.insert(_entry!);
+    Future.delayed(duration, () {
+      _entry?.remove();
+      if (_entry != null) _entry = null;
+    });
   }
 }
 ```
@@ -9399,6 +9370,36 @@ Future<List<Attachment>> savePendingAttachments(
 }
 ```
 
+## File: lib/presentation/pages/image_attachment_viewer_page.dart
+```dart
+import 'dart:typed_data';
+import 'package:aiservice/presentation/widgets/common/app_page_scaffold.dart';
+import 'package:flutter/cupertino.dart';
+
+class ImageAttachmentViewerPage extends StatelessWidget {
+  final Uint8List imageBytes;
+
+  const ImageAttachmentViewerPage({super.key, required this.imageBytes});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppPageScaffold(
+      navigationBar: const CupertinoNavigationBar(middle: Text('图片预览')),      
+      body: InteractiveViewer(
+        minScale: 0.5,
+        maxScale: 4.0,
+        child: Center(
+          child: Image.memory(
+            imageBytes,
+            fit: BoxFit.contain,
+          ),
+        ),
+      ),
+    );
+  }
+}
+```
+
 ## File: lib/presentation/providers/input_notifier.dart
 ```dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10547,40 +10548,6 @@ final settingsFormProvider = NotifierProvider<SettingsFormNotifier, SettingsForm
 );
 ```
 
-## File: lib/presentation/widgets/common/app_section.dart
-```dart
-import 'package:flutter/cupertino.dart';
-
-class AppSection extends StatelessWidget {
-  final String title;
-  final String? subtitle;
-  final List<Widget> children;
-  final EdgeInsetsGeometry? margin;
-
-  const AppSection({
-    super.key,
-    required this.title,
-    this.subtitle,
-    required this.children,
-    this.margin,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = CupertinoTheme.of(context).textTheme;
-
-    return Container(
-      margin: margin ?? const EdgeInsets.only(bottom: 16),
-      child: CupertinoFormSection.insetGrouped(
-        header: Text(title, style: textTheme.navTitleTextStyle),
-        footer: subtitle != null ? Text(subtitle!, style: textTheme.tabLabelTextStyle) : null,
-        children: children,
-      ),
-    );
-  }
-}
-```
-
 ## File: lib/core/constants/app_constants.dart
 ```dart
 abstract class AppConstants {
@@ -10841,7 +10808,7 @@ class TextAttachmentViewerPage extends StatelessWidget {
 
   Future<void> _copyAll() async {
     await Clipboard.setData(ClipboardData(text: content));
-    await AppToast.show('全文已复制');
+    AppToast.show('全文已复制');
   }
 
   @override
@@ -10877,13 +10844,68 @@ class TextAttachmentViewerPage extends StatelessWidget {
 }
 ```
 
-## File: lib/presentation/themes/app_theme.dart
+## File: lib/data/data_sources/local_file_source.dart
 ```dart
-import 'package:flutter/cupertino.dart';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:crypto/crypto.dart';
+import 'package:path/path.dart' as path;
+import '../../core/constants/app_constants.dart';
 
-class AppTheme {
-  static CupertinoThemeData get cupertinoTheme {
-    return const CupertinoThemeData();
+class LocalFileSource{
+  final String _baseDir;
+  final Directory _directory;
+
+  LocalFileSource(this._baseDir) : _directory = Directory(_baseDir);
+
+  Future<String> get basePath async => _baseDir;
+
+  Future<void> initDirectories() async {
+    await _directory.create(recursive: true);
+    await Directory(path.join(_baseDir, AppConstants.dirAttachments))
+      .create(recursive: true);
+  }
+
+  Future<void> deleteAttachment(String relativePath) async {
+    try {
+      final file = File(path.join(_baseDir, relativePath));
+      if (await file.exists()) {
+        await file.delete();
+       }
+    } on FileSystemException catch (e) {
+      throw Exception('删除文件失败：${e.message}');
+    }
+  }
+
+  Future<String> saveAttachment(Uint8List data, String fileName) async {
+    try {
+      final ext = path.extension(fileName).toLowerCase();
+      final hash = sha256.convert(data).toString();
+       final hashedFileName = '$hash$ext';
+      final relativePath = '${AppConstants.dirAttachments}/$hashedFileName';
+      final filePath = path.join(_baseDir, relativePath);
+       final file = File(filePath);
+
+      if (!await file.exists()) {
+        await file.writeAsBytes(data, flush: true);
+      }
+
+      return relativePath;
+    } on FileSystemException catch (e) {
+      throw Exception('保存附件失败：${e.message}');
+    }
+  }
+
+  Future<Uint8List> readAttachment(String relativePath) async {
+    try {
+      final file = File(path.join(_baseDir, relativePath));
+      if (!await file.exists()) {
+        throw Exception('附件不存在');
+      }
+      return await file.readAsBytes();
+    } on FileSystemException catch (e) {
+      throw Exception('读取附件失败：${e.message}');
+    }
   }
 }
 ```
@@ -10895,36 +10917,26 @@ import 'package:flutter/cupertino.dart';
 class AppPageScaffold extends StatelessWidget {
   final ObstructingPreferredSizeWidget? navigationBar;
   final Widget body;
-  final Widget? bottomNavigationBar;
-  final Color? backgroundColor;
   final bool useSafeArea;
 
   const AppPageScaffold({
     super.key,
     this.navigationBar,
     required this.body,
-    this.bottomNavigationBar,
-    this.backgroundColor,
     this.useSafeArea = true,
   });
 
   @override
   Widget build(BuildContext context) {
-    final content = useSafeArea ? SafeArea(child: body) : body;
-
     return CupertinoPageScaffold(
-      backgroundColor: backgroundColor,
+      backgroundColor: CupertinoColors.systemGroupedBackground,
       navigationBar: navigationBar,
 
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
         
-        child: Column(
-          children: [
-            Expanded(child: content),
-          ],
-        ),
+        child: SafeArea(child: body),
       ),
     );
   }
@@ -11014,70 +11026,22 @@ class _ThoughtBubbleState extends State<ThoughtBubble> {
 }
 ```
 
-## File: lib/data/data_sources/local_file_source.dart
+## File: lib/presentation/providers/config_notifier.dart
 ```dart
-import 'dart:io';
-import 'dart:typed_data';
-import 'package:crypto/crypto.dart';
-import 'package:path/path.dart' as path;
-import '../../core/constants/app_constants.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/app_config.dart';
+import '../../core/models/app_config_store.dart';
+import '../../di/providers.dart';
 
-class LocalFileSource{
-  final String _baseDir;
-  final Directory _directory;
+/// 监听当前激活的配置（响应式）
+final configProvider = StreamProvider<AppConfig>((ref) {
+  return ref.read(configServiceProvider).watchConfig();
+});
 
-  LocalFileSource(this._baseDir) : _directory = Directory(_baseDir);
-
-  Future<String> get basePath async => _baseDir;
-
-  Future<void> initDirectories() async {
-    await _directory.create(recursive: true);
-    await Directory(path.join(_baseDir, AppConstants.dirAttachments))
-      .create(recursive: true);
-  }
-
-  Future<void> deleteAttachment(String relativePath) async {
-    try {
-      final file = File(path.join(_baseDir, relativePath));
-      if (await file.exists()) {
-        await file.delete();
-       }
-    } on FileSystemException catch (e) {
-      throw Exception('删除文件失败：${e.message}');
-    }
-  }
-
-  Future<String> saveAttachment(Uint8List data, String fileName) async {
-    try {
-      final ext = path.extension(fileName).toLowerCase();
-      final hash = sha256.convert(data).toString();
-       final hashedFileName = '$hash$ext';
-      final relativePath = '${AppConstants.dirAttachments}/$hashedFileName';
-      final filePath = path.join(_baseDir, relativePath);
-       final file = File(filePath);
-
-      if (!await file.exists()) {
-        await file.writeAsBytes(data, flush: true);
-      }
-
-      return relativePath;
-    } on FileSystemException catch (e) {
-      throw Exception('保存附件失败：${e.message}');
-    }
-  }
-
-  Future<Uint8List> readAttachment(String relativePath) async {
-    try {
-      final file = File(path.join(_baseDir, relativePath));
-      if (!await file.exists()) {
-        throw Exception('附件不存在');
-      }
-      return await file.readAsBytes();
-    } on FileSystemException catch (e) {
-      throw Exception('读取附件失败：${e.message}');
-    }
-  }
-}
+/// 监听配置存档列表（响应式）
+final configProfilesProvider = StreamProvider<AppConfigStore>((ref) {
+  return ref.read(configServiceProvider).watchConfigStore();
+});
 ```
 
 ## File: lib/presentation/widgets/attachment_list.dart
@@ -11158,7 +11122,7 @@ class _AttachmentActionHelper {
         text: attachment.name,
       );
     } catch (e) {
-      await AppToast.show('共享文件失败：$e');
+      AppToast.show('共享文件失败：$e');
     }
   }
 
@@ -11304,7 +11268,7 @@ class _FileAttachmentChip extends ConsumerWidget {
               );
               return;
             }
-            await AppToast.show('该文件暂不支持直接预览，请长按进行分享');
+            AppToast.show('该文件暂不支持直接预览，请长按进行分享');
           },
           onLongPress: () => _AttachmentActionHelper.shareAttachmentFromBytes(attachment, bytes),
           child: Container(
@@ -11333,24 +11297,6 @@ class _FileAttachmentChip extends ConsumerWidget {
     );
   }
 }
-```
-
-## File: lib/presentation/providers/config_notifier.dart
-```dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/app_config.dart';
-import '../../core/models/app_config_store.dart';
-import '../../di/providers.dart';
-
-/// 监听当前激活的配置（响应式）
-final configProvider = StreamProvider<AppConfig>((ref) {
-  return ref.read(configServiceProvider).watchConfig();
-});
-
-/// 监听配置存档列表（响应式）
-final configProfilesProvider = StreamProvider<AppConfigStore>((ref) {
-  return ref.read(configServiceProvider).watchConfigStore();
-});
 ```
 
 ## File: lib/presentation/widgets/message_bubble.dart
@@ -11441,12 +11387,10 @@ class MessageBubble extends StatelessWidget {
 ```dart
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'core/utils/app_route_observer.dart';
 import 'di/providers.dart'; // 仅导入 providers
 import 'presentation/pages/home_page.dart';
-import 'presentation/themes/app_theme.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -11469,8 +11413,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return CupertinoApp(
       title: 'AI Chat',
-      theme: AppTheme.cupertinoTheme,
-      navigatorObservers: [appRouteObserver],
+      navigatorKey: navigatorKey,
       home: const HomePage(),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
@@ -12085,7 +12028,7 @@ class _InputBarState extends ConsumerState<InputBar> {
 
     if (!isImage && !isText) {
       if (mounted) {
-        await AppToast.show('仅支持图片和文本文件（.txt, .md, .json, .dart, .yaml 等）');
+        AppToast.show('仅支持图片和文本文件（.txt, .md, .json, .dart, .yaml 等）');
       }
       return;
     }
@@ -12130,16 +12073,16 @@ class _InputBarState extends ConsumerState<InputBar> {
     final file = result.files.single;
     final bytes = file.bytes;
     if (bytes == null) {
-      await AppToast.show('无法读取文件');
+      AppToast.show('无法读取文件');
       return;
     }
     try {
       final character = await CharacterCardParser.parseFile(bytes, file.name);
       ref.read(currentCharacterProvider.notifier).state = character;
       ref.read(characterGreetingSentProvider.notifier).state = false;
-      await AppToast.show('已导入角色：${character.name}');
+      AppToast.show('已导入角色：${character.name}');
     } catch (e) {
-      await AppToast.show('导入失败：$e');
+      AppToast.show('导入失败：$e');
     }
   }
 
@@ -12489,9 +12432,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 onPressed: () async {
                   try {
                     await notifier.refreshModels();
-                    if (mounted) await AppToast.show('模型列表已同步');
+                    if (mounted) AppToast.show('模型列表已同步');
                   } catch (e) {
-                    if (mounted) await AppToast.show('同步模型失败：$e');
+                    if (mounted) AppToast.show('同步模型失败：$e');
                   }
                 },
                 child: formState.isRefreshingModels
@@ -12539,9 +12482,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 : () async {
                     try {
                       await notifier.save();
-                      if (mounted) await AppToast.show('设置已保存');
+                      if (mounted) AppToast.show('设置已保存');
                     } catch (e) {
-                      if (mounted) await AppToast.show('保存失败：$e');
+                      if (mounted) AppToast.show('保存失败：$e');
                     }
                   },
             child: formState.isSaving
@@ -12718,7 +12661,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Future<void> _deleteProfile(BuildContext context, ConfigProfile profile, int profileCount, ConfigService configService) async {
     if (profileCount <= 1) {
-      await AppToast.show('至少保留一个配置存档');
+      AppToast.show('至少保留一个配置存档');
       return;
     }
     final confirmed = await showCupertinoDialog<bool>(
@@ -12756,7 +12699,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (confirmed) {
       notifier.restoreDefaults();
       await notifier.save();
-      if (mounted) await AppToast.show('已恢复默认设置');
+      if (mounted) AppToast.show('已恢复默认设置');
     }
   }
 }
@@ -13226,7 +13169,6 @@ class HomePage extends ConsumerWidget {
     final controller = ref.read(sessionListControllerProvider);
 
     return AppPageScaffold(
-      backgroundColor: CupertinoColors.systemGroupedBackground,
       navigationBar: CupertinoNavigationBar(
         middle: const Text('AI Chat'),
         trailing: CupertinoButton(
@@ -13864,7 +13806,6 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
     final topology = ref.watch(chatTopologyProvider(widget.sessionId));
     return AppPageScaffold(
       navigationBar: CupertinoNavigationBar(middle: const Text('分支树')),
-      backgroundColor: CupertinoColors.systemGroupedBackground,
       body: topology.when(
         loading: () => const Center(child: CupertinoActivityIndicator()),
         error: (err, _) => Center(child: Text('加载分支结构失败：$err')),
@@ -14242,6 +14183,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     });
   }
 
+  String _getTitleWithPage(String sessionTitle, List<String> visibleRoundIds, String? currentRoundId) {
+    final total = visibleRoundIds.length;
+    final currentIndex = visibleRoundIds.indexOf(currentRoundId ?? '');
+    if (currentIndex == -1) return sessionTitle;
+    return '$sessionTitle (${currentIndex + 1}/$total)';
+  }
+
   Future<void> _ensureInitialRoundId() async {
     if (_branchLeafId != null) return;
     final topology = await ref.read(chatTopologyProvider(widget.sessionId).future);
@@ -14358,9 +14306,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     }
 
     return AppPageScaffold(
-      backgroundColor: CupertinoColors.systemGroupedBackground,
       navigationBar: CupertinoNavigationBar(
-        middle: Text(sessionTitle),
+        middle: Text(_getTitleWithPage(sessionTitle, visibleRoundIds, _currentRoundId)),
         trailing: CupertinoButton(
           onPressed: () async {
             final selectedId = await Navigator.of(context).push<String>(
@@ -14378,11 +14325,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       ),
       body: Column(
         children: [
-          if (visibleRoundIds.isNotEmpty)
-            _PaginationBar(
-              currentIndex: currentIndex,
-              totalPages: visibleRoundIds.length,
-            ),
           Expanded(
             child: visibleRoundIds.isEmpty
                 ? const Center(child: Text('加载中'))
@@ -14597,40 +14539,6 @@ class _AiReplySection extends ConsumerWidget {
             child: CupertinoActivityIndicator(),
           ),
       ],
-    );
-  }
-}
-
-class _PaginationBar extends StatelessWidget {
-  final int currentIndex, totalPages;
-
-  const _PaginationBar({
-    required this.currentIndex,
-    required this.totalPages,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final displayPage = currentIndex + 1;
-    final pageText = totalPages == 0 ? '0 / 0' : '$displayPage / $totalPages';
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: CupertinoColors.systemGrey5,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            pageText,
-            style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

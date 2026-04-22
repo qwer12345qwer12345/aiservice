@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'di/providers.dart'; // 仅导入 providers
 import 'presentation/pages/home_page.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -26,6 +26,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return CupertinoApp(
       title: 'AI Chat',
+      navigatorKey: navigatorKey,
       home: const HomePage(),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,

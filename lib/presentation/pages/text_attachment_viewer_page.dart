@@ -15,7 +15,7 @@ class TextAttachmentViewerPage extends StatelessWidget {
 
   Future<void> _copyAll() async {
     await Clipboard.setData(ClipboardData(text: content));
-    await AppToast.show('全文已复制');
+    AppToast.show('全文已复制');
   }
 
   @override

@@ -74,7 +74,7 @@ class _AttachmentActionHelper {
         text: attachment.name,
       );
     } catch (e) {
-      await AppToast.show('共享文件失败：$e');
+      AppToast.show('共享文件失败：$e');
     }
   }
 
@@ -220,7 +220,7 @@ class _FileAttachmentChip extends ConsumerWidget {
               );
               return;
             }
-            await AppToast.show('该文件暂不支持直接预览，请长按进行分享');
+            AppToast.show('该文件暂不支持直接预览，请长按进行分享');
           },
           onLongPress: () => _AttachmentActionHelper.shareAttachmentFromBytes(attachment, bytes),
           child: Container(
