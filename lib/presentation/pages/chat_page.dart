@@ -302,7 +302,6 @@ class _UserSection extends ConsumerWidget {
         Center(
           child: Text(
             DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(round.time)),
-            style: const TextStyle(fontSize: 12, color: CupertinoColors.systemGrey),
           ),
         ),
         const SizedBox(height: 12),

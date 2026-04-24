@@ -170,7 +170,7 @@ class _FileAttachmentChip extends ConsumerWidget {
       loading: () => Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: CupertinoColors.systemGrey5,
+          color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey5, context),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -191,7 +191,7 @@ class _FileAttachmentChip extends ConsumerWidget {
       error: (e, st) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: CupertinoColors.systemGrey5,
+          color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey5, context),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -226,7 +226,7 @@ class _FileAttachmentChip extends ConsumerWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: CupertinoColors.systemGrey5,
+              color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey5, context),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(

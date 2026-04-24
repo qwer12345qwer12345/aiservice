@@ -33,10 +33,13 @@ class TextAttachmentViewerPage extends StatelessWidget {
           child: const Icon(CupertinoIcons.doc_on_doc),
         ),
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Container(
-          color: CupertinoColors.systemBackground,
+          decoration: BoxDecoration(
+            color: CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context),
+            borderRadius: BorderRadius.circular(12),
+          ),
           padding: const EdgeInsets.all(16),
           child: Text(
             content,

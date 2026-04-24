@@ -8,7 +8,6 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final container = ProviderContainer();
-  // ✅ 等待核心环境初始化完成（目录创建、依赖图预热）
   await container.read(localFileSourceProvider.future);
 
   runApp(

@@ -26,7 +26,7 @@ class _ThoughtBubbleState extends State<ThoughtBubble> {
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: CupertinoColors.systemBackground,
+        color: CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -40,22 +40,20 @@ class _ThoughtBubbleState extends State<ThoughtBubble> {
                 Icon(
                   CupertinoIcons.lightbulb,
                   size: 16,
-                  color: CupertinoTheme.of(context).primaryColor,
+                  color: CupertinoDynamicColor.resolve(CupertinoColors.systemBlue, context),
                 ),
                 const SizedBox(width: 6),
                 Text(
                   '推理过程',
                   style: textTheme.textStyle.copyWith(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    color: CupertinoTheme.of(context).primaryColor,
+                    color: CupertinoDynamicColor.resolve(CupertinoColors.systemBlue, context),
                   ),
                 ),
                 const Spacer(),
                 Icon(
                   _isExpanded ? CupertinoIcons.chevron_up : CupertinoIcons.chevron_down,
                   size: 18,
-                  color: CupertinoColors.systemGrey,
+                  color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey, context),
                 ),
               ],
             ),
@@ -68,7 +66,7 @@ class _ThoughtBubbleState extends State<ThoughtBubble> {
                 style: textTheme.textStyle.copyWith(
                   fontSize: 13,
                   height: 1.5,
-                  color: CupertinoColors.label,
+                  color: CupertinoDynamicColor.resolve(CupertinoColors.label, context),
                 ),
               ),
             ),

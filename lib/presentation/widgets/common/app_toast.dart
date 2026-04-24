@@ -21,7 +21,7 @@ abstract class AppToast {
                 color: const Color(0xE6111827),
                 child: Text(
                   message,
-                  style: const TextStyle(color: CupertinoColors.white, fontSize: 14),
+                  style: const TextStyle(color: CupertinoColors.white),
                 ),
               ),
             ),

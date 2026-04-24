@@ -166,7 +166,7 @@ class _HomeEmptyState extends StatelessWidget {
               SizedBox(height: 16),
               Text(
                 '开始你的第一段对话',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+                style: TextStyle(fontSize: 20),
               ),
               SizedBox(height: 8),
               Text(
@@ -208,7 +208,7 @@ class _HomeErrorState extends StatelessWidget {
               const SizedBox(height: 12),
               const Text(
                 '出现了一点问题',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                style: TextStyle(fontSize: 18),
               ),
               const SizedBox(height: 8),
               Text(
@@ -311,131 +311,120 @@ class _SessionCard extends ConsumerWidget {
     );
   }
 
-  void _showLongPressMenu(BuildContext context) {
-    showCupertinoModalPopup<void>(
-      context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(ctx);
-              onRename(item);
-            },
-            child: const Text('重命名'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(ctx);
-              onDelete(item);
-            },
-            isDestructiveAction: true,
-            child: const Text('删除'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('取消'),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sessionId = item.id;
-    final updatedAt = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(item.updatedAt));
+    final updatedAt = DateFormat('yyyy-MM-dd HH:mm:ss')
+        .format(DateTime.fromMillisecondsSinceEpoch(item.updatedAt));
     final metaAsync = ref.watch(sessionCardMetaProvider(item.id));
 
-    return GestureDetector(
-      onTap: () async {
-        await Navigator.push(
-          context,
-          CupertinoPageRoute(
-            builder: (_) => ChatPage(sessionId: sessionId),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 获取父级最大宽度，并减去可能的内边距（ListView 默认有 padding 16）
+        final maxWidth = constraints.maxWidth - 32;
+        return CupertinoContextMenu(
+          actions: [
+            CupertinoContextMenuAction(
+              child: const Text('重命名'),
+              onPressed: () => onRename(item),
+            ),
+            CupertinoContextMenuAction(
+              child: const Text('删除'),
+              isDestructiveAction: true,
+              onPressed: () => onDelete(item),
+            ),
+          ],
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            child: GestureDetector(
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  CupertinoPageRoute(
+                    builder: (_) => ChatPage(sessionId: sessionId),
+                  ),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: CupertinoDynamicColor.resolve(
+                    CupertinoColors.systemBackground,
+                    context,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: metaAsync.when(
+                  loading: () => Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 8),
+                      const Text('加载中...'),
+                      const SizedBox(height: 8),
+                      _buildMetaChip(updatedAt, icon: CupertinoIcons.clock),
+                    ],
+                  ),
+                  error: (e, st) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 8),
+                      const Text('加载摘要失败'),
+                      const SizedBox(height: 8),
+                      _buildMetaChip(updatedAt, icon: CupertinoIcons.clock),
+                    ],
+                  ),
+                  data: (meta) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              item.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (meta.isStreaming) ...[
+                            const SizedBox(width: 8),
+                            const _BlinkingDot(),
+                          ],
+                          if (meta.hasUnseen) ...[
+                            const SizedBox(width: 8),
+                            const _BlueDot(),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      _PreviewLine(
+                        label: 'YOU',
+                        text: meta.userPreview,
+                      ),
+                      const SizedBox(height: 4),
+                      _PreviewLine(
+                        label: 'AI',
+                        text: meta.aiPreview,
+                      ),
+                      const SizedBox(height: 8),
+                      _buildMetaChip(updatedAt, icon: CupertinoIcons.clock),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
         );
       },
-      onLongPress: () => _showLongPressMenu(context),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: CupertinoColors.systemBackground,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: CupertinoColors.separator.withOpacity(0.2),
-              blurRadius: 4,
-              offset: const Offset(0, 1),
-            ),
-          ],
-        ),
-        child: metaAsync.when(
-          loading: () => Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                item.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 8),
-              const Text('加载中...'),
-              const SizedBox(height: 8),
-              _buildMetaChip(updatedAt, icon: CupertinoIcons.clock),
-            ],
-          ),
-          error: (e, st) => Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                item.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 8),
-              const Text('加载摘要失败'),
-              const SizedBox(height: 8),
-              _buildMetaChip(updatedAt, icon: CupertinoIcons.clock),
-            ],
-          ),
-          data: (meta) => Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      item.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (meta.isStreaming) ...[
-                    const SizedBox(width: 8),
-                    const _BlinkingDot(),
-                  ],
-                  if (meta.hasUnseen) ...[
-                    const SizedBox(width: 8),
-                    const _BlueDot(),
-                  ],
-                ],
-              ),
-              const SizedBox(height: 8),
-              _PreviewLine(
-                label: 'YOU',
-                text: meta.userPreview,
-              ),
-              const SizedBox(height: 4),
-              _PreviewLine(
-                label: 'AI',
-                text: meta.aiPreview,
-              ),
-              const SizedBox(height: 8),
-              _buildMetaChip(updatedAt, icon: CupertinoIcons.clock),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
@@ -457,9 +446,7 @@ class _PreviewLine extends StatelessWidget {
       children: [
         Text(
           '$label  ',
-          style: textTheme.textStyle.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
+          style: textTheme.textStyle,
         ),
         Expanded(
           child: Text(

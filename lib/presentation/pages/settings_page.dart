@@ -193,7 +193,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             padding: const EdgeInsets.only(top: 8),
             child: Text(
               '同步错误：${formState.modelsRefreshError}',
-              style: const TextStyle(color: CupertinoColors.systemRed, fontSize: 12),
+              style: const TextStyle(color: CupertinoColors.systemRed),
             ),
           ),
       ],
@@ -227,7 +227,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             padding: const EdgeInsets.only(top: 8),
             child: Text(
               formState.error!,
-              style: const TextStyle(color: CupertinoColors.systemRed, fontSize: 12),
+              style: const TextStyle(color: CupertinoColors.systemRed),
             ),
           ),
       ],
@@ -242,7 +242,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: CupertinoColors.systemGrey6,
+        color: CupertinoColors.systemBackground,
         borderRadius: BorderRadius.circular(12),
       ),
       child: DeclarativeCupertinoTextField(

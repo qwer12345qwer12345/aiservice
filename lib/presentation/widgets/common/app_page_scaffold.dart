@@ -15,7 +15,7 @@ class AppPageScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      backgroundColor: CupertinoColors.systemGroupedBackground,
+      backgroundColor: CupertinoDynamicColor.resolve(CupertinoColors.systemGroupedBackground, context),
       navigationBar: navigationBar,
 
       child: GestureDetector(

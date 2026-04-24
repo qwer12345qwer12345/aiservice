@@ -358,63 +358,60 @@ class _TreeNodeCard extends ConsumerWidget {
         ? null
         : ((round.assistantContent ?? '').trim().isEmpty ? '（等待回复）' : round.assistantContent!);
 
-    return Container(
-      width: _nodeWidth,
-      height: _nodeHeight,
-      decoration: BoxDecoration(
-        color: CupertinoColors.systemBackground,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: CupertinoColors.separator.withOpacity(0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  dateText ?? '加载中...',
-                  style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(fontSize: 12),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+    return CupertinoContextMenu(
+      actions: [
+        CupertinoContextMenuAction(
+          onPressed: () {
+            Navigator.pop(context);
+            onDelete();
+          },
+          isDestructiveAction: true,
+          child: const Text('删除节点'),
+        ),
+      ],
+      child: Container(
+        width: _nodeWidth,
+        height: _nodeHeight,
+        decoration: BoxDecoration(
+          color: CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    dateText ?? '加载中...',
+                    style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+                      color: CupertinoDynamicColor.resolve(CupertinoColors.label, context),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
-              if (round != null && (round.isIncomplete || round.hasUnseenUpdate))
-                _buildStatusDot(isStreaming: round.isIncomplete, hasUnseen: round.hasUnseenUpdate),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Expanded(child: _PreviewSlot(label: 'YOU', content: userText, loading: round == null)),
-          const SizedBox(height: 4),
-          Expanded(child: _PreviewSlot(label: 'AI', content: aiText, loading: round == null)),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: CupertinoButton.filled(
-                  borderRadius: BorderRadius.circular(12),
-                  onPressed: onSwitch,
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: const Text('切换到此分支'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              CupertinoButton(
+                if (round != null && (round.isIncomplete || round.hasUnseenUpdate))
+                  _buildStatusDot(isStreaming: round.isIncomplete, hasUnseen: round.hasUnseenUpdate),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Expanded(child: _PreviewSlot(label: 'YOU', content: userText, loading: round == null)),
+            const SizedBox(height: 4),
+            Expanded(child: _PreviewSlot(label: 'AI', content: aiText, loading: round == null)),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: CupertinoButton.filled(
                 borderRadius: BorderRadius.circular(12),
-                onPressed: onDelete,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                child: const Icon(CupertinoIcons.delete),
+                onPressed: onSwitch,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: const Text('切换到此分支'),
               ),
-            ],
-          ),
-        ],
+            )
+          ],
+        ),
       ),
     );
   }
@@ -433,13 +430,14 @@ class _PreviewSlot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = CupertinoTheme.of(context).textTheme.textStyle;
+    final textColor = CupertinoDynamicColor.resolve(CupertinoColors.label, context);
+    final style = CupertinoTheme.of(context).textTheme.textStyle.copyWith(color: textColor);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
           width: 34,
-          child: Text('$label ', style: style.copyWith(fontWeight: FontWeight.w700)),
+          child: Text('$label ', style: style),
         ),
         Expanded(
           child: loading

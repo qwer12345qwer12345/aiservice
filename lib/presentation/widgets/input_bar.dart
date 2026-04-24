@@ -210,14 +210,23 @@ class _InputBarState extends ConsumerState<InputBar> {
     );
   }
 
+  String _sanitizeInput(String input) {
+    var result = input.replaceAll('\uFEFF', '');               // 移除 BOM
+    result = result.replaceAll(RegExp(r'[\u200B\u200C\u200D]'), ''); // 移除零宽字符
+    result = result.replaceAll('\r\n', '\n').replaceAll('\r', '\n');   // 统一换行符
+    return result;
+  }
+
   Future<void> _handleSend() async {
     FocusScope.of(context).unfocus();
 
     final state = ref.read(inputStateProvider);
     if (!state.canSend) return;
 
+    final sanitizedText = _sanitizeInput(state.text);
+
     try {
-      await widget.onSend(state.text, state.attachments);
+      await widget.onSend(sanitizedText, state.attachments);
       ref.read(inputStateProvider.notifier).clear();
     } catch (e) {
       // 发送失败，保持输入内容和附件不变
@@ -247,7 +256,7 @@ class _InputBarState extends ConsumerState<InputBar> {
     return SafeArea(
       top: false,
       child: Container(
-        color: CupertinoColors.systemBackground,
+        color: CupertinoDynamicColor.resolve(CupertinoColors.systemGroupedBackground, context),
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -264,7 +273,7 @@ class _InputBarState extends ConsumerState<InputBar> {
                       return CupertinoButton(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         borderRadius: BorderRadius.circular(8),
-                        color: CupertinoColors.systemGrey5,
+                        color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey5, context),
                         onPressed: () {},
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -307,7 +316,7 @@ class _InputBarState extends ConsumerState<InputBar> {
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(
-                      color: CupertinoColors.systemGrey6,
+                      color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey5, context),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: CupertinoTextField(
