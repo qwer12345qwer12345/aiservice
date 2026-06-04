@@ -85,6 +85,8 @@ lib/domain/models/tree_node.g.dart
 lib/domain/services/attachment_preparer.dart
 lib/domain/services/character_card_parser.dart
 lib/domain/services/chat_context_builder.dart
+lib/domain/services/chat_generation_service.dart
+lib/domain/services/chat_service.dart
 lib/domain/services/stream_processor.dart
 lib/domain/services/tree_builder.dart
 lib/main.dart
@@ -117,6 +119,206 @@ lib/presentation/widgets/thought_bubble.dart
 ```
 
 # Files
+
+## File: lib/domain/services/chat_generation_service.dart
+````dart
+import 'package:aiservice/domain/services/character_card_parser.dart';
+import '../../core/models/generation_event.dart';
+import '../../data/repositories/conversation_repository.dart';
+import '../../data/services/config_service.dart';
+import '../../data/data_sources/remote_api_source.dart';
+import 'chat_context_builder.dart';
+import 'stream_processor.dart';
+
+/// 流式生成服务（纯 Dart，依赖通过参数传递）
+class ChatGenerationService {
+  static Stream<GenerationEvent> generateStream({
+    required ConversationRepository repository,
+    required ConfigService configService,
+    required RemoteApiSource apiSource,
+    required String roundId,
+    CharacterData? character,
+  }) async* {
+    final contextRounds = await repository.getContextRounds(roundId);
+    final apiContext = await buildApiContextFromRounds(
+      contextRounds,
+      repository,
+      character,
+    );
+
+    final config = await configService.loadConfig();
+
+    final chatStream = apiSource.chatStream(
+      loadConfig: () async => config,
+      context: apiContext,
+    );
+
+    final processor = StreamProcessor();
+    yield* processor.process(chatStream);
+  }
+}
+````
+
+## File: lib/domain/services/chat_service.dart
+````dart
+import 'dart:async';
+import 'package:uuid/uuid.dart';
+import '../../core/models/attachment.dart';
+import '../../core/models/chat_round.dart';
+import '../../data/repositories/conversation_repository.dart';
+import '../../data/services/config_service.dart';
+import '../../data/data_sources/remote_api_source.dart';
+import '../../presentation/models/pending_attachment.dart';
+import 'attachment_preparer.dart';
+import 'character_card_parser.dart';
+import 'chat_generation_service.dart';
+
+class ChatService {
+  static final Map<String, StreamSubscription> _activeGenerations = {};
+
+  static Future<String> sendMessage({
+    required ConversationRepository repository,
+    required ConfigService configService,
+    required RemoteApiSource apiSource,
+    required String sessionId,
+    required String content,
+    required String? parentRoundId,
+    required List<PendingAttachment> pendingAttachments,
+    CharacterData? character,
+  }) async {
+    final savedAttachments = await savePendingAttachments(repository, pendingAttachments);
+    final newRoundId = await _createRound(
+      repository: repository,
+      sessionId: sessionId,
+      content: content,
+      parentRoundId: parentRoundId,
+      attachments: savedAttachments,
+    );
+    
+    _startGeneration(
+      repository: repository,
+      configService: configService,
+      apiSource: apiSource,
+      roundId: newRoundId,
+      character: character,
+    );
+    
+    return newRoundId;
+  }
+
+  static Future<String> retryFromRound({
+    required ConversationRepository repository,
+    required ConfigService configService,
+    required RemoteApiSource apiSource,
+    required String sessionId,
+    required ChatRound sourceRound,
+    CharacterData? character,
+  }) async {
+    final newRoundId = await _createRound(
+      repository: repository,
+      sessionId: sessionId,
+      content: sourceRound.userContent,
+      parentRoundId: sourceRound.parentId,
+      attachments: sourceRound.userAttachments,
+    );
+
+    _startGeneration(
+      repository: repository,
+      configService: configService,
+      apiSource: apiSource,
+      roundId: newRoundId,
+      character: character,
+    );
+
+    return newRoundId;
+  }
+
+  static void stopGeneration(String roundId, ConversationRepository repository) {
+    final subscription = _activeGenerations.remove(roundId);
+    if (subscription != null) {
+      subscription.cancel();
+      repository.updateRound(
+        roundId: roundId,
+        isIncomplete: false,
+        hasUnseenUpdate: true,
+      );
+    }
+  }
+
+  static void _startGeneration({
+    required ConversationRepository repository,
+    required ConfigService configService,
+    required RemoteApiSource apiSource,
+    required String roundId,
+    CharacterData? character,
+  }) {
+    final stream = ChatGenerationService.generateStream(
+      repository: repository,
+      configService: configService,
+      apiSource: apiSource,
+      roundId: roundId,
+      character: character,
+    );
+
+    final subscription = stream.listen(
+      (event) {
+        event.when(
+          partial: (content, reasoning) {
+            repository.updateRound(
+              roundId: roundId,
+              assistantContent: content,
+              assistantThinking: reasoning,
+              isIncomplete: true,
+            );
+          },
+          completed: (content, reasoning) {
+            repository.updateRound(
+              roundId: roundId,
+              assistantContent: content,
+              assistantThinking: reasoning,
+              isIncomplete: false,
+              hasUnseenUpdate: true,
+            );
+            _activeGenerations.remove(roundId);
+          },
+          failed: (error) {
+            repository.updateRound(
+              roundId: roundId,
+              assistantContent: '[错误]\n$error',
+              assistantThinking: '',
+              isIncomplete: false,
+              hasUnseenUpdate: true,
+            );
+            _activeGenerations.remove(roundId);
+          },
+        );
+      },
+    );
+
+    _activeGenerations[roundId] = subscription;
+  }
+
+  static Future<String> _createRound({
+    required ConversationRepository repository,
+    required String sessionId,
+    required String content,
+    required String? parentRoundId,
+    required List<Attachment> attachments,
+  }) async {
+    final newRound = ChatRound(
+      id: const Uuid().v4(),
+      parentId: parentRoundId,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+      userContent: content,
+      userAttachments: attachments,
+      isIncomplete: true,
+      hasUnseenUpdate: false,
+    );
+    await repository.appendRound(sessionId, newRound);
+    return newRound.id;
+  }
+}
+````
 
 ## File: lib/core/models/api_message.dart
 ````dart
@@ -7097,6 +7299,29 @@ class $AppDatabaseManager {
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:png_chunks_extract/png_chunks_extract.dart' as pngExtract;
+import 'package:uuid/uuid.dart';
+import '../../core/models/chat_round.dart';
+import '../../data/repositories/conversation_repository.dart';
+
+extension CharacterDataPersistenceX on CharacterData {
+  Future<String> appendGreeting({
+    required ConversationRepository repository,
+    required String sessionId,
+  }) async {
+    final newRound = ChatRound(
+      id: const Uuid().v4(),
+      parentId: null, 
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+      userContent: '',
+      userAttachments: const [],
+      assistantContent: firstMes,
+      isIncomplete: false,
+      hasUnseenUpdate: true,
+    );
+    await repository.appendRound(sessionId, newRound);
+    return newRound.id;
+  }
+}
 
 /// 解析后的角色数据结构（支持 V2/V3）
 class CharacterData {
@@ -10523,80 +10748,59 @@ final attachmentBytesProvider =
 ````dart
 import 'package:aiservice/presentation/providers/character_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../../core/models/generation_event.dart';
 import '../../di/providers.dart';
-import '../../domain/services/chat_context_builder.dart';
-import '../../domain/services/stream_processor.dart';
+import '../../domain/services/chat_generation_service.dart';
 
-final chatGenerationProvider =
-  StreamProvider.family<void, String>((ref, roundId) {
-    Stream<GenerationEvent> runTask() async* {
-      final repository = ref.read(conversationRepositoryProvider);     
-      final configService = ref.read(configServiceProvider);
-      final apiSource = ref.read(remoteApiSourceProvider);
+final chatGenerationProvider = StreamProvider.family<void, String>((ref, roundId) {
+  final repository = ref.read(conversationRepositoryProvider);
+  final configService = ref.read(configServiceProvider);
+  final apiSource = ref.read(remoteApiSourceProvider);
+  final character = ref.read(currentCharacterProvider);
 
-      // 1. 构建上下文
-      final contextRounds = await repository.getContextRounds(roundId);
-      final character = ref.read(currentCharacterProvider);
-      final apiContext = await buildApiContextFromRounds(
-        contextRounds,
-        repository,
-        character,   // 传递角色信息
-      );
+  final eventStream = ChatGenerationService.generateStream(
+    repository: repository,
+    configService: configService,
+    apiSource: apiSource,
+    roundId: roundId,
+    character: character,
+  );
 
-      // 2. 加载配置
-      final config = await configService.loadConfig();
-
-      // 3. 发起请求
-      final stream = apiSource.chatStream(
-        loadConfig: () async => config,
-        context: apiContext,
-      );
-
-      // 4. 处理流
-      final processor = StreamProcessor();
-      yield* processor.process(stream);
-    }
-
-    void handleEvent(GenerationEvent event) {
-      final repository = ref.read(conversationRepositoryProvider);
-
-      event.when(
-        partial: (content, reasoning) {
-          repository.updateRound(
-            roundId: roundId,
-            assistantContent: content,
-            assistantThinking: reasoning,
-            isIncomplete: true,
-          );
-        },
-        completed: (content, reasoning) {
-          repository.updateRound(
-            roundId: roundId,
-            assistantContent: content,
-            assistantThinking: reasoning,
-            isIncomplete: false,
-            hasUnseenUpdate: true,
-          );
-        },
-        failed: (error) {
-          repository.updateRound(
-            roundId: roundId,
-            assistantContent: '[错误]\n$error',
-            assistantThinking: '',
-            isIncomplete: false,
-            hasUnseenUpdate: true,
-          );
-        },
-      );
-    }
-
-    return runTask().asyncMap((event) {
-      handleEvent(event);
-    });
+  void handleEvent(GenerationEvent event) {
+    event.when(
+      partial: (content, reasoning) {
+        repository.updateRound(
+          roundId: roundId,
+          assistantContent: content,
+          assistantThinking: reasoning,
+          isIncomplete: true,
+        );
+      },
+      completed: (content, reasoning) {
+        repository.updateRound(
+          roundId: roundId,
+          assistantContent: content,
+          assistantThinking: reasoning,
+          isIncomplete: false,
+          hasUnseenUpdate: true,
+        );
+      },
+      failed: (error) {
+        repository.updateRound(
+          roundId: roundId,
+          assistantContent: '[错误]\n$error',
+          assistantThinking: '',
+          isIncomplete: false,
+          hasUnseenUpdate: true,
+        );
+      },
+    );
   }
-);
+
+  return eventStream.asyncMap((event) {
+    handleEvent(event);
+  });
+});
 ````
 
 ## File: lib/presentation/providers/settings_form_notifier.dart
@@ -14322,15 +14526,9 @@ class _PreviewSlot extends StatelessWidget {
 
 ## File: lib/presentation/providers/chat_notifier.dart
 ````dart
-import 'dart:async';
-import 'package:aiservice/core/models/attachment.dart';
-import 'package:aiservice/presentation/models/pending_attachment.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/chat_round.dart';
 import '../../di/providers.dart';
-import '../../domain/services/attachment_preparer.dart';
-import 'chat_generation_provider.dart';
-import 'package:uuid/uuid.dart';
 
 final sessionTitleProvider = StreamProvider.family<String, String>((ref, sessionId) {
   return ref.watch(conversationRepositoryProvider).watchSessionTitle(sessionId)
@@ -14365,89 +14563,13 @@ final visibleRoundIdsProvider =
     return path.reversed.toList();
   },
 );
-
-class ChatController {
-  final Ref ref;
-  final String sessionId;
-
-  ChatController(this.ref, this.sessionId);
-
-  Future<String> sendMessage({
-    required String content,
-    required String? parentRoundId,
-    List<PendingAttachment>? attachments,
-  }) async {
-    final repository = ref.read(conversationRepositoryProvider);
-    
-    // 仅对新建消息执行文件持久化
-    final saved = await savePendingAttachments(
-      repository,
-      attachments ?? [],
-    );
-
-    return _createAndGenerateRound(
-      content: content,
-      parentRoundId: parentRoundId,
-      attachments: saved,
-    );
-  }
-
-  Future<String> retryFromRound(String roundId) async {
-    final source = await ref.read(roundDetailProvider(roundId).future);
-    if (source == null) {
-      throw Exception('找不到对应的对话轮次');
-    }
-
-    // 直接传入已持久化的 Attachment 列表
-    return _createAndGenerateRound(
-      content: source.userContent,
-      parentRoundId: source.parentId,
-      attachments: source.userAttachments,
-    );
-  }
-
-  Future<String> _createAndGenerateRound({
-    required String content,
-    required String? parentRoundId,
-    required List<Attachment> attachments,
-  }) async {
-    final repository = ref.read(conversationRepositoryProvider);
-
-    final newRound = ChatRound(
-      id: const Uuid().v4(),
-      parentId: parentRoundId,
-      createdAt: DateTime.now().millisecondsSinceEpoch,
-      userContent: content,
-      userAttachments: attachments,
-      isIncomplete: true,
-      hasUnseenUpdate: false,
-    );
-
-    await repository.appendRound(sessionId, newRound);
-
-    ref.listen(
-      chatGenerationProvider(newRound.id),
-      (previous, next) {},
-    );
-
-    return newRound.id;
-  }
-
-  void stopGeneration(String roundId) {
-    ref.invalidate(chatGenerationProvider(roundId));
-  }
-}
-
-final chatControllerProvider =
-    Provider.family<ChatController, String>((ref, sessionId) {
-  return ChatController(ref, sessionId);
-});
 ````
 
 ## File: lib/presentation/pages/chat_page.dart
 ````dart
 import 'package:aiservice/di/providers.dart';
 import 'package:aiservice/domain/services/character_card_parser.dart';
+import 'package:aiservice/domain/services/chat_service.dart';
 import 'package:aiservice/presentation/models/pending_attachment.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
@@ -14524,11 +14646,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     if (character != null && !greetingSent && character.firstMes.isNotEmpty) {
       ref.read(characterGreetingSentProvider.notifier).state = true;
       
-      final controller = ref.read(chatControllerProvider(widget.sessionId));
-      final newId = await controller.sendMessage(
-        content: character.firstMes,
-        parentRoundId: _currentRoundId,
-        attachments: [],
+      final newId = await character.appendGreeting(
+        repository: ref.read(conversationRepositoryProvider),
+        sessionId: widget.sessionId,
       );
       _updateBranch(newId);
     }
@@ -14540,16 +14660,21 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     _handleInitialMessage();
   }
 
-  void _handleInitialMessage() async {
+  void _handleInitialMessage() async { 
     if (_initialMessageHandled || widget.initialMessage == null) return;
     _initialMessageHandled = true;
 
     try {
-      final newId = await ref.read(chatControllerProvider(widget.sessionId)).sendMessage(
-            content: widget.initialMessage!,
-            parentRoundId: _currentRoundId,
-            attachments: widget.initialAttachments ?? [],
-          );
+      final newId = await ChatService.sendMessage(
+        repository: ref.read(conversationRepositoryProvider),
+        configService: ref.read(configServiceProvider),
+        apiSource: ref.read(remoteApiSourceProvider),
+        sessionId: widget.sessionId,
+        content: widget.initialMessage!,
+        parentRoundId: _currentRoundId,
+        pendingAttachments: widget.initialAttachments ?? [],
+        character: ref.read(currentCharacterProvider),
+      );
       _updateBranch(newId);
     } catch (e) {
       AppToast.show('发送失败：$e');
@@ -14592,6 +14717,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final sessionTitle = ref.watch(sessionTitleProvider(widget.sessionId)).valueOrNull ?? '未加载';
     final currentRoundAsync = ref.watch(roundDetailProvider(_currentRoundId ?? ''));
     final isIncomplete = currentRoundAsync.valueOrNull?.isIncomplete ?? false;
+    
     ref.listen<CharacterData?>(
       currentCharacterProvider,
       (previous, next) {
@@ -14605,7 +14731,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       _maybeSendGreeting();
     });
 
-    final visibleRoundIds = ref.watch(visibleRoundIdsProvider((
+    final visibleRoundIds = ref.watch(visibleRoundIdsProvider(( 
       sessionId: widget.sessionId,
       roundId: _branchLeafId,
     )));
@@ -14662,14 +14788,23 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           ),
           InputBar(
             hintText: '发送消息',
-            isIncomplete: isIncomplete,
-            onStop: () => ref.read(chatControllerProvider(widget.sessionId)).stopGeneration(_currentRoundId!),
+            isIncomplete: isIncomplete, 
+            onStop: () {
+              ChatService.stopGeneration(
+                _currentRoundId!, 
+                ref.read(conversationRepositoryProvider),
+              );
+            },
             onSend: (text, attachments) async {
-              final controller = ref.read(chatControllerProvider(widget.sessionId));
-              final newId = await controller.sendMessage(
+              final newId = await ChatService.sendMessage(
+                repository: ref.read(conversationRepositoryProvider),
+                configService: ref.read(configServiceProvider),
+                apiSource: ref.read(remoteApiSourceProvider),
+                sessionId: widget.sessionId,
                 content: text,
                 parentRoundId: _currentRoundId,
-                attachments: attachments,
+                pendingAttachments: attachments,
+                character: ref.read(currentCharacterProvider),
               );
               _updateBranch(newId);
             },
@@ -14680,7 +14815,17 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   void _retry(String roundId) async {
-    final newId = await ref.read(chatControllerProvider(widget.sessionId)).retryFromRound(roundId);
+    final sourceRound = await ref.read(roundDetailProvider(roundId).future);
+    if (sourceRound == null) return;
+
+    final newId = await ChatService.retryFromRound(
+      repository: ref.read(conversationRepositoryProvider),
+      configService: ref.read(configServiceProvider),
+      apiSource: ref.read(remoteApiSourceProvider),
+      sessionId: widget.sessionId,
+      sourceRound: sourceRound,
+      character: ref.read(currentCharacterProvider),
+    );
     _updateBranch(newId);
   }
 }

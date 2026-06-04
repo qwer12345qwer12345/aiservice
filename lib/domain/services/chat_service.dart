@@ -1,0 +1,157 @@
+import 'dart:async';
+import 'package:uuid/uuid.dart';
+import '../../core/models/attachment.dart';
+import '../../core/models/chat_round.dart';
+import '../../data/repositories/conversation_repository.dart';
+import '../../data/services/config_service.dart';
+import '../../data/data_sources/remote_api_source.dart';
+import '../../presentation/models/pending_attachment.dart';
+import 'attachment_preparer.dart';
+import 'character_card_parser.dart';
+import 'chat_generation_service.dart';
+
+class ChatService {
+  static final Map<String, StreamSubscription> _activeGenerations = {};
+
+  static Future<String> sendMessage({
+    required ConversationRepository repository,
+    required ConfigService configService,
+    required RemoteApiSource apiSource,
+    required String sessionId,
+    required String content,
+    required String? parentRoundId,
+    required List<PendingAttachment> pendingAttachments,
+    CharacterData? character,
+  }) async {
+    final savedAttachments = await savePendingAttachments(repository, pendingAttachments);
+    final newRoundId = await _createRound(
+      repository: repository,
+      sessionId: sessionId,
+      content: content,
+      parentRoundId: parentRoundId,
+      attachments: savedAttachments,
+    );
+    
+    _startGeneration(
+      repository: repository,
+      configService: configService,
+      apiSource: apiSource,
+      roundId: newRoundId,
+      character: character,
+    );
+    
+    return newRoundId;
+  }
+
+  static Future<String> retryFromRound({
+    required ConversationRepository repository,
+    required ConfigService configService,
+    required RemoteApiSource apiSource,
+    required String sessionId,
+    required ChatRound sourceRound,
+    CharacterData? character,
+  }) async {
+    final newRoundId = await _createRound(
+      repository: repository,
+      sessionId: sessionId,
+      content: sourceRound.userContent,
+      parentRoundId: sourceRound.parentId,
+      attachments: sourceRound.userAttachments,
+    );
+
+    _startGeneration(
+      repository: repository,
+      configService: configService,
+      apiSource: apiSource,
+      roundId: newRoundId,
+      character: character,
+    );
+
+    return newRoundId;
+  }
+
+  static void stopGeneration(String roundId, ConversationRepository repository) {
+    final subscription = _activeGenerations.remove(roundId);
+    if (subscription != null) {
+      subscription.cancel();
+      repository.updateRound(
+        roundId: roundId,
+        isIncomplete: false,
+        hasUnseenUpdate: true,
+      );
+    }
+  }
+
+  static void _startGeneration({
+    required ConversationRepository repository,
+    required ConfigService configService,
+    required RemoteApiSource apiSource,
+    required String roundId,
+    CharacterData? character,
+  }) {
+    final stream = ChatGenerationService.generateStream(
+      repository: repository,
+      configService: configService,
+      apiSource: apiSource,
+      roundId: roundId,
+      character: character,
+    );
+
+    final subscription = stream.listen(
+      (event) {
+        event.when(
+          partial: (content, reasoning) {
+            repository.updateRound(
+              roundId: roundId,
+              assistantContent: content,
+              assistantThinking: reasoning,
+              isIncomplete: true,
+            );
+          },
+          completed: (content, reasoning) {
+            repository.updateRound(
+              roundId: roundId,
+              assistantContent: content,
+              assistantThinking: reasoning,
+              isIncomplete: false,
+              hasUnseenUpdate: true,
+            );
+            _activeGenerations.remove(roundId);
+          },
+          failed: (error) {
+            repository.updateRound(
+              roundId: roundId,
+              assistantContent: '[错误]\n$error',
+              assistantThinking: '',
+              isIncomplete: false,
+              hasUnseenUpdate: true,
+            );
+            _activeGenerations.remove(roundId);
+          },
+        );
+      },
+    );
+
+    _activeGenerations[roundId] = subscription;
+  }
+
+  static Future<String> _createRound({
+    required ConversationRepository repository,
+    required String sessionId,
+    required String content,
+    required String? parentRoundId,
+    required List<Attachment> attachments,
+  }) async {
+    final newRound = ChatRound(
+      id: const Uuid().v4(),
+      parentId: parentRoundId,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+      userContent: content,
+      userAttachments: attachments,
+      isIncomplete: true,
+      hasUnseenUpdate: false,
+    );
+    await repository.appendRound(sessionId, newRound);
+    return newRound.id;
+  }
+}

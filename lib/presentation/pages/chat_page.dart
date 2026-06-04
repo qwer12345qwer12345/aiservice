@@ -1,5 +1,6 @@
 import 'package:aiservice/di/providers.dart';
 import 'package:aiservice/domain/services/character_card_parser.dart';
+import 'package:aiservice/domain/services/chat_service.dart';
 import 'package:aiservice/presentation/models/pending_attachment.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
@@ -76,11 +77,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     if (character != null && !greetingSent && character.firstMes.isNotEmpty) {
       ref.read(characterGreetingSentProvider.notifier).state = true;
       
-      final controller = ref.read(chatControllerProvider(widget.sessionId));
-      final newId = await controller.sendMessage(
-        content: character.firstMes,
-        parentRoundId: _currentRoundId,
-        attachments: [],
+      final newId = await character.appendGreeting(
+        repository: ref.read(conversationRepositoryProvider),
+        sessionId: widget.sessionId,
       );
       _updateBranch(newId);
     }
@@ -92,16 +91,21 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     _handleInitialMessage();
   }
 
-  void _handleInitialMessage() async {
+  void _handleInitialMessage() async { 
     if (_initialMessageHandled || widget.initialMessage == null) return;
     _initialMessageHandled = true;
 
     try {
-      final newId = await ref.read(chatControllerProvider(widget.sessionId)).sendMessage(
-            content: widget.initialMessage!,
-            parentRoundId: _currentRoundId,
-            attachments: widget.initialAttachments ?? [],
-          );
+      final newId = await ChatService.sendMessage(
+        repository: ref.read(conversationRepositoryProvider),
+        configService: ref.read(configServiceProvider),
+        apiSource: ref.read(remoteApiSourceProvider),
+        sessionId: widget.sessionId,
+        content: widget.initialMessage!,
+        parentRoundId: _currentRoundId,
+        pendingAttachments: widget.initialAttachments ?? [],
+        character: ref.read(currentCharacterProvider),
+      );
       _updateBranch(newId);
     } catch (e) {
       AppToast.show('发送失败：$e');
@@ -144,6 +148,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final sessionTitle = ref.watch(sessionTitleProvider(widget.sessionId)).valueOrNull ?? '未加载';
     final currentRoundAsync = ref.watch(roundDetailProvider(_currentRoundId ?? ''));
     final isIncomplete = currentRoundAsync.valueOrNull?.isIncomplete ?? false;
+    
     ref.listen<CharacterData?>(
       currentCharacterProvider,
       (previous, next) {
@@ -157,7 +162,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       _maybeSendGreeting();
     });
 
-    final visibleRoundIds = ref.watch(visibleRoundIdsProvider((
+    final visibleRoundIds = ref.watch(visibleRoundIdsProvider(( 
       sessionId: widget.sessionId,
       roundId: _branchLeafId,
     )));
@@ -214,14 +219,23 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           ),
           InputBar(
             hintText: '发送消息',
-            isIncomplete: isIncomplete,
-            onStop: () => ref.read(chatControllerProvider(widget.sessionId)).stopGeneration(_currentRoundId!),
+            isIncomplete: isIncomplete, 
+            onStop: () {
+              ChatService.stopGeneration(
+                _currentRoundId!, 
+                ref.read(conversationRepositoryProvider),
+              );
+            },
             onSend: (text, attachments) async {
-              final controller = ref.read(chatControllerProvider(widget.sessionId));
-              final newId = await controller.sendMessage(
+              final newId = await ChatService.sendMessage(
+                repository: ref.read(conversationRepositoryProvider),
+                configService: ref.read(configServiceProvider),
+                apiSource: ref.read(remoteApiSourceProvider),
+                sessionId: widget.sessionId,
                 content: text,
                 parentRoundId: _currentRoundId,
-                attachments: attachments,
+                pendingAttachments: attachments,
+                character: ref.read(currentCharacterProvider),
               );
               _updateBranch(newId);
             },
@@ -232,7 +246,17 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   void _retry(String roundId) async {
-    final newId = await ref.read(chatControllerProvider(widget.sessionId)).retryFromRound(roundId);
+    final sourceRound = await ref.read(roundDetailProvider(roundId).future);
+    if (sourceRound == null) return;
+
+    final newId = await ChatService.retryFromRound(
+      repository: ref.read(conversationRepositoryProvider),
+      configService: ref.read(configServiceProvider),
+      apiSource: ref.read(remoteApiSourceProvider),
+      sessionId: widget.sessionId,
+      sourceRound: sourceRound,
+      character: ref.read(currentCharacterProvider),
+    );
     _updateBranch(newId);
   }
 }

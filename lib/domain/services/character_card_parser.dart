@@ -1,6 +1,29 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:png_chunks_extract/png_chunks_extract.dart' as pngExtract;
+import 'package:uuid/uuid.dart';
+import '../../core/models/chat_round.dart';
+import '../../data/repositories/conversation_repository.dart';
+
+extension CharacterDataPersistenceX on CharacterData {
+  Future<String> appendGreeting({
+    required ConversationRepository repository,
+    required String sessionId,
+  }) async {
+    final newRound = ChatRound(
+      id: const Uuid().v4(),
+      parentId: null, 
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+      userContent: '',
+      userAttachments: const [],
+      assistantContent: firstMes,
+      isIncomplete: false,
+      hasUnseenUpdate: true,
+    );
+    await repository.appendRound(sessionId, newRound);
+    return newRound.id;
+  }
+}
 
 /// 解析后的角色数据结构（支持 V2/V3）
 class CharacterData {
