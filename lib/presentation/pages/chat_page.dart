@@ -1,5 +1,6 @@
 import 'package:aiservice/di/providers.dart';
 import 'package:aiservice/domain/services/character_card_parser.dart';
+import 'package:aiservice/presentation/models/pending_attachment.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,7 +19,7 @@ class ChatPage extends ConsumerStatefulWidget {
   final String sessionId;
   final String? initialRoundId;
   final String? initialMessage;
-  final List<dynamic>? initialAttachments;
+  final List<PendingAttachment>? initialAttachments;
 
   const ChatPage({
     super.key,
@@ -99,7 +100,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       final newId = await ref.read(chatControllerProvider(widget.sessionId)).sendMessage(
             content: widget.initialMessage!,
             parentRoundId: _currentRoundId,
-            attachments: widget.initialAttachments?.cast() ?? [],
+            attachments: widget.initialAttachments ?? [],
           );
       _updateBranch(newId);
     } catch (e) {

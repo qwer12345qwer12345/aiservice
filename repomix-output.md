@@ -118,319 +118,6 @@ lib/presentation/widgets/thought_bubble.dart
 
 # Files
 
-## File: lib/presentation/widgets/markdown_parser.dart
-````dart
-/// Markdown 块级节点类型
-enum MarkdownBlockType {
-  heading,
-  paragraph,
-  code,
-  table,
-}
-
-/// 内联元素类型
-enum InlineType { text, bold }
-
-/// 内联片段
-class InlineSpan {
-  final InlineType type;
-  final String text;
-
-  const InlineSpan(this.type, this.text);
-}
-
-/// 表格行
-class TableRowData {
-  final List<String> cells;
-  TableRowData(this.cells);
-}
-
-/// 块级节点
-class MarkdownBlock {
-  final MarkdownBlockType type;
-  final int? level; // 标题级别 1-6
-  final String? text; // 段落/标题/代码的文本内容
-  final String? codeLanguage;
-  final List<TableRowData>? tableRows; // 表格数据，第一行为表头
-
-  MarkdownBlock.heading(this.level, this.text)
-      : type = MarkdownBlockType.heading,
-        codeLanguage = null,
-        tableRows = null;
-
-  MarkdownBlock.paragraph(this.text)
-      : type = MarkdownBlockType.paragraph,
-        level = null,
-        codeLanguage = null,
-        tableRows = null;
-
-  MarkdownBlock.code(this.text, {this.codeLanguage})
-      : type = MarkdownBlockType.code,
-        level = null,
-        tableRows = null;
-
-  MarkdownBlock.table(this.tableRows)
-      : type = MarkdownBlockType.table,
-        level = null,
-        text = null,
-        codeLanguage = null;
-}
-
-/// Markdown 解析器（仅支持标题、粗体、代码块、表格）
-class MarkdownParser {
-  /// 解析完整文本
-  static List<MarkdownBlock> parse(String data) {
-    final lines = data.split('\n');
-    final blocks = <MarkdownBlock>[];
-    int i = 0;
-    final n = lines.length;
-
-    while (i < n) {
-      final line = lines[i];
-      // 空行跳过
-      if (line.trim().isEmpty) {
-        i++;
-        continue;
-      }
-
-      // 标题
-      final headingMatch = RegExp(r'^(#{1,6})\s+(.*)$').firstMatch(line);
-      if (headingMatch != null) {
-        final level = headingMatch.group(1)!.length;
-        final text = headingMatch.group(2)!;
-        blocks.add(MarkdownBlock.heading(level, text));
-        i++;
-        continue;
-      }
-
-      // 代码块
-      if (line.trim().startsWith('```')) {
-        final lang = line.trim().substring(3).trim();
-        final codeLines = <String>[];
-        i++;
-        while (i < n && !lines[i].trim().startsWith('```')) {
-          codeLines.add(lines[i]);
-          i++;
-        }
-        i++; // 跳过结束 ```
-        final codeText = codeLines.join('\n');
-        blocks.add(MarkdownBlock.code(codeText, codeLanguage: lang.isEmpty ? null : lang));
-        continue;
-      }
-
-      // 表格：以 | 开头和结尾的行，且下一行是分隔行（|---|...）或者连续收集
-      if (line.trim().startsWith('|') && line.trim().endsWith('|')) {
-        final tableLines = <String>[];
-        // 收集所有表格行直到遇到空行或非表格行
-        while (i < n && lines[i].trim().startsWith('|') && lines[i].trim().endsWith('|')) {
-          tableLines.add(lines[i].trim());
-          i++;
-        }
-        final rows = _parseTable(tableLines);
-        if (rows != null && rows.isNotEmpty) {
-          blocks.add(MarkdownBlock.table(rows));
-        }
-        continue;
-      }
-
-      // 普通段落
-      blocks.add(MarkdownBlock.paragraph(line));
-      i++;
-    }
-
-    return blocks;
-  }
-
-  /// 解析表格，返回行列表（第一行为表头）
-  static List<TableRowData>? _parseTable(List<String> lines) {
-    if (lines.length < 2) return null;
-
-    // 分隔行校验
-    final separatorLine = lines[1];
-    if (!_isTableSeparator(separatorLine)) return null;
-
-    final rows = <TableRowData>[];
-    // 表头
-    rows.add(TableRowData(_splitTableRow(lines[0])));
-    // 数据行
-    for (int i = 2; i < lines.length; i++) {
-      rows.add(TableRowData(_splitTableRow(lines[i])));
-    }
-    return rows;
-  }
-
-  static bool _isTableSeparator(String line) {
-    return RegExp(r'^\|[\s\-:|]+\|$').hasMatch(line);
-  }
-
-  static List<String> _splitTableRow(String line) {
-    // 去掉首尾的 |，然后按 | 分割
-    final trimmed = line.substring(1, line.length - 1);
-    return trimmed.split('|').map((s) => s.trim()).toList();
-  }
-
-  /// 解析内联格式（粗体、斜体），返回 InlineSpan 列表
-  static List<InlineSpan> parseInline(String text) {
-    final spans = <InlineSpan>[];
-    final buffer = StringBuffer();
-    bool inBold = false;
-    int i = 0;
-    final len = text.length;
-
-    while (i < len) {
-      // 粗体 **
-      if (i + 1 < len && text[i] == '*' && text[i + 1] == '*') {
-        _flushBuffer(buffer, spans, inBold);
-        inBold = !inBold;
-        i += 2;
-        continue;
-      }
-      buffer.write(text[i]);
-      i++;
-    }
-    _flushBuffer(buffer, spans, inBold);
-    return spans;
-  }
-
-  static void _flushBuffer(StringBuffer buffer, List<InlineSpan> spans, bool inBold) {
-    if (buffer.isEmpty) return;
-    final text = buffer.toString();
-    buffer.clear();
-    if (inBold) {
-      spans.add(InlineSpan(InlineType.bold, text));
-    } 
-    else {
-      spans.add(InlineSpan(InlineType.text, text));
-    }
-  }
-}
-````
-
-## File: lib/presentation/widgets/markdown_widget.dart
-````dart
-import 'package:flutter/cupertino.dart';
-import 'markdown_parser.dart';
-
-class MarkdownWidget extends StatelessWidget {
-  final String data;
-  final TextStyle? baseStyle;
-
-  const MarkdownWidget({super.key, required this.data, this.baseStyle});
-
-  @override
-  Widget build(BuildContext context) {
-    final blocks = MarkdownParser.parse(data);
-    final theme = CupertinoTheme.of(context);
-    final defaultStyle = baseStyle ?? theme.textTheme.textStyle;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: blocks.map((block) => _buildBlock(block, defaultStyle, theme, context)).toList(),
-    );
-  }
-
-  Widget _buildBlock(
-    MarkdownBlock block, 
-    TextStyle defaultStyle, 
-    CupertinoThemeData theme, 
-    BuildContext context) {
-    switch (block.type) {
-      case MarkdownBlockType.heading:
-        final level = block.level ?? 1;
-        double fontSizeFactor;
-        switch (level) {
-          case 1:
-            fontSizeFactor = 1.8;
-            break;
-          case 2:
-            fontSizeFactor = 1.6;
-            break;
-          case 3:
-            fontSizeFactor = 1.4;
-            break;
-          default:
-            fontSizeFactor = 1.2;
-        }
-        final style = defaultStyle.copyWith(
-          fontSize: theme.textTheme.textStyle.fontSize! * fontSizeFactor,
-        );
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: _buildRichText(block.text ?? '', style),
-        );
-
-      case MarkdownBlockType.paragraph:
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: _buildRichText(block.text ?? '', defaultStyle),
-        );
-
-      case MarkdownBlockType.code:
-        return Container(
-          margin: const EdgeInsets.symmetric(vertical: 8),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey5, context),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Text(
-              block.text ?? '',
-              style: defaultStyle.copyWith(
-                fontFamily: 'monospace',
-                fontSize: 13,
-              ),
-            ),
-          ),
-        );
-
-      case MarkdownBlockType.table:
-        final rows = block.tableRows;
-        if (rows == null || rows.isEmpty) return const SizedBox.shrink();
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Table(
-            border: TableBorder.all(color: CupertinoDynamicColor.resolve(CupertinoColors.separator, context)),
-            children: rows.map((row) {
-              final isHeader = rows.indexOf(row) == 0;
-              return TableRow(
-                decoration: BoxDecoration(
-                  color: isHeader ? CupertinoDynamicColor.resolve(CupertinoColors.systemGrey5, context) : null, // 修改这里
-                ),
-                children: row.cells.map((cell) {
-                  return Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: isHeader
-                        ? _buildRichText(cell, defaultStyle)
-                        : _buildRichText(cell, defaultStyle),
-                  );
-                }).toList(),
-              );
-            }).toList(),
-          ),
-        );
-    }
-  }
-
-  Widget _buildRichText(String text, TextStyle baseStyle) {
-    final spans = MarkdownParser.parseInline(text);
-    return RichText(
-      text: TextSpan(
-        style: baseStyle,
-        children: spans.map((span) {
-          TextStyle style = baseStyle;
-          if (span.type == InlineType.bold) {
-            style = baseStyle;
-          }
-          return TextSpan(text: span.text, style: style);
-        }).toList(),
-      ),
-    );
-  }
-}
-````
-
 ## File: lib/core/models/api_message.dart
 ````dart
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -7992,6 +7679,319 @@ class _DeclarativeCupertinoTextFieldState extends State<DeclarativeCupertinoText
 }
 ````
 
+## File: lib/presentation/widgets/markdown_parser.dart
+````dart
+/// Markdown 块级节点类型
+enum MarkdownBlockType {
+  heading,
+  paragraph,
+  code,
+  table,
+}
+
+/// 内联元素类型
+enum InlineType { text, bold }
+
+/// 内联片段
+class InlineSpan {
+  final InlineType type;
+  final String text;
+
+  const InlineSpan(this.type, this.text);
+}
+
+/// 表格行
+class TableRowData {
+  final List<String> cells;
+  TableRowData(this.cells);
+}
+
+/// 块级节点
+class MarkdownBlock {
+  final MarkdownBlockType type;
+  final int? level; // 标题级别 1-6
+  final String? text; // 段落/标题/代码的文本内容
+  final String? codeLanguage;
+  final List<TableRowData>? tableRows; // 表格数据，第一行为表头
+
+  MarkdownBlock.heading(this.level, this.text)
+      : type = MarkdownBlockType.heading,
+        codeLanguage = null,
+        tableRows = null;
+
+  MarkdownBlock.paragraph(this.text)
+      : type = MarkdownBlockType.paragraph,
+        level = null,
+        codeLanguage = null,
+        tableRows = null;
+
+  MarkdownBlock.code(this.text, {this.codeLanguage})
+      : type = MarkdownBlockType.code,
+        level = null,
+        tableRows = null;
+
+  MarkdownBlock.table(this.tableRows)
+      : type = MarkdownBlockType.table,
+        level = null,
+        text = null,
+        codeLanguage = null;
+}
+
+/// Markdown 解析器（仅支持标题、粗体、代码块、表格）
+class MarkdownParser {
+  /// 解析完整文本
+  static List<MarkdownBlock> parse(String data) {
+    final lines = data.split('\n');
+    final blocks = <MarkdownBlock>[];
+    int i = 0;
+    final n = lines.length;
+
+    while (i < n) {
+      final line = lines[i];
+      // 空行跳过
+      if (line.trim().isEmpty) {
+        i++;
+        continue;
+      }
+
+      // 标题
+      final headingMatch = RegExp(r'^(#{1,6})\s+(.*)$').firstMatch(line);
+      if (headingMatch != null) {
+        final level = headingMatch.group(1)!.length;
+        final text = headingMatch.group(2)!;
+        blocks.add(MarkdownBlock.heading(level, text));
+        i++;
+        continue;
+      }
+
+      // 代码块
+      if (line.trim().startsWith('```')) {
+        final lang = line.trim().substring(3).trim();
+        final codeLines = <String>[];
+        i++;
+        while (i < n && !lines[i].trim().startsWith('```')) {
+          codeLines.add(lines[i]);
+          i++;
+        }
+        i++; // 跳过结束 ```
+        final codeText = codeLines.join('\n');
+        blocks.add(MarkdownBlock.code(codeText, codeLanguage: lang.isEmpty ? null : lang));
+        continue;
+      }
+
+      // 表格：以 | 开头和结尾的行，且下一行是分隔行（|---|...）或者连续收集
+      if (line.trim().startsWith('|') && line.trim().endsWith('|')) {
+        final tableLines = <String>[];
+        // 收集所有表格行直到遇到空行或非表格行
+        while (i < n && lines[i].trim().startsWith('|') && lines[i].trim().endsWith('|')) {
+          tableLines.add(lines[i].trim());
+          i++;
+        }
+        final rows = _parseTable(tableLines);
+        if (rows != null && rows.isNotEmpty) {
+          blocks.add(MarkdownBlock.table(rows));
+        }
+        continue;
+      }
+
+      // 普通段落
+      blocks.add(MarkdownBlock.paragraph(line));
+      i++;
+    }
+
+    return blocks;
+  }
+
+  /// 解析表格，返回行列表（第一行为表头）
+  static List<TableRowData>? _parseTable(List<String> lines) {
+    if (lines.length < 2) return null;
+
+    // 分隔行校验
+    final separatorLine = lines[1];
+    if (!_isTableSeparator(separatorLine)) return null;
+
+    final rows = <TableRowData>[];
+    // 表头
+    rows.add(TableRowData(_splitTableRow(lines[0])));
+    // 数据行
+    for (int i = 2; i < lines.length; i++) {
+      rows.add(TableRowData(_splitTableRow(lines[i])));
+    }
+    return rows;
+  }
+
+  static bool _isTableSeparator(String line) {
+    return RegExp(r'^\|[\s\-:|]+\|$').hasMatch(line);
+  }
+
+  static List<String> _splitTableRow(String line) {
+    // 去掉首尾的 |，然后按 | 分割
+    final trimmed = line.substring(1, line.length - 1);
+    return trimmed.split('|').map((s) => s.trim()).toList();
+  }
+
+  /// 解析内联格式（粗体、斜体），返回 InlineSpan 列表
+  static List<InlineSpan> parseInline(String text) {
+    final spans = <InlineSpan>[];
+    final buffer = StringBuffer();
+    bool inBold = false;
+    int i = 0;
+    final len = text.length;
+
+    while (i < len) {
+      // 粗体 **
+      if (i + 1 < len && text[i] == '*' && text[i + 1] == '*') {
+        _flushBuffer(buffer, spans, inBold);
+        inBold = !inBold;
+        i += 2;
+        continue;
+      }
+      buffer.write(text[i]);
+      i++;
+    }
+    _flushBuffer(buffer, spans, inBold);
+    return spans;
+  }
+
+  static void _flushBuffer(StringBuffer buffer, List<InlineSpan> spans, bool inBold) {
+    if (buffer.isEmpty) return;
+    final text = buffer.toString();
+    buffer.clear();
+    if (inBold) {
+      spans.add(InlineSpan(InlineType.bold, text));
+    } 
+    else {
+      spans.add(InlineSpan(InlineType.text, text));
+    }
+  }
+}
+````
+
+## File: lib/presentation/widgets/markdown_widget.dart
+````dart
+import 'package:flutter/cupertino.dart';
+import 'markdown_parser.dart';
+
+class MarkdownWidget extends StatelessWidget {
+  final String data;
+  final TextStyle? baseStyle;
+
+  const MarkdownWidget({super.key, required this.data, this.baseStyle});
+
+  @override
+  Widget build(BuildContext context) {
+    final blocks = MarkdownParser.parse(data);
+    final theme = CupertinoTheme.of(context);
+    final defaultStyle = baseStyle ?? theme.textTheme.textStyle;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: blocks.map((block) => _buildBlock(block, defaultStyle, theme, context)).toList(),
+    );
+  }
+
+  Widget _buildBlock(
+    MarkdownBlock block, 
+    TextStyle defaultStyle, 
+    CupertinoThemeData theme, 
+    BuildContext context) {
+    switch (block.type) {
+      case MarkdownBlockType.heading:
+        final level = block.level ?? 1;
+        double fontSizeFactor;
+        switch (level) {
+          case 1:
+            fontSizeFactor = 1.8;
+            break;
+          case 2:
+            fontSizeFactor = 1.6;
+            break;
+          case 3:
+            fontSizeFactor = 1.4;
+            break;
+          default:
+            fontSizeFactor = 1.2;
+        }
+        final style = defaultStyle.copyWith(
+          fontSize: theme.textTheme.textStyle.fontSize! * fontSizeFactor,
+        );
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: _buildRichText(block.text ?? '', style),
+        );
+
+      case MarkdownBlockType.paragraph:
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: _buildRichText(block.text ?? '', defaultStyle),
+        );
+
+      case MarkdownBlockType.code:
+        return Container(
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey5, context),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Text(
+              block.text ?? '',
+              style: defaultStyle.copyWith(
+                fontFamily: 'monospace',
+                fontSize: 13,
+              ),
+            ),
+          ),
+        );
+
+      case MarkdownBlockType.table:
+        final rows = block.tableRows;
+        if (rows == null || rows.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Table(
+            border: TableBorder.all(color: CupertinoDynamicColor.resolve(CupertinoColors.separator, context)),
+            children: rows.map((row) {
+              final isHeader = rows.indexOf(row) == 0;
+              return TableRow(
+                decoration: BoxDecoration(
+                  color: isHeader ? CupertinoDynamicColor.resolve(CupertinoColors.systemGrey5, context) : null, // 修改这里
+                ),
+                children: row.cells.map((cell) {
+                  return Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: isHeader
+                        ? _buildRichText(cell, defaultStyle)
+                        : _buildRichText(cell, defaultStyle),
+                  );
+                }).toList(),
+              );
+            }).toList(),
+          ),
+        );
+    }
+  }
+
+  Widget _buildRichText(String text, TextStyle baseStyle) {
+    final spans = MarkdownParser.parseInline(text);
+    return RichText(
+      text: TextSpan(
+        style: baseStyle,
+        children: spans.map((span) {
+          TextStyle style = baseStyle;
+          if (span.type == InlineType.bold) {
+            style = baseStyle.copyWith(fontWeight: FontWeight.bold);
+          }
+          return TextSpan(text: span.text, style: style);
+        }).toList(),
+      ),
+    );
+  }
+}
+````
+
 ## File: lib/core/models/chat_round.dart
 ````dart
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -9722,49 +9722,6 @@ final inputStateProvider =
     NotifierProvider<InputNotifier, InputState>(InputNotifier.new);
 ````
 
-## File: lib/presentation/widgets/common/app_toast.dart
-````dart
-// lib/presentation/widgets/common/app_toast.dart
-import 'package:flutter/cupertino.dart';
-import '../../../main.dart'; // 全局 navigatorKey
-
-abstract class AppToast {
-  static OverlayEntry? _entry;
-
-  static void show(String message, {Duration duration = const Duration(seconds: 1)}) {
-    _entry?.remove();
-    final overlay = navigatorKey.currentState?.overlay;
-    if (overlay == null) return;
-
-    _entry = OverlayEntry(
-      builder: (context) => Positioned.fill(
-        child: IgnorePointer(
-          child: Center(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                color: const Color(0xE6111827),
-                child: Text(
-                  message,
-                  style: const TextStyle(color: CupertinoColors.white),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    overlay.insert(_entry!);
-    Future.delayed(duration, () {
-      _entry?.remove();
-      if (_entry != null) _entry = null;
-    });
-  }
-}
-````
-
 ## File: lib/core/models/model_info.dart
 ````dart
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -10863,6 +10820,49 @@ final settingsFormProvider = NotifierProvider<SettingsFormNotifier, SettingsForm
 );
 ````
 
+## File: lib/presentation/widgets/common/app_toast.dart
+````dart
+// lib/presentation/widgets/common/app_toast.dart
+import 'package:flutter/cupertino.dart';
+import '../../../main.dart'; // 全局 navigatorKey
+
+abstract class AppToast {
+  static OverlayEntry? _entry;
+
+  static void show(String message, {Duration duration = const Duration(seconds: 1)}) {
+    _entry?.remove();
+    final overlay = navigatorKey.currentState?.overlay;
+    if (overlay == null) return;
+
+    _entry = OverlayEntry(
+      builder: (context) => Positioned.fill(
+        child: IgnorePointer(
+          child: Center(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                color: const Color(0xE6111827),
+                child: Text(
+                  message,
+                  style: const TextStyle(color: CupertinoColors.white),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    overlay.insert(_entry!);
+    Future.delayed(duration, () {
+      _entry?.remove();
+      if (_entry != null) _entry = null;
+    });
+  }
+}
+````
+
 ## File: lib/core/constants/app_constants.dart
 ````dart
 abstract class AppConstants {
@@ -11228,6 +11228,24 @@ class TextAttachmentViewerPage extends StatelessWidget {
 }
 ````
 
+## File: lib/presentation/providers/config_notifier.dart
+````dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/app_config.dart';
+import '../../core/models/app_config_store.dart';
+import '../../di/providers.dart';
+
+/// 监听当前激活的配置（响应式）
+final configProvider = StreamProvider<AppConfig>((ref) {
+  return ref.read(configServiceProvider).watchConfig();
+});
+
+/// 监听配置存档列表（响应式）
+final configProfilesProvider = StreamProvider<AppConfigStore>((ref) {
+  return ref.read(configServiceProvider).watchConfigStore();
+});
+````
+
 ## File: lib/presentation/widgets/common/app_page_scaffold.dart
 ````dart
 import 'package:flutter/cupertino.dart';
@@ -11340,24 +11358,6 @@ class _ThoughtBubbleState extends State<ThoughtBubble> {
     );
   }
 }
-````
-
-## File: lib/presentation/providers/config_notifier.dart
-````dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/app_config.dart';
-import '../../core/models/app_config_store.dart';
-import '../../di/providers.dart';
-
-/// 监听当前激活的配置（响应式）
-final configProvider = StreamProvider<AppConfig>((ref) {
-  return ref.read(configServiceProvider).watchConfig();
-});
-
-/// 监听配置存档列表（响应式）
-final configProfilesProvider = StreamProvider<AppConfigStore>((ref) {
-  return ref.read(configServiceProvider).watchConfigStore();
-});
 ````
 
 ## File: lib/presentation/widgets/attachment_list.dart
@@ -11869,51 +11869,6 @@ class RemoteApiSource {
 }
 ````
 
-## File: lib/main.dart
-````dart
-import 'package:flutter/cupertino.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'di/providers.dart'; // 仅导入 providers
-import 'presentation/pages/home_page.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  final container = ProviderContainer();
-  await container.read(localFileSourceProvider.future);
-
-  runApp(
-    UncontrolledProviderScope(
-      container: container,
-      child: const MyApp(),
-    ),
-  );
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return CupertinoApp(
-      title: 'AI Chat',
-      navigatorKey: navigatorKey,
-      home: const HomePage(),
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: const [
-        Locale('en', 'US'),
-        Locale('zh', 'CN'),
-      ],
-    );
-  }
-}
-````
-
 ## File: lib/presentation/providers/session_list_notifier.dart
 ````dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12207,6 +12162,51 @@ class ConfigService{
         orElse: () => store.profiles.first,
       ).config;
     });
+  }
+}
+````
+
+## File: lib/main.dart
+````dart
+import 'package:flutter/cupertino.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'di/providers.dart'; // 仅导入 providers
+import 'presentation/pages/home_page.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final container = ProviderContainer();
+  await container.read(localFileSourceProvider.future);
+
+  runApp(
+    UncontrolledProviderScope(
+      container: container,
+      child: const MyApp(),
+    ),
+  );
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoApp(
+      title: 'AI Chat',
+      navigatorKey: navigatorKey,
+      home: const HomePage(),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en', 'US'),
+        Locale('zh', 'CN'),
+      ],
+    );
   }
 }
 ````
@@ -14323,6 +14323,8 @@ class _PreviewSlot extends StatelessWidget {
 ## File: lib/presentation/providers/chat_notifier.dart
 ````dart
 import 'dart:async';
+import 'package:aiservice/core/models/attachment.dart';
+import 'package:aiservice/presentation/models/pending_attachment.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/chat_round.dart';
 import '../../di/providers.dart';
@@ -14373,20 +14375,50 @@ class ChatController {
   Future<String> sendMessage({
     required String content,
     required String? parentRoundId,
-    List<dynamic>? attachments,
+    List<PendingAttachment>? attachments,
   }) async {
     final repository = ref.read(conversationRepositoryProvider);
+    
+    // 仅对新建消息执行文件持久化
     final saved = await savePendingAttachments(
       repository,
-      attachments?.cast() ?? [],
+      attachments ?? [],
     );
+
+    return _createAndGenerateRound(
+      content: content,
+      parentRoundId: parentRoundId,
+      attachments: saved,
+    );
+  }
+
+  Future<String> retryFromRound(String roundId) async {
+    final source = await ref.read(roundDetailProvider(roundId).future);
+    if (source == null) {
+      throw Exception('找不到对应的对话轮次');
+    }
+
+    // 直接传入已持久化的 Attachment 列表
+    return _createAndGenerateRound(
+      content: source.userContent,
+      parentRoundId: source.parentId,
+      attachments: source.userAttachments,
+    );
+  }
+
+  Future<String> _createAndGenerateRound({
+    required String content,
+    required String? parentRoundId,
+    required List<Attachment> attachments,
+  }) async {
+    final repository = ref.read(conversationRepositoryProvider);
 
     final newRound = ChatRound(
       id: const Uuid().v4(),
       parentId: parentRoundId,
       createdAt: DateTime.now().millisecondsSinceEpoch,
       userContent: content,
-      userAttachments: saved,
+      userAttachments: attachments,
       isIncomplete: true,
       hasUnseenUpdate: false,
     );
@@ -14399,17 +14431,6 @@ class ChatController {
     );
 
     return newRound.id;
-  }
-
-  Future<String> retryFromRound(String roundId) async {
-    final source = await ref.read(roundDetailProvider(roundId).future);
-    if (source == null) throw Exception('找不到对应的对话轮次');
-
-    return sendMessage(
-      content: source.userContent,
-      parentRoundId: source.parentId,
-      attachments: source.userAttachments,
-    );
   }
 
   void stopGeneration(String roundId) {
@@ -14427,6 +14448,7 @@ final chatControllerProvider =
 ````dart
 import 'package:aiservice/di/providers.dart';
 import 'package:aiservice/domain/services/character_card_parser.dart';
+import 'package:aiservice/presentation/models/pending_attachment.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14445,7 +14467,7 @@ class ChatPage extends ConsumerStatefulWidget {
   final String sessionId;
   final String? initialRoundId;
   final String? initialMessage;
-  final List<dynamic>? initialAttachments;
+  final List<PendingAttachment>? initialAttachments;
 
   const ChatPage({
     super.key,
@@ -14526,7 +14548,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       final newId = await ref.read(chatControllerProvider(widget.sessionId)).sendMessage(
             content: widget.initialMessage!,
             parentRoundId: _currentRoundId,
-            attachments: widget.initialAttachments?.cast() ?? [],
+            attachments: widget.initialAttachments ?? [],
           );
       _updateBranch(newId);
     } catch (e) {
