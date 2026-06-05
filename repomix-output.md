@@ -87,7 +87,6 @@ lib/domain/models/tree_node.g.dart
 lib/domain/services/attachment_preparer.dart
 lib/domain/services/character_card_parser.dart
 lib/domain/services/chat_context_builder.dart
-lib/domain/services/chat_generation_service.dart
 lib/domain/services/chat_service.dart
 lib/domain/services/stream_processor.dart
 lib/domain/services/tree_builder.dart
@@ -9837,207 +9836,6 @@ class CharacterCardParser {
 }
 ````
 
-## File: lib/domain/services/chat_generation_service.dart
-````dart
-import 'package:aiservice/data/data_sources/chat_source_router.dart';
-import 'package:aiservice/domain/services/character_card_parser.dart';
-import '../../core/models/generation_event.dart';
-import '../../data/repositories/conversation_repository.dart';
-import '../../data/services/config_service.dart';
-import 'chat_context_builder.dart';
-import 'stream_processor.dart';
-
-/// 流式生成服务（纯 Dart，依赖通过参数传递）
-class ChatGenerationService {
-  static Stream<GenerationEvent> generateStream({
-    required ConversationRepository repository,
-    required ConfigService configService,
-    required ChatSourceRouter sourceRouter,
-    required String roundId,
-    CharacterData? character,
-  }) async* {
-    final contextRounds = await repository.getContextRounds(roundId);
-    final apiContext = await buildApiContextFromRounds(
-      contextRounds,
-      repository,
-      character,
-    );
-
-    final config = await configService.loadConfig();
-
-    final source = sourceRouter.getSourceFromConfig(config);
-    final chatStream = source.chatStream(
-      config: config,
-      context: apiContext,
-    );
-
-    final processor = StreamProcessor();
-    yield* processor.process(chatStream);
-  }
-}
-````
-
-## File: lib/domain/services/chat_service.dart
-````dart
-import 'dart:async';
-import 'package:aiservice/data/data_sources/chat_source_router.dart';
-import 'package:uuid/uuid.dart';
-import '../../core/models/attachment.dart';
-import '../../core/models/chat_round.dart';
-import '../../data/repositories/conversation_repository.dart';
-import '../../data/services/config_service.dart';
-import '../../presentation/models/pending_attachment.dart';
-import 'attachment_preparer.dart';
-import 'character_card_parser.dart';
-import 'chat_generation_service.dart';
-
-class ChatService {
-  static final Map<String, StreamSubscription> _activeGenerations = {};
-
-  static Future<String> sendMessage({
-    required ConversationRepository repository,
-    required ConfigService configService,
-    required ChatSourceRouter sourceRouter,
-    required String sessionId,
-    required String content,
-    required String? parentRoundId,
-    required List<PendingAttachment> pendingAttachments,
-    CharacterData? character,
-  }) async {
-    final savedAttachments = await savePendingAttachments(repository, pendingAttachments);
-    final newRoundId = await _createRound(
-      repository: repository,
-      sessionId: sessionId,
-      content: content,
-      parentRoundId: parentRoundId,
-      attachments: savedAttachments,
-    );
-    
-    _startGeneration(
-      repository: repository,
-      configService: configService,
-      sourceRouter: sourceRouter,
-      roundId: newRoundId,
-      character: character,
-    );
-    
-    return newRoundId;
-  }
-
-  static Future<String> retryFromRound({
-    required ConversationRepository repository,
-    required ConfigService configService,
-    required ChatSourceRouter sourceRouter,
-    required String sessionId,
-    required ChatRound sourceRound,
-    CharacterData? character,
-  }) async {
-    final newRoundId = await _createRound(
-      repository: repository,
-      sessionId: sessionId,
-      content: sourceRound.userContent,
-      parentRoundId: sourceRound.parentId,
-      attachments: sourceRound.userAttachments,
-    );
-
-    _startGeneration(
-      repository: repository,
-      configService: configService,
-      sourceRouter: sourceRouter,
-      roundId: newRoundId,
-      character: character,
-    );
-
-    return newRoundId;
-  }
-
-  static void stopGeneration(String roundId, ConversationRepository repository) {
-    final subscription = _activeGenerations.remove(roundId);
-    if (subscription != null) {
-      subscription.cancel();
-      repository.updateRound(
-        roundId: roundId,
-        isIncomplete: false,
-        hasUnseenUpdate: true,
-      );
-    }
-  }
-
-  static void _startGeneration({
-    required ConversationRepository repository,
-    required ConfigService configService,
-    required ChatSourceRouter sourceRouter,
-    required String roundId,
-    CharacterData? character,
-  }) {
-    final stream = ChatGenerationService.generateStream(
-      repository: repository,
-      configService: configService,
-      sourceRouter: sourceRouter,
-      roundId: roundId,
-      character: character,
-    );
-
-    final subscription = stream.listen(
-      (event) {
-        event.when(
-          partial: (content, reasoning) {
-            repository.updateRound(
-              roundId: roundId,
-              assistantContent: content,
-              assistantThinking: reasoning,
-              isIncomplete: true,
-            );
-          },
-          completed: (content, reasoning) {
-            repository.updateRound(
-              roundId: roundId,
-              assistantContent: content,
-              assistantThinking: reasoning,
-              isIncomplete: false,
-              hasUnseenUpdate: true,
-            );
-            _activeGenerations.remove(roundId);
-          },
-          failed: (error) {
-            repository.updateRound(
-              roundId: roundId,
-              assistantContent: '[错误]\n$error',
-              assistantThinking: '',
-              isIncomplete: false,
-              hasUnseenUpdate: true,
-            );
-            _activeGenerations.remove(roundId);
-          },
-        );
-      },
-    );
-
-    _activeGenerations[roundId] = subscription;
-  }
-
-  static Future<String> _createRound({
-    required ConversationRepository repository,
-    required String sessionId,
-    required String content,
-    required String? parentRoundId,
-    required List<Attachment> attachments,
-  }) async {
-    final newRound = ChatRound(
-      id: const Uuid().v4(),
-      parentId: parentRoundId,
-      createdAt: DateTime.now().millisecondsSinceEpoch,
-      userContent: content,
-      userAttachments: attachments,
-      isIncomplete: true,
-      hasUnseenUpdate: false,
-    );
-    await repository.appendRound(sessionId, newRound);
-    return newRound.id;
-  }
-}
-````
-
 ## File: lib/presentation/pages/image_attachment_viewer_page.dart
 ````dart
 import 'dart:typed_data';
@@ -10894,6 +10692,176 @@ abstract class _TreePath implements TreePath {
   @JsonKey(includeFromJson: false, includeToJson: false)
   _$$TreePathImplCopyWith<_$TreePathImpl> get copyWith =>
       throw _privateConstructorUsedError;
+}
+````
+
+## File: lib/domain/services/chat_service.dart
+````dart
+import 'dart:async';
+import 'package:aiservice/data/data_sources/chat_source_router.dart';
+import 'package:uuid/uuid.dart';
+import '../../core/models/attachment.dart';
+import '../../core/models/chat_round.dart';
+import '../../data/repositories/conversation_repository.dart';
+import '../../data/services/config_service.dart';
+import '../../presentation/models/pending_attachment.dart';
+import 'attachment_preparer.dart';
+import 'character_card_parser.dart';
+import 'chat_context_builder.dart';
+import 'stream_processor.dart';
+
+class ChatService {
+  static final Map<String, StreamSubscription> _activeGenerations = {};
+
+  static Future<String> sendMessage({
+    required ConversationRepository repository,
+    required ConfigService configService,
+    required ChatSourceRouter sourceRouter,
+    required String sessionId,
+    required String content,
+    required String? parentRoundId,
+    required List<PendingAttachment> pendingAttachments,
+    CharacterData? character,
+  }) async {
+    final savedAttachments = await savePendingAttachments(repository, pendingAttachments);
+    final newRoundId = await _createRound(
+      repository: repository,
+      sessionId: sessionId,
+      content: content,
+      parentRoundId: parentRoundId,
+      attachments: savedAttachments,
+    );
+    
+    _startGeneration(
+      repository: repository,
+      configService: configService,
+      sourceRouter: sourceRouter,
+      roundId: newRoundId,
+      character: character,
+    );
+    
+    return newRoundId;
+  }
+
+  static Future<String> retryFromRound({
+    required ConversationRepository repository,
+    required ConfigService configService,
+    required ChatSourceRouter sourceRouter,
+    required String sessionId,
+    required ChatRound sourceRound,
+    CharacterData? character,
+  }) async {
+    final newRoundId = await _createRound(
+      repository: repository,
+      sessionId: sessionId,
+      content: sourceRound.userContent,
+      parentRoundId: sourceRound.parentId,
+      attachments: sourceRound.userAttachments,
+    );
+
+    _startGeneration(
+      repository: repository,
+      configService: configService,
+      sourceRouter: sourceRouter,
+      roundId: newRoundId,
+      character: character,
+    );
+
+    return newRoundId;
+  }
+
+  static void stopGeneration(String roundId, ConversationRepository repository) {
+    final subscription = _activeGenerations.remove(roundId);
+    if (subscription != null) {
+      subscription.cancel();
+      repository.updateRound(
+        roundId: roundId,
+        isIncomplete: false,
+        hasUnseenUpdate: true,
+      );
+    }
+  }
+
+  static Future<void> _startGeneration({
+    required ConversationRepository repository,
+    required ConfigService configService,
+    required ChatSourceRouter sourceRouter,
+    required String roundId,
+    CharacterData? character,
+  }) async {
+    final contextRounds = await repository.getContextRounds(roundId);
+    final apiContext = await buildApiContextFromRounds(
+      contextRounds,
+      repository,
+      character,
+    );
+
+    final config = await configService.loadConfig();
+    final source = sourceRouter.getSourceFromConfig(config);
+    
+    final chatStream = source.chatStream(
+      config: config,
+      context: apiContext,
+    );
+
+    final processor = StreamProcessor();
+    final eventStream = processor.process(chatStream);
+
+    final subscription = eventStream.listen((event) {
+      event.when(
+        partial: (content, reasoning) {
+          repository.updateRound(
+            roundId: roundId,
+            assistantContent: content,
+            assistantThinking: reasoning,
+            isIncomplete: true,
+          );
+        },
+        completed: (content, reasoning) {
+          repository.updateRound(
+            roundId: roundId,
+            assistantContent: content,
+            assistantThinking: reasoning,
+            isIncomplete: false,
+            hasUnseenUpdate: true,
+          );
+          _activeGenerations.remove(roundId);
+        },
+        failed: (error) {
+          repository.updateRound(
+            roundId: roundId,
+            assistantContent: '[错误]\n$error',
+            assistantThinking: '',
+            isIncomplete: false,
+            hasUnseenUpdate: true,
+          );
+          _activeGenerations.remove(roundId);
+        },
+      );
+    });
+
+    _activeGenerations[roundId] = subscription;
+  }
+
+  static Future<String> _createRound({
+    required ConversationRepository repository,
+    required String sessionId,
+    required String content,
+    required String? parentRoundId,
+    required List<Attachment> attachments,
+  }) async {
+    final newRound = ChatRound(
+      id: const Uuid().v4(),
+      parentId: parentRoundId,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+      userContent: content,
+      userAttachments: attachments,
+      isIncomplete: true,
+      hasUnseenUpdate: false,
+    );
+    await repository.appendRound(sessionId, newRound);
+    return newRound.id;
+  }
 }
 ````
 
@@ -11970,12 +11938,18 @@ class MessageBubble extends StatelessWidget {
     final actions = <Widget>[
       CupertinoContextMenuAction(
         child: const Text('复制'),
-        onPressed: onCopy ?? () {},
+        onPressed: () {
+          Navigator.of(context).pop();
+          onCopy?.call();
+        },
       ),
       if (onRetryReply != null)
         CupertinoContextMenuAction(
           child: const Text('重试回复'),
-          onPressed: onRetryReply!,
+          onPressed: () {
+            Navigator.of(context).pop();
+            onRetryReply!();
+          },
         ),
     ];
 
@@ -13828,12 +13802,18 @@ class _SessionCard extends ConsumerWidget {
           actions: [
             CupertinoContextMenuAction(
               child: const Text('重命名'),
-              onPressed: () => onRename(item),
+              onPressed: () {
+                Navigator.of(context).pop();
+                onRename(item);
+              },
             ),
             CupertinoContextMenuAction(
-              child: const Text('删除'),
               isDestructiveAction: true,
-              onPressed: () => onDelete(item),
+              onPressed: () {
+                Navigator.of(context).pop();
+                onDelete(item);
+              },
+              child: const Text('删除'),
             ),
           ],
           child: ConstrainedBox(
@@ -14506,13 +14486,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   PageController? _pageController;
   bool _initialMessageHandled = false;
 
-  String? _branchLeafId;
   String? _currentRoundId;
   
   @override
   void initState() {
     super.initState();
-    _branchLeafId = widget.initialRoundId;
     _currentRoundId = widget.initialRoundId;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -14528,12 +14506,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   Future<void> _ensureInitialRoundId() async {
-    if (_branchLeafId != null) return;
+    if (_currentRoundId != null) return;
     final topology = await ref.read(chatTopologyProvider(widget.sessionId).future);
     if (topology.isNotEmpty && mounted) {
       setState(() {
-        _branchLeafId = topology.last.id;
-        _currentRoundId = _branchLeafId;
+        _currentRoundId = topology.last.id;
       });
     }
   }
@@ -14589,7 +14566,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   void _updateBranch(String leafId) {
     if (!mounted) return;
     setState(() {
-      _branchLeafId = leafId;
       _currentRoundId = leafId;
     });
   }
@@ -14632,7 +14608,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
     final visibleRoundIds = ref.watch(visibleRoundIdsProvider(( 
       sessionId: widget.sessionId,
-      roundId: _branchLeafId,
+      roundId: _currentRoundId,
     )));
 
     int currentIndex = visibleRoundIds.indexOf(_currentRoundId ?? '');

@@ -30,12 +30,18 @@ class MessageBubble extends StatelessWidget {
     final actions = <Widget>[
       CupertinoContextMenuAction(
         child: const Text('复制'),
-        onPressed: onCopy ?? () {},
+        onPressed: () {
+          Navigator.of(context).pop();
+          onCopy?.call();
+        },
       ),
       if (onRetryReply != null)
         CupertinoContextMenuAction(
           child: const Text('重试回复'),
-          onPressed: onRetryReply!,
+          onPressed: () {
+            Navigator.of(context).pop();
+            onRetryReply!();
+          },
         ),
     ];
 

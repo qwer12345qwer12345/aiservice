@@ -328,12 +328,18 @@ class _SessionCard extends ConsumerWidget {
           actions: [
             CupertinoContextMenuAction(
               child: const Text('重命名'),
-              onPressed: () => onRename(item),
+              onPressed: () {
+                Navigator.of(context).pop();
+                onRename(item);
+              },
             ),
             CupertinoContextMenuAction(
-              child: const Text('删除'),
               isDestructiveAction: true,
-              onPressed: () => onDelete(item),
+              onPressed: () {
+                Navigator.of(context).pop();
+                onDelete(item);
+              },
+              child: const Text('删除'),
             ),
           ],
           child: ConstrainedBox(
