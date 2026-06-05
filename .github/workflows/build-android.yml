@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 1. 设置 Java 环境 (Flutter 3.16+ 及现代 Android Gradle 插件需要 JDK 17)
+      # 1. 设置 Java 环境
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -32,30 +32,19 @@ jobs:
       # ★★★ 核心步骤：在插件目录中克隆 llama.cpp ★★★
       - name: Provide llama.cpp inside flutter_llama plugin
         run: |
-          # 使用通配符查找插件目录，避免版本号硬编码导致找不到 (修复了原脚本的隐患)
           PLUGIN_DIR=$(find $HOME/.pub-cache/hosted -type d -name "flutter_llama-*" 2>/dev/null | head -n 1)
-          
-          # 如果默认 pub-cache 路径找不到，尝试在系统其他可能的地方查找 (兼容不同的 Runner 配置)
           if [ -z "$PLUGIN_DIR" ]; then
             echo "Primary path failed. Trying alternative search..."
             PLUGIN_DIR=$(find / -type d -name "flutter_llama-*" 2>/dev/null | grep pub | head -n 1)
           fi
-          
           if [ -z "$PLUGIN_DIR" ]; then
             echo "❌ Failed to find flutter_llama plugin directory"
             exit 1
           fi
-          
           echo "✅ Plugin directory found: $PLUGIN_DIR"
           cd "$PLUGIN_DIR"
-          
-          # 删除可能已存在的 llama.cpp（避免冲突）
           rm -rf llama.cpp
-          
-          # 克隆 llama.cpp
           git clone https://github.com/ggerganov/llama.cpp.git
-          
-          # 验证头文件存在
           if [ -f "llama.cpp/include/llama.h" ]; then
             echo "✅ llama.h successfully placed in plugin directory"
           else
@@ -63,7 +52,19 @@ jobs:
             exit 1
           fi
 
-      # 3. 构建 Android APK (Release 模式)
+      # ★★★ 新增修复：安装插件强制要求的 CMake 3.18.1 ★★★
+      - name: Install CMake 3.18.1
+        run: |
+          echo "Installing CMake 3.18.1 required by flutter_llama..."
+          # 动态查找 sdkmanager 路径以兼容不同的 Runner 镜像版本
+          SDKMANAGER=$(find $ANDROID_HOME/cmdline-tools -name sdkmanager -type f 2>/dev/null | head -n 1)
+          if [ -z "$SDKMANAGER" ]; then
+            SDKMANAGER="$ANDROID_HOME/tools/bin/sdkmanager"
+          fi
+          # 接受许可并安装指定的 CMake 版本
+          yes | $SDKMANAGER "cmake;3.18.1"
+
+      # 3. 构建 Android APK
       - name: Build Android APK
         run: flutter build apk --release
 
