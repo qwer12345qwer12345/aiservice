@@ -1,17 +1,17 @@
 import 'dart:async';
+import 'package:aiservice/data/data_sources/chat_source_router.dart';
 import 'package:drift/drift.dart';
 import '../../core/models/app_config.dart';
 import '../../core/models/app_config_store.dart';
 import '../../core/models/model_info.dart';
-import '../../data/data_sources/remote_api_source.dart';
 import '../database/database.dart';
 import 'package:uuid/uuid.dart';
 
 class ConfigService{
   final AppDatabase _db;
-  final RemoteApiSource _apiSource;
+  final ChatSourceRouter _sourceRouter;
 
-  ConfigService(this._db, this._apiSource);
+  ConfigService(this._db, this._sourceRouter);
 
   Future<AppConfigStore> _ensureInitialized() async {
     final storeRow = await _db.select(_db.dbConfigStore).getSingleOrNull();
@@ -86,12 +86,8 @@ class ConfigService{
   Future<void> refreshModels() async {
     final activeConfig = await loadConfig();
 
-    final remoteModels = await _apiSource.fetchModels(
-      baseUrl: activeConfig.baseUrl,
-      apiKey: activeConfig.apiKey,
-      modelsPath: activeConfig.modelsPath,
-      apiMode: activeConfig.apiMode,
-    );
+    final source = _sourceRouter.getSourceFromConfig(activeConfig);
+    final remoteModels = await source.fetchModels(activeConfig);
 
     final oldModels = activeConfig.availableModels ?? const <ModelInfo>[];
     final oldById = {for (final model in oldModels) model.id: model};

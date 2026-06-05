@@ -7,13 +7,13 @@ import '../../domain/services/chat_generation_service.dart';
 final chatGenerationProvider = StreamProvider.family<void, String>((ref, roundId) {
   final repository = ref.read(conversationRepositoryProvider);
   final configService = ref.read(configServiceProvider);
-  final apiSource = ref.read(remoteApiSourceProvider);
+  final sourceRouter = ref.read(chatSourceRouterProvider);
   final character = ref.read(currentCharacterProvider);
 
   final eventStream = ChatGenerationService.generateStream(
     repository: repository,
     configService: configService,
-    apiSource: apiSource,
+    sourceRouter: sourceRouter,
     roundId: roundId,
     character: character,
   );

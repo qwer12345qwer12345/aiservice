@@ -1,10 +1,10 @@
 import 'dart:async';
+import 'package:aiservice/data/data_sources/chat_source_router.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/models/attachment.dart';
 import '../../core/models/chat_round.dart';
 import '../../data/repositories/conversation_repository.dart';
 import '../../data/services/config_service.dart';
-import '../../data/data_sources/remote_api_source.dart';
 import '../../presentation/models/pending_attachment.dart';
 import 'attachment_preparer.dart';
 import 'character_card_parser.dart';
@@ -16,7 +16,7 @@ class ChatService {
   static Future<String> sendMessage({
     required ConversationRepository repository,
     required ConfigService configService,
-    required RemoteApiSource apiSource,
+    required ChatSourceRouter sourceRouter,
     required String sessionId,
     required String content,
     required String? parentRoundId,
@@ -35,7 +35,7 @@ class ChatService {
     _startGeneration(
       repository: repository,
       configService: configService,
-      apiSource: apiSource,
+      sourceRouter: sourceRouter,
       roundId: newRoundId,
       character: character,
     );
@@ -46,7 +46,7 @@ class ChatService {
   static Future<String> retryFromRound({
     required ConversationRepository repository,
     required ConfigService configService,
-    required RemoteApiSource apiSource,
+    required ChatSourceRouter sourceRouter,
     required String sessionId,
     required ChatRound sourceRound,
     CharacterData? character,
@@ -62,7 +62,7 @@ class ChatService {
     _startGeneration(
       repository: repository,
       configService: configService,
-      apiSource: apiSource,
+      sourceRouter: sourceRouter,
       roundId: newRoundId,
       character: character,
     );
@@ -85,14 +85,14 @@ class ChatService {
   static void _startGeneration({
     required ConversationRepository repository,
     required ConfigService configService,
-    required RemoteApiSource apiSource,
+    required ChatSourceRouter sourceRouter,
     required String roundId,
     CharacterData? character,
   }) {
     final stream = ChatGenerationService.generateStream(
       repository: repository,
       configService: configService,
-      apiSource: apiSource,
+      sourceRouter: sourceRouter,
       roundId: roundId,
       character: character,
     );

@@ -1,8 +1,8 @@
+import 'package:aiservice/data/data_sources/chat_source_router.dart';
 import 'package:aiservice/domain/services/character_card_parser.dart';
 import '../../core/models/generation_event.dart';
 import '../../data/repositories/conversation_repository.dart';
 import '../../data/services/config_service.dart';
-import '../../data/data_sources/remote_api_source.dart';
 import 'chat_context_builder.dart';
 import 'stream_processor.dart';
 
@@ -11,7 +11,7 @@ class ChatGenerationService {
   static Stream<GenerationEvent> generateStream({
     required ConversationRepository repository,
     required ConfigService configService,
-    required RemoteApiSource apiSource,
+    required ChatSourceRouter sourceRouter,
     required String roundId,
     CharacterData? character,
   }) async* {
@@ -24,8 +24,9 @@ class ChatGenerationService {
 
     final config = await configService.loadConfig();
 
-    final chatStream = apiSource.chatStream(
-      loadConfig: () async => config,
+    final source = sourceRouter.getSourceFromConfig(config);
+    final chatStream = source.chatStream(
+      config: config,
       context: apiContext,
     );
 

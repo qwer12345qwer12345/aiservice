@@ -99,7 +99,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       final newId = await ChatService.sendMessage(
         repository: ref.read(conversationRepositoryProvider),
         configService: ref.read(configServiceProvider),
-        apiSource: ref.read(remoteApiSourceProvider),
+        sourceRouter: ref.read(chatSourceRouterProvider),
         sessionId: widget.sessionId,
         content: widget.initialMessage!,
         parentRoundId: _currentRoundId,
@@ -230,7 +230,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               final newId = await ChatService.sendMessage(
                 repository: ref.read(conversationRepositoryProvider),
                 configService: ref.read(configServiceProvider),
-                apiSource: ref.read(remoteApiSourceProvider),
+                sourceRouter: ref.read(chatSourceRouterProvider),
                 sessionId: widget.sessionId,
                 content: text,
                 parentRoundId: _currentRoundId,
@@ -252,7 +252,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final newId = await ChatService.retryFromRound(
       repository: ref.read(conversationRepositoryProvider),
       configService: ref.read(configServiceProvider),
-      apiSource: ref.read(remoteApiSourceProvider),
+      sourceRouter: ref.read(chatSourceRouterProvider),
       sessionId: widget.sessionId,
       sourceRound: sourceRound,
       character: ref.read(currentCharacterProvider),
