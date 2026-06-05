@@ -8,7 +8,8 @@ import '../../data/services/config_service.dart';
 import '../../presentation/models/pending_attachment.dart';
 import 'attachment_preparer.dart';
 import 'character_card_parser.dart';
-import 'chat_generation_service.dart';
+import 'chat_context_builder.dart';
+import 'stream_processor.dart';
 
 class ChatService {
   static final Map<String, StreamSubscription> _activeGenerations = {};
@@ -82,55 +83,63 @@ class ChatService {
     }
   }
 
-  static void _startGeneration({
+  static Future<void> _startGeneration({
     required ConversationRepository repository,
     required ConfigService configService,
     required ChatSourceRouter sourceRouter,
     required String roundId,
     CharacterData? character,
-  }) {
-    final stream = ChatGenerationService.generateStream(
-      repository: repository,
-      configService: configService,
-      sourceRouter: sourceRouter,
-      roundId: roundId,
-      character: character,
+  }) async {
+    final contextRounds = await repository.getContextRounds(roundId);
+    final apiContext = await buildApiContextFromRounds(
+      contextRounds,
+      repository,
+      character,
     );
 
-    final subscription = stream.listen(
-      (event) {
-        event.when(
-          partial: (content, reasoning) {
-            repository.updateRound(
-              roundId: roundId,
-              assistantContent: content,
-              assistantThinking: reasoning,
-              isIncomplete: true,
-            );
-          },
-          completed: (content, reasoning) {
-            repository.updateRound(
-              roundId: roundId,
-              assistantContent: content,
-              assistantThinking: reasoning,
-              isIncomplete: false,
-              hasUnseenUpdate: true,
-            );
-            _activeGenerations.remove(roundId);
-          },
-          failed: (error) {
-            repository.updateRound(
-              roundId: roundId,
-              assistantContent: '[错误]\n$error',
-              assistantThinking: '',
-              isIncomplete: false,
-              hasUnseenUpdate: true,
-            );
-            _activeGenerations.remove(roundId);
-          },
-        );
-      },
+    final config = await configService.loadConfig();
+    final source = sourceRouter.getSourceFromConfig(config);
+    
+    final chatStream = source.chatStream(
+      config: config,
+      context: apiContext,
     );
+
+    final processor = StreamProcessor();
+    final eventStream = processor.process(chatStream);
+
+    final subscription = eventStream.listen((event) {
+      event.when(
+        partial: (content, reasoning) {
+          repository.updateRound(
+            roundId: roundId,
+            assistantContent: content,
+            assistantThinking: reasoning,
+            isIncomplete: true,
+          );
+        },
+        completed: (content, reasoning) {
+          repository.updateRound(
+            roundId: roundId,
+            assistantContent: content,
+            assistantThinking: reasoning,
+            isIncomplete: false,
+            hasUnseenUpdate: true,
+          );
+          _activeGenerations.remove(roundId);
+        },
+        failed: (error) {
+          repository.updateRound(
+            roundId: roundId,
+            assistantContent: '[错误]\n$error',
+            assistantThinking: '',
+            isIncomplete: false,
+            hasUnseenUpdate: true,
+          );
+          _activeGenerations.remove(roundId);
+        },
+      );
+    });
 
     _activeGenerations[roundId] = subscription;
   }

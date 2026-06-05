@@ -66,11 +66,13 @@ lib/core/utils/sse_parser.dart
 lib/data/data_sources/api_builders/api_request_builder.dart
 lib/data/data_sources/api_builders/chat_completions_api_builder.dart
 lib/data/data_sources/api_builders/google_api_builder.dart
-lib/data/data_sources/api_builders/local_api_builder.dart
 lib/data/data_sources/api_builders/model_info_parser.dart
 lib/data/data_sources/api_builders/responses_api_builder.dart
+lib/data/data_sources/chat_source_router.dart
+lib/data/data_sources/chat_source.dart
+lib/data/data_sources/local_chat_source.dart
 lib/data/data_sources/local_file_source.dart
-lib/data/data_sources/remote_api_source.dart
+lib/data/data_sources/remote_chat_source.dart
 lib/data/data_sources/sse_event_decoder.dart
 lib/data/database/database.dart
 lib/data/database/database.g.dart
@@ -101,7 +103,6 @@ lib/presentation/pages/settings_page.dart
 lib/presentation/pages/text_attachment_viewer_page.dart
 lib/presentation/providers/attachment_bytes_provider.dart
 lib/presentation/providers/character_provider.dart
-lib/presentation/providers/chat_generation_provider.dart
 lib/presentation/providers/chat_notifier.dart
 lib/presentation/providers/config_notifier.dart
 lib/presentation/providers/input_notifier.dart
@@ -119,206 +120,6 @@ lib/presentation/widgets/thought_bubble.dart
 ```
 
 # Files
-
-## File: lib/domain/services/chat_generation_service.dart
-````dart
-import 'package:aiservice/domain/services/character_card_parser.dart';
-import '../../core/models/generation_event.dart';
-import '../../data/repositories/conversation_repository.dart';
-import '../../data/services/config_service.dart';
-import '../../data/data_sources/remote_api_source.dart';
-import 'chat_context_builder.dart';
-import 'stream_processor.dart';
-
-/// 流式生成服务（纯 Dart，依赖通过参数传递）
-class ChatGenerationService {
-  static Stream<GenerationEvent> generateStream({
-    required ConversationRepository repository,
-    required ConfigService configService,
-    required RemoteApiSource apiSource,
-    required String roundId,
-    CharacterData? character,
-  }) async* {
-    final contextRounds = await repository.getContextRounds(roundId);
-    final apiContext = await buildApiContextFromRounds(
-      contextRounds,
-      repository,
-      character,
-    );
-
-    final config = await configService.loadConfig();
-
-    final chatStream = apiSource.chatStream(
-      loadConfig: () async => config,
-      context: apiContext,
-    );
-
-    final processor = StreamProcessor();
-    yield* processor.process(chatStream);
-  }
-}
-````
-
-## File: lib/domain/services/chat_service.dart
-````dart
-import 'dart:async';
-import 'package:uuid/uuid.dart';
-import '../../core/models/attachment.dart';
-import '../../core/models/chat_round.dart';
-import '../../data/repositories/conversation_repository.dart';
-import '../../data/services/config_service.dart';
-import '../../data/data_sources/remote_api_source.dart';
-import '../../presentation/models/pending_attachment.dart';
-import 'attachment_preparer.dart';
-import 'character_card_parser.dart';
-import 'chat_generation_service.dart';
-
-class ChatService {
-  static final Map<String, StreamSubscription> _activeGenerations = {};
-
-  static Future<String> sendMessage({
-    required ConversationRepository repository,
-    required ConfigService configService,
-    required RemoteApiSource apiSource,
-    required String sessionId,
-    required String content,
-    required String? parentRoundId,
-    required List<PendingAttachment> pendingAttachments,
-    CharacterData? character,
-  }) async {
-    final savedAttachments = await savePendingAttachments(repository, pendingAttachments);
-    final newRoundId = await _createRound(
-      repository: repository,
-      sessionId: sessionId,
-      content: content,
-      parentRoundId: parentRoundId,
-      attachments: savedAttachments,
-    );
-    
-    _startGeneration(
-      repository: repository,
-      configService: configService,
-      apiSource: apiSource,
-      roundId: newRoundId,
-      character: character,
-    );
-    
-    return newRoundId;
-  }
-
-  static Future<String> retryFromRound({
-    required ConversationRepository repository,
-    required ConfigService configService,
-    required RemoteApiSource apiSource,
-    required String sessionId,
-    required ChatRound sourceRound,
-    CharacterData? character,
-  }) async {
-    final newRoundId = await _createRound(
-      repository: repository,
-      sessionId: sessionId,
-      content: sourceRound.userContent,
-      parentRoundId: sourceRound.parentId,
-      attachments: sourceRound.userAttachments,
-    );
-
-    _startGeneration(
-      repository: repository,
-      configService: configService,
-      apiSource: apiSource,
-      roundId: newRoundId,
-      character: character,
-    );
-
-    return newRoundId;
-  }
-
-  static void stopGeneration(String roundId, ConversationRepository repository) {
-    final subscription = _activeGenerations.remove(roundId);
-    if (subscription != null) {
-      subscription.cancel();
-      repository.updateRound(
-        roundId: roundId,
-        isIncomplete: false,
-        hasUnseenUpdate: true,
-      );
-    }
-  }
-
-  static void _startGeneration({
-    required ConversationRepository repository,
-    required ConfigService configService,
-    required RemoteApiSource apiSource,
-    required String roundId,
-    CharacterData? character,
-  }) {
-    final stream = ChatGenerationService.generateStream(
-      repository: repository,
-      configService: configService,
-      apiSource: apiSource,
-      roundId: roundId,
-      character: character,
-    );
-
-    final subscription = stream.listen(
-      (event) {
-        event.when(
-          partial: (content, reasoning) {
-            repository.updateRound(
-              roundId: roundId,
-              assistantContent: content,
-              assistantThinking: reasoning,
-              isIncomplete: true,
-            );
-          },
-          completed: (content, reasoning) {
-            repository.updateRound(
-              roundId: roundId,
-              assistantContent: content,
-              assistantThinking: reasoning,
-              isIncomplete: false,
-              hasUnseenUpdate: true,
-            );
-            _activeGenerations.remove(roundId);
-          },
-          failed: (error) {
-            repository.updateRound(
-              roundId: roundId,
-              assistantContent: '[错误]\n$error',
-              assistantThinking: '',
-              isIncomplete: false,
-              hasUnseenUpdate: true,
-            );
-            _activeGenerations.remove(roundId);
-          },
-        );
-      },
-    );
-
-    _activeGenerations[roundId] = subscription;
-  }
-
-  static Future<String> _createRound({
-    required ConversationRepository repository,
-    required String sessionId,
-    required String content,
-    required String? parentRoundId,
-    required List<Attachment> attachments,
-  }) async {
-    final newRound = ChatRound(
-      id: const Uuid().v4(),
-      parentId: parentRoundId,
-      createdAt: DateTime.now().millisecondsSinceEpoch,
-      userContent: content,
-      userAttachments: attachments,
-      isIncomplete: true,
-      hasUnseenUpdate: false,
-    );
-    await repository.appendRound(sessionId, newRound);
-    return newRound.id;
-  }
-}
-````
 
 ## File: lib/core/models/api_message.dart
 ````dart
@@ -3605,75 +3406,78 @@ abstract class ApiRequestBuilder {
 }
 ````
 
-## File: lib/data/data_sources/api_builders/local_api_builder.dart
+## File: lib/data/data_sources/chat_source_router.dart
+````dart
+import '../../core/models/app_config.dart';
+import 'chat_source.dart';
+import 'local_chat_source.dart';
+import 'remote_chat_source.dart';
+
+class ChatSourceRouter {
+  final RemoteChatSource remote;
+  final LocalChatSource local;
+
+  ChatSourceRouter(this.remote, this.local);
+
+  ChatSource getSource(String apiMode) {
+    return apiMode == 'local' ? local : remote;
+  }
+  
+  ChatSource getSourceFromConfig(AppConfig config) {
+    return getSource(config.apiMode);
+  }
+}
+````
+
+## File: lib/data/data_sources/chat_source.dart
+````dart
+import '../../core/models/app_config.dart';
+import '../../core/models/api_message.dart';
+import '../../core/models/chat_chunk.dart';
+import '../../core/models/model_info.dart';
+
+abstract class ChatSource {
+  Future<List<ModelInfo>> fetchModels(AppConfig config);
+  Stream<ChatChunk> chatStream({
+    required AppConfig config,
+    required List<ApiMessage> context,
+  });
+}
+````
+
+## File: lib/data/data_sources/local_chat_source.dart
 ````dart
 import 'dart:async';
-import '../../../core/models/api_message.dart';
 import 'package:flutter_llama/flutter_llama.dart';
-import 'api_request_builder.dart';
-import '../../../core/models/chat_chunk.dart';
-import '../../../core/models/model_info.dart';
+import '../../core/models/api_message.dart';
+import '../../core/models/app_config.dart';
+import '../../core/models/chat_chunk.dart';
+import '../../core/models/model_info.dart';
+import 'chat_source.dart';
 
-class LocalApiBuilder implements ApiRequestBuilder {
+class LocalChatSource implements ChatSource {
   static final FlutterLlama _llama = FlutterLlama.instance;
   static String? _loadedModelPath;
   static bool _isLoaded = false;
 
   @override
-  Map<String, String> buildHeaders(ApiBuildContext ctx) => {};
-
-  @override
-  Uri buildUri(ApiBuildContext ctx) => Uri();
-
-  @override
-  Uri buildModelsUri(ApiBuildContext ctx) => Uri();
-
-  @override
-  Map<String, dynamic> buildRequestBody(ApiBuildContext ctx) => {};
-
-  @override
-  List<ModelInfo> parseModelsResponse(Map<String, dynamic> json) => [];
-
-  /// 将历史消息列表格式化为带轮次编号的 prompt
-  String _buildPromptFromContext(List<ApiMessage> context) {
-    final buffer = StringBuffer();
-    int round = 0;
-    for (final msg in context) {
-      if (msg.role == 'user') {
-        round++;
-        // 提取用户消息文本
-        String text = msg.content ?? '';
-        if (text.isEmpty && msg.parts.isNotEmpty) {
-          // 从 parts 中提取所有文本部分
-          final textParts = msg.parts.whereType<ApiMessageTextPart>();
-          text = textParts.map((p) => p.text).join('\n');
-        }
-        if (text.isNotEmpty) {
-          buffer.writeln('User $round: $text');
-        }
-      } else if (msg.role == 'assistant') {
-        String text = msg.content ?? '';
-        if (text.isNotEmpty) {
-          buffer.writeln('Assistant $round: $text');
-        }
-      }
-    }
-    // 添加下一轮的引导标记
-    buffer.write('Assistant $round: ');
-    return buffer.toString();
+  Future<List<ModelInfo>> fetchModels(AppConfig config) async {
+    return []; 
   }
 
-  Stream<ChatChunk> generateStream(ApiBuildContext ctx) async* {
-    final modelPath = ctx.model;
+  @override
+  Stream<ChatChunk> chatStream({
+    required AppConfig config,
+    required List<ApiMessage> context,
+  }) async* {
+    final modelPath = config.selectedModel?.trim() ?? '';
     if (modelPath.isEmpty) {
       yield const ChatChunk(isDone: true, error: '未选择本地模型');
       return;
     }
 
-    // 构建包含完整历史且带轮次编号的 prompt
-    final prompt = _buildPromptFromContext(ctx.context);
+    final prompt = _buildPromptFromContext(context);
 
-    // 加载模型（如果已加载且路径相同则跳过）
     if (!_isLoaded || _loadedModelPath != modelPath) {
       if (_isLoaded) await _llama.unloadModel();
       try {
@@ -3681,7 +3485,7 @@ class LocalApiBuilder implements ApiRequestBuilder {
           modelPath: modelPath,
           nThreads: 4,
           nGpuLayers: -1,
-          contextSize: 262144,
+          contextSize: 16384,
           batchSize: 512,
           useGpu: true,
           verbose: false,
@@ -3700,7 +3504,6 @@ class LocalApiBuilder implements ApiRequestBuilder {
     }
 
     final params = GenerationParams(prompt: prompt);
-
     try {
       await for (final token in _llama.generateStream(params)) {
         yield ChatChunk(content: token, isDone: false);
@@ -3708,6 +3511,173 @@ class LocalApiBuilder implements ApiRequestBuilder {
       yield const ChatChunk(isDone: true);
     } catch (e) {
       yield ChatChunk(isDone: true, error: '生成失败：$e');
+    }
+  }
+
+  String _buildPromptFromContext(List<ApiMessage> context) {
+    final buffer = StringBuffer();
+    int round = 0;
+    for (final msg in context) {
+      if (msg.role == 'user') {
+        round++;
+        String text = msg.content ?? '';
+        if (text.isEmpty && msg.parts.isNotEmpty) {
+          final textParts = msg.parts.whereType<ApiMessageTextPart>();
+          text = textParts.map((p) => p.text).join('\n');
+        }
+        if (text.isNotEmpty) {
+          buffer.writeln('User $round: $text');
+        }
+      } else if (msg.role == 'assistant') {
+        String text = msg.content ?? '';
+        if (text.isNotEmpty) {
+          buffer.writeln('Assistant $round: $text');
+        }
+      }
+    }
+    buffer.write('Assistant $round: ');
+    return buffer.toString();
+  }
+}
+````
+
+## File: lib/data/data_sources/remote_chat_source.dart
+````dart
+import 'dart:convert';
+import 'package:collection/collection.dart';
+import 'package:http/http.dart' as http;
+import '../../core/models/model_info.dart';
+import '../../core/models/api_message.dart';
+import '../../core/models/app_config.dart';
+import '../../core/models/chat_chunk.dart';
+import '../../core/utils/sse_parser.dart';
+import 'chat_source.dart';
+import 'sse_event_decoder.dart';
+import 'api_builders/api_request_builder.dart';
+import 'api_builders/google_api_builder.dart';
+import 'api_builders/chat_completions_api_builder.dart';
+import 'api_builders/responses_api_builder.dart';
+
+class RemoteChatSource implements ChatSource {
+  ApiRequestBuilder _getBuilder(String apiMode) {
+    switch (apiMode) {
+      case 'google':
+        return GoogleApiBuilder();
+      case 'responses':
+        return ResponsesApiBuilder();
+      case 'chat_completions':
+      default:
+        return ChatCompletionsApiBuilder();
+    }
+  }
+
+  @override
+  Future<List<ModelInfo>> fetchModels(AppConfig config) async {
+    final builder = _getBuilder(config.apiMode);
+    final ctx = ApiBuildContext(
+      model: '',
+      context: [],
+      enableReasoning: false,
+      apiKey: config.apiKey,
+      baseUrl: config.baseUrl,
+      chatPath: '',
+      modelsPath: config.modelsPath,
+    );
+
+    final url = builder.buildModelsUri(ctx);
+    final response = await http.get(url, headers: builder.buildHeaders(ctx));
+
+    if (response.statusCode != 200) {
+      throw Exception('获取模型列表失败：${response.statusCode}');
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return builder.parseModelsResponse(json);
+  }
+
+  @override
+  Stream<ChatChunk> chatStream({
+    required AppConfig config,
+    required List<ApiMessage> context,
+  }) async* {
+    final client = http.Client();
+    try {
+      final apiMode = config.apiMode.trim();
+      final selectedId = config.selectedModel;
+      final selectedModel = config.availableModels?.firstWhereOrNull((m) => m.id == selectedId);
+      final enableReasoning = selectedModel?.overrideSupportsReasoning == true;
+      final model = config.selectedModel?.trim() ?? '';
+
+      if (config.baseUrl.isEmpty) {
+        yield const ChatChunk(isDone: true, error: 'Base URL 为空'); return;
+      }
+      if (config.apiKey.isEmpty) {
+        yield const ChatChunk(isDone: true, error: 'API Key 为空'); return;
+      }
+      if (config.chatPath.isEmpty) {
+        yield const ChatChunk(isDone: true, error: 'Chat Path 为空'); return;
+      }
+      if (model.isEmpty) {
+        yield const ChatChunk(isDone: true, error: '未选择模型'); return;
+      }
+
+      final builder = _getBuilder(apiMode);
+      String resolvedChatPath = config.chatPath.trim();
+      if (resolvedChatPath.contains('{model}')) {
+        resolvedChatPath = resolvedChatPath.replaceAll('{model}', model);
+      }
+
+      final ctx = ApiBuildContext(
+        model: model, context: context, enableReasoning: enableReasoning,
+        apiKey: config.apiKey.trim(), baseUrl: config.baseUrl.trim(),
+        chatPath: resolvedChatPath, modelsPath: config.modelsPath.trim(),
+      );
+
+      final uri = builder.buildUri(ctx);
+      final requestBody = builder.buildRequestBody(ctx);
+
+      final request = http.Request('POST', uri)
+        ..headers.addAll(builder.buildHeaders(ctx))
+        ..headers.addAll({'Accept': 'text/event-stream', 'Cache-Control': 'no-cache'})
+        ..body = jsonEncode(requestBody);
+
+      final streamedResponse = await client.send(request);
+
+      if (streamedResponse.statusCode < 200 || streamedResponse.statusCode >= 300) {
+        final errorBody = await streamedResponse.stream.bytesToString();
+        throw Exception('${streamedResponse.statusCode} $errorBody');
+      }
+
+      final parser = SseParser();
+      final stream = streamedResponse.stream.transform(utf8.decoder);
+
+      await for (final rawChunk in stream) {
+        final events = parser.addChunk(rawChunk);
+        for (final event in events) {
+          try {
+            final decoded = SseEventDecoder.decode(apiMode: apiMode, event: event);
+            if (decoded == null) continue;
+            yield decoded;
+            if (decoded.isDone) return;
+          } catch (_) {}
+        }
+      }
+
+      final lastEvent = parser.close();
+      if (lastEvent != null) {
+        try {
+          final decoded = SseEventDecoder.decode(apiMode: apiMode, event: lastEvent);
+          if (decoded != null) {
+            yield decoded;
+            if (decoded.isDone) return;
+          }
+        } catch (_) {}
+      }
+      yield const ChatChunk(isDone: true);
+    } catch (e) {
+      yield ChatChunk(isDone: true, error: '$e');
+    } finally {
+      client.close();
     }
   }
 }
@@ -7294,210 +7264,6 @@ class $AppDatabaseManager {
 }
 ````
 
-## File: lib/domain/services/character_card_parser.dart
-````dart
-import 'dart:convert';
-import 'dart:typed_data';
-import 'package:png_chunks_extract/png_chunks_extract.dart' as pngExtract;
-import 'package:uuid/uuid.dart';
-import '../../core/models/chat_round.dart';
-import '../../data/repositories/conversation_repository.dart';
-
-extension CharacterDataPersistenceX on CharacterData {
-  Future<String> appendGreeting({
-    required ConversationRepository repository,
-    required String sessionId,
-  }) async {
-    final newRound = ChatRound(
-      id: const Uuid().v4(),
-      parentId: null, 
-      createdAt: DateTime.now().millisecondsSinceEpoch,
-      userContent: '',
-      userAttachments: const [],
-      assistantContent: firstMes,
-      isIncomplete: false,
-      hasUnseenUpdate: true,
-    );
-    await repository.appendRound(sessionId, newRound);
-    return newRound.id;
-  }
-}
-
-/// 解析后的角色数据结构（支持 V2/V3）
-class CharacterData {
-  final String name;
-  final String description;
-  final String personality;
-  final String scenario;
-  final String firstMes;
-  final String mesExample;
-  final String systemPrompt;
-  final String postHistoryInstructions;
-  final List<String> alternateGreetings;
-  final Map<String, dynamic>? characterBook;
-  final Map<String, dynamic>? extensions;
-
-  CharacterData({
-    required this.name,
-    required this.description,
-    required this.personality,
-    required this.scenario,
-    required this.firstMes,
-    required this.mesExample,
-    required this.systemPrompt,
-    required this.postHistoryInstructions,
-    required this.alternateGreetings,
-    this.characterBook,
-    this.extensions,
-  });
-
-  /// 生成系统提示词（供模型使用）
-  String buildSystemPrompt() {
-    final buffer = StringBuffer();
-    buffer.writeln('# 角色设定');
-    buffer.writeln('你是 $name。\n');
-
-    if (description.isNotEmpty) {
-      buffer.writeln('## 外貌与背景');
-      buffer.writeln(description);
-      buffer.writeln();
-    }
-
-    if (personality.isNotEmpty) {
-      buffer.writeln('## 性格特点');
-      buffer.writeln(personality);
-      buffer.writeln();
-    }
-
-    if (scenario.isNotEmpty) {
-      buffer.writeln('## 当前场景');
-      buffer.writeln(scenario);
-      buffer.writeln();
-    }
-
-    if (systemPrompt.isNotEmpty) {
-      buffer.writeln('## 核心指令');
-      buffer.writeln(systemPrompt);
-      buffer.writeln();
-    }
-
-    buffer.writeln('## 对话要求');
-    buffer.writeln('- 请严格按照以上设定进行角色扮演');
-    buffer.writeln('- 保持角色性格和语气的一致性');
-    buffer.writeln('- 根据对话历史适当推进情节');
-
-    if (mesExample.isNotEmpty) {
-      buffer.writeln('\n## 对话范例参考');
-      buffer.writeln(mesExample);
-    }
-
-    return buffer.toString();
-  }
-}
-
-/// 角色卡解析器
-class CharacterCardParser {
-  /// 解析文件（支持 PNG 和 JSON）
-  static Future<CharacterData> parseFile(Uint8List bytes, String fileName) async {
-    final lowerName = fileName.toLowerCase();
-    if (lowerName.endsWith('.png')) {
-      return _parsePngCard(bytes);
-    } else if (lowerName.endsWith('.json')) {
-      return _parseJsonCard(bytes);
-    } else {
-      throw Exception('不支持的文件格式，请使用 PNG 或 JSON 文件');
-    }
-  }
-
-  /// 解析 PNG 角色卡（V2/V3）
-  static CharacterData _parsePngCard(Uint8List bytes) {
-    final chunks = pngExtract.extractChunks(bytes);
-    
-    String? base64Data;
-    for (final chunk in chunks) {
-      final chunkName = chunk['name'] as String;
-      if (chunkName == 'tEXt') {
-        final dataBytes = chunk['data'] as List<int>;
-        // 解析 tEXt 块：keyword + 0x00 + text
-        final zeroIndex = dataBytes.indexOf(0);
-        if (zeroIndex == -1) continue;
-        final keyword = utf8.decode(dataBytes.sublist(0, zeroIndex));
-        final textBytes = dataBytes.sublist(zeroIndex + 1);
-        final text = utf8.decode(textBytes);
-        
-        if (keyword == 'ccv3') {
-          base64Data = text;
-          break;
-        } else if (keyword == 'chara' && base64Data == null) {
-          base64Data = text;
-        }
-      }
-    }
-    
-    if (base64Data == null) {
-      throw Exception('未找到角色数据块（ccv3/chara）');
-    }
-    
-    final jsonString = utf8.decode(base64.decode(base64Data));
-    return _parseJsonString(jsonString);
-  }
-
-  /// 解析 JSON 角色卡
-  static CharacterData _parseJsonCard(Uint8List bytes) {
-    final jsonString = utf8.decode(bytes);
-    return _parseJsonString(jsonString);
-  }
-
-  static CharacterData _parseJsonString(String jsonString) {
-    final Map<String, dynamic> json = jsonDecode(jsonString);
-    final spec = json['spec'] as String?;
-    
-    if (spec == 'chara_card_v3') {
-      return _parseV3(json);
-    } else if (spec == 'chara_card_v2') {
-      return _parseV2(json);
-    } else {
-      // 兼容旧格式
-      return _parseV2({'data': json});
-    }
-  }
-
-  static CharacterData _parseV3(Map<String, dynamic> json) {
-    final data = json['data'] as Map<String, dynamic>;
-    return CharacterData(
-      name: data['name'] ?? '',
-      description: data['description'] ?? '',
-      personality: data['personality'] ?? '',
-      scenario: data['scenario'] ?? '',
-      firstMes: data['first_mes'] ?? '',
-      mesExample: data['mes_example'] ?? '',
-      systemPrompt: data['system_prompt'] ?? '',
-      postHistoryInstructions: data['post_history_instructions'] ?? '',
-      alternateGreetings: (data['alternate_greetings'] as List?)?.cast<String>() ?? [],
-      characterBook: data['character_book'],
-      extensions: data['extensions'],
-    );
-  }
-
-  static CharacterData _parseV2(Map<String, dynamic> json) {
-    final data = json['data'] as Map<String, dynamic>? ?? json;
-    return CharacterData(
-      name: data['name'] ?? '',
-      description: data['description'] ?? '',
-      personality: data['personality'] ?? '',
-      scenario: data['scenario'] ?? '',
-      firstMes: data['first_mes'] ?? '',
-      mesExample: data['mes_example'] ?? '',
-      systemPrompt: data['system_prompt'] ?? '',
-      postHistoryInstructions: data['post_history_instructions'] ?? '',
-      alternateGreetings: (data['alternate_greetings'] as List?)?.cast<String>() ?? [],
-      characterBook: data['character_book'],
-      extensions: data['extensions'],
-    );
-  }
-}
-````
-
 ## File: lib/domain/services/stream_processor.dart
 ````dart
 import 'dart:async';
@@ -9867,6 +9633,411 @@ Future<List<Attachment>> savePendingAttachments(
 }
 ````
 
+## File: lib/domain/services/character_card_parser.dart
+````dart
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:png_chunks_extract/png_chunks_extract.dart' as pngExtract;
+import 'package:uuid/uuid.dart';
+import '../../core/models/chat_round.dart';
+import '../../data/repositories/conversation_repository.dart';
+
+extension CharacterDataPersistenceX on CharacterData {
+  Future<String> appendGreeting({
+    required ConversationRepository repository,
+    required String sessionId,
+  }) async {
+    final newRound = ChatRound(
+      id: const Uuid().v4(),
+      parentId: null, 
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+      userContent: '',
+      userAttachments: const [],
+      assistantContent: firstMes,
+      isIncomplete: false,
+      hasUnseenUpdate: true,
+    );
+    await repository.appendRound(sessionId, newRound);
+    return newRound.id;
+  }
+}
+
+/// 解析后的角色数据结构（支持 V2/V3）
+class CharacterData {
+  final String name;
+  final String description;
+  final String personality;
+  final String scenario;
+  final String firstMes;
+  final String mesExample;
+  final String systemPrompt;
+  final String postHistoryInstructions;
+  final List<String> alternateGreetings;
+  final Map<String, dynamic>? characterBook;
+  final Map<String, dynamic>? extensions;
+
+  CharacterData({
+    required this.name,
+    required this.description,
+    required this.personality,
+    required this.scenario,
+    required this.firstMes,
+    required this.mesExample,
+    required this.systemPrompt,
+    required this.postHistoryInstructions,
+    required this.alternateGreetings,
+    this.characterBook,
+    this.extensions,
+  });
+
+  /// 生成系统提示词（供模型使用）
+  String buildSystemPrompt() {
+    final buffer = StringBuffer();
+    buffer.writeln('# 角色设定');
+    buffer.writeln('你是 $name。\n');
+
+    if (description.isNotEmpty) {
+      buffer.writeln('## 外貌与背景');
+      buffer.writeln(description);
+      buffer.writeln();
+    }
+
+    if (personality.isNotEmpty) {
+      buffer.writeln('## 性格特点');
+      buffer.writeln(personality);
+      buffer.writeln();
+    }
+
+    if (scenario.isNotEmpty) {
+      buffer.writeln('## 当前场景');
+      buffer.writeln(scenario);
+      buffer.writeln();
+    }
+
+    if (systemPrompt.isNotEmpty) {
+      buffer.writeln('## 核心指令');
+      buffer.writeln(systemPrompt);
+      buffer.writeln();
+    }
+
+    buffer.writeln('## 对话要求');
+    buffer.writeln('- 请严格按照以上设定进行角色扮演');
+    buffer.writeln('- 保持角色性格和语气的一致性');
+    buffer.writeln('- 根据对话历史适当推进情节');
+
+    if (mesExample.isNotEmpty) {
+      buffer.writeln('\n## 对话范例参考');
+      buffer.writeln(mesExample);
+    }
+
+    return buffer.toString();
+  }
+}
+
+/// 角色卡解析器
+class CharacterCardParser {
+  /// 解析文件（支持 PNG 和 JSON）
+  static Future<CharacterData> parseFile(Uint8List bytes, String fileName) async {
+    final lowerName = fileName.toLowerCase();
+    if (lowerName.endsWith('.png')) {
+      return _parsePngCard(bytes);
+    } else if (lowerName.endsWith('.json')) {
+      return _parseJsonCard(bytes);
+    } else {
+      throw Exception('不支持的文件格式，请使用 PNG 或 JSON 文件');
+    }
+  }
+
+  /// 解析 PNG 角色卡（V2/V3）
+  static CharacterData _parsePngCard(Uint8List bytes) {
+    final chunks = pngExtract.extractChunks(bytes);
+    
+    String? base64Data;
+    for (final chunk in chunks) {
+      final chunkName = chunk['name'] as String;
+      if (chunkName == 'tEXt') {
+        final dataBytes = chunk['data'] as List<int>;
+        // 解析 tEXt 块：keyword + 0x00 + text
+        final zeroIndex = dataBytes.indexOf(0);
+        if (zeroIndex == -1) continue;
+        final keyword = utf8.decode(dataBytes.sublist(0, zeroIndex));
+        final textBytes = dataBytes.sublist(zeroIndex + 1);
+        final text = utf8.decode(textBytes);
+        
+        if (keyword == 'ccv3') {
+          base64Data = text;
+          break;
+        } else if (keyword == 'chara' && base64Data == null) {
+          base64Data = text;
+        }
+      }
+    }
+    
+    if (base64Data == null) {
+      throw Exception('未找到角色数据块（ccv3/chara）');
+    }
+    
+    final jsonString = utf8.decode(base64.decode(base64Data));
+    return _parseJsonString(jsonString);
+  }
+
+  /// 解析 JSON 角色卡
+  static CharacterData _parseJsonCard(Uint8List bytes) {
+    final jsonString = utf8.decode(bytes);
+    return _parseJsonString(jsonString);
+  }
+
+  static CharacterData _parseJsonString(String jsonString) {
+    final Map<String, dynamic> json = jsonDecode(jsonString);
+    final spec = json['spec'] as String?;
+    
+    if (spec == 'chara_card_v3') {
+      return _parseV3(json);
+    } else if (spec == 'chara_card_v2') {
+      return _parseV2(json);
+    } else {
+      // 兼容旧格式
+      return _parseV2({'data': json});
+    }
+  }
+
+  static CharacterData _parseV3(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>;
+    return CharacterData(
+      name: data['name'] ?? '',
+      description: data['description'] ?? '',
+      personality: data['personality'] ?? '',
+      scenario: data['scenario'] ?? '',
+      firstMes: data['first_mes'] ?? '',
+      mesExample: data['mes_example'] ?? '',
+      systemPrompt: data['system_prompt'] ?? '',
+      postHistoryInstructions: data['post_history_instructions'] ?? '',
+      alternateGreetings: (data['alternate_greetings'] as List?)?.cast<String>() ?? [],
+      characterBook: data['character_book'],
+      extensions: data['extensions'],
+    );
+  }
+
+  static CharacterData _parseV2(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>? ?? json;
+    return CharacterData(
+      name: data['name'] ?? '',
+      description: data['description'] ?? '',
+      personality: data['personality'] ?? '',
+      scenario: data['scenario'] ?? '',
+      firstMes: data['first_mes'] ?? '',
+      mesExample: data['mes_example'] ?? '',
+      systemPrompt: data['system_prompt'] ?? '',
+      postHistoryInstructions: data['post_history_instructions'] ?? '',
+      alternateGreetings: (data['alternate_greetings'] as List?)?.cast<String>() ?? [],
+      characterBook: data['character_book'],
+      extensions: data['extensions'],
+    );
+  }
+}
+````
+
+## File: lib/domain/services/chat_generation_service.dart
+````dart
+import 'package:aiservice/data/data_sources/chat_source_router.dart';
+import 'package:aiservice/domain/services/character_card_parser.dart';
+import '../../core/models/generation_event.dart';
+import '../../data/repositories/conversation_repository.dart';
+import '../../data/services/config_service.dart';
+import 'chat_context_builder.dart';
+import 'stream_processor.dart';
+
+/// 流式生成服务（纯 Dart，依赖通过参数传递）
+class ChatGenerationService {
+  static Stream<GenerationEvent> generateStream({
+    required ConversationRepository repository,
+    required ConfigService configService,
+    required ChatSourceRouter sourceRouter,
+    required String roundId,
+    CharacterData? character,
+  }) async* {
+    final contextRounds = await repository.getContextRounds(roundId);
+    final apiContext = await buildApiContextFromRounds(
+      contextRounds,
+      repository,
+      character,
+    );
+
+    final config = await configService.loadConfig();
+
+    final source = sourceRouter.getSourceFromConfig(config);
+    final chatStream = source.chatStream(
+      config: config,
+      context: apiContext,
+    );
+
+    final processor = StreamProcessor();
+    yield* processor.process(chatStream);
+  }
+}
+````
+
+## File: lib/domain/services/chat_service.dart
+````dart
+import 'dart:async';
+import 'package:aiservice/data/data_sources/chat_source_router.dart';
+import 'package:uuid/uuid.dart';
+import '../../core/models/attachment.dart';
+import '../../core/models/chat_round.dart';
+import '../../data/repositories/conversation_repository.dart';
+import '../../data/services/config_service.dart';
+import '../../presentation/models/pending_attachment.dart';
+import 'attachment_preparer.dart';
+import 'character_card_parser.dart';
+import 'chat_generation_service.dart';
+
+class ChatService {
+  static final Map<String, StreamSubscription> _activeGenerations = {};
+
+  static Future<String> sendMessage({
+    required ConversationRepository repository,
+    required ConfigService configService,
+    required ChatSourceRouter sourceRouter,
+    required String sessionId,
+    required String content,
+    required String? parentRoundId,
+    required List<PendingAttachment> pendingAttachments,
+    CharacterData? character,
+  }) async {
+    final savedAttachments = await savePendingAttachments(repository, pendingAttachments);
+    final newRoundId = await _createRound(
+      repository: repository,
+      sessionId: sessionId,
+      content: content,
+      parentRoundId: parentRoundId,
+      attachments: savedAttachments,
+    );
+    
+    _startGeneration(
+      repository: repository,
+      configService: configService,
+      sourceRouter: sourceRouter,
+      roundId: newRoundId,
+      character: character,
+    );
+    
+    return newRoundId;
+  }
+
+  static Future<String> retryFromRound({
+    required ConversationRepository repository,
+    required ConfigService configService,
+    required ChatSourceRouter sourceRouter,
+    required String sessionId,
+    required ChatRound sourceRound,
+    CharacterData? character,
+  }) async {
+    final newRoundId = await _createRound(
+      repository: repository,
+      sessionId: sessionId,
+      content: sourceRound.userContent,
+      parentRoundId: sourceRound.parentId,
+      attachments: sourceRound.userAttachments,
+    );
+
+    _startGeneration(
+      repository: repository,
+      configService: configService,
+      sourceRouter: sourceRouter,
+      roundId: newRoundId,
+      character: character,
+    );
+
+    return newRoundId;
+  }
+
+  static void stopGeneration(String roundId, ConversationRepository repository) {
+    final subscription = _activeGenerations.remove(roundId);
+    if (subscription != null) {
+      subscription.cancel();
+      repository.updateRound(
+        roundId: roundId,
+        isIncomplete: false,
+        hasUnseenUpdate: true,
+      );
+    }
+  }
+
+  static void _startGeneration({
+    required ConversationRepository repository,
+    required ConfigService configService,
+    required ChatSourceRouter sourceRouter,
+    required String roundId,
+    CharacterData? character,
+  }) {
+    final stream = ChatGenerationService.generateStream(
+      repository: repository,
+      configService: configService,
+      sourceRouter: sourceRouter,
+      roundId: roundId,
+      character: character,
+    );
+
+    final subscription = stream.listen(
+      (event) {
+        event.when(
+          partial: (content, reasoning) {
+            repository.updateRound(
+              roundId: roundId,
+              assistantContent: content,
+              assistantThinking: reasoning,
+              isIncomplete: true,
+            );
+          },
+          completed: (content, reasoning) {
+            repository.updateRound(
+              roundId: roundId,
+              assistantContent: content,
+              assistantThinking: reasoning,
+              isIncomplete: false,
+              hasUnseenUpdate: true,
+            );
+            _activeGenerations.remove(roundId);
+          },
+          failed: (error) {
+            repository.updateRound(
+              roundId: roundId,
+              assistantContent: '[错误]\n$error',
+              assistantThinking: '',
+              isIncomplete: false,
+              hasUnseenUpdate: true,
+            );
+            _activeGenerations.remove(roundId);
+          },
+        );
+      },
+    );
+
+    _activeGenerations[roundId] = subscription;
+  }
+
+  static Future<String> _createRound({
+    required ConversationRepository repository,
+    required String sessionId,
+    required String content,
+    required String? parentRoundId,
+    required List<Attachment> attachments,
+  }) async {
+    final newRound = ChatRound(
+      id: const Uuid().v4(),
+      parentId: parentRoundId,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+      userContent: content,
+      userAttachments: attachments,
+      isIncomplete: true,
+      hasUnseenUpdate: false,
+    );
+    await repository.appendRound(sessionId, newRound);
+    return newRound.id;
+  }
+}
+````
+
 ## File: lib/presentation/pages/image_attachment_viewer_page.dart
 ````dart
 import 'dart:typed_data';
@@ -10744,65 +10915,6 @@ final attachmentBytesProvider =
 );
 ````
 
-## File: lib/presentation/providers/chat_generation_provider.dart
-````dart
-import 'package:aiservice/presentation/providers/character_provider.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/generation_event.dart';
-import '../../di/providers.dart';
-import '../../domain/services/chat_generation_service.dart';
-
-final chatGenerationProvider = StreamProvider.family<void, String>((ref, roundId) {
-  final repository = ref.read(conversationRepositoryProvider);
-  final configService = ref.read(configServiceProvider);
-  final apiSource = ref.read(remoteApiSourceProvider);
-  final character = ref.read(currentCharacterProvider);
-
-  final eventStream = ChatGenerationService.generateStream(
-    repository: repository,
-    configService: configService,
-    apiSource: apiSource,
-    roundId: roundId,
-    character: character,
-  );
-
-  void handleEvent(GenerationEvent event) {
-    event.when(
-      partial: (content, reasoning) {
-        repository.updateRound(
-          roundId: roundId,
-          assistantContent: content,
-          assistantThinking: reasoning,
-          isIncomplete: true,
-        );
-      },
-      completed: (content, reasoning) {
-        repository.updateRound(
-          roundId: roundId,
-          assistantContent: content,
-          assistantThinking: reasoning,
-          isIncomplete: false,
-          hasUnseenUpdate: true,
-        );
-      },
-      failed: (error) {
-        repository.updateRound(
-          roundId: roundId,
-          assistantContent: '[错误]\n$error',
-          assistantThinking: '',
-          isIncomplete: false,
-          hasUnseenUpdate: true,
-        );
-      },
-    );
-  }
-
-  return eventStream.asyncMap((event) {
-    handleEvent(event);
-  });
-});
-````
-
 ## File: lib/presentation/providers/settings_form_notifier.dart
 ````dart
 // lib/presentation/providers/settings_form_notifier.dart
@@ -11085,53 +11197,6 @@ abstract class AppConstants {
 }
 ````
 
-## File: lib/di/providers.dart
-````dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
-
-import '../data/data_sources/local_file_source.dart';
-import '../data/data_sources/remote_api_source.dart';
-import '../data/database/database.dart';
-import '../data/services/config_service.dart';
-import '../data/repositories/conversation_repository.dart';
-
-/// 1. 环境初始化 Provider
-final localFileSourceProvider = FutureProvider<LocalFileSource>((ref) async {
-  final appDir = await getApplicationDocumentsDirectory();
-  final fileSource = LocalFileSource(appDir.path);
-  await fileSource.initDirectories();
-  return fileSource;
-});
-
-/// 2. 数据库 Provider
-final appDatabaseProvider = Provider<AppDatabase>((ref) {
-  ref.watch(localFileSourceProvider); // 触发依赖追踪
-  return AppDatabase();
-});
-
-/// 3. 远程 API 数据源
-final remoteApiSourceProvider = Provider<RemoteApiSource>((ref) {
-  return RemoteApiSource();
-});
-
-/// 4. 配置服务
-final configServiceProvider = Provider<ConfigService>((ref) {
-  return ConfigService(
-    ref.watch(appDatabaseProvider),
-    ref.watch(remoteApiSourceProvider),
-  );
-});
-
-/// 5. 会话仓库
-final conversationRepositoryProvider = Provider<ConversationRepository>((ref) {
-  return ConversationRepository(
-    ref.watch(appDatabaseProvider),
-    ref.watch(localFileSourceProvider).requireValue, // main() 已阻塞等待，此处必定就绪
-  );
-});
-````
-
 ## File: lib/domain/services/chat_context_builder.dart
 ````dart
 import 'dart:convert';
@@ -11372,6 +11437,58 @@ class LocalFileSource{
     }
   }
 }
+````
+
+## File: lib/di/providers.dart
+````dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
+
+import '../data/data_sources/local_file_source.dart';
+import '../data/data_sources/local_chat_source.dart'; // 新增
+import '../data/data_sources/remote_chat_source.dart'; // 替换原 remote_api_source
+import '../data/data_sources/chat_source_router.dart'; // 新增
+import '../data/database/database.dart';
+import '../data/services/config_service.dart';
+import '../data/repositories/conversation_repository.dart';
+
+final localFileSourceProvider = FutureProvider<LocalFileSource>((ref) async {
+  final appDir = await getApplicationDocumentsDirectory();
+  final fileSource = LocalFileSource(appDir.path);
+  await fileSource.initDirectories();
+  return fileSource;
+});
+
+final appDatabaseProvider = Provider<AppDatabase>((ref) {
+  ref.watch(localFileSourceProvider);
+  return AppDatabase();
+});
+
+// --- 新增 Data Sources ---
+final remoteChatSourceProvider = Provider<RemoteChatSource>((ref) => RemoteChatSource());
+final localChatSourceProvider = Provider<LocalChatSource>((ref) => LocalChatSource());
+
+final chatSourceRouterProvider = Provider<ChatSourceRouter>((ref) {
+  return ChatSourceRouter(
+    ref.watch(remoteChatSourceProvider),
+    ref.watch(localChatSourceProvider),
+  );
+});
+
+// --- 更新 Service 依赖 ---
+final configServiceProvider = Provider<ConfigService>((ref) {
+  return ConfigService(
+    ref.watch(appDatabaseProvider),
+    ref.watch(chatSourceRouterProvider), // 替换原 remoteApiSourceProvider
+  );
+});
+
+final conversationRepositoryProvider = Provider<ConversationRepository>((ref) {
+  return ConversationRepository(
+    ref.watch(appDatabaseProvider),
+    ref.watch(localFileSourceProvider).requireValue,
+  );
+});
 ````
 
 ## File: lib/presentation/pages/text_attachment_viewer_page.dart
@@ -11888,198 +12005,58 @@ class MessageBubble extends StatelessWidget {
 }
 ````
 
-## File: lib/data/data_sources/remote_api_source.dart
+## File: lib/main.dart
 ````dart
-import 'dart:convert';
-import 'api_builders/local_api_builder.dart';
-import 'package:collection/collection.dart';
-import 'package:http/http.dart' as http;
-import '../../core/models/model_info.dart';
-import '../../core/models/api_message.dart';
-import '../../core/models/app_config.dart';
-import '../../core/models/chat_chunk.dart';
-import '../../core/utils/sse_parser.dart';
-import 'sse_event_decoder.dart';
-import 'api_builders/api_request_builder.dart';
-import 'api_builders/google_api_builder.dart';
-import 'api_builders/chat_completions_api_builder.dart';
-import 'api_builders/responses_api_builder.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'di/providers.dart'; // 仅导入 providers
+import 'presentation/pages/home_page.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
 
-class RemoteApiSource {
-  ApiRequestBuilder _getBuilder(String apiMode) {
-    switch (apiMode) {
-      case 'google':
-        return GoogleApiBuilder();
-      case 'responses':
-        return ResponsesApiBuilder();
-      case 'local':
-        return LocalApiBuilder();
-      case 'chat_completions':
-      default:
-        return ChatCompletionsApiBuilder();
-    }
-  }
+  final container = ProviderContainer();
+  await container.read(localFileSourceProvider.future);
 
-  Future<List<ModelInfo>> fetchModels({
-    required String baseUrl,
-    required String apiKey,
-    required String modelsPath,
-    required String apiMode,
-  }) async {
-    final builder = _getBuilder(apiMode);
-    final ctx = ApiBuildContext(
-      model: '',
-      context: [],
-      enableReasoning: false,
-      apiKey: apiKey,
-      baseUrl: baseUrl,
-      chatPath: '',
-      modelsPath: modelsPath,
+  runApp(
+    UncontrolledProviderScope(
+      container: container,
+      child: const MyApp(),
+    ),
+  );
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoApp(
+      title: 'AI Chat',
+      navigatorKey: navigatorKey,
+      home: const HomePage(),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en', 'US'),
+        Locale('zh', 'CN'),
+      ],
     );
-
-    final url = builder.buildModelsUri(ctx);
-
-    final response = await http.get(
-      url,
-      headers: builder.buildHeaders(ctx),
-    );
-
-    if (response.statusCode != 200) {
-      throw Exception('获取模型列表失败：${response.statusCode}');
-    }
-
-    final json = jsonDecode(response.body) as Map<String, dynamic>;
-    return builder.parseModelsResponse(json);
-  }
-
-  Stream<ChatChunk> chatStream({
-    required Future<AppConfig> Function() loadConfig,
-    required List<ApiMessage> context,
-  }) async* {
-    final client = http.Client();
-
-    try {
-      final config = await loadConfig();
-      final apiMode = config.apiMode.trim();
-      
-      if (apiMode == 'local') {
-        final builder = LocalApiBuilder();
-        final ctx = ApiBuildContext(
-          model: config.selectedModel?.trim() ?? '',
-          context: context,
-          enableReasoning: false,
-          apiKey: '',
-          baseUrl: '',
-          chatPath: '',
-          modelsPath: '',
-        );
-        yield* builder.generateStream(ctx);
-        return;
-      }
-
-      final selectedId = config.selectedModel;
-      final selectedModel =
-          config.availableModels?.firstWhereOrNull((m) => m.id == selectedId);
-      final enableReasoning = selectedModel?.overrideSupportsReasoning == true;
-      final model = config.selectedModel?.trim() ?? '';
-      
-
-      if (config.baseUrl.isEmpty) {
-        yield const ChatChunk(isDone: true, error: 'Base URL 为空');
-        return;
-      }
-      if (config.apiKey.isEmpty) {
-        yield const ChatChunk(isDone: true, error: 'API Key 为空');
-        return;
-      }
-      if (config.chatPath.isEmpty) {
-        yield const ChatChunk(isDone: true, error: 'Chat Path 为空');
-        return;
-      }
-      if (model.isEmpty) {
-        yield const ChatChunk(isDone: true, error: '未选择模型');
-        return;
-      }
-
-      final builder = _getBuilder(apiMode);
-
-      String resolvedChatPath = config.chatPath.trim();
-      if (resolvedChatPath.contains('{model}')) {
-        resolvedChatPath = resolvedChatPath.replaceAll('{model}', model);
-      }
-
-      final ctx = ApiBuildContext(
-        model: model,
-        context: context,
-        enableReasoning: enableReasoning,
-        apiKey: config.apiKey.trim(),
-        baseUrl: config.baseUrl.trim(),
-        chatPath: resolvedChatPath,
-        modelsPath: config.modelsPath.trim(),
-      );
-
-      final uri = builder.buildUri(ctx);
-      final requestBody = builder.buildRequestBody(ctx);
-
-      final request = http.Request('POST', uri)
-        ..headers.addAll(builder.buildHeaders(ctx))
-        ..headers.addAll({
-          'Accept': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-        })
-        ..body = jsonEncode(requestBody);
-
-      final streamedResponse = await client.send(request);
-
-      if (streamedResponse.statusCode < 200 || streamedResponse.statusCode >= 300) {
-        final errorBody = await streamedResponse.stream.bytesToString();
-        throw Exception('${streamedResponse.statusCode} $errorBody');
-      }
-
-      final parser = SseParser();
-      final stream = streamedResponse.stream.transform(utf8.decoder);
-
-      await for (final rawChunk in stream) {
-        final events = parser.addChunk(rawChunk);
-        for (final event in events) {
-          try {
-            final decoded = SseEventDecoder.decode(apiMode: apiMode, event: event);
-            if (decoded == null) continue;
-            
-            yield decoded;
-            
-            if (decoded.isDone) return;
-          } catch (_) {}
-        }
-      }
-
-      final lastEvent = parser.close();
-      if (lastEvent != null) {
-        try {
-          final decoded = SseEventDecoder.decode(apiMode: apiMode, event: lastEvent);
-          if (decoded != null) {
-            yield decoded;
-            if (decoded.isDone) return;
-          }
-        } catch (_) {}
-      }
-      yield const ChatChunk(isDone: true);
-    } catch (e) {
-      yield ChatChunk(isDone: true, error: '$e');
-    } finally {
-      client.close();
-    }
   }
 }
 ````
 
 ## File: lib/presentation/providers/session_list_notifier.dart
 ````dart
+// lib/presentation/providers/session_list_notifier.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../di/providers.dart';
 import '../../domain/models/session_list_item.dart';
 import '../../domain/models/session_card_meta.dart';
-import 'package:uuid/uuid.dart';
 
 final sessionListProvider = StreamProvider<List<SessionListItem>>((ref) {
   final repository = ref.watch(conversationRepositoryProvider);
@@ -12091,55 +12068,24 @@ final sessionCardMetaProvider =
   final repository = ref.watch(conversationRepositoryProvider);
   return repository.watchSessionCardMeta(sessionId);
 });
-
-class SessionListController {
-  final Ref ref;
-
-  SessionListController(this.ref);
-
-  Future<void> deleteSession(String sessionId) async {
-    final repository = ref.read(conversationRepositoryProvider);
-    await repository.deleteSession(sessionId);
-  }
-
-  Future<void> updateSessionTitle(String sessionId, String newTitle) async {
-    final repository = ref.read(conversationRepositoryProvider);
-    final cleanTitle = newTitle.trim();
-    if (cleanTitle.isEmpty) return;
-    await repository.updateSessionTitle(sessionId, cleanTitle);
-  }
-
-  Future<String> createSession(String title) async {
-    final repository = ref.read(conversationRepositoryProvider);
-
-    final sessionId = const Uuid().v4();
-
-    await repository.createSession(sessionId: sessionId, title: '新对话');
-    return sessionId;
-  }
-}
-
-final sessionListControllerProvider = Provider<SessionListController>((ref) {
-  return SessionListController(ref);
-});
 ````
 
 ## File: lib/data/services/config_service.dart
 ````dart
 import 'dart:async';
+import 'package:aiservice/data/data_sources/chat_source_router.dart';
 import 'package:drift/drift.dart';
 import '../../core/models/app_config.dart';
 import '../../core/models/app_config_store.dart';
 import '../../core/models/model_info.dart';
-import '../../data/data_sources/remote_api_source.dart';
 import '../database/database.dart';
 import 'package:uuid/uuid.dart';
 
 class ConfigService{
   final AppDatabase _db;
-  final RemoteApiSource _apiSource;
+  final ChatSourceRouter _sourceRouter;
 
-  ConfigService(this._db, this._apiSource);
+  ConfigService(this._db, this._sourceRouter);
 
   Future<AppConfigStore> _ensureInitialized() async {
     final storeRow = await _db.select(_db.dbConfigStore).getSingleOrNull();
@@ -12214,12 +12160,8 @@ class ConfigService{
   Future<void> refreshModels() async {
     final activeConfig = await loadConfig();
 
-    final remoteModels = await _apiSource.fetchModels(
-      baseUrl: activeConfig.baseUrl,
-      apiKey: activeConfig.apiKey,
-      modelsPath: activeConfig.modelsPath,
-      apiMode: activeConfig.apiMode,
-    );
+    final source = _sourceRouter.getSourceFromConfig(activeConfig);
+    final remoteModels = await source.fetchModels(activeConfig);
 
     final oldModels = activeConfig.availableModels ?? const <ModelInfo>[];
     final oldById = {for (final model in oldModels) model.id: model};
@@ -12366,51 +12308,6 @@ class ConfigService{
         orElse: () => store.profiles.first,
       ).config;
     });
-  }
-}
-````
-
-## File: lib/main.dart
-````dart
-import 'package:flutter/cupertino.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'di/providers.dart'; // 仅导入 providers
-import 'presentation/pages/home_page.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  final container = ProviderContainer();
-  await container.read(localFileSourceProvider.future);
-
-  runApp(
-    UncontrolledProviderScope(
-      container: container,
-      child: const MyApp(),
-    ),
-  );
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return CupertinoApp(
-      title: 'AI Chat',
-      navigatorKey: navigatorKey,
-      home: const HomePage(),
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: const [
-        Locale('en', 'US'),
-        Locale('zh', 'CN'),
-      ],
-    );
   }
 }
 ````
@@ -13601,9 +13498,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
 ## File: lib/presentation/pages/home_page.dart
 ````dart
+import 'package:aiservice/di/providers.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 import '../../domain/models/session_list_item.dart';
 import '../providers/session_list_notifier.dart';
 import '../widgets/common/app_page_scaffold.dart';
@@ -13616,7 +13515,7 @@ class HomePage extends ConsumerWidget {
 
   Future<void> _showRenameDialog(
     BuildContext context,
-    SessionListController controller,
+    WidgetRef ref,
     SessionListItem item,
   ) async {
     final controllerText = TextEditingController(text: item.title);
@@ -13642,13 +13541,14 @@ class HomePage extends ConsumerWidget {
       ),
     );
     if (result != null && result.isNotEmpty && result != item.title) {
-      await controller.updateSessionTitle(item.id, result);
+      final repository = ref.read(conversationRepositoryProvider);
+      await repository.updateSessionTitle(item.id, result);
     }
   }
 
   Future<void> _showDeleteConfirmDialog(
     BuildContext context,
-    SessionListController controller,
+    WidgetRef ref,
     SessionListItem item,
   ) async {
     final confirmed = await showCupertinoDialog<bool>(
@@ -13672,14 +13572,14 @@ class HomePage extends ConsumerWidget {
         false;
 
     if (confirmed == true) {
-      await controller.deleteSession(item.id);
+      final repository = ref.read(conversationRepositoryProvider);
+      await repository.deleteSession(item.id);
     }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sessionsAsync = ref.watch(sessionListProvider);
-    final controller = ref.read(sessionListControllerProvider);
 
     return AppPageScaffold(
       navigationBar: CupertinoNavigationBar(
@@ -13719,9 +13619,8 @@ class HomePage extends ConsumerWidget {
                     final item = items[index];
                     return _SessionCard(
                       item: item,
-                      controller: controller,
-                      onRename: (item) => _showRenameDialog(context, controller, item),
-                      onDelete: (item) => _showDeleteConfirmDialog(context, controller, item),
+                      onRename: (item) => _showRenameDialog(context, ref, item),
+                      onDelete: (item) => _showDeleteConfirmDialog(context, ref, item),
                     );
                   },
                 );
@@ -13731,7 +13630,9 @@ class HomePage extends ConsumerWidget {
           InputBar(
             hintText: '发送消息',
             onSend: (content, attachments) async {
-              final sessionId = await controller.createSession('新对话');
+              final repository = ref.read(conversationRepositoryProvider);
+              final sessionId = const Uuid().v4();
+              await repository.createSession(sessionId: sessionId, title: '新对话');
               if (context.mounted) {
                 await Navigator.push(
                   context,
@@ -13890,13 +13791,11 @@ class _BlinkingDotState extends State<_BlinkingDot> with SingleTickerProviderSta
 
 class _SessionCard extends ConsumerWidget {
   final SessionListItem item;
-  final SessionListController controller;
   final Future<void> Function(SessionListItem item) onRename;
   final Future<void> Function(SessionListItem item) onDelete;
 
   const _SessionCard({
     required this.item,
-    required this.controller,
     required this.onRename,
     required this.onDelete,
   });
@@ -14668,7 +14567,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       final newId = await ChatService.sendMessage(
         repository: ref.read(conversationRepositoryProvider),
         configService: ref.read(configServiceProvider),
-        apiSource: ref.read(remoteApiSourceProvider),
+        sourceRouter: ref.read(chatSourceRouterProvider),
         sessionId: widget.sessionId,
         content: widget.initialMessage!,
         parentRoundId: _currentRoundId,
@@ -14799,7 +14698,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               final newId = await ChatService.sendMessage(
                 repository: ref.read(conversationRepositoryProvider),
                 configService: ref.read(configServiceProvider),
-                apiSource: ref.read(remoteApiSourceProvider),
+                sourceRouter: ref.read(chatSourceRouterProvider),
                 sessionId: widget.sessionId,
                 content: text,
                 parentRoundId: _currentRoundId,
@@ -14821,7 +14720,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final newId = await ChatService.retryFromRound(
       repository: ref.read(conversationRepositoryProvider),
       configService: ref.read(configServiceProvider),
-      apiSource: ref.read(remoteApiSourceProvider),
+      sourceRouter: ref.read(chatSourceRouterProvider),
       sessionId: widget.sessionId,
       sourceRound: sourceRound,
       character: ref.read(currentCharacterProvider),
