@@ -1,6 +1,8 @@
+import 'package:aiservice/di/providers.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 import '../../domain/models/session_list_item.dart';
 import '../providers/session_list_notifier.dart';
 import '../widgets/common/app_page_scaffold.dart';
@@ -13,7 +15,7 @@ class HomePage extends ConsumerWidget {
 
   Future<void> _showRenameDialog(
     BuildContext context,
-    SessionListController controller,
+    WidgetRef ref,
     SessionListItem item,
   ) async {
     final controllerText = TextEditingController(text: item.title);
@@ -39,13 +41,14 @@ class HomePage extends ConsumerWidget {
       ),
     );
     if (result != null && result.isNotEmpty && result != item.title) {
-      await controller.updateSessionTitle(item.id, result);
+      final repository = ref.read(conversationRepositoryProvider);
+      await repository.updateSessionTitle(item.id, result);
     }
   }
 
   Future<void> _showDeleteConfirmDialog(
     BuildContext context,
-    SessionListController controller,
+    WidgetRef ref,
     SessionListItem item,
   ) async {
     final confirmed = await showCupertinoDialog<bool>(
@@ -69,14 +72,14 @@ class HomePage extends ConsumerWidget {
         false;
 
     if (confirmed == true) {
-      await controller.deleteSession(item.id);
+      final repository = ref.read(conversationRepositoryProvider);
+      await repository.deleteSession(item.id);
     }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sessionsAsync = ref.watch(sessionListProvider);
-    final controller = ref.read(sessionListControllerProvider);
 
     return AppPageScaffold(
       navigationBar: CupertinoNavigationBar(
@@ -116,9 +119,8 @@ class HomePage extends ConsumerWidget {
                     final item = items[index];
                     return _SessionCard(
                       item: item,
-                      controller: controller,
-                      onRename: (item) => _showRenameDialog(context, controller, item),
-                      onDelete: (item) => _showDeleteConfirmDialog(context, controller, item),
+                      onRename: (item) => _showRenameDialog(context, ref, item),
+                      onDelete: (item) => _showDeleteConfirmDialog(context, ref, item),
                     );
                   },
                 );
@@ -128,7 +130,9 @@ class HomePage extends ConsumerWidget {
           InputBar(
             hintText: '发送消息',
             onSend: (content, attachments) async {
-              final sessionId = await controller.createSession('新对话');
+              final repository = ref.read(conversationRepositoryProvider);
+              final sessionId = const Uuid().v4();
+              await repository.createSession(sessionId: sessionId, title: '新对话');
               if (context.mounted) {
                 await Navigator.push(
                   context,
@@ -287,13 +291,11 @@ class _BlinkingDotState extends State<_BlinkingDot> with SingleTickerProviderSta
 
 class _SessionCard extends ConsumerWidget {
   final SessionListItem item;
-  final SessionListController controller;
   final Future<void> Function(SessionListItem item) onRename;
   final Future<void> Function(SessionListItem item) onDelete;
 
   const _SessionCard({
     required this.item,
-    required this.controller,
     required this.onRename,
     required this.onDelete,
   });
