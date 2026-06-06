@@ -37,8 +37,8 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # ★★★ 核心步骤：终极 Patch (解除限制 + 物理注入 Vulkan + Kotlin 兼容) ★★★
-      - name: Ultimate Patch for flutter_llama & Vulkan & Kotlin
+      # ★★★ 核心步骤：硬编码绕过 NDK 沙箱 + 官方 Kotlin 兼容模式 ★★★
+      - name: Ultimate Patch for Vulkan & Kotlin Compatibility
         run: |
           echo "🔍 Searching for flutter_llama plugin directory..."
           PLUGIN_DIR=$(find $HOME/.pub-cache/hosted/pub.dev -maxdepth 1 -type d -name "flutter_llama-*" 2>/dev/null | head -n 1)
@@ -73,30 +73,35 @@ jobs:
           echo "🚀 Shallow cloning llama.cpp..."
           git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/ggerganov/llama.cpp.git
           
-          # --- 修复 3: 下载 SPIRV-Headers 源码并物理注入 (绕过 NDK 沙箱) ---
-          echo "🛠️ Downloading SPIRV-Headers source code..."
+          # --- 修复 3: 编译 SPIRV-Headers 并获取精确的 Config 目录 ---
+          echo "🛠️ Downloading and installing SPIRV-Headers locally..."
           rm -rf SPIRV-Headers
           git clone --depth 1 https://github.com/KhronosGroup/SPIRV-Headers.git
+          cd SPIRV-Headers
+          cmake -B build -DCMAKE_INSTALL_PREFIX=./install
+          cmake --build build --target install
+          cd ..
           
-          # 获取绝对路径
-          SPIRV_INCLUDE_DIR=$(pwd)/SPIRV-Headers/include
-          echo "✅ SPIRV-Headers include dir: $SPIRV_INCLUDE_DIR"
+          # 核心：找到包含 SPIRV-HeadersConfig.cmake 的精确绝对路径
+          SPIRV_CONFIG_DIR=$(find SPIRV-Headers/install -type f -name "SPIRV-HeadersConfig.cmake" -exec dirname {} \; | head -n 1)
+          echo "✅ Found SPIRV-HeadersConfig.cmake in: $SPIRV_CONFIG_DIR"
           
-          # 找到 llama.cpp 中 Vulkan 的 CMakeLists.txt
-          VULKAN_CMAKE=$(find llama.cpp -type f -name "CMakeLists.txt" | grep -i vulkan | head -n 1)
-          
-          if [ -n "$VULKAN_CMAKE" ]; then
-            echo "🛠️ Patching $VULKAN_CMAKE to bypass find_package..."
-            # 1. 注释掉 find_package，让 CMake 不再去系统里找 Config 文件
-            sed -i 's/find_package(SPIRV-Headers/# find_package(SPIRV-Headers/g' "$VULKAN_CMAKE"
-            # 2. 在文件第一行强行注入 include 目录，物理指定头文件位置
-            sed -i "1i include_directories(\"$SPIRV_INCLUDE_DIR\")" "$VULKAN_CMAKE"
-            echo "✅ Vulkan CMake patched successfully. NDK sysroot restriction bypassed."
+          # --- 修复 4: 硬编码注入 Vulkan CMakeLists.txt (绕过 NDK 沙箱) ---
+          # 直接使用错误日志中确认的精确相对路径，避免 find/grep 管道失效
+          VULKAN_CMAKE="llama.cpp/ggml/src/ggml-vulkan/CMakeLists.txt"
+          if [ -f "$VULKAN_CMAKE" ]; then
+            echo "🛠️ Injecting exact SPIRV-Headers_DIR into $VULKAN_CMAKE..."
+            # CMake 底层机制：_DIR 变量不受 NDK CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY 的限制！
+            sed -i "1i set(SPIRV-Headers_DIR \"$SPIRV_CONFIG_DIR\")" "$VULKAN_CMAKE"
+            sed -i "2i list(APPEND CMAKE_PREFIX_PATH \"$SPIRV_CONFIG_DIR\")" "$VULKAN_CMAKE"
+            sed -i "3i set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE BOTH)" "$VULKAN_CMAKE"
+            echo "✅ NDK sysroot restriction bypassed via _DIR variable."
           else
-            echo "⚠️ Warning: Could not find Vulkan CMakeLists.txt in llama.cpp."
+            echo "❌ Fatal: Could not find $VULKAN_CMAKE"
+            exit 1
           fi
           
-          # --- 修复 4: 根据 Flutter 官方指南，配置 Kotlin Legacy 兼容模式 ---
+          # --- 修复 5: 根据 Flutter 官方指南，开启 Kotlin Legacy 兼容模式 ---
           cd $GITHUB_WORKSPACE
           GRADLE_PROPS="android/gradle.properties"
           if [ -f "$GRADLE_PROPS" ]; then
