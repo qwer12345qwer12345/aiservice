@@ -11,7 +11,7 @@ jobs:
       # 1. 检出代码
       - uses: actions/checkout@v4
 
-      # 2. 安装 Vulkan 着色器编译工具 (glslc 是 llama.cpp 编译 Vulkan 必需的)
+      # 2. 安装 Vulkan 着色器编译工具 (glslc)
       - name: Install Vulkan build tools
         run: |
           sudo apt-get update -qq
@@ -37,8 +37,8 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # ★★★ 核心步骤：Python 物理注入 Target + 官方 Kotlin 兼容模式 ★★★
-      - name: Ultimate Patch for Vulkan & Kotlin Compatibility
+      # ★★★ 核心反思与重构：融入 NDK 沙箱 + 精准替换版本 ★★★
+      - name: Ultimate NDK Sysroot Injection & Version Patch
         run: |
           echo "🔍 Searching for flutter_llama plugin directory..."
           PLUGIN_DIR=$(find $HOME/.pub-cache/hosted/pub.dev -maxdepth 1 -type d -name "flutter_llama-*" 2>/dev/null | head -n 1)
@@ -55,7 +55,7 @@ jobs:
           echo "✅ Plugin directory found: $PLUGIN_DIR"
           cd "$PLUGIN_DIR"
           
-          # --- 修复 1: 解除 CMake 3.18.1 限制 ---
+          # --- 修复 1: 精准替换 CMake 版本 (不删除，而是替换为预装的 3.22.1) ---
           GRADLE_FILE=""
           if [ -f "android/build.gradle.kts" ]; then
             GRADLE_FILE="android/build.gradle.kts"
@@ -64,8 +64,9 @@ jobs:
           fi
           
           if [ -n "$GRADLE_FILE" ]; then
-            echo "🛠️ Removing CMake 3.18.1 restriction in $GRADLE_FILE..."
-            perl -i -ne 'print unless /3\.18\.1/' "$GRADLE_FILE"
+            echo "🛠️ Replacing CMake 3.18.1 with 3.22.1 in $GRADLE_FILE..."
+            sed -i 's/"3.18.1"/"3.22.1"/g' "$GRADLE_FILE"
+            sed -i "s/'3.18.1'/'3.22.1'/g" "$GRADLE_FILE"
           fi
           
           # --- 修复 2: 极速克隆 llama.cpp ---
@@ -73,69 +74,37 @@ jobs:
           echo "🚀 Shallow cloning llama.cpp..."
           git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/ggerganov/llama.cpp.git
           
-          # --- 修复 3: 下载 SPIRV-Headers 源码 ---
-          echo "🛠️ Downloading SPIRV-Headers source code..."
+          # --- 修复 3: 降维打击 - 将 SPIRV-Headers 直接安装到 NDK Sysroot ---
+          echo "🛠️ Downloading SPIRV-Headers..."
           rm -rf SPIRV-Headers
           git clone --depth 1 https://github.com/KhronosGroup/SPIRV-Headers.git
+          cd SPIRV-Headers
           
-          SPIRV_INCLUDE_DIR=$(pwd)/SPIRV-Headers/include
-          echo "✅ SPIRV-Headers include dir: $SPIRV_INCLUDE_DIR"
-          export SPIRV_INCLUDE_DIR
-          
-          # --- 修复 4: 使用 Python 物理注入 Vulkan CMakeLists.txt (绕过 NDK 沙箱) ---
-          VULKAN_CMAKE="llama.cpp/ggml/src/ggml-vulkan/CMakeLists.txt"
-          if [ -f "$VULKAN_CMAKE" ]; then
-            echo "🛠️ Patching $VULKAN_CMAKE with Python..."
-            python3 << 'EOF'
-import sys
-import os
-
-cmake_file = 'llama.cpp/ggml/src/ggml-vulkan/CMakeLists.txt'
-spirv_include = os.environ.get('SPIRV_INCLUDE_DIR', '')
-
-if not os.path.exists(cmake_file):
-    print(f"ERROR: {cmake_file} not found!")
-    sys.exit(1)
-
-with open(cmake_file, 'r') as f:
-    lines = f.readlines()
-
-# 核心：手动创建 NDK 环境下找不到的 IMPORTED Target
-injection = f"""
-# --- INJECTED BY CI ---
-add_library(SPIRV-Headers::SPIRV-Headers INTERFACE IMPORTED)
-set_target_properties(SPIRV-Headers::SPIRV-Headers PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "{spirv_include}")
-set(SPIRV-Headers_FOUND TRUE)
-# ----------------------
-"""
-
-new_lines = [injection]
-for line in lines:
-    # 注释掉所有 find_package(SPIRV-Headers 相关的调用
-    if 'find_package(SPIRV-Headers' in line:
-        new_lines.append(f'# {line}')
-    else:
-        new_lines.append(line)
-
-with open(cmake_file, 'w') as f:
-    f.writelines(new_lines)
-
-print('✅ Successfully patched ggml-vulkan/CMakeLists.txt')
-EOF
-          else
-            echo "❌ Fatal: Could not find $VULKAN_CMAKE"
-            exit 1
+          # 推导 NDK 路径
+          NDK_PATH=$(ls -d $ANDROID_HOME/ndk/* 2>/dev/null | head -n 1)
+          if [ -z "$NDK_PATH" ]; then
+            NDK_PATH="/usr/local/lib/android/sdk/ndk/27.0.12077973" # fallback
           fi
+          SYSROOT="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
           
-          # --- 修复 5: 根据 Flutter 官方指南，开启 Kotlin Legacy 兼容模式 ---
+          echo "🚀 Installing SPIRV-Headers directly into NDK Sysroot: $SYSROOT"
+          # 核心：直接安装到 sysroot/usr，CMake 在 NDK 环境下会自动将其视为 Android 系统原生库！
+          cmake -B build -DCMAKE_INSTALL_PREFIX=$SYSROOT/usr
+          cmake --build build --target install
+          cd ..
+          
+          # --- 修复 4: 清理 Gradle CMake 缓存，强制重新配置 ---
           cd $GITHUB_WORKSPACE
+          echo "🧹 Cleaning Gradle .cxx cache to force CMake reconfiguration..."
+          rm -rf android/.cxx
+          rm -rf android/app/.cxx
+          
+          # --- 修复 5: 开启 Kotlin Legacy 兼容模式 ---
           GRADLE_PROPS="android/gradle.properties"
           if [ -f "$GRADLE_PROPS" ]; then
-            echo "🛠️ Applying Built-in Kotlin migration flags (Legacy mode)..."
-            # 按照官方文档，添加这两个 flag 以兼容未迁移的旧插件 (如 flutter_llama)
+            echo "🛠️ Applying Built-in Kotlin migration flags..."
             grep -qxF "android.builtInKotlin=false" "$GRADLE_PROPS" || echo "android.builtInKotlin=false" >> "$GRADLE_PROPS"
             grep -qxF "android.newDsl=false" "$GRADLE_PROPS" || echo "android.newDsl=false" >> "$GRADLE_PROPS"
-            echo "✅ Kotlin Legacy mode enabled. Warnings suppressed."
           fi
 
       # 5. 构建 Android APK
