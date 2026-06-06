@@ -34,7 +34,7 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # ★★★ 核心：预装 NDK + 注入 SPIRV-Headers + 注入 Vulkan-Hpp ★★★
+      # ★★★ 核心：预装 NDK + 动态追踪注入 Vulkan-Hpp + 官方 Kotlin 兼容 ★★★
       - name: Pre-install NDK & Inject All Vulkan Dependencies into Sysroot
         run: |
           echo "🚀 Step 1: Pre-installing NDK 27 & CMake 3.22.1..."
@@ -62,8 +62,11 @@ jobs:
           rm -rf llama.cpp
           git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/ggerganov/llama.cpp.git
           
-          echo "💉 Step 5: Injecting SPIRV-Headers & Vulkan-Hpp into NDK 27 Sysroot..."
+          echo "💉 Step 5: Injecting SPIRV-Headers, Vulkan-Headers & Vulkan-Hpp into NDK 27 Sysroot..."
           SYSROOT="$ANDROID_HOME/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
+          
+          # 确保目标目录存在
+          mkdir -p $SYSROOT/usr/include/vulkan
           
           # 1. 安装 SPIRV-Headers (CMake Config) - 解决之前的 find_package 报错
           rm -rf SPIRV-Headers
@@ -73,16 +76,30 @@ jobs:
           cmake --build build --target install
           cd ..
           
-          # 2. 注入 Vulkan-Hpp (提供 vulkan/vulkan.hpp C++ bindings) - 解决当前的 fatal error
+          # 2. 注入 Vulkan-Headers (C API, 提供 vulkan_core.h 等底层定义)
+          rm -rf Vulkan-Headers
+          git clone --depth 1 https://github.com/KhronosGroup/Vulkan-Headers.git
+          if [ -d "Vulkan-Headers/include/vulkan" ]; then
+              cp -r Vulkan-Headers/include/vulkan/* $SYSROOT/usr/include/vulkan/
+              echo "✅ Vulkan-Headers (C API) injected."
+          fi
+          
+          # 3. 动态追踪并注入 Vulkan-Hpp (C++ API, 提供 vulkan.hpp)
           rm -rf Vulkan-Hpp
           git clone --depth 1 https://github.com/KhronosGroup/Vulkan-Hpp.git
-          # 将 C++ 头文件直接合并到 NDK 的系统 include 目录中
-          cp -r Vulkan-Hpp/include/* $SYSROOT/usr/include/
-          # 兼容不同版本的仓库结构
-          if [ -d "Vulkan-Hpp/Vulkan-Headers/include" ]; then
-              cp -r Vulkan-Hpp/Vulkan-Headers/include/* $SYSROOT/usr/include/
+          
+          # 使用 find 动态查找 vulkan.hpp 的真实位置，无视 Khronos 的目录结构变更
+          HPP_FILE=$(find Vulkan-Hpp -type f -name "vulkan.hpp" | head -n 1)
+          if [ -n "$HPP_FILE" ]; then
+              VULKAN_HPP_DIR=$(dirname "$HPP_FILE")
+              echo "🔍 Found vulkan.hpp in: $VULKAN_HPP_DIR"
+              # 将包含 vulkan.hpp 的目录下所有文件合并到 NDK 的 vulkan include 目录中
+              cp -r "$VULKAN_HPP_DIR"/* $SYSROOT/usr/include/vulkan/
+              echo "✅ Vulkan-Hpp (vulkan.hpp) successfully injected."
+          else
+              echo "❌ Fatal: Could not find vulkan.hpp in Vulkan-Hpp repository."
+              exit 1
           fi
-          echo "✅ Vulkan-Hpp (vulkan.hpp) successfully injected into Sysroot."
           
           echo "🧹 Step 6: Cleaning all CMake caches..."
           rm -rf android/.cxx
@@ -94,7 +111,6 @@ jobs:
           cd $GITHUB_WORKSPACE
           GRADLE_PROPS="android/gradle.properties"
           if [ -f "$GRADLE_PROPS" ]; then
-            # 根据官方文档，保留 Legacy 模式以兼容未迁移的插件
             grep -qxF "android.builtInKotlin=false" "$GRADLE_PROPS" || echo "android.builtInKotlin=false" >> "$GRADLE_PROPS"
             grep -qxF "android.newDsl=false" "$GRADLE_PROPS" || echo "android.newDsl=false" >> "$GRADLE_PROPS"
           fi
