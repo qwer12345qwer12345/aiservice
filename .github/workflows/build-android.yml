@@ -31,7 +31,7 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # ★★★ 核心步骤：解除 CMake 3.18.1 限制 & 极速克隆 llama.cpp ★★★
+      # ★★★ 核心步骤：解除 CMake 限制 & 极速克隆 llama.cpp (含子模块) ★★★
       - name: Bypass CMake 3.18.1 restriction & Clone llama.cpp
         run: |
           echo "🔍 Searching for flutter_llama plugin directory..."
@@ -67,12 +67,10 @@ jobs:
           
           echo "📄 Target Gradle file: $GRADLE_FILE"
           echo "---------------- BEFORE MODIFICATION ----------------"
-          # 打印修改前包含 3.18.1 的行，方便排查
           grep -n "3.18.1" "$GRADLE_FILE" || echo "(No 3.18.1 restriction found before modification)"
           echo "-----------------------------------------------------"
           
           # 🛠️ 核心 Hack：使用 perl 暴力删除包含 3.18.1 的整行
-          # 删除后，AGP 会自动使用 Runner 预装的 CMake (通常是 3.22.1，满足 llama.cpp >= 3.19 的要求)
           perl -i -ne 'print unless /3\.18\.1/' "$GRADLE_FILE"
           
           # 清理可能产生的连续空行
@@ -82,16 +80,27 @@ jobs:
           grep -n "3.18.1" "$GRADLE_FILE" || echo "✅ 3.18.1 restriction successfully removed!"
           echo "-----------------------------------------------------"
           
-          # 🚀 浅克隆 llama.cpp (极速下载)
+          # 🚀 极速克隆 llama.cpp (包含 Vulkan 需要的 SPIRV-Headers 子模块)
           rm -rf llama.cpp
-          echo "🚀 Shallow cloning llama.cpp..."
-          git clone --depth 1 https://github.com/ggerganov/llama.cpp.git
+          echo "🚀 Shallow cloning llama.cpp with submodules..."
+          
+          # --depth 1: 主仓库浅克隆
+          # --recurse-submodules: 拉取子模块
+          # --shallow-submodules: 子模块也浅克隆 (极速)
+          git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/ggerganov/llama.cpp.git
           
           if [ -f "llama.cpp/include/llama.h" ]; then
             echo "✅ llama.h successfully placed in plugin directory"
           else
             echo "❌ Failed to place llama.h"
             exit 1
+          fi
+          
+          # 验证子模块是否成功拉取
+          if [ -d "llama.cpp/vendor/SPIRV-Headers" ] && [ "$(ls -A llama.cpp/vendor/SPIRV-Headers 2>/dev/null)" ]; then
+            echo "✅ SPIRV-Headers submodule successfully cloned!"
+          else
+            echo "⚠️ Warning: SPIRV-Headers directory seems empty. Vulkan build might fail."
           fi
 
       # 4. 构建 Android APK (Release 模式)
