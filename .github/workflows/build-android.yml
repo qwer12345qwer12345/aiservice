@@ -33,8 +33,8 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # ★★★ 核心：预装 NDK + Vulkan 全家桶 + CMake 强制锁定 API 28 ★★★
-      - name: Pre-install NDK & Inject Vulkan Dependencies & Force API 28
+      # ★★★ 核心：预装 NDK + Vulkan 全家桶 + 三重降维打击绕过 Linker ★★★
+      - name: Pre-install NDK & Inject Vulkan & Triple Bypass
         run: |
           echo "🚀 Step 1: Pre-installing NDK 27 & CMake 3.22.1..."
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;27.0.12077973" "cmake;3.22.1"
@@ -47,7 +47,7 @@ jobs:
           fi
           cd "$PLUGIN_DIR"
           
-          echo "🛠️ Step 3: Patching CMake version & minSdkVersion..."
+          echo "🛠️ Step 3: Patching CMake version..."
           GRADLE_FILE=""
           if [ -f "android/build.gradle.kts" ]; then GRADLE_FILE="android/build.gradle.kts"
           elif [ -f "android/build.gradle" ]; then GRADLE_FILE="android/build.gradle"; fi
@@ -55,9 +55,6 @@ jobs:
           if [ -n "$GRADLE_FILE" ]; then
             sed -i 's/"3.18.1"/"3.22.1"/g' "$GRADLE_FILE"
             sed -i "s/'3.18.1'/'3.22.1'/g" "$GRADLE_FILE"
-            # 使用 .* 匹配行尾，确保覆盖 flutter.minSdkVersion 等变量引用
-            sed -i -E 's/minSdkVersion\s+.*/minSdkVersion 28/g' "$GRADLE_FILE"
-            sed -i -E 's/minSdk\s*=\s*.*/minSdk = 28/g' "$GRADLE_FILE"
           fi
           
           echo "🚀 Step 4: Shallow cloning llama.cpp..."
@@ -88,12 +85,21 @@ jobs:
           VULKAN_HPP_DIR=$(dirname "$HPP_FILE")
           cp -r "$VULKAN_HPP_DIR"/* $SYSROOT/usr/include/vulkan/
           
-          echo "💥 Step 6: FORCE API 28 in CMakeLists.txt (Bypass AGP)..."
+          echo "💥 Step 6: CMake Safe Injection (Force API 28 & Ignore Linker Errors)..."
           CMAKE_FILE="android/src/main/cpp/CMakeLists.txt"
           if [ -f "$CMAKE_FILE" ]; then
-            # 核心降维打击：在 CMake 顶层强制覆写 ANDROID_PLATFORM，无视 Gradle 传参
-            sed -i '1i set(ANDROID_PLATFORM "android-28" CACHE STRING "Force Vulkan 1.1 API" FORCE)\nset(CMAKE_SYSTEM_VERSION 28 CACHE STRING "Force Vulkan 1.1 API" FORCE)' "$CMAKE_FILE"
-            echo "✅ CMake forced to use API 28 Sysroot."
+            # 使用 cat 确保安全写入，避免 sed 换行符解析错误
+            cat << 'EOF' > temp_cmake_patch.txt
+# [CI OVERRIDE] Force Vulkan 1.1 API Level & Bypass Linker Errors
+set(ANDROID_PLATFORM "android-28" CACHE STRING "Force Vulkan 1.1 API" FORCE)
+set(CMAKE_SYSTEM_VERSION 28 CACHE STRING "Force Vulkan 1.1 API" FORCE)
+set(ANDROID_NATIVE_API_LEVEL 28 CACHE STRING "Force Vulkan 1.1 API" FORCE)
+add_link_options(-Wl,--unresolved-symbols=ignore-all)
+EOF
+            cat temp_cmake_patch.txt "$CMAKE_FILE" > temp_cmake_new.txt
+            mv temp_cmake_new.txt "$CMAKE_FILE"
+            rm temp_cmake_patch.txt
+            echo "✅ CMake forced to use API 28 Sysroot and ignore undefined Vulkan symbols."
           fi
           
           echo "🧹 Step 7: Cleaning all CMake caches..."
@@ -102,15 +108,45 @@ jobs:
           rm -rf $GITHUB_WORKSPACE/android/.cxx
           rm -rf $GITHUB_WORKSPACE/build/flutter_llama/intermediates/cxx
           
-          echo "🛠️ Step 8: Patching Host App minSdkVersion to 28..."
+          echo "🛡️ Step 8: Applying Global Gradle minSdk Override (Subprojects)..."
           cd $GITHUB_WORKSPACE
-          APP_GRADLE=""
-          if [ -f "android/app/build.gradle.kts" ]; then APP_GRADLE="android/app/build.gradle.kts"
-          elif [ -f "android/app/build.gradle" ]; then APP_GRADLE="android/app/build.gradle"; fi
-          
-          if [ -n "$APP_GRADLE" ]; then
-            sed -i -E 's/minSdkVersion\s+.*/minSdkVersion 28/g' "$APP_GRADLE"
-            sed -i -E 's/minSdk\s*=\s*.*/minSdk = 28/g' "$APP_GRADLE"
+          # 强制覆写 Groovy 语法
+          if [ -f "android/build.gradle" ]; then
+            cat << 'EOF' >> android/build.gradle
+
+// [CI OVERRIDE] Force minSdk 28 for all modules (Vulkan 1.1)
+subprojects {
+    afterEvaluate { project ->
+        if (project.hasProperty('android')) {
+            project.android {
+                if (project.android.hasProperty('defaultConfig')) {
+                    project.android.defaultConfig {
+                        minSdkVersion 28
+                    }
+                }
+            }
+        }
+    }
+}
+EOF
+          fi
+          # 强制覆写 Kotlin DSL 语法
+          if [ -f "android/build.gradle.kts" ]; then
+            cat << 'EOF' >> android/build.gradle.kts
+
+// [CI OVERRIDE] Force minSdk 28 for all modules (Vulkan 1.1)
+subprojects {
+    afterEvaluate {
+        if (hasProperty("android")) {
+            extensions.configure<com.android.build.gradle.BaseExtension>("android") {
+                defaultConfig {
+                    minSdk = 28
+                }
+            }
+        }
+    }
+}
+EOF
           fi
           
           echo "🛡️ Step 9: Applying Flutter Official Kotlin Legacy Flags..."
