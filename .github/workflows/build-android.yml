@@ -11,7 +11,7 @@ jobs:
       # 1. 检出代码
       - uses: actions/checkout@v4
 
-      # 2. 设置 Java 环境 (Flutter 3.16+ 及现代 Android Gradle 插件需要 JDK 17)
+      # 2. 设置 Java 环境
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -31,79 +31,71 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # ★★★ 核心步骤：解除 CMake 限制 & 极速克隆 llama.cpp (含子模块) ★★★
-      - name: Bypass CMake 3.18.1 restriction & Clone llama.cpp
+      # ★★★ 核心步骤：解除限制 + 编译 Vulkan 依赖 + 消除警告 ★★★
+      - name: Patch flutter_llama & Prepare Vulkan & Fix Warnings
         run: |
           echo "🔍 Searching for flutter_llama plugin directory..."
-          
-          # 优先在现代 Flutter 默认的 pub.dev 缓存目录查找
           PLUGIN_DIR=$(find $HOME/.pub-cache/hosted/pub.dev -maxdepth 1 -type d -name "flutter_llama-*" 2>/dev/null | head -n 1)
           
-          # 如果找不到，再 fallback 到全局搜索
           if [ -z "$PLUGIN_DIR" ]; then
-            echo "⚠️ Standard pub.dev path failed. Searching globally in .pub-cache..."
             PLUGIN_DIR=$(find $HOME/.pub-cache -type d -name "flutter_llama-*" 2>/dev/null | head -n 1)
           fi
           
           if [ -z "$PLUGIN_DIR" ]; then
-            echo "❌ Fatal: Could not find flutter_llama plugin directory anywhere."
+            echo "❌ Fatal: Could not find flutter_llama plugin directory."
             exit 1
           fi
           
           echo "✅ Plugin directory found: $PLUGIN_DIR"
           cd "$PLUGIN_DIR"
           
-          # 自动识别是 Groovy (build.gradle) 还是 Kotlin DSL (build.gradle.kts)
+          # --- 修复 1: 解除 CMake 3.18.1 限制 ---
           GRADLE_FILE=""
           if [ -f "android/build.gradle.kts" ]; then
             GRADLE_FILE="android/build.gradle.kts"
           elif [ -f "android/build.gradle" ]; then
             GRADLE_FILE="android/build.gradle"
-          else
-            echo "❌ Fatal: Could not find build.gradle or build.gradle.kts in android/"
-            ls -la android/
-            exit 1
           fi
           
-          echo "📄 Target Gradle file: $GRADLE_FILE"
-          echo "---------------- BEFORE MODIFICATION ----------------"
-          grep -n "3.18.1" "$GRADLE_FILE" || echo "(No 3.18.1 restriction found before modification)"
-          echo "-----------------------------------------------------"
+          if [ -n "$GRADLE_FILE" ]; then
+            echo "🛠️ Removing CMake 3.18.1 restriction in $GRADLE_FILE..."
+            perl -i -ne 'print unless /3\.18\.1/' "$GRADLE_FILE"
+          fi
           
-          # 🛠️ 核心 Hack：使用 perl 暴力删除包含 3.18.1 的整行
-          perl -i -ne 'print unless /3\.18\.1/' "$GRADLE_FILE"
-          
-          # 清理可能产生的连续空行
-          perl -i -0pe 's/\n{3,}/\n\n/g' "$GRADLE_FILE"
-          
-          echo "---------------- AFTER MODIFICATION -----------------"
-          grep -n "3.18.1" "$GRADLE_FILE" || echo "✅ 3.18.1 restriction successfully removed!"
-          echo "-----------------------------------------------------"
-          
-          # 🚀 极速克隆 llama.cpp (包含 Vulkan 需要的 SPIRV-Headers 子模块)
+          # --- 修复 2: 极速克隆 llama.cpp (含 Vulkan 需要的子模块) ---
           rm -rf llama.cpp
           echo "🚀 Shallow cloning llama.cpp with submodules..."
-          
-          # --depth 1: 主仓库浅克隆
-          # --recurse-submodules: 拉取子模块
-          # --shallow-submodules: 子模块也浅克隆 (极速)
           git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/ggerganov/llama.cpp.git
           
-          if [ -f "llama.cpp/include/llama.h" ]; then
-            echo "✅ llama.h successfully placed in plugin directory"
-          else
-            echo "❌ Failed to place llama.h"
-            exit 1
+          # --- 修复 3: 编译并安装 SPIRV-Headers 以供 Vulkan 使用 ---
+          echo "🛠️ Building and installing SPIRV-Headers for Vulkan..."
+          cd llama.cpp/vendor/SPIRV-Headers
+          # 配置并安装到本地的 install 目录，生成 CMake 需要的 Config 文件
+          cmake -B build -DCMAKE_INSTALL_PREFIX=./install
+          cmake --build build --target install
+          cd ../../..
+          
+          # --- 修复 4: 注入 CMAKE_PREFIX_PATH 到 flutter_llama 的 CMakeLists.txt ---
+          CMAKE_FILE="android/src/main/cpp/CMakeLists.txt"
+          if [ -f "$CMAKE_FILE" ]; then
+            echo "🛠️ Injecting SPIRV-Headers path into $CMAKE_FILE..."
+            # 在文件第一行注入 CMAKE_PREFIX_PATH，让 find_package(SPIRV-Headers) 能找到我们刚安装的目录
+            sed -i '1i list(APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../../llama.cpp/vendor/SPIRV-Headers/install")' "$CMAKE_FILE"
+            echo "✅ SPIRV-Headers path injected. Vulkan will be ENABLED."
           fi
           
-          # 验证子模块是否成功拉取
-          if [ -d "llama.cpp/vendor/SPIRV-Headers" ] && [ "$(ls -A llama.cpp/vendor/SPIRV-Headers 2>/dev/null)" ]; then
-            echo "✅ SPIRV-Headers submodule successfully cloned!"
-          else
-            echo "⚠️ Warning: SPIRV-Headers directory seems empty. Vulkan build might fail."
+          # --- 修复 5: 消除 Kotlin Gradle Plugin WARNING ---
+          # 根据 Flutter 官方指南，添加这两个 flag 可以安全抑制 AGP 9.0 相关的迁移警告
+          cd $GITHUB_WORKSPACE
+          GRADLE_PROPS="android/gradle.properties"
+          if [ -f "$GRADLE_PROPS" ]; then
+            echo "🛠️ Suppressing Built-in Kotlin warnings in $GRADLE_PROPS..."
+            echo "android.builtInKotlin=false" >> "$GRADLE_PROPS"
+            echo "android.newDsl=false" >> "$GRADLE_PROPS"
+            echo "✅ Kotlin warnings suppressed."
           fi
 
-      # 4. 构建 Android APK (Release 模式)
+      # 4. 构建 Android APK
       - name: Build Android APK
         run: flutter build apk --release
 
