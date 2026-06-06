@@ -37,7 +37,7 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # ★★★ 核心步骤：硬编码绕过 NDK 沙箱 + 官方 Kotlin 兼容模式 ★★★
+      # ★★★ 核心步骤：Python 物理注入 Target + 官方 Kotlin 兼容模式 ★★★
       - name: Ultimate Patch for Vulkan & Kotlin Compatibility
         run: |
           echo "🔍 Searching for flutter_llama plugin directory..."
@@ -73,29 +73,55 @@ jobs:
           echo "🚀 Shallow cloning llama.cpp..."
           git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/ggerganov/llama.cpp.git
           
-          # --- 修复 3: 编译 SPIRV-Headers 并获取精确的 Config 目录 ---
-          echo "🛠️ Downloading and installing SPIRV-Headers locally..."
+          # --- 修复 3: 下载 SPIRV-Headers 源码 ---
+          echo "🛠️ Downloading SPIRV-Headers source code..."
           rm -rf SPIRV-Headers
           git clone --depth 1 https://github.com/KhronosGroup/SPIRV-Headers.git
-          cd SPIRV-Headers
-          cmake -B build -DCMAKE_INSTALL_PREFIX=./install
-          cmake --build build --target install
-          cd ..
           
-          # 核心：找到包含 SPIRV-HeadersConfig.cmake 的精确绝对路径
-          SPIRV_CONFIG_DIR=$(find SPIRV-Headers/install -type f -name "SPIRV-HeadersConfig.cmake" -exec dirname {} \; | head -n 1)
-          echo "✅ Found SPIRV-HeadersConfig.cmake in: $SPIRV_CONFIG_DIR"
+          SPIRV_INCLUDE_DIR=$(pwd)/SPIRV-Headers/include
+          echo "✅ SPIRV-Headers include dir: $SPIRV_INCLUDE_DIR"
+          export SPIRV_INCLUDE_DIR
           
-          # --- 修复 4: 硬编码注入 Vulkan CMakeLists.txt (绕过 NDK 沙箱) ---
-          # 直接使用错误日志中确认的精确相对路径，避免 find/grep 管道失效
+          # --- 修复 4: 使用 Python 物理注入 Vulkan CMakeLists.txt (绕过 NDK 沙箱) ---
           VULKAN_CMAKE="llama.cpp/ggml/src/ggml-vulkan/CMakeLists.txt"
           if [ -f "$VULKAN_CMAKE" ]; then
-            echo "🛠️ Injecting exact SPIRV-Headers_DIR into $VULKAN_CMAKE..."
-            # CMake 底层机制：_DIR 变量不受 NDK CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY 的限制！
-            sed -i "1i set(SPIRV-Headers_DIR \"$SPIRV_CONFIG_DIR\")" "$VULKAN_CMAKE"
-            sed -i "2i list(APPEND CMAKE_PREFIX_PATH \"$SPIRV_CONFIG_DIR\")" "$VULKAN_CMAKE"
-            sed -i "3i set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE BOTH)" "$VULKAN_CMAKE"
-            echo "✅ NDK sysroot restriction bypassed via _DIR variable."
+            echo "🛠️ Patching $VULKAN_CMAKE with Python..."
+            python3 << 'EOF'
+import sys
+import os
+
+cmake_file = 'llama.cpp/ggml/src/ggml-vulkan/CMakeLists.txt'
+spirv_include = os.environ.get('SPIRV_INCLUDE_DIR', '')
+
+if not os.path.exists(cmake_file):
+    print(f"ERROR: {cmake_file} not found!")
+    sys.exit(1)
+
+with open(cmake_file, 'r') as f:
+    lines = f.readlines()
+
+# 核心：手动创建 NDK 环境下找不到的 IMPORTED Target
+injection = f"""
+# --- INJECTED BY CI ---
+add_library(SPIRV-Headers::SPIRV-Headers INTERFACE IMPORTED)
+set_target_properties(SPIRV-Headers::SPIRV-Headers PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "{spirv_include}")
+set(SPIRV-Headers_FOUND TRUE)
+# ----------------------
+"""
+
+new_lines = [injection]
+for line in lines:
+    # 注释掉所有 find_package(SPIRV-Headers 相关的调用
+    if 'find_package(SPIRV-Headers' in line:
+        new_lines.append(f'# {line}')
+    else:
+        new_lines.append(line)
+
+with open(cmake_file, 'w') as f:
+    f.writelines(new_lines)
+
+print('✅ Successfully patched ggml-vulkan/CMakeLists.txt')
+EOF
           else
             echo "❌ Fatal: Could not find $VULKAN_CMAKE"
             exit 1
