@@ -11,14 +11,20 @@ jobs:
       # 1. 检出代码
       - uses: actions/checkout@v4
 
-      # 2. 设置 Java 环境
+      # 2. 安装 Vulkan 构建工具 (glslc 用于编译着色器, libvulkan-dev 提供 Vulkan 库)
+      - name: Install Vulkan build tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq glslc libvulkan-dev
+
+      # 3. 设置 Java 环境
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      # 3. 设置 Flutter 环境
+      # 4. 设置 Flutter 环境
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -62,30 +68,31 @@ jobs:
             perl -i -ne 'print unless /3\.18\.1/' "$GRADLE_FILE"
           fi
           
-          # --- 修复 2: 极速克隆 llama.cpp (含 Vulkan 需要的子模块) ---
+          # --- 修复 2: 极速克隆 llama.cpp ---
           rm -rf llama.cpp
-          echo "🚀 Shallow cloning llama.cpp with submodules..."
+          echo "🚀 Shallow cloning llama.cpp..."
           git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/ggerganov/llama.cpp.git
           
-          # --- 修复 3: 编译并安装 SPIRV-Headers 以供 Vulkan 使用 ---
-          echo "🛠️ Building and installing SPIRV-Headers for Vulkan..."
-          cd llama.cpp/vendor/SPIRV-Headers
+          # --- 修复 3: 手动下载并安装 SPIRV-Headers 以供 CMake find_package 使用 ---
+          echo "🛠️ Downloading and installing SPIRV-Headers locally for Vulkan..."
+          rm -rf SPIRV-Headers
+          git clone --depth 1 https://github.com/KhronosGroup/SPIRV-Headers.git
+          cd SPIRV-Headers
           # 配置并安装到本地的 install 目录，生成 CMake 需要的 Config 文件
           cmake -B build -DCMAKE_INSTALL_PREFIX=./install
           cmake --build build --target install
-          cd ../../..
+          cd ..
           
           # --- 修复 4: 注入 CMAKE_PREFIX_PATH 到 flutter_llama 的 CMakeLists.txt ---
           CMAKE_FILE="android/src/main/cpp/CMakeLists.txt"
           if [ -f "$CMAKE_FILE" ]; then
             echo "🛠️ Injecting SPIRV-Headers path into $CMAKE_FILE..."
             # 在文件第一行注入 CMAKE_PREFIX_PATH，让 find_package(SPIRV-Headers) 能找到我们刚安装的目录
-            sed -i '1i list(APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../../llama.cpp/vendor/SPIRV-Headers/install")' "$CMAKE_FILE"
+            sed -i '1i list(APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../../../SPIRV-Headers/install")' "$CMAKE_FILE"
             echo "✅ SPIRV-Headers path injected. Vulkan will be ENABLED."
           fi
           
           # --- 修复 5: 消除 Kotlin Gradle Plugin WARNING ---
-          # 根据 Flutter 官方指南，添加这两个 flag 可以安全抑制 AGP 9.0 相关的迁移警告
           cd $GITHUB_WORKSPACE
           GRADLE_PROPS="android/gradle.properties"
           if [ -f "$GRADLE_PROPS" ]; then
@@ -95,11 +102,11 @@ jobs:
             echo "✅ Kotlin warnings suppressed."
           fi
 
-      # 4. 构建 Android APK
+      # 5. 构建 Android APK
       - name: Build Android APK
         run: flutter build apk --release
 
-      # 5. 上传构建产物
+      # 6. 上传构建产物
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
