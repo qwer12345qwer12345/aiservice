@@ -8,23 +8,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. 检出代码
       - uses: actions/checkout@v4
 
-      # 2. 安装 Vulkan 着色器编译工具 (glslc)
+      # 1. 安装 Vulkan 着色器编译器 (glslc 是 llama.cpp 编译 Vulkan 必需的)
       - name: Install Vulkan build tools
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq glslc
 
-      # 3. 设置 Java 环境
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      # 4. 设置 Flutter 环境
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -37,81 +34,66 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # ★★★ 核心反思与重构：融入 NDK 沙箱 + 精准替换版本 ★★★
-      - name: Ultimate NDK Sysroot Injection & Version Patch
+      # ★★★ 核心重构：抢占 NDK 下载时序 + 融入 Sysroot + 官方 Kotlin 兼容 ★★★
+      - name: Pre-install NDK & Inject Vulkan Dependencies into Sysroot
         run: |
-          echo "🔍 Searching for flutter_llama plugin directory..."
+          echo "🚀 Step 1: Pre-installing NDK 27 & CMake 3.22.1 to prevent Gradle overwrite..."
+          # 抢在 Gradle 之前安装，防止 Gradle 运行时重新解压 NDK 导致注入失效
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;27.0.12077973" "cmake;3.22.1"
+          
+          echo "🔍 Step 2: Locating flutter_llama plugin..."
           PLUGIN_DIR=$(find $HOME/.pub-cache/hosted/pub.dev -maxdepth 1 -type d -name "flutter_llama-*" 2>/dev/null | head -n 1)
-          
-          if [ -z "$PLUGIN_DIR" ]; then
-            PLUGIN_DIR=$(find $HOME/.pub-cache -type d -name "flutter_llama-*" 2>/dev/null | head -n 1)
-          fi
-          
           if [ -z "$PLUGIN_DIR" ]; then
             echo "❌ Fatal: Could not find flutter_llama plugin directory."
             exit 1
           fi
-          
-          echo "✅ Plugin directory found: $PLUGIN_DIR"
           cd "$PLUGIN_DIR"
           
-          # --- 修复 1: 精准替换 CMake 版本 (不删除，而是替换为预装的 3.22.1) ---
+          echo "🛠️ Step 3: Patching CMake version restriction (3.18.1 -> 3.22.1)..."
           GRADLE_FILE=""
-          if [ -f "android/build.gradle.kts" ]; then
-            GRADLE_FILE="android/build.gradle.kts"
-          elif [ -f "android/build.gradle" ]; then
-            GRADLE_FILE="android/build.gradle"
-          fi
+          if [ -f "android/build.gradle.kts" ]; then GRADLE_FILE="android/build.gradle.kts"
+          elif [ -f "android/build.gradle" ]; then GRADLE_FILE="android/build.gradle"; fi
           
           if [ -n "$GRADLE_FILE" ]; then
-            echo "🛠️ Replacing CMake 3.18.1 with 3.22.1 in $GRADLE_FILE..."
             sed -i 's/"3.18.1"/"3.22.1"/g' "$GRADLE_FILE"
             sed -i "s/'3.18.1'/'3.22.1'/g" "$GRADLE_FILE"
           fi
           
-          # --- 修复 2: 极速克隆 llama.cpp ---
+          echo "🚀 Step 4: Shallow cloning llama.cpp..."
           rm -rf llama.cpp
-          echo "🚀 Shallow cloning llama.cpp..."
           git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/ggerganov/llama.cpp.git
           
-          # --- 修复 3: 降维打击 - 将 SPIRV-Headers 直接安装到 NDK Sysroot ---
-          echo "🛠️ Downloading SPIRV-Headers..."
+          echo "💉 Step 5: Injecting SPIRV-Headers directly into NDK 27 Sysroot..."
+          # 精确获取我们刚刚预装好的 NDK 27 的 Sysroot 路径
+          SYSROOT="$ANDROID_HOME/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
+          
           rm -rf SPIRV-Headers
           git clone --depth 1 https://github.com/KhronosGroup/SPIRV-Headers.git
           cd SPIRV-Headers
-          
-          # 推导 NDK 路径
-          NDK_PATH=$(ls -d $ANDROID_HOME/ndk/* 2>/dev/null | head -n 1)
-          if [ -z "$NDK_PATH" ]; then
-            NDK_PATH="/usr/local/lib/android/sdk/ndk/27.0.12077973" # fallback
-          fi
-          SYSROOT="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
-          
-          echo "🚀 Installing SPIRV-Headers directly into NDK Sysroot: $SYSROOT"
-          # 核心：直接安装到 sysroot/usr，CMake 在 NDK 环境下会自动将其视为 Android 系统原生库！
+          # 核心：直接安装到 sysroot/usr，CMake 在 NDK 环境下会将其视为 Android 系统原生库！
           cmake -B build -DCMAKE_INSTALL_PREFIX=$SYSROOT/usr
           cmake --build build --target install
           cd ..
           
-          # --- 修复 4: 清理 Gradle CMake 缓存，强制重新配置 ---
-          cd $GITHUB_WORKSPACE
-          echo "🧹 Cleaning Gradle .cxx cache to force CMake reconfiguration..."
+          echo "🧹 Step 6: Cleaning all CMake caches to force reconfiguration..."
+          # 清理插件和宿主 App 的 .cxx 缓存，确保 CMake 必须重新读取 Sysroot
           rm -rf android/.cxx
-          rm -rf android/app/.cxx
+          rm -rf $HOME/.pub-cache/hosted/pub.dev/flutter_llama-*/android/.cxx
+          rm -rf $GITHUB_WORKSPACE/android/.cxx
+          rm -rf $GITHUB_WORKSPACE/build/flutter_llama/intermediates/cxx
           
-          # --- 修复 5: 开启 Kotlin Legacy 兼容模式 ---
+          echo "🛡️ Step 7: Applying Flutter Official Kotlin Legacy Flags..."
+          cd $GITHUB_WORKSPACE
           GRADLE_PROPS="android/gradle.properties"
           if [ -f "$GRADLE_PROPS" ]; then
-            echo "🛠️ Applying Built-in Kotlin migration flags..."
+            # 根据 Flutter 官方文档，注入这两个 flag 以兼容未迁移的旧插件
             grep -qxF "android.builtInKotlin=false" "$GRADLE_PROPS" || echo "android.builtInKotlin=false" >> "$GRADLE_PROPS"
             grep -qxF "android.newDsl=false" "$GRADLE_PROPS" || echo "android.newDsl=false" >> "$GRADLE_PROPS"
           fi
 
-      # 5. 构建 Android APK
       - name: Build Android APK
         run: flutter build apk --release
 
-      # 6. 上传构建产物
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
