@@ -33,8 +33,8 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # ★★★ 核心：预装 NDK + 注入 Vulkan + 劫持 Gradle minSdk 数据流 ★★★
-      - name: Pre-install NDK & Inject Vulkan & Root Fix minSdk
+      # ★★★ 核心：预装 NDK + 注入 Vulkan + Perl 暴力重写 minSdk ★★★
+      - name: Pre-install NDK & Inject Vulkan & Perl Force minSdk
         run: |
           echo "🚀 Step 1: Pre-installing NDK 27 & CMake 3.22.1..."
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;27.0.12077973" "cmake;3.22.1"
@@ -47,7 +47,7 @@ jobs:
           fi
           cd "$PLUGIN_DIR"
           
-          echo "🛠️ Step 3: Patching Plugin CMake & minSdk..."
+          echo "🛠️ Step 3: Patching Plugin CMake & PERL FORCE minSdk 28..."
           GRADLE_FILE=""
           if [ -f "android/build.gradle.kts" ]; then GRADLE_FILE="android/build.gradle.kts"
           elif [ -f "android/build.gradle" ]; then GRADLE_FILE="android/build.gradle"; fi
@@ -55,9 +55,11 @@ jobs:
           if [ -n "$GRADLE_FILE" ]; then
             sed -i 's/"3.18.1"/"3.22.1"/g' "$GRADLE_FILE"
             sed -i "s/'3.18.1'/'3.22.1'/g" "$GRADLE_FILE"
-            # 强制替换插件自身的 minSdk
-            sed -i -E 's/minSdkVersion\s+[a-zA-Z0-9_.]+/minSdkVersion 28/g' "$GRADLE_FILE"
-            sed -i -E 's/minSdk\s*=\s*[a-zA-Z0-9_.]+/minSdk = 28/g' "$GRADLE_FILE"
+            
+            # 核心杀招：使用 Perl 捕获缩进并暴力重写整行，无视任何复杂的变量引用
+            perl -i -pe 's/^(\s*)minSdkVersion\s+.*/$1minSdkVersion 28/' "$GRADLE_FILE"
+            perl -i -pe 's/^(\s*)minSdk\s*=\s*.*/$1minSdk = 28/' "$GRADLE_FILE"
+            echo "✅ minSdk forcefully overridden to 28 in $GRADLE_FILE"
           fi
           
           echo "🚀 Step 4: Shallow cloning llama.cpp..."
@@ -92,20 +94,18 @@ jobs:
           rm -rf android/.cxx
           rm -rf $HOME/.pub-cache/hosted/pub.dev/flutter_llama-*/android/.cxx
           
-          echo "💥 Step 7: ROOT FIX - Force minSdk 28 in Host App & local.properties..."
+          echo "💥 Step 7: PERL FORCE minSdk 28 in Host App & local.properties..."
           cd $GITHUB_WORKSPACE
           
-          # 核心杀招：修改 local.properties，覆盖 Flutter 默认的 minSdkVersion 变量
-          # 这将迫使 AGP 在生成 Ninja 文件时，自动链接 API 28 的 libvulkan.so
           echo "flutter.minSdkVersion=28" >> android/local.properties
           
-          # 替换宿主 App 的 minSdk
-          if [ -f "android/app/build.gradle.kts" ]; then
-            sed -i -E 's/minSdkVersion\s+[a-zA-Z0-9_.]+/minSdkVersion 28/g' android/app/build.gradle.kts
-            sed -i -E 's/minSdk\s*=\s*[a-zA-Z0-9_.]+/minSdk = 28/g' android/app/build.gradle.kts
-          elif [ -f "android/app/build.gradle" ]; then
-            sed -i -E 's/minSdkVersion\s+[a-zA-Z0-9_.]+/minSdkVersion 28/g' android/app/build.gradle
-            sed -i -E 's/minSdk\s*=\s*[a-zA-Z0-9_.]+/minSdk = 28/g' android/app/build.gradle
+          APP_GRADLE=""
+          if [ -f "android/app/build.gradle.kts" ]; then APP_GRADLE="android/app/build.gradle.kts"
+          elif [ -f "android/app/build.gradle" ]; then APP_GRADLE="android/app/build.gradle"; fi
+          
+          if [ -n "$APP_GRADLE" ]; then
+            perl -i -pe 's/^(\s*)minSdkVersion\s+.*/$1minSdkVersion 28/' "$APP_GRADLE"
+            perl -i -pe 's/^(\s*)minSdk\s*=\s*.*/$1minSdk = 28/' "$APP_GRADLE"
           fi
           
           echo "🛡️ Step 8: Applying Kotlin Legacy Flags..."
