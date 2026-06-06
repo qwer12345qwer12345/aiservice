@@ -34,8 +34,8 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # ★★★ 核心：预装 NDK + 完整注入 Vulkan 全家桶 (含 vk_video) ★★★
-      - name: Pre-install NDK & Inject All Vulkan Dependencies into Sysroot
+      # ★★★ 核心：预装 NDK + 固定版本注入 Vulkan 全家桶 + 官方 Kotlin 兼容 ★★★
+      - name: Pre-install NDK & Inject Version-Pinned Vulkan Dependencies
         run: |
           echo "🚀 Step 1: Pre-installing NDK 27 & CMake 3.22.1..."
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;27.0.12077973" "cmake;3.22.1"
@@ -62,7 +62,7 @@ jobs:
           rm -rf llama.cpp
           git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/ggerganov/llama.cpp.git
           
-          echo "💉 Step 5: Injecting SPIRV-Headers, Vulkan-Headers & Vulkan-Hpp into NDK 27 Sysroot..."
+          echo "💉 Step 5: Injecting Version-Pinned Vulkan Dependencies into NDK 27 Sysroot..."
           SYSROOT="$ANDROID_HOME/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
           
           # 确保目标目录存在
@@ -71,35 +71,35 @@ jobs:
           
           # 1. 安装 SPIRV-Headers (CMake Config)
           rm -rf SPIRV-Headers
-          git clone --depth 1 https://github.com/KhronosGroup/SPIRV-Headers.git
+          git clone --depth 1 --branch main https://github.com/KhronosGroup/SPIRV-Headers.git
           cd SPIRV-Headers
           cmake -B build -DCMAKE_INSTALL_PREFIX=$SYSROOT/usr
           cmake --build build --target install
           cd ..
           
-          # 2. 注入 Vulkan-Headers (C API, 包含 vulkan/ 和 vk_video/)
+          # 2. 注入 Vulkan-Headers & Vulkan-Hpp (使用固定 Tag 确保版本对齐)
+          # 使用 v1.3.290 这个已知稳定的 Release Tag，确保 vulkan_core.h 和 vulkan.hpp 版本号完全一致
+          VULKAN_TAG="v1.3.290"
+          
           rm -rf Vulkan-Headers
-          git clone --depth 1 https://github.com/KhronosGroup/Vulkan-Headers.git
+          git clone --depth 1 --branch $VULKAN_TAG https://github.com/KhronosGroup/Vulkan-Headers.git
           if [ -d "Vulkan-Headers/include/vulkan" ]; then
               cp -r Vulkan-Headers/include/vulkan/* $SYSROOT/usr/include/vulkan/
               echo "✅ Vulkan-Headers (vulkan/) injected."
           fi
-          # 关键修复：注入 vk_video 目录，解决 vulkan_core.h 找不到 av1std.h 的问题
           if [ -d "Vulkan-Headers/include/vk_video" ]; then
               cp -r Vulkan-Headers/include/vk_video/* $SYSROOT/usr/include/vk_video/
               echo "✅ Vulkan-Headers (vk_video/) injected."
           fi
           
-          # 3. 动态追踪并注入 Vulkan-Hpp (C++ API)
           rm -rf Vulkan-Hpp
-          git clone --depth 1 https://github.com/KhronosGroup/Vulkan-Hpp.git
-          
+          git clone --depth 1 --branch $VULKAN_TAG https://github.com/KhronosGroup/Vulkan-Hpp.git
           HPP_FILE=$(find Vulkan-Hpp -type f -name "vulkan.hpp" | head -n 1)
           if [ -n "$HPP_FILE" ]; then
               VULKAN_HPP_DIR=$(dirname "$HPP_FILE")
               echo "🔍 Found vulkan.hpp in: $VULKAN_HPP_DIR"
               cp -r "$VULKAN_HPP_DIR"/* $SYSROOT/usr/include/vulkan/
-              echo "✅ Vulkan-Hpp (vulkan.hpp) successfully injected."
+              echo "✅ Vulkan-Hpp (vulkan.hpp) successfully injected with matching version."
           else
               echo "❌ Fatal: Could not find vulkan.hpp in Vulkan-Hpp repository."
               exit 1
