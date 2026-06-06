@@ -37,7 +37,7 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # ★★★ 核心步骤：解除限制 + 编译 Vulkan 依赖 + 消除警告 ★★★
+      # ★★★ 核心步骤：解除限制 + 绕过 NDK 沙箱 + 编译 Vulkan 依赖 ★★★
       - name: Patch flutter_llama & Prepare Vulkan & Fix Warnings
         run: |
           echo "🔍 Searching for flutter_llama plugin directory..."
@@ -73,23 +73,41 @@ jobs:
           echo "🚀 Shallow cloning llama.cpp..."
           git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/ggerganov/llama.cpp.git
           
-          # --- 修复 3: 手动下载并安装 SPIRV-Headers 以供 CMake find_package 使用 ---
+          # --- 修复 3: 手动下载并安装 SPIRV-Headers ---
           echo "🛠️ Downloading and installing SPIRV-Headers locally for Vulkan..."
           rm -rf SPIRV-Headers
           git clone --depth 1 https://github.com/KhronosGroup/SPIRV-Headers.git
           cd SPIRV-Headers
-          # 配置并安装到本地的 install 目录，生成 CMake 需要的 Config 文件
+          # 配置并安装到本地的 install 目录
           cmake -B build -DCMAKE_INSTALL_PREFIX=./install
           cmake --build build --target install
           cd ..
           
-          # --- 修复 4: 注入 CMAKE_PREFIX_PATH 到 flutter_llama 的 CMakeLists.txt ---
+          # 获取绝对路径 (关键！)
+          SPIRV_INSTALL_DIR=$(pwd)/SPIRV-Headers/install
+          echo "✅ SPIRV-Headers installed at absolute path: $SPIRV_INSTALL_DIR"
+          
+          # --- 修复 4: 注入绝对路径并绕过 NDK sysroot 限制 ---
           CMAKE_FILE="android/src/main/cpp/CMakeLists.txt"
           if [ -f "$CMAKE_FILE" ]; then
             echo "🛠️ Injecting SPIRV-Headers path into $CMAKE_FILE..."
-            # 在文件第一行注入 CMAKE_PREFIX_PATH，让 find_package(SPIRV-Headers) 能找到我们刚安装的目录
-            sed -i '1i list(APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../../../SPIRV-Headers/install")' "$CMAKE_FILE"
-            echo "✅ SPIRV-Headers path injected. Vulkan will be ENABLED."
+            
+            # 创建补丁文件：
+            # 1. CMAKE_FIND_ROOT_PATH_MODE_PACKAGE BOTH 是核心！它允许 CMake 在 NDK 交叉编译时查找宿主机路径
+            # 2. 注入绝对路径到 CMAKE_PREFIX_PATH 和 SPIRV-Headers_DIR
+            cat <<EOF > cmake_patch.txt
+# Patch for CI Vulkan build
+set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE BOTH)
+list(APPEND CMAKE_PREFIX_PATH "$SPIRV_INSTALL_DIR")
+set(SPIRV-Headers_DIR "$SPIRV_INSTALL_DIR")
+EOF
+            
+            # 将补丁安全地插入到 CMakeLists.txt 的最顶部
+            cat cmake_patch.txt "$CMAKE_FILE" > temp_cmake.txt
+            mv temp_cmake.txt "$CMAKE_FILE"
+            rm cmake_patch.txt
+            
+            echo "✅ Patch injected successfully. NDK sysroot restriction bypassed."
           fi
           
           # --- 修复 5: 消除 Kotlin Gradle Plugin WARNING ---
@@ -97,8 +115,9 @@ jobs:
           GRADLE_PROPS="android/gradle.properties"
           if [ -f "$GRADLE_PROPS" ]; then
             echo "🛠️ Suppressing Built-in Kotlin warnings in $GRADLE_PROPS..."
-            echo "android.builtInKotlin=false" >> "$GRADLE_PROPS"
-            echo "android.newDsl=false" >> "$GRADLE_PROPS"
+            # 确保不重复添加
+            grep -qxF "android.builtInKotlin=false" "$GRADLE_PROPS" || echo "android.builtInKotlin=false" >> "$GRADLE_PROPS"
+            grep -qxF "android.newDsl=false" "$GRADLE_PROPS" || echo "android.newDsl=false" >> "$GRADLE_PROPS"
             echo "✅ Kotlin warnings suppressed."
           fi
 
