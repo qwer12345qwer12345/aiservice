@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 1. 安装 Vulkan 着色器编译器 (glslc 是 llama.cpp 编译 Vulkan 必需的)
+      # 1. 安装 Vulkan 着色器编译器
       - name: Install Vulkan build tools
         run: |
           sudo apt-get update -qq
@@ -34,11 +34,10 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # ★★★ 核心重构：抢占 NDK 下载时序 + 融入 Sysroot + 官方 Kotlin 兼容 ★★★
-      - name: Pre-install NDK & Inject Vulkan Dependencies into Sysroot
+      # ★★★ 核心：预装 NDK + 注入 SPIRV-Headers + 注入 Vulkan-Hpp ★★★
+      - name: Pre-install NDK & Inject All Vulkan Dependencies into Sysroot
         run: |
-          echo "🚀 Step 1: Pre-installing NDK 27 & CMake 3.22.1 to prevent Gradle overwrite..."
-          # 抢在 Gradle 之前安装，防止 Gradle 运行时重新解压 NDK 导致注入失效
+          echo "🚀 Step 1: Pre-installing NDK 27 & CMake 3.22.1..."
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;27.0.12077973" "cmake;3.22.1"
           
           echo "🔍 Step 2: Locating flutter_llama plugin..."
@@ -63,20 +62,29 @@ jobs:
           rm -rf llama.cpp
           git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/ggerganov/llama.cpp.git
           
-          echo "💉 Step 5: Injecting SPIRV-Headers directly into NDK 27 Sysroot..."
-          # 精确获取我们刚刚预装好的 NDK 27 的 Sysroot 路径
+          echo "💉 Step 5: Injecting SPIRV-Headers & Vulkan-Hpp into NDK 27 Sysroot..."
           SYSROOT="$ANDROID_HOME/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
           
+          # 1. 安装 SPIRV-Headers (CMake Config) - 解决之前的 find_package 报错
           rm -rf SPIRV-Headers
           git clone --depth 1 https://github.com/KhronosGroup/SPIRV-Headers.git
           cd SPIRV-Headers
-          # 核心：直接安装到 sysroot/usr，CMake 在 NDK 环境下会将其视为 Android 系统原生库！
           cmake -B build -DCMAKE_INSTALL_PREFIX=$SYSROOT/usr
           cmake --build build --target install
           cd ..
           
-          echo "🧹 Step 6: Cleaning all CMake caches to force reconfiguration..."
-          # 清理插件和宿主 App 的 .cxx 缓存，确保 CMake 必须重新读取 Sysroot
+          # 2. 注入 Vulkan-Hpp (提供 vulkan/vulkan.hpp C++ bindings) - 解决当前的 fatal error
+          rm -rf Vulkan-Hpp
+          git clone --depth 1 https://github.com/KhronosGroup/Vulkan-Hpp.git
+          # 将 C++ 头文件直接合并到 NDK 的系统 include 目录中
+          cp -r Vulkan-Hpp/include/* $SYSROOT/usr/include/
+          # 兼容不同版本的仓库结构
+          if [ -d "Vulkan-Hpp/Vulkan-Headers/include" ]; then
+              cp -r Vulkan-Hpp/Vulkan-Headers/include/* $SYSROOT/usr/include/
+          fi
+          echo "✅ Vulkan-Hpp (vulkan.hpp) successfully injected into Sysroot."
+          
+          echo "🧹 Step 6: Cleaning all CMake caches..."
           rm -rf android/.cxx
           rm -rf $HOME/.pub-cache/hosted/pub.dev/flutter_llama-*/android/.cxx
           rm -rf $GITHUB_WORKSPACE/android/.cxx
@@ -86,7 +94,7 @@ jobs:
           cd $GITHUB_WORKSPACE
           GRADLE_PROPS="android/gradle.properties"
           if [ -f "$GRADLE_PROPS" ]; then
-            # 根据 Flutter 官方文档，注入这两个 flag 以兼容未迁移的旧插件
+            # 根据官方文档，保留 Legacy 模式以兼容未迁移的插件
             grep -qxF "android.builtInKotlin=false" "$GRADLE_PROPS" || echo "android.builtInKotlin=false" >> "$GRADLE_PROPS"
             grep -qxF "android.newDsl=false" "$GRADLE_PROPS" || echo "android.newDsl=false" >> "$GRADLE_PROPS"
           fi
