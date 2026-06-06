@@ -33,8 +33,8 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # ★★★ 核心：预装 NDK + 注入 Vulkan 依赖 + Patch 第三方插件限制 ★★★
-      - name: Prepare NDK Sysroot & Patch flutter_llama plugin
+      # ★★★ 核心：预装 NDK + Vulkan 全家桶 + 提升 API Level 到 28 ★★★
+      - name: Pre-install NDK & Inject Vulkan Dependencies & Fix Linker
         run: |
           echo "🚀 Step 1: Pre-installing NDK 27 & CMake 3.22.1..."
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;27.0.12077973" "cmake;3.22.1"
@@ -47,27 +47,31 @@ jobs:
           fi
           cd "$PLUGIN_DIR"
           
-          echo "🛠️ Step 3: Patching flutter_llama CMake restriction (3.18.1 -> 3.22.1)..."
-          # 注意：这里只 patch 第三方插件的 build.gradle，因为它是 pub get 下载的，无法通过 Git 控制
+          echo "🛠️ Step 3: Patching CMake version & minSdkVersion (API 28 for Vulkan 1.1)..."
           GRADLE_FILE=""
           if [ -f "android/build.gradle.kts" ]; then GRADLE_FILE="android/build.gradle.kts"
           elif [ -f "android/build.gradle" ]; then GRADLE_FILE="android/build.gradle"; fi
           
           if [ -n "$GRADLE_FILE" ]; then
+            # 替换 CMake 版本
             sed -i 's/"3.18.1"/"3.22.1"/g' "$GRADLE_FILE"
             sed -i "s/'3.18.1'/'3.22.1'/g" "$GRADLE_FILE"
+            
+            # 核心修复：强制提升 minSdkVersion 到 28，解决 Vulkan 1.1 符号链接失败问题
+            sed -i -E 's/minSdkVersion\s+[a-zA-Z0-9_.]+/minSdkVersion 28/g' "$GRADLE_FILE"
+            sed -i -E 's/minSdkVersion\s*=\s*[a-zA-Z0-9_.]+/minSdkVersion = 28/g' "$GRADLE_FILE"
+            sed -i -E 's/minSdk\s*=\s*[a-zA-Z0-9_.]+/minSdk = 28/g' "$GRADLE_FILE"
           fi
           
-          echo "🚀 Step 4: Shallow cloning llama.cpp into plugin..."
+          echo "🚀 Step 4: Shallow cloning llama.cpp..."
           rm -rf llama.cpp
           git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/ggerganov/llama.cpp.git
           
-          echo "💉 Step 5: Injecting Vulkan Dependencies into NDK 27 Sysroot..."
+          echo "💉 Step 5: Injecting Version-Pinned Vulkan Dependencies into NDK 27 Sysroot..."
           SYSROOT="$ANDROID_HOME/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
           mkdir -p $SYSROOT/usr/include/vulkan
           mkdir -p $SYSROOT/usr/include/vk_video
           
-          # 安装 SPIRV-Headers
           rm -rf SPIRV-Headers
           git clone --depth 1 --branch main https://github.com/KhronosGroup/SPIRV-Headers.git
           cd SPIRV-Headers
@@ -75,7 +79,6 @@ jobs:
           cmake --build build --target install
           cd ..
           
-          # 注入 Vulkan C/C++ Headers (使用固定 Tag 保证版本对齐)
           VULKAN_TAG="v1.3.290"
           rm -rf Vulkan-Headers
           git clone --depth 1 --branch $VULKAN_TAG https://github.com/KhronosGroup/Vulkan-Headers.git
@@ -88,10 +91,30 @@ jobs:
           VULKAN_HPP_DIR=$(dirname "$HPP_FILE")
           cp -r "$VULKAN_HPP_DIR"/* $SYSROOT/usr/include/vulkan/
           
-          echo "🧹 Step 6: Cleaning CMake caches to force reconfiguration..."
+          echo "🧹 Step 6: Cleaning all CMake caches..."
           rm -rf android/.cxx
+          rm -rf $HOME/.pub-cache/hosted/pub.dev/flutter_llama-*/android/.cxx
           rm -rf $GITHUB_WORKSPACE/android/.cxx
           rm -rf $GITHUB_WORKSPACE/build/flutter_llama/intermediates/cxx
+          
+          echo "🛠️ Step 7: Patching Host App minSdkVersion to 28..."
+          cd $GITHUB_WORKSPACE
+          APP_GRADLE=""
+          if [ -f "android/app/build.gradle.kts" ]; then APP_GRADLE="android/app/build.gradle.kts"
+          elif [ -f "android/app/build.gradle" ]; then APP_GRADLE="android/app/build.gradle"; fi
+          
+          if [ -n "$APP_GRADLE" ]; then
+            sed -i -E 's/minSdkVersion\s+[a-zA-Z0-9_.]+/minSdkVersion 28/g' "$APP_GRADLE"
+            sed -i -E 's/minSdkVersion\s*=\s*[a-zA-Z0-9_.]+/minSdkVersion = 28/g' "$APP_GRADLE"
+            sed -i -E 's/minSdk\s*=\s*[a-zA-Z0-9_.]+/minSdk = 28/g' "$APP_GRADLE"
+          fi
+          
+          echo "🛡️ Step 8: Applying Flutter Official Kotlin Legacy Flags..."
+          GRADLE_PROPS="android/gradle.properties"
+          if [ -f "$GRADLE_PROPS" ]; then
+            grep -qxF "android.builtInKotlin=false" "$GRADLE_PROPS" || echo "android.builtInKotlin=false" >> "$GRADLE_PROPS"
+            grep -qxF "android.newDsl=false" "$GRADLE_PROPS" || echo "android.newDsl=false" >> "$GRADLE_PROPS"
+          fi
 
       - name: Build Android APK
         run: flutter build apk --release
