@@ -38,11 +38,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   PageController? _pageController;
   bool _initialMessageHandled = false;
 
+  String? _branchLeafId;
   String? _currentRoundId;
   
   @override
   void initState() {
     super.initState();
+    _branchLeafId = widget.initialRoundId;
     _currentRoundId = widget.initialRoundId;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -58,11 +60,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   Future<void> _ensureInitialRoundId() async {
-    if (_currentRoundId != null) return;
+    if (_branchLeafId != null) return;
     final topology = await ref.read(chatTopologyProvider(widget.sessionId).future);
     if (topology.isNotEmpty && mounted) {
       setState(() {
-        _currentRoundId = topology.last.id;
+        _branchLeafId = topology.last.id;
+        _currentRoundId = _branchLeafId;
       });
     }
   }
@@ -118,31 +121,20 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   void _updateBranch(String leafId) {
     if (!mounted) return;
     setState(() {
+      _branchLeafId = leafId;
       _currentRoundId = leafId;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final topologyAsync = ref.watch(chatTopologyProvider(widget.sessionId));
-    topologyAsync.whenData((topology) {
-      if (_currentRoundId != null) {
-        final idExists = topology.any((t) => t.id == _currentRoundId);
-        if (!idExists) {
-          final fallbackId = topology.isEmpty ? null : topology.last.id;
-          if (_currentRoundId != fallbackId) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted && _currentRoundId != fallbackId) {
-                setState(() {
-                  _currentRoundId = fallbackId;
-                });
-              }
-            });
-          }
-        }
+    ref.listen(chatTopologyProvider(widget.sessionId), (prev, next) {
+      final topology = next.valueOrNull;
+      if (topology != null && _currentRoundId != null && !topology.any((t) => t.id == _currentRoundId)) {
+        setState(() => _currentRoundId = topology.isNotEmpty ? topology.last.id : null);
       }
     });
-
+    
     final hasUnseen = ref.watch(
       roundDetailProvider(_currentRoundId ?? '').select(
         (round) => round.valueOrNull?.hasUnseenUpdate ?? false,
@@ -179,7 +171,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
     final visibleRoundIds = ref.watch(visibleRoundIdsProvider(( 
       sessionId: widget.sessionId,
-      roundId: _currentRoundId,
+      roundId: _branchLeafId,
     )));
 
     int currentIndex = visibleRoundIds.indexOf(_currentRoundId ?? '');

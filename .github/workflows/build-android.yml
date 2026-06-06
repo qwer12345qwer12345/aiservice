@@ -33,8 +33,8 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # ★★★ 核心：预装 NDK + Vulkan 全家桶 + 提升 API Level 到 28 ★★★
-      - name: Pre-install NDK & Inject Vulkan Dependencies & Fix Linker
+      # ★★★ 核心：预装 NDK + Vulkan 全家桶 + CMake 强制锁定 API 28 ★★★
+      - name: Pre-install NDK & Inject Vulkan Dependencies & Force API 28
         run: |
           echo "🚀 Step 1: Pre-installing NDK 27 & CMake 3.22.1..."
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;27.0.12077973" "cmake;3.22.1"
@@ -47,20 +47,17 @@ jobs:
           fi
           cd "$PLUGIN_DIR"
           
-          echo "🛠️ Step 3: Patching CMake version & minSdkVersion (API 28 for Vulkan 1.1)..."
+          echo "🛠️ Step 3: Patching CMake version & minSdkVersion..."
           GRADLE_FILE=""
           if [ -f "android/build.gradle.kts" ]; then GRADLE_FILE="android/build.gradle.kts"
           elif [ -f "android/build.gradle" ]; then GRADLE_FILE="android/build.gradle"; fi
           
           if [ -n "$GRADLE_FILE" ]; then
-            # 替换 CMake 版本
             sed -i 's/"3.18.1"/"3.22.1"/g' "$GRADLE_FILE"
             sed -i "s/'3.18.1'/'3.22.1'/g" "$GRADLE_FILE"
-            
-            # 核心修复：强制提升 minSdkVersion 到 28，解决 Vulkan 1.1 符号链接失败问题
-            sed -i -E 's/minSdkVersion\s+[a-zA-Z0-9_.]+/minSdkVersion 28/g' "$GRADLE_FILE"
-            sed -i -E 's/minSdkVersion\s*=\s*[a-zA-Z0-9_.]+/minSdkVersion = 28/g' "$GRADLE_FILE"
-            sed -i -E 's/minSdk\s*=\s*[a-zA-Z0-9_.]+/minSdk = 28/g' "$GRADLE_FILE"
+            # 使用 .* 匹配行尾，确保覆盖 flutter.minSdkVersion 等变量引用
+            sed -i -E 's/minSdkVersion\s+.*/minSdkVersion 28/g' "$GRADLE_FILE"
+            sed -i -E 's/minSdk\s*=\s*.*/minSdk = 28/g' "$GRADLE_FILE"
           fi
           
           echo "🚀 Step 4: Shallow cloning llama.cpp..."
@@ -91,25 +88,32 @@ jobs:
           VULKAN_HPP_DIR=$(dirname "$HPP_FILE")
           cp -r "$VULKAN_HPP_DIR"/* $SYSROOT/usr/include/vulkan/
           
-          echo "🧹 Step 6: Cleaning all CMake caches..."
+          echo "💥 Step 6: FORCE API 28 in CMakeLists.txt (Bypass AGP)..."
+          CMAKE_FILE="android/src/main/cpp/CMakeLists.txt"
+          if [ -f "$CMAKE_FILE" ]; then
+            # 核心降维打击：在 CMake 顶层强制覆写 ANDROID_PLATFORM，无视 Gradle 传参
+            sed -i '1i set(ANDROID_PLATFORM "android-28" CACHE STRING "Force Vulkan 1.1 API" FORCE)\nset(CMAKE_SYSTEM_VERSION 28 CACHE STRING "Force Vulkan 1.1 API" FORCE)' "$CMAKE_FILE"
+            echo "✅ CMake forced to use API 28 Sysroot."
+          fi
+          
+          echo "🧹 Step 7: Cleaning all CMake caches..."
           rm -rf android/.cxx
           rm -rf $HOME/.pub-cache/hosted/pub.dev/flutter_llama-*/android/.cxx
           rm -rf $GITHUB_WORKSPACE/android/.cxx
           rm -rf $GITHUB_WORKSPACE/build/flutter_llama/intermediates/cxx
           
-          echo "🛠️ Step 7: Patching Host App minSdkVersion to 28..."
+          echo "🛠️ Step 8: Patching Host App minSdkVersion to 28..."
           cd $GITHUB_WORKSPACE
           APP_GRADLE=""
           if [ -f "android/app/build.gradle.kts" ]; then APP_GRADLE="android/app/build.gradle.kts"
           elif [ -f "android/app/build.gradle" ]; then APP_GRADLE="android/app/build.gradle"; fi
           
           if [ -n "$APP_GRADLE" ]; then
-            sed -i -E 's/minSdkVersion\s+[a-zA-Z0-9_.]+/minSdkVersion 28/g' "$APP_GRADLE"
-            sed -i -E 's/minSdkVersion\s*=\s*[a-zA-Z0-9_.]+/minSdkVersion = 28/g' "$APP_GRADLE"
-            sed -i -E 's/minSdk\s*=\s*[a-zA-Z0-9_.]+/minSdk = 28/g' "$APP_GRADLE"
+            sed -i -E 's/minSdkVersion\s+.*/minSdkVersion 28/g' "$APP_GRADLE"
+            sed -i -E 's/minSdk\s*=\s*.*/minSdk = 28/g' "$APP_GRADLE"
           fi
           
-          echo "🛡️ Step 8: Applying Flutter Official Kotlin Legacy Flags..."
+          echo "🛡️ Step 9: Applying Flutter Official Kotlin Legacy Flags..."
           GRADLE_PROPS="android/gradle.properties"
           if [ -f "$GRADLE_PROPS" ]; then
             grep -qxF "android.builtInKotlin=false" "$GRADLE_PROPS" || echo "android.builtInKotlin=false" >> "$GRADLE_PROPS"
