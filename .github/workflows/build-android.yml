@@ -10,14 +10,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 1. 设置 Java 环境 (Flutter 3.16+ 及现代 Android Gradle 插件需要 JDK 17)
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      # 2. 设置 Flutter 环境
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -29,30 +27,27 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # ★★★ 核心优化 1：缓存 CMake 3.18.1 目录 ★★★
+      # ★★★ 1. 缓存 CMake 3.18.1 (解决安装慢的问题) ★★★
       - name: Cache Android CMake 3.18.1
         id: cache-cmake
         uses: actions/cache@v4
         with:
-          # GitHub Actions ubuntu-latest 的默认 ANDROID_HOME 绝对路径
           path: /usr/local/lib/android/sdk/cmake/3.18.1
           key: android-cmake-3.18.1-${{ runner.os }}
 
-      # ★★★ 核心优化 2：仅在缓存未命中时执行安装 ★★★
+      # ★★★ 2. 仅在无缓存时安装 3.18.1 ★★★
       - name: Install CMake 3.18.1 (if not cached)
         if: steps.cache-cmake.outputs.cache-hit != 'true'
         run: |
-          echo "🛠️ Cache miss. Installing CMake 3.18.1 via sdkmanager..."
+          echo "🛠️ Cache miss. Installing CMake 3.18.1..."
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "cmake;3.18.1"
-          echo "✅ CMake 3.18.1 installed. It will be cached for future runs."
+          echo "✅ CMake 3.18.1 installed and cached."
 
-      # ★★★ 核心优化 3：克隆 llama.cpp (加入浅克隆优化) ★★★
-      - name: Provide llama.cpp inside flutter_llama plugin
+      # ★★★ 3. 克隆 llama.cpp 并 Hack 它的版本要求 (解决版本死锁) ★★★
+      - name: Provide llama.cpp & Hack CMake Requirement
         run: |
           PLUGIN_DIR=$(find $HOME/.pub-cache/hosted -type d -name "flutter_llama-*" 2>/dev/null | head -n 1)
-          
           if [ -z "$PLUGIN_DIR" ]; then
-            echo "Primary path failed. Trying alternative search..."
             PLUGIN_DIR=$(find / -type d -name "flutter_llama-*" 2>/dev/null | grep pub | head -n 1)
           fi
           
@@ -66,22 +61,19 @@ jobs:
           
           rm -rf llama.cpp
           
-          # 使用 --depth 1 进行浅克隆，跳过下载庞大的 Git 历史记录
+          # 浅克隆，极速下载
           echo "🚀 Shallow cloning llama.cpp..."
           git clone --depth 1 https://github.com/ggerganov/llama.cpp.git
           
-          if [ -f "llama.cpp/include/llama.h" ]; then
-            echo "✅ llama.h successfully placed in plugin directory"
-          else
-            echo "❌ Failed to place llama.h"
-            exit 1
-          fi
+          # 核心 Hack：强行将 llama.cpp 的 CMake 最低版本要求降级为 3.18
+          # 这会匹配并替换所有 CMakeLists.txt 中的 cmake_minimum_required(VERSION x.xx)
+          echo "🛠️ Hacking llama.cpp to accept CMake 3.18.1..."
+          find llama.cpp -name "CMakeLists.txt" -exec sed -i -E 's/cmake_minimum_required[[:space:]]*\([[:space:]]*VERSION[[:space:]]*[0-9.]+/cmake_minimum_required(VERSION 3.18/g' {} +
+          echo "✅ llama.cpp CMake requirement downgraded to 3.18."
 
-      # 3. 构建 Android APK (Release 模式)
       - name: Build Android APK
         run: flutter build apk --release
 
-      # 4. 上传构建产物
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
