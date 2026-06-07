@@ -17,17 +17,32 @@ jobs:
         with:
           channel: 'stable'
           cache: true
+          
+      # 安装 Vulkan 宿主机编译工具，防止 CMake 编译 Shader 时报错
+      - name: Install Vulkan build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y glslang-tools glslang-dev spirv-tools
+          
       - name: Clone flutter_llama source
         run: |
           git clone --depth 1 --recursive https://github.com/libsFlutter/flutter_llama.git ../flutter_llama
+          
       - name: Override dependency to use local source
         run: |
           echo "" >> pubspec.yaml
           echo "dependency_overrides:" >> pubspec.yaml
           echo "  flutter_llama:" >> pubspec.yaml
           echo "    path: ../flutter_llama" >> pubspec.yaml
+          
       - run: flutter pub get
       - run: flutter build apk --release --split-per-abi
+      
+      # 上传 Android 产物 (注意路径是 flutter-apk)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: build/app/outputs/flutter-apk/app-*.apk
 
   build_ios:
     runs-on: macos-latest
@@ -37,20 +52,25 @@ jobs:
         with:
           channel: 'stable'
           cache: true
-          - name: Clone flutter_llama source & Pull LFS
+          
+      # 修复了之前的 YAML 缩进错误，并拉取 LFS 静态库
+      - name: Clone flutter_llama source & Pull LFS
         run: |
           git clone --depth 1 --recursive https://github.com/libsFlutter/flutter_llama.git ../flutter_llama
           cd ../flutter_llama
           git lfs install
           git lfs pull
+          
       - name: Override dependency to use local source
         run: |
           echo "" >> pubspec.yaml
           echo "dependency_overrides:" >> pubspec.yaml
           echo "  flutter_llama:" >> pubspec.yaml
           echo "    path: ../flutter_llama" >> pubspec.yaml
+          
       - run: flutter pub get
       - run: flutter build ipa --no-codesign
+      
       - uses: actions/upload-artifact@v4
         with:
           name: ios
@@ -64,9 +84,12 @@ jobs:
         with:
           channel: 'stable'
           cache: true
+          
+      # Windows 不需要 flutter_llama，保持您原本干净高效的逻辑
       - run: flutter pub get
       - run: flutter build windows --release
       - run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath build\windows-app.zip
+      
       - uses: actions/upload-artifact@v4
         with:
           name: windows
@@ -81,16 +104,19 @@ jobs:
         with:
           name: android
           path: android
+          
       - name: Download iOS artifacts
         uses: actions/download-artifact@v4
         with:
           name: ios
           path: ios
+          
       - name: Download Windows artifacts
         uses: actions/download-artifact@v4
         with:
           name: windows
           path: windows
+          
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
