@@ -56,36 +56,36 @@ jobs:
           path: build\windows-app.zip
 
   release:
-  needs: [build_android, build_ios, build_windows]
-  runs-on: ubuntu-latest
-  steps:
-    - name: Download Android artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: android
-        path: android          # 下载到 android/ 下
+    needs: [build_android, build_ios, build_windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Android artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: android
+          path: android          # 下载到 android/ 下
 
-    - name: Download iOS artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: ios
-        path: ios
+      - name: Download iOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ios
+          path: ios
 
-    - name: Download Windows artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: windows
-        path: windows
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows
+          path: windows
 
-    - name: Create Release
-      uses: softprops/action-gh-release@v2
-      with:
-        tag_name: v${{ github.run_number }}
-        name: ai service
-        files: |
-          android/*.apk
-          ios/*.ipa
-          windows/*.zip
-        generate_release_notes: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: ai service
+          files: |
+            android/*.apk
+            ios/*.ipa
+            windows/*.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
