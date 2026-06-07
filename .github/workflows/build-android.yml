@@ -1,17 +1,16 @@
-name: Build Flutter Android APK (Release)
+name: Build Flutter Android APK
 
 on:
   workflow_dispatch:
 
 jobs:
-  build-android-release:
+  build-android:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install Vulkan build tools (glslc)
+      - name: Install Vulkan build tools
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq glslc
@@ -34,7 +33,7 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # ★★★ 核心 1：NDK 预装 + Vulkan 头文件注入 + 物理替换桩库 (解决 flutter_llama 链接报错) ★★★
+      # ★★★ 核心：预装 NDK + 注入头文件 + 物理替换桩库 (The Ultimate Hack) ★★★
       - name: Ultimate NDK Hack & Vulkan Injection
         run: |
           echo "🚀 Step 1: Pre-installing NDK 27 & CMake 3.22.1..."
@@ -48,7 +47,7 @@ jobs:
           fi
           cd "$PLUGIN_DIR"
           
-          echo "🛠️ Step 3: Patching Plugin CMake version (3.18.1 -> 3.22.1)..."
+          echo "🛠️ Step 3: Patching Plugin CMake version..."
           GRADLE_FILE=""
           if [ -f "android/build.gradle.kts" ]; then GRADLE_FILE="android/build.gradle.kts"
           elif [ -f "android/build.gradle" ]; then GRADLE_FILE="android/build.gradle"; fi
@@ -62,7 +61,7 @@ jobs:
           rm -rf llama.cpp
           git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/ggerganov/llama.cpp.git
           
-          echo "💉 Step 5: Injecting Vulkan & SPIRV Headers into NDK 27 Sysroot..."
+          echo "💉 Step 5: Injecting Vulkan Headers into NDK 27 Sysroot..."
           SYSROOT="$ANDROID_HOME/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
           mkdir -p $SYSROOT/usr/include/vulkan
           mkdir -p $SYSROOT/usr/include/vk_video
@@ -87,64 +86,35 @@ jobs:
           cp -r "$VULKAN_HPP_DIR"/* $SYSROOT/usr/include/vulkan/
           
           echo "💥 Step 6: THE ULTIMATE HACK - Overwrite API 24 libvulkan.so with API 28..."
+          # AGP 硬编码了 API 24 的 libvulkan.so 绝对路径，导致链接器找不到 Vulkan 1.1 符号
+          # 我们直接用包含 Vulkan 1.1 符号的 API 28 的 stub 库覆盖它！
           LIB_VULKAN_24="$SYSROOT/usr/lib/aarch64-linux-android/24/libvulkan.so"
           LIB_VULKAN_28="$SYSROOT/usr/lib/aarch64-linux-android/28/libvulkan.so"
           
           if [ -f "$LIB_VULKAN_28" ] && [ -f "$LIB_VULKAN_24" ]; then
             cp "$LIB_VULKAN_28" "$LIB_VULKAN_24"
-            echo "✅ Successfully overwrote API 24 libvulkan.so with API 28 version."
+            echo "✅ Successfully overwrote API 24 libvulkan.so with API 28 version. Linker will now find Vulkan 1.1 symbols!"
           else
             echo "⚠️ Warning: Could not find libvulkan.so to overwrite."
           fi
-
-      # ★★★ 核心 2：Base64 注入 ProGuard 终极保护伞 (彻底免疫 YAML 缩进报错) ★★★
-      - name: Inject Ultimate ProGuard Rules (Base64 Safe)
-        run: |
-          echo "🛡️ Injecting ProGuard rules safely via Base64..."
-          PROGUARD_FILE="android/app/proguard-rules.pro"
           
-          mkdir -p android/app
-          touch "$PROGUARD_FILE"
+          echo "🧹 Step 7: Cleaning CMake caches..."
+          rm -rf android/.cxx
+          rm -rf $HOME/.pub-cache/hosted/pub.dev/flutter_llama-*/android/.cxx
           
-          # 使用 Base64 编码避免 YAML 解析器对多行文本和特殊符号的误判
-          PROGUARD_CONTENT=$(echo "CiMgQ0kgSW5qZWN0ZWQgVWx0aW1hdGUgUHJvR3VhcmQgUnVsZXMKLWtlZXAgY2xhc3MgaW8uZmx1dHRlci5hcHAuKiogeyAqOyB9Ci1rZWVwIGNsYXNzIGlvLmZsdXR0ZXIucGx1Z2luLioqIHsgKjsgfQota2VlcCBjbGFzcyBpby5mbHV0dGVyLnV0aWwuKiogeyAqOyB9Ci1rZWVwIGNsYXNzIGlvLmZsdXR0ZXIudmlldy4qKiB7ICo7IH0KLWtlZXAgY2xhc3MgaW8uZmx1dHRlci4qKiB7ICo7IH0KLWtlZXAgY2xhc3MgaW8uZmx1dHRlci5wbHVnaW5zLioqIHsgKjsgfQota2VlcCBjbGFzcyBjb20ubXIuZmx1dHRlci5wbHVnaW4uZmlsZXBpY2tlci4qKiB7ICo7IH0KLWtlZXAgY2xhc3MgZGV2LmZsdXR0ZXJjb21tdW5pdHkucGx1cy4qKiB7ICo7IH0KLWtlZXAgY2xhc3MgaW8uZmx1dHRlci5wbHVnaW5zLmltYWdlcGlja2VyLioqIHsgKjsgfQota2VlcGNsYXNzZXN3aXRobWVtYmVybmFtZXMgY2xhc3MgKiB7CiAgICBuYXRpdmUgPG1ldGhvZHM+Owp9Ci1rZWVwIGNsYXNzIGV1LnNpbW9ucm9vcy5zcWxpdGUzLioqIHsgKjsgfQota2VlcCBjbGFzcyBvcmcuc3FsaXRlLioqIHsgKjsgfQota2VlcCBjbGFzcyBjb20uc3FsaXRlLioqIHsgKjsgfQota2VlcCBjbGFzcyBhbmRyb2lkeC5jb3JlLmNvbnRlbnQuRmlsZVByb3ZpZGVyIHsgKjsgfQota2VlcCBwdWJsaWMgY2xhc3MgKiBleHRlbmRzIGFuZHJvaWR4LmNvcmUuY29udGVudC5GaWxlUHJvdmlkZXIgeyAqOyB9Cg==")
-          
-          echo "$PROGUARD_CONTENT" | base64 --decode >> "$PROGUARD_FILE"
-          echo "✅ Ultimate ProGuard rules injected successfully."
-
-      # ★★★ 核心 3：应用 Flutter 官方 Kotlin Legacy 兼容模式 (消除 AGP 9.0 WARNING) ★★★
-      - name: Apply Kotlin Legacy Flags
-        run: |
-          echo "🛡️ Applying Flutter Official Kotlin Legacy Flags..."
+          echo "🛡️ Step 8: Applying Kotlin Legacy Flags..."
+          cd $GITHUB_WORKSPACE
           GRADLE_PROPS="android/gradle.properties"
           if [ -f "$GRADLE_PROPS" ]; then
             grep -qxF "android.builtInKotlin=false" "$GRADLE_PROPS" || echo "android.builtInKotlin=false" >> "$GRADLE_PROPS"
             grep -qxF "android.newDsl=false" "$GRADLE_PROPS" || echo "android.newDsl=false" >> "$GRADLE_PROPS"
-            echo "✅ Kotlin Legacy flags applied."
-          else
-            echo "⚠️ Warning: gradle.properties not found."
           fi
 
-      # ★★★ 核心 4：深度清理缓存 (确保所有 Hack 生效) ★★★
-      - name: Deep Clean Build Cache
-        run: |
-          echo "🧹 Deep cleaning Flutter and Gradle caches..."
-          flutter clean
-          rm -rf pubspec.lock
-          flutter pub get
-          
-          cd android
-          ./gradlew clean
-          rm -rf .cxx build app/build
-          cd ..
-
-      # ★★★ 核心 5：构建 Release APK ★★★
-      - name: Build Android APK (Release Mode)
+      - name: Build Android APK
         run: flutter build apk --release
 
-      # ★★★ 核心 6：上传 Release APK ★★★
-      - name: Upload Release APK Artifact
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: android-release-apk
+          name: android-apk
           path: build/app/outputs/flutter-apk/app-release.apk

@@ -1,0 +1,91 @@
+name: Flutter CD
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build_android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+      - run: flutter pub get
+      - run: flutter build apk --release --split-per-abi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: build/app/outputs/flutter-apk/app-*.apk
+
+  build_ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+      - run: flutter pub get
+      - run: flutter build ipa --no-codesign
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios
+          path: build/ios/ipa/*.ipa
+
+  build_windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+      - run: flutter pub get
+      - run: flutter build windows --release
+      - run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath build\windows-app.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: build\windows-app.zip
+
+  release:
+  needs: [build_android, build_ios, build_windows]
+  runs-on: ubuntu-latest
+  steps:
+    - name: Download Android artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: android
+        path: android          # 下载到 android/ 下
+
+    - name: Download iOS artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: ios
+        path: ios
+
+    - name: Download Windows artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: windows
+        path: windows
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v${{ github.run_number }}
+        name: ai service
+        files: |
+          android/*.apk
+          ios/*.ipa
+          windows/*.zip
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -98,7 +98,7 @@ class _InputBarState extends ConsumerState<InputBar> {
   }
 
   Future<void> _pickFileAttachment() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       allowMultiple: false,
       withData: false,
       type: FileType.any,
@@ -150,7 +150,7 @@ class _InputBarState extends ConsumerState<InputBar> {
   }
 
   Future<void> _importCharacterCard() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['png', 'json'],
     );

@@ -62,7 +62,7 @@ dev_dependencies:
 
   intl: ^0.20.2
 
-  file_picker: ^8.1.2
+  file_picker: ^11.0.2
 
   synchronized: ^3.3.0
 

@@ -174,7 +174,7 @@ class SettingsFormNotifier extends Notifier<SettingsFormState> {
   }
 
   Future<void> addLocalModel() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['gguf'],
     );

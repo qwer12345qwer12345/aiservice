@@ -2651,599 +2651,6 @@ abstract class _ChatChunk implements ChatChunk {
 }
 ````
 
-## File: lib/core/models/generation_event.dart
-````dart
-import 'package:freezed_annotation/freezed_annotation.dart';
-
-part 'generation_event.freezed.dart';
-
-/// 生成过程中的统一事件
-@freezed
-class GenerationEvent with _$GenerationEvent {
-  const factory GenerationEvent.partial({
-    required String content,
-    required String reasoning,
-  }) = PartialGeneration;
-
-  const factory GenerationEvent.completed({
-    required String content,
-    required String reasoning,
-  }) = CompletedGeneration;
-
-  const factory GenerationEvent.failed({
-    required String error,
-  }) = FailedGeneration;
-}
-````
-
-## File: lib/core/models/generation_event.freezed.dart
-````dart
-// coverage:ignore-file
-// GENERATED CODE - DO NOT MODIFY BY HAND
-// ignore_for_file: type=lint
-// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
-
-part of 'generation_event.dart';
-
-// **************************************************************************
-// FreezedGenerator
-// **************************************************************************
-
-T _$identity<T>(T value) => value;
-
-final _privateConstructorUsedError = UnsupportedError(
-  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
-);
-
-/// @nodoc
-mixin _$GenerationEvent {
-  @optionalTypeArgs
-  TResult when<TResult extends Object?>({
-    required TResult Function(String content, String reasoning) partial,
-    required TResult Function(String content, String reasoning) completed,
-    required TResult Function(String error) failed,
-  }) => throw _privateConstructorUsedError;
-  @optionalTypeArgs
-  TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function(String content, String reasoning)? partial,
-    TResult? Function(String content, String reasoning)? completed,
-    TResult? Function(String error)? failed,
-  }) => throw _privateConstructorUsedError;
-  @optionalTypeArgs
-  TResult maybeWhen<TResult extends Object?>({
-    TResult Function(String content, String reasoning)? partial,
-    TResult Function(String content, String reasoning)? completed,
-    TResult Function(String error)? failed,
-    required TResult orElse(),
-  }) => throw _privateConstructorUsedError;
-  @optionalTypeArgs
-  TResult map<TResult extends Object?>({
-    required TResult Function(PartialGeneration value) partial,
-    required TResult Function(CompletedGeneration value) completed,
-    required TResult Function(FailedGeneration value) failed,
-  }) => throw _privateConstructorUsedError;
-  @optionalTypeArgs
-  TResult? mapOrNull<TResult extends Object?>({
-    TResult? Function(PartialGeneration value)? partial,
-    TResult? Function(CompletedGeneration value)? completed,
-    TResult? Function(FailedGeneration value)? failed,
-  }) => throw _privateConstructorUsedError;
-  @optionalTypeArgs
-  TResult maybeMap<TResult extends Object?>({
-    TResult Function(PartialGeneration value)? partial,
-    TResult Function(CompletedGeneration value)? completed,
-    TResult Function(FailedGeneration value)? failed,
-    required TResult orElse(),
-  }) => throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-abstract class $GenerationEventCopyWith<$Res> {
-  factory $GenerationEventCopyWith(
-    GenerationEvent value,
-    $Res Function(GenerationEvent) then,
-  ) = _$GenerationEventCopyWithImpl<$Res, GenerationEvent>;
-}
-
-/// @nodoc
-class _$GenerationEventCopyWithImpl<$Res, $Val extends GenerationEvent>
-    implements $GenerationEventCopyWith<$Res> {
-  _$GenerationEventCopyWithImpl(this._value, this._then);
-
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-
-  /// Create a copy of GenerationEvent
-  /// with the given fields replaced by the non-null parameter values.
-}
-
-/// @nodoc
-abstract class _$$PartialGenerationImplCopyWith<$Res> {
-  factory _$$PartialGenerationImplCopyWith(
-    _$PartialGenerationImpl value,
-    $Res Function(_$PartialGenerationImpl) then,
-  ) = __$$PartialGenerationImplCopyWithImpl<$Res>;
-  @useResult
-  $Res call({String content, String reasoning});
-}
-
-/// @nodoc
-class __$$PartialGenerationImplCopyWithImpl<$Res>
-    extends _$GenerationEventCopyWithImpl<$Res, _$PartialGenerationImpl>
-    implements _$$PartialGenerationImplCopyWith<$Res> {
-  __$$PartialGenerationImplCopyWithImpl(
-    _$PartialGenerationImpl _value,
-    $Res Function(_$PartialGenerationImpl) _then,
-  ) : super(_value, _then);
-
-  /// Create a copy of GenerationEvent
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({Object? content = null, Object? reasoning = null}) {
-    return _then(
-      _$PartialGenerationImpl(
-        content: null == content
-            ? _value.content
-            : content // ignore: cast_nullable_to_non_nullable
-                  as String,
-        reasoning: null == reasoning
-            ? _value.reasoning
-            : reasoning // ignore: cast_nullable_to_non_nullable
-                  as String,
-      ),
-    );
-  }
-}
-
-/// @nodoc
-
-class _$PartialGenerationImpl implements PartialGeneration {
-  const _$PartialGenerationImpl({
-    required this.content,
-    required this.reasoning,
-  });
-
-  @override
-  final String content;
-  @override
-  final String reasoning;
-
-  @override
-  String toString() {
-    return 'GenerationEvent.partial(content: $content, reasoning: $reasoning)';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$PartialGenerationImpl &&
-            (identical(other.content, content) || other.content == content) &&
-            (identical(other.reasoning, reasoning) ||
-                other.reasoning == reasoning));
-  }
-
-  @override
-  int get hashCode => Object.hash(runtimeType, content, reasoning);
-
-  /// Create a copy of GenerationEvent
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$PartialGenerationImplCopyWith<_$PartialGenerationImpl> get copyWith =>
-      __$$PartialGenerationImplCopyWithImpl<_$PartialGenerationImpl>(
-        this,
-        _$identity,
-      );
-
-  @override
-  @optionalTypeArgs
-  TResult when<TResult extends Object?>({
-    required TResult Function(String content, String reasoning) partial,
-    required TResult Function(String content, String reasoning) completed,
-    required TResult Function(String error) failed,
-  }) {
-    return partial(content, reasoning);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function(String content, String reasoning)? partial,
-    TResult? Function(String content, String reasoning)? completed,
-    TResult? Function(String error)? failed,
-  }) {
-    return partial?.call(content, reasoning);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult maybeWhen<TResult extends Object?>({
-    TResult Function(String content, String reasoning)? partial,
-    TResult Function(String content, String reasoning)? completed,
-    TResult Function(String error)? failed,
-    required TResult orElse(),
-  }) {
-    if (partial != null) {
-      return partial(content, reasoning);
-    }
-    return orElse();
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult map<TResult extends Object?>({
-    required TResult Function(PartialGeneration value) partial,
-    required TResult Function(CompletedGeneration value) completed,
-    required TResult Function(FailedGeneration value) failed,
-  }) {
-    return partial(this);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult? mapOrNull<TResult extends Object?>({
-    TResult? Function(PartialGeneration value)? partial,
-    TResult? Function(CompletedGeneration value)? completed,
-    TResult? Function(FailedGeneration value)? failed,
-  }) {
-    return partial?.call(this);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult maybeMap<TResult extends Object?>({
-    TResult Function(PartialGeneration value)? partial,
-    TResult Function(CompletedGeneration value)? completed,
-    TResult Function(FailedGeneration value)? failed,
-    required TResult orElse(),
-  }) {
-    if (partial != null) {
-      return partial(this);
-    }
-    return orElse();
-  }
-}
-
-abstract class PartialGeneration implements GenerationEvent {
-  const factory PartialGeneration({
-    required final String content,
-    required final String reasoning,
-  }) = _$PartialGenerationImpl;
-
-  String get content;
-  String get reasoning;
-
-  /// Create a copy of GenerationEvent
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$PartialGenerationImplCopyWith<_$PartialGenerationImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-abstract class _$$CompletedGenerationImplCopyWith<$Res> {
-  factory _$$CompletedGenerationImplCopyWith(
-    _$CompletedGenerationImpl value,
-    $Res Function(_$CompletedGenerationImpl) then,
-  ) = __$$CompletedGenerationImplCopyWithImpl<$Res>;
-  @useResult
-  $Res call({String content, String reasoning});
-}
-
-/// @nodoc
-class __$$CompletedGenerationImplCopyWithImpl<$Res>
-    extends _$GenerationEventCopyWithImpl<$Res, _$CompletedGenerationImpl>
-    implements _$$CompletedGenerationImplCopyWith<$Res> {
-  __$$CompletedGenerationImplCopyWithImpl(
-    _$CompletedGenerationImpl _value,
-    $Res Function(_$CompletedGenerationImpl) _then,
-  ) : super(_value, _then);
-
-  /// Create a copy of GenerationEvent
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({Object? content = null, Object? reasoning = null}) {
-    return _then(
-      _$CompletedGenerationImpl(
-        content: null == content
-            ? _value.content
-            : content // ignore: cast_nullable_to_non_nullable
-                  as String,
-        reasoning: null == reasoning
-            ? _value.reasoning
-            : reasoning // ignore: cast_nullable_to_non_nullable
-                  as String,
-      ),
-    );
-  }
-}
-
-/// @nodoc
-
-class _$CompletedGenerationImpl implements CompletedGeneration {
-  const _$CompletedGenerationImpl({
-    required this.content,
-    required this.reasoning,
-  });
-
-  @override
-  final String content;
-  @override
-  final String reasoning;
-
-  @override
-  String toString() {
-    return 'GenerationEvent.completed(content: $content, reasoning: $reasoning)';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$CompletedGenerationImpl &&
-            (identical(other.content, content) || other.content == content) &&
-            (identical(other.reasoning, reasoning) ||
-                other.reasoning == reasoning));
-  }
-
-  @override
-  int get hashCode => Object.hash(runtimeType, content, reasoning);
-
-  /// Create a copy of GenerationEvent
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$CompletedGenerationImplCopyWith<_$CompletedGenerationImpl> get copyWith =>
-      __$$CompletedGenerationImplCopyWithImpl<_$CompletedGenerationImpl>(
-        this,
-        _$identity,
-      );
-
-  @override
-  @optionalTypeArgs
-  TResult when<TResult extends Object?>({
-    required TResult Function(String content, String reasoning) partial,
-    required TResult Function(String content, String reasoning) completed,
-    required TResult Function(String error) failed,
-  }) {
-    return completed(content, reasoning);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function(String content, String reasoning)? partial,
-    TResult? Function(String content, String reasoning)? completed,
-    TResult? Function(String error)? failed,
-  }) {
-    return completed?.call(content, reasoning);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult maybeWhen<TResult extends Object?>({
-    TResult Function(String content, String reasoning)? partial,
-    TResult Function(String content, String reasoning)? completed,
-    TResult Function(String error)? failed,
-    required TResult orElse(),
-  }) {
-    if (completed != null) {
-      return completed(content, reasoning);
-    }
-    return orElse();
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult map<TResult extends Object?>({
-    required TResult Function(PartialGeneration value) partial,
-    required TResult Function(CompletedGeneration value) completed,
-    required TResult Function(FailedGeneration value) failed,
-  }) {
-    return completed(this);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult? mapOrNull<TResult extends Object?>({
-    TResult? Function(PartialGeneration value)? partial,
-    TResult? Function(CompletedGeneration value)? completed,
-    TResult? Function(FailedGeneration value)? failed,
-  }) {
-    return completed?.call(this);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult maybeMap<TResult extends Object?>({
-    TResult Function(PartialGeneration value)? partial,
-    TResult Function(CompletedGeneration value)? completed,
-    TResult Function(FailedGeneration value)? failed,
-    required TResult orElse(),
-  }) {
-    if (completed != null) {
-      return completed(this);
-    }
-    return orElse();
-  }
-}
-
-abstract class CompletedGeneration implements GenerationEvent {
-  const factory CompletedGeneration({
-    required final String content,
-    required final String reasoning,
-  }) = _$CompletedGenerationImpl;
-
-  String get content;
-  String get reasoning;
-
-  /// Create a copy of GenerationEvent
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$CompletedGenerationImplCopyWith<_$CompletedGenerationImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-abstract class _$$FailedGenerationImplCopyWith<$Res> {
-  factory _$$FailedGenerationImplCopyWith(
-    _$FailedGenerationImpl value,
-    $Res Function(_$FailedGenerationImpl) then,
-  ) = __$$FailedGenerationImplCopyWithImpl<$Res>;
-  @useResult
-  $Res call({String error});
-}
-
-/// @nodoc
-class __$$FailedGenerationImplCopyWithImpl<$Res>
-    extends _$GenerationEventCopyWithImpl<$Res, _$FailedGenerationImpl>
-    implements _$$FailedGenerationImplCopyWith<$Res> {
-  __$$FailedGenerationImplCopyWithImpl(
-    _$FailedGenerationImpl _value,
-    $Res Function(_$FailedGenerationImpl) _then,
-  ) : super(_value, _then);
-
-  /// Create a copy of GenerationEvent
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({Object? error = null}) {
-    return _then(
-      _$FailedGenerationImpl(
-        error: null == error
-            ? _value.error
-            : error // ignore: cast_nullable_to_non_nullable
-                  as String,
-      ),
-    );
-  }
-}
-
-/// @nodoc
-
-class _$FailedGenerationImpl implements FailedGeneration {
-  const _$FailedGenerationImpl({required this.error});
-
-  @override
-  final String error;
-
-  @override
-  String toString() {
-    return 'GenerationEvent.failed(error: $error)';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$FailedGenerationImpl &&
-            (identical(other.error, error) || other.error == error));
-  }
-
-  @override
-  int get hashCode => Object.hash(runtimeType, error);
-
-  /// Create a copy of GenerationEvent
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$FailedGenerationImplCopyWith<_$FailedGenerationImpl> get copyWith =>
-      __$$FailedGenerationImplCopyWithImpl<_$FailedGenerationImpl>(
-        this,
-        _$identity,
-      );
-
-  @override
-  @optionalTypeArgs
-  TResult when<TResult extends Object?>({
-    required TResult Function(String content, String reasoning) partial,
-    required TResult Function(String content, String reasoning) completed,
-    required TResult Function(String error) failed,
-  }) {
-    return failed(error);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function(String content, String reasoning)? partial,
-    TResult? Function(String content, String reasoning)? completed,
-    TResult? Function(String error)? failed,
-  }) {
-    return failed?.call(error);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult maybeWhen<TResult extends Object?>({
-    TResult Function(String content, String reasoning)? partial,
-    TResult Function(String content, String reasoning)? completed,
-    TResult Function(String error)? failed,
-    required TResult orElse(),
-  }) {
-    if (failed != null) {
-      return failed(error);
-    }
-    return orElse();
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult map<TResult extends Object?>({
-    required TResult Function(PartialGeneration value) partial,
-    required TResult Function(CompletedGeneration value) completed,
-    required TResult Function(FailedGeneration value) failed,
-  }) {
-    return failed(this);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult? mapOrNull<TResult extends Object?>({
-    TResult? Function(PartialGeneration value)? partial,
-    TResult? Function(CompletedGeneration value)? completed,
-    TResult? Function(FailedGeneration value)? failed,
-  }) {
-    return failed?.call(this);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult maybeMap<TResult extends Object?>({
-    TResult Function(PartialGeneration value)? partial,
-    TResult Function(CompletedGeneration value)? completed,
-    TResult Function(FailedGeneration value)? failed,
-    required TResult orElse(),
-  }) {
-    if (failed != null) {
-      return failed(this);
-    }
-    return orElse();
-  }
-}
-
-abstract class FailedGeneration implements GenerationEvent {
-  const factory FailedGeneration({required final String error}) =
-      _$FailedGenerationImpl;
-
-  String get error;
-
-  /// Create a copy of GenerationEvent
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$FailedGenerationImplCopyWith<_$FailedGenerationImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-````
-
 ## File: lib/core/utils/sse_parser.dart
 ````dart
 import '../models/sse_event.dart';
@@ -7263,91 +6670,6 @@ class $AppDatabaseManager {
 }
 ````
 
-## File: lib/domain/services/stream_processor.dart
-````dart
-import 'dart:async';
-import '../../core/models/chat_chunk.dart';
-import '../../core/models/generation_event.dart';
-
-/// 流处理器
-///
-/// 职责：
-/// - 累加 content 和 reasoning
-/// - 节流输出 partial 事件
-/// - 映射错误和完成状态
-/// - 纯逻辑，无副作用，易于测试
-class StreamProcessor {
-  final Duration throttleInterval;
-
-  StreamProcessor({this.throttleInterval = const Duration(seconds: 1)});
-
-  /// 处理输入流并输出生成事件流
-  Stream<GenerationEvent> process(Stream<ChatChunk> input) async* {
-    final contentBuffer = StringBuffer();
-    final reasoningBuffer = StringBuffer();
-    String? error;
-    DateTime? lastEmitTime;
-
-    // 辅助函数：检查是否需要节流输出
-    bool shouldEmit() {
-      final now = DateTime.now();
-      if (lastEmitTime == null) {
-        lastEmitTime = now;
-        return true;
-      }
-      if (now.difference(lastEmitTime!) >= throttleInterval) {
-        lastEmitTime = now;
-        return true;
-      }
-      return false;
-    }
-
-    try {
-      await for (final chunk in input) {
-        // 错误处理
-        if (chunk.error != null) {
-          error = chunk.error;
-          break;
-        }
-
-        // 累加数据
-        if (chunk.content != null) {
-          contentBuffer.write(chunk.content);
-        }
-        if (chunk.reasoningContent != null) {
-          reasoningBuffer.write(chunk.reasoningContent);
-        }
-
-        // 节流输出
-        if (shouldEmit()) {
-          yield GenerationEvent.partial(
-            content: contentBuffer.toString(),
-            reasoning: reasoningBuffer.toString(),
-          );
-        }
-
-        // 完成处理
-        if (chunk.isDone) {
-          break;
-        }
-      }
-
-      // 最终输出
-      if (error != null) {
-        yield GenerationEvent.failed(error: error);
-      } else {
-        yield GenerationEvent.completed(
-          content: contentBuffer.toString(),
-          reasoning: reasoningBuffer.toString(),
-        );
-      }
-    } catch (e) {
-      yield GenerationEvent.failed(error: e.toString());
-    }
-  }
-}
-````
-
 ## File: lib/presentation/models/input_state.dart
 ````dart
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -8419,6 +7741,677 @@ Map<String, dynamic> _$$ChatRoundImplToJson(_$ChatRoundImpl instance) =>
       'isIncomplete': instance.isIncomplete,
       'hasUnseenUpdate': instance.hasUnseenUpdate,
     };
+````
+
+## File: lib/core/models/generation_event.dart
+````dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'generation_event.freezed.dart';
+
+/// 生成过程中的统一事件
+@freezed
+class GenerationEvent with _$GenerationEvent {
+  const factory GenerationEvent.partial({
+    required String content,
+    required String reasoning,
+  }) = PartialGeneration;
+
+  const factory GenerationEvent.completed({
+    required String content,
+    required String reasoning,
+  }) = CompletedGeneration;
+
+  const factory GenerationEvent.failed({
+    required String error,
+    @Default('') String content,
+    @Default('') String reasoning,
+  }) = FailedGeneration;
+}
+````
+
+## File: lib/core/models/generation_event.freezed.dart
+````dart
+// coverage:ignore-file
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint
+// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
+
+part of 'generation_event.dart';
+
+// **************************************************************************
+// FreezedGenerator
+// **************************************************************************
+
+T _$identity<T>(T value) => value;
+
+final _privateConstructorUsedError = UnsupportedError(
+  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
+);
+
+/// @nodoc
+mixin _$GenerationEvent {
+  String get content => throw _privateConstructorUsedError;
+  String get reasoning => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function(String content, String reasoning) partial,
+    required TResult Function(String content, String reasoning) completed,
+    required TResult Function(String error, String content, String reasoning)
+    failed,
+  }) => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function(String content, String reasoning)? partial,
+    TResult? Function(String content, String reasoning)? completed,
+    TResult? Function(String error, String content, String reasoning)? failed,
+  }) => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function(String content, String reasoning)? partial,
+    TResult Function(String content, String reasoning)? completed,
+    TResult Function(String error, String content, String reasoning)? failed,
+    required TResult orElse(),
+  }) => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(PartialGeneration value) partial,
+    required TResult Function(CompletedGeneration value) completed,
+    required TResult Function(FailedGeneration value) failed,
+  }) => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(PartialGeneration value)? partial,
+    TResult? Function(CompletedGeneration value)? completed,
+    TResult? Function(FailedGeneration value)? failed,
+  }) => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(PartialGeneration value)? partial,
+    TResult Function(CompletedGeneration value)? completed,
+    TResult Function(FailedGeneration value)? failed,
+    required TResult orElse(),
+  }) => throw _privateConstructorUsedError;
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $GenerationEventCopyWith<GenerationEvent> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $GenerationEventCopyWith<$Res> {
+  factory $GenerationEventCopyWith(
+    GenerationEvent value,
+    $Res Function(GenerationEvent) then,
+  ) = _$GenerationEventCopyWithImpl<$Res, GenerationEvent>;
+  @useResult
+  $Res call({String content, String reasoning});
+}
+
+/// @nodoc
+class _$GenerationEventCopyWithImpl<$Res, $Val extends GenerationEvent>
+    implements $GenerationEventCopyWith<$Res> {
+  _$GenerationEventCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? content = null, Object? reasoning = null}) {
+    return _then(
+      _value.copyWith(
+            content: null == content
+                ? _value.content
+                : content // ignore: cast_nullable_to_non_nullable
+                      as String,
+            reasoning: null == reasoning
+                ? _value.reasoning
+                : reasoning // ignore: cast_nullable_to_non_nullable
+                      as String,
+          )
+          as $Val,
+    );
+  }
+}
+
+/// @nodoc
+abstract class _$$PartialGenerationImplCopyWith<$Res>
+    implements $GenerationEventCopyWith<$Res> {
+  factory _$$PartialGenerationImplCopyWith(
+    _$PartialGenerationImpl value,
+    $Res Function(_$PartialGenerationImpl) then,
+  ) = __$$PartialGenerationImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({String content, String reasoning});
+}
+
+/// @nodoc
+class __$$PartialGenerationImplCopyWithImpl<$Res>
+    extends _$GenerationEventCopyWithImpl<$Res, _$PartialGenerationImpl>
+    implements _$$PartialGenerationImplCopyWith<$Res> {
+  __$$PartialGenerationImplCopyWithImpl(
+    _$PartialGenerationImpl _value,
+    $Res Function(_$PartialGenerationImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? content = null, Object? reasoning = null}) {
+    return _then(
+      _$PartialGenerationImpl(
+        content: null == content
+            ? _value.content
+            : content // ignore: cast_nullable_to_non_nullable
+                  as String,
+        reasoning: null == reasoning
+            ? _value.reasoning
+            : reasoning // ignore: cast_nullable_to_non_nullable
+                  as String,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+
+class _$PartialGenerationImpl implements PartialGeneration {
+  const _$PartialGenerationImpl({
+    required this.content,
+    required this.reasoning,
+  });
+
+  @override
+  final String content;
+  @override
+  final String reasoning;
+
+  @override
+  String toString() {
+    return 'GenerationEvent.partial(content: $content, reasoning: $reasoning)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$PartialGenerationImpl &&
+            (identical(other.content, content) || other.content == content) &&
+            (identical(other.reasoning, reasoning) ||
+                other.reasoning == reasoning));
+  }
+
+  @override
+  int get hashCode => Object.hash(runtimeType, content, reasoning);
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$PartialGenerationImplCopyWith<_$PartialGenerationImpl> get copyWith =>
+      __$$PartialGenerationImplCopyWithImpl<_$PartialGenerationImpl>(
+        this,
+        _$identity,
+      );
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function(String content, String reasoning) partial,
+    required TResult Function(String content, String reasoning) completed,
+    required TResult Function(String error, String content, String reasoning)
+    failed,
+  }) {
+    return partial(content, reasoning);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function(String content, String reasoning)? partial,
+    TResult? Function(String content, String reasoning)? completed,
+    TResult? Function(String error, String content, String reasoning)? failed,
+  }) {
+    return partial?.call(content, reasoning);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function(String content, String reasoning)? partial,
+    TResult Function(String content, String reasoning)? completed,
+    TResult Function(String error, String content, String reasoning)? failed,
+    required TResult orElse(),
+  }) {
+    if (partial != null) {
+      return partial(content, reasoning);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(PartialGeneration value) partial,
+    required TResult Function(CompletedGeneration value) completed,
+    required TResult Function(FailedGeneration value) failed,
+  }) {
+    return partial(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(PartialGeneration value)? partial,
+    TResult? Function(CompletedGeneration value)? completed,
+    TResult? Function(FailedGeneration value)? failed,
+  }) {
+    return partial?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(PartialGeneration value)? partial,
+    TResult Function(CompletedGeneration value)? completed,
+    TResult Function(FailedGeneration value)? failed,
+    required TResult orElse(),
+  }) {
+    if (partial != null) {
+      return partial(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class PartialGeneration implements GenerationEvent {
+  const factory PartialGeneration({
+    required final String content,
+    required final String reasoning,
+  }) = _$PartialGenerationImpl;
+
+  @override
+  String get content;
+  @override
+  String get reasoning;
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$PartialGenerationImplCopyWith<_$PartialGenerationImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class _$$CompletedGenerationImplCopyWith<$Res>
+    implements $GenerationEventCopyWith<$Res> {
+  factory _$$CompletedGenerationImplCopyWith(
+    _$CompletedGenerationImpl value,
+    $Res Function(_$CompletedGenerationImpl) then,
+  ) = __$$CompletedGenerationImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({String content, String reasoning});
+}
+
+/// @nodoc
+class __$$CompletedGenerationImplCopyWithImpl<$Res>
+    extends _$GenerationEventCopyWithImpl<$Res, _$CompletedGenerationImpl>
+    implements _$$CompletedGenerationImplCopyWith<$Res> {
+  __$$CompletedGenerationImplCopyWithImpl(
+    _$CompletedGenerationImpl _value,
+    $Res Function(_$CompletedGenerationImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? content = null, Object? reasoning = null}) {
+    return _then(
+      _$CompletedGenerationImpl(
+        content: null == content
+            ? _value.content
+            : content // ignore: cast_nullable_to_non_nullable
+                  as String,
+        reasoning: null == reasoning
+            ? _value.reasoning
+            : reasoning // ignore: cast_nullable_to_non_nullable
+                  as String,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+
+class _$CompletedGenerationImpl implements CompletedGeneration {
+  const _$CompletedGenerationImpl({
+    required this.content,
+    required this.reasoning,
+  });
+
+  @override
+  final String content;
+  @override
+  final String reasoning;
+
+  @override
+  String toString() {
+    return 'GenerationEvent.completed(content: $content, reasoning: $reasoning)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$CompletedGenerationImpl &&
+            (identical(other.content, content) || other.content == content) &&
+            (identical(other.reasoning, reasoning) ||
+                other.reasoning == reasoning));
+  }
+
+  @override
+  int get hashCode => Object.hash(runtimeType, content, reasoning);
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$CompletedGenerationImplCopyWith<_$CompletedGenerationImpl> get copyWith =>
+      __$$CompletedGenerationImplCopyWithImpl<_$CompletedGenerationImpl>(
+        this,
+        _$identity,
+      );
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function(String content, String reasoning) partial,
+    required TResult Function(String content, String reasoning) completed,
+    required TResult Function(String error, String content, String reasoning)
+    failed,
+  }) {
+    return completed(content, reasoning);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function(String content, String reasoning)? partial,
+    TResult? Function(String content, String reasoning)? completed,
+    TResult? Function(String error, String content, String reasoning)? failed,
+  }) {
+    return completed?.call(content, reasoning);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function(String content, String reasoning)? partial,
+    TResult Function(String content, String reasoning)? completed,
+    TResult Function(String error, String content, String reasoning)? failed,
+    required TResult orElse(),
+  }) {
+    if (completed != null) {
+      return completed(content, reasoning);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(PartialGeneration value) partial,
+    required TResult Function(CompletedGeneration value) completed,
+    required TResult Function(FailedGeneration value) failed,
+  }) {
+    return completed(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(PartialGeneration value)? partial,
+    TResult? Function(CompletedGeneration value)? completed,
+    TResult? Function(FailedGeneration value)? failed,
+  }) {
+    return completed?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(PartialGeneration value)? partial,
+    TResult Function(CompletedGeneration value)? completed,
+    TResult Function(FailedGeneration value)? failed,
+    required TResult orElse(),
+  }) {
+    if (completed != null) {
+      return completed(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class CompletedGeneration implements GenerationEvent {
+  const factory CompletedGeneration({
+    required final String content,
+    required final String reasoning,
+  }) = _$CompletedGenerationImpl;
+
+  @override
+  String get content;
+  @override
+  String get reasoning;
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$CompletedGenerationImplCopyWith<_$CompletedGenerationImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class _$$FailedGenerationImplCopyWith<$Res>
+    implements $GenerationEventCopyWith<$Res> {
+  factory _$$FailedGenerationImplCopyWith(
+    _$FailedGenerationImpl value,
+    $Res Function(_$FailedGenerationImpl) then,
+  ) = __$$FailedGenerationImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({String error, String content, String reasoning});
+}
+
+/// @nodoc
+class __$$FailedGenerationImplCopyWithImpl<$Res>
+    extends _$GenerationEventCopyWithImpl<$Res, _$FailedGenerationImpl>
+    implements _$$FailedGenerationImplCopyWith<$Res> {
+  __$$FailedGenerationImplCopyWithImpl(
+    _$FailedGenerationImpl _value,
+    $Res Function(_$FailedGenerationImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? error = null,
+    Object? content = null,
+    Object? reasoning = null,
+  }) {
+    return _then(
+      _$FailedGenerationImpl(
+        error: null == error
+            ? _value.error
+            : error // ignore: cast_nullable_to_non_nullable
+                  as String,
+        content: null == content
+            ? _value.content
+            : content // ignore: cast_nullable_to_non_nullable
+                  as String,
+        reasoning: null == reasoning
+            ? _value.reasoning
+            : reasoning // ignore: cast_nullable_to_non_nullable
+                  as String,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+
+class _$FailedGenerationImpl implements FailedGeneration {
+  const _$FailedGenerationImpl({
+    required this.error,
+    this.content = '',
+    this.reasoning = '',
+  });
+
+  @override
+  final String error;
+  @override
+  @JsonKey()
+  final String content;
+  @override
+  @JsonKey()
+  final String reasoning;
+
+  @override
+  String toString() {
+    return 'GenerationEvent.failed(error: $error, content: $content, reasoning: $reasoning)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$FailedGenerationImpl &&
+            (identical(other.error, error) || other.error == error) &&
+            (identical(other.content, content) || other.content == content) &&
+            (identical(other.reasoning, reasoning) ||
+                other.reasoning == reasoning));
+  }
+
+  @override
+  int get hashCode => Object.hash(runtimeType, error, content, reasoning);
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$FailedGenerationImplCopyWith<_$FailedGenerationImpl> get copyWith =>
+      __$$FailedGenerationImplCopyWithImpl<_$FailedGenerationImpl>(
+        this,
+        _$identity,
+      );
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function(String content, String reasoning) partial,
+    required TResult Function(String content, String reasoning) completed,
+    required TResult Function(String error, String content, String reasoning)
+    failed,
+  }) {
+    return failed(error, content, reasoning);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function(String content, String reasoning)? partial,
+    TResult? Function(String content, String reasoning)? completed,
+    TResult? Function(String error, String content, String reasoning)? failed,
+  }) {
+    return failed?.call(error, content, reasoning);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function(String content, String reasoning)? partial,
+    TResult Function(String content, String reasoning)? completed,
+    TResult Function(String error, String content, String reasoning)? failed,
+    required TResult orElse(),
+  }) {
+    if (failed != null) {
+      return failed(error, content, reasoning);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(PartialGeneration value) partial,
+    required TResult Function(CompletedGeneration value) completed,
+    required TResult Function(FailedGeneration value) failed,
+  }) {
+    return failed(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(PartialGeneration value)? partial,
+    TResult? Function(CompletedGeneration value)? completed,
+    TResult? Function(FailedGeneration value)? failed,
+  }) {
+    return failed?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(PartialGeneration value)? partial,
+    TResult Function(CompletedGeneration value)? completed,
+    TResult Function(FailedGeneration value)? failed,
+    required TResult orElse(),
+  }) {
+    if (failed != null) {
+      return failed(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class FailedGeneration implements GenerationEvent {
+  const factory FailedGeneration({
+    required final String error,
+    final String content,
+    final String reasoning,
+  }) = _$FailedGenerationImpl;
+
+  String get error;
+  @override
+  String get content;
+  @override
+  String get reasoning;
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$FailedGenerationImplCopyWith<_$FailedGenerationImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
 ````
 
 ## File: lib/core/models/session.dart
@@ -9836,6 +9829,95 @@ class CharacterCardParser {
 }
 ````
 
+## File: lib/domain/services/stream_processor.dart
+````dart
+import 'dart:async';
+import '../../core/models/chat_chunk.dart';
+import '../../core/models/generation_event.dart';
+
+/// 流处理器
+///
+/// 职责：
+/// - 累加 content 和 reasoning
+/// - 节流输出 partial 事件
+/// - 映射错误和完成状态
+/// - 纯逻辑，无副作用，易于测试
+class StreamProcessor {
+  final Duration throttleInterval;
+
+  StreamProcessor({this.throttleInterval = const Duration(seconds: 1)});
+
+  /// 处理输入流并输出生成事件流
+  Stream<GenerationEvent> process(Stream<ChatChunk> input) async* {
+    final contentBuffer = StringBuffer();
+    final reasoningBuffer = StringBuffer();
+    String? error;
+    DateTime? lastEmitTime;
+
+    // 辅助函数：检查是否需要节流输出
+    bool shouldEmit() {
+      final now = DateTime.now();
+      if (lastEmitTime == null) {
+        lastEmitTime = now;
+        return true;
+      }
+      if (now.difference(lastEmitTime!) >= throttleInterval) {
+        lastEmitTime = now;
+        return true;
+      }
+      return false;
+    }
+
+    try {
+      await for (final chunk in input) {
+        // 错误处理
+        if (chunk.error != null) {
+          error = chunk.error;
+          break;
+        }
+
+        // 累加数据
+        if (chunk.content != null) {
+          contentBuffer.write(chunk.content);
+        }
+        if (chunk.reasoningContent != null) {
+          reasoningBuffer.write(chunk.reasoningContent);
+        }
+
+        // 节流输出
+        if (shouldEmit()) {
+          yield GenerationEvent.partial(
+            content: contentBuffer.toString(),
+            reasoning: reasoningBuffer.toString(),
+          );
+        }
+
+        // 完成处理
+        if (chunk.isDone) {
+          break;
+        }
+      }
+
+      // 最终输出
+      if (error != null) {
+        yield GenerationEvent.failed(
+          error: error,
+          content: '$contentBuffer.toString()\n\n[错误] $error'.trim(),
+          reasoning: reasoningBuffer.toString(),
+        );
+      } else {
+        yield GenerationEvent.completed(
+          content: contentBuffer.toString(),
+          reasoning: reasoningBuffer.toString(),
+        );
+      }
+    } catch (e) {
+      yield GenerationEvent.failed(error: e.toString());
+    }
+  }
+}
+````
+
 ## File: lib/presentation/pages/image_attachment_viewer_page.dart
 ````dart
 import 'dart:typed_data';
@@ -10695,176 +10777,6 @@ abstract class _TreePath implements TreePath {
 }
 ````
 
-## File: lib/domain/services/chat_service.dart
-````dart
-import 'dart:async';
-import 'package:aiservice/data/data_sources/chat_source_router.dart';
-import 'package:uuid/uuid.dart';
-import '../../core/models/attachment.dart';
-import '../../core/models/chat_round.dart';
-import '../../data/repositories/conversation_repository.dart';
-import '../../data/services/config_service.dart';
-import '../../presentation/models/pending_attachment.dart';
-import 'attachment_preparer.dart';
-import 'character_card_parser.dart';
-import 'chat_context_builder.dart';
-import 'stream_processor.dart';
-
-class ChatService {
-  static final Map<String, StreamSubscription> _activeGenerations = {};
-
-  static Future<String> sendMessage({
-    required ConversationRepository repository,
-    required ConfigService configService,
-    required ChatSourceRouter sourceRouter,
-    required String sessionId,
-    required String content,
-    required String? parentRoundId,
-    required List<PendingAttachment> pendingAttachments,
-    CharacterData? character,
-  }) async {
-    final savedAttachments = await savePendingAttachments(repository, pendingAttachments);
-    final newRoundId = await _createRound(
-      repository: repository,
-      sessionId: sessionId,
-      content: content,
-      parentRoundId: parentRoundId,
-      attachments: savedAttachments,
-    );
-    
-    _startGeneration(
-      repository: repository,
-      configService: configService,
-      sourceRouter: sourceRouter,
-      roundId: newRoundId,
-      character: character,
-    );
-    
-    return newRoundId;
-  }
-
-  static Future<String> retryFromRound({
-    required ConversationRepository repository,
-    required ConfigService configService,
-    required ChatSourceRouter sourceRouter,
-    required String sessionId,
-    required ChatRound sourceRound,
-    CharacterData? character,
-  }) async {
-    final newRoundId = await _createRound(
-      repository: repository,
-      sessionId: sessionId,
-      content: sourceRound.userContent,
-      parentRoundId: sourceRound.parentId,
-      attachments: sourceRound.userAttachments,
-    );
-
-    _startGeneration(
-      repository: repository,
-      configService: configService,
-      sourceRouter: sourceRouter,
-      roundId: newRoundId,
-      character: character,
-    );
-
-    return newRoundId;
-  }
-
-  static void stopGeneration(String roundId, ConversationRepository repository) {
-    final subscription = _activeGenerations.remove(roundId);
-    if (subscription != null) {
-      subscription.cancel();
-      repository.updateRound(
-        roundId: roundId,
-        isIncomplete: false,
-        hasUnseenUpdate: true,
-      );
-    }
-  }
-
-  static Future<void> _startGeneration({
-    required ConversationRepository repository,
-    required ConfigService configService,
-    required ChatSourceRouter sourceRouter,
-    required String roundId,
-    CharacterData? character,
-  }) async {
-    final contextRounds = await repository.getContextRounds(roundId);
-    final apiContext = await buildApiContextFromRounds(
-      contextRounds,
-      repository,
-      character,
-    );
-
-    final config = await configService.loadConfig();
-    final source = sourceRouter.getSourceFromConfig(config);
-    
-    final chatStream = source.chatStream(
-      config: config,
-      context: apiContext,
-    );
-
-    final processor = StreamProcessor();
-    final eventStream = processor.process(chatStream);
-
-    final subscription = eventStream.listen((event) {
-      event.when(
-        partial: (content, reasoning) {
-          repository.updateRound(
-            roundId: roundId,
-            assistantContent: content,
-            assistantThinking: reasoning,
-            isIncomplete: true,
-          );
-        },
-        completed: (content, reasoning) {
-          repository.updateRound(
-            roundId: roundId,
-            assistantContent: content,
-            assistantThinking: reasoning,
-            isIncomplete: false,
-            hasUnseenUpdate: true,
-          );
-          _activeGenerations.remove(roundId);
-        },
-        failed: (error) {
-          repository.updateRound(
-            roundId: roundId,
-            assistantContent: '[错误]\n$error',
-            assistantThinking: '',
-            isIncomplete: false,
-            hasUnseenUpdate: true,
-          );
-          _activeGenerations.remove(roundId);
-        },
-      );
-    });
-
-    _activeGenerations[roundId] = subscription;
-  }
-
-  static Future<String> _createRound({
-    required ConversationRepository repository,
-    required String sessionId,
-    required String content,
-    required String? parentRoundId,
-    required List<Attachment> attachments,
-  }) async {
-    final newRound = ChatRound(
-      id: const Uuid().v4(),
-      parentId: parentRoundId,
-      createdAt: DateTime.now().millisecondsSinceEpoch,
-      userContent: content,
-      userAttachments: attachments,
-      isIncomplete: true,
-      hasUnseenUpdate: false,
-    );
-    await repository.appendRound(sessionId, newRound);
-    return newRound.id;
-  }
-}
-````
-
 ## File: lib/presentation/providers/attachment_bytes_provider.dart
 ````dart
 // presentation/providers/attachment_bytes_provider.dart
@@ -11061,7 +10973,7 @@ class SettingsFormNotifier extends Notifier<SettingsFormState> {
   }
 
   Future<void> addLocalModel() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['gguf'],
     );
@@ -11268,6 +11180,176 @@ Future<List<ApiMessageContentPart>> _buildAttachmentParts(
     final bytes = await repository.getAttachment(attachment.relativePath);
     final text = utf8.decode(bytes, allowMalformed: true);
     return [ApiMessageContentPart.text(text: text)];
+  }
+}
+````
+
+## File: lib/domain/services/chat_service.dart
+````dart
+import 'dart:async';
+import 'package:aiservice/data/data_sources/chat_source_router.dart';
+import 'package:uuid/uuid.dart';
+import '../../core/models/attachment.dart';
+import '../../core/models/chat_round.dart';
+import '../../data/repositories/conversation_repository.dart';
+import '../../data/services/config_service.dart';
+import '../../presentation/models/pending_attachment.dart';
+import 'attachment_preparer.dart';
+import 'character_card_parser.dart';
+import 'chat_context_builder.dart';
+import 'stream_processor.dart';
+
+class ChatService {
+  static final Map<String, StreamSubscription> _activeGenerations = {};
+
+  static Future<String> sendMessage({
+    required ConversationRepository repository,
+    required ConfigService configService,
+    required ChatSourceRouter sourceRouter,
+    required String sessionId,
+    required String content,
+    required String? parentRoundId,
+    required List<PendingAttachment> pendingAttachments,
+    CharacterData? character,
+  }) async {
+    final savedAttachments = await savePendingAttachments(repository, pendingAttachments);
+    final newRoundId = await _createRound(
+      repository: repository,
+      sessionId: sessionId,
+      content: content,
+      parentRoundId: parentRoundId,
+      attachments: savedAttachments,
+    );
+    
+    _startGeneration(
+      repository: repository,
+      configService: configService,
+      sourceRouter: sourceRouter,
+      roundId: newRoundId,
+      character: character,
+    );
+    
+    return newRoundId;
+  }
+
+  static Future<String> retryFromRound({
+    required ConversationRepository repository,
+    required ConfigService configService,
+    required ChatSourceRouter sourceRouter,
+    required String sessionId,
+    required ChatRound sourceRound,
+    CharacterData? character,
+  }) async {
+    final newRoundId = await _createRound(
+      repository: repository,
+      sessionId: sessionId,
+      content: sourceRound.userContent,
+      parentRoundId: sourceRound.parentId,
+      attachments: sourceRound.userAttachments,
+    );
+
+    _startGeneration(
+      repository: repository,
+      configService: configService,
+      sourceRouter: sourceRouter,
+      roundId: newRoundId,
+      character: character,
+    );
+
+    return newRoundId;
+  }
+
+  static void stopGeneration(String roundId, ConversationRepository repository) {
+    final subscription = _activeGenerations.remove(roundId);
+    if (subscription != null) {
+      subscription.cancel();
+      repository.updateRound(
+        roundId: roundId,
+        isIncomplete: false,
+        hasUnseenUpdate: true,
+      );
+    }
+  }
+
+  static Future<void> _startGeneration({
+    required ConversationRepository repository,
+    required ConfigService configService,
+    required ChatSourceRouter sourceRouter,
+    required String roundId,
+    CharacterData? character,
+  }) async {
+    final contextRounds = await repository.getContextRounds(roundId);
+    final apiContext = await buildApiContextFromRounds(
+      contextRounds,
+      repository,
+      character,
+    );
+
+    final config = await configService.loadConfig();
+    final source = sourceRouter.getSourceFromConfig(config);
+    
+    final chatStream = source.chatStream(
+      config: config,
+      context: apiContext,
+    );
+
+    final processor = StreamProcessor();
+    final eventStream = processor.process(chatStream);
+
+    final subscription = eventStream.listen((event) {
+      event.when(
+        partial: (content, reasoning) {
+          repository.updateRound(
+            roundId: roundId,
+            assistantContent: content,
+            assistantThinking: reasoning,
+            isIncomplete: true,
+          );
+        },
+        completed: (content, reasoning) {
+          repository.updateRound(
+            roundId: roundId,
+            assistantContent: content,
+            assistantThinking: reasoning,
+            isIncomplete: false,
+            hasUnseenUpdate: true,
+          );
+          _activeGenerations.remove(roundId);
+        },
+        failed: (error, content, reasoning) {
+          repository.updateRound(
+            roundId: roundId,
+            assistantContent: content, 
+            assistantThinking: reasoning,
+            isIncomplete: false,
+            hasUnseenUpdate: true,
+          );
+          _activeGenerations.remove(roundId);
+        },
+      );
+    });
+
+    _activeGenerations[roundId] = subscription;
+  }
+
+  static Future<String> _createRound({
+    required ConversationRepository repository,
+    required String sessionId,
+    required String content,
+    required String? parentRoundId,
+    required List<Attachment> attachments,
+  }) async {
+    final newRound = ChatRound(
+      id: const Uuid().v4(),
+      parentId: parentRoundId,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+      userContent: content,
+      userAttachments: attachments,
+      isIncomplete: true,
+      hasUnseenUpdate: false,
+    );
+    await repository.appendRound(sessionId, newRound);
+    return newRound.id;
   }
 }
 ````
@@ -12388,7 +12470,7 @@ class _InputBarState extends ConsumerState<InputBar> {
   }
 
   Future<void> _pickFileAttachment() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       allowMultiple: false,
       withData: false,
       type: FileType.any,
@@ -12440,7 +12522,7 @@ class _InputBarState extends ConsumerState<InputBar> {
   }
 
   Future<void> _importCharacterCard() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['png', 'json'],
     );
