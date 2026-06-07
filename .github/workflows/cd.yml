@@ -13,12 +13,13 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '17'
+      - name: Install CMake 3.18.1
+        run: yes | sdkmanager "cmake;3.18.1"
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           cache: true
       - run: flutter pub get
-
       - name: Inject official llama.cpp source
         run: |
           PLUGIN_DIR=$(find ~/.pub-cache -type d -name "flutter_llama-*" | head -n 1)
@@ -31,7 +32,6 @@ jobs:
             mv /tmp/llama_cpp_repo "$PLUGIN_DIR/llama.cpp"
             echo "Injection complete."
           fi
-
       - run: flutter build apk --release --split-per-abi
       - uses: actions/upload-artifact@v4
         with:
@@ -47,7 +47,6 @@ jobs:
           channel: 'stable'
           cache: true
       - run: flutter pub get
-
       - name: Inject official llama.cpp source
         run: |
           PLUGIN_DIR=$(find ~/.pub-cache -type d -name "flutter_llama-*" | head -n 1)
@@ -60,7 +59,6 @@ jobs:
             mv /tmp/llama_cpp_repo "$PLUGIN_DIR/llama.cpp"
             echo "Injection complete."
           fi
-
       - run: flutter build ipa --no-codesign
       - uses: actions/upload-artifact@v4
         with:
@@ -92,19 +90,16 @@ jobs:
         with:
           name: android
           path: android
-
       - name: Download iOS artifacts
         uses: actions/download-artifact@v4
         with:
           name: ios
           path: ios
-
       - name: Download Windows artifacts
         uses: actions/download-artifact@v4
         with:
           name: windows
           path: windows
-
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
