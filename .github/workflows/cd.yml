@@ -18,6 +18,17 @@ jobs:
           channel: 'stable'
           cache: true
       - run: flutter pub get
+
+      - name: Inject llama.cpp from GitHub
+        run: |
+          PLUGIN_DIR=$(find ~/.pub-cache -type d -name "flutter_llama-*" | head -n 1)
+          if [ -d "$PLUGIN_DIR" ] && [ ! -d "$PLUGIN_DIR/llama.cpp" ]; then
+            git clone --filter=blob:none --sparse --depth 1 https://github.com/libsFlutter/flutter_llama.git /tmp/flutter_llama_repo
+            cd /tmp/flutter_llama_repo
+            git sparse-checkout set llama.cpp
+            cp -r llama.cpp "$PLUGIN_DIR/"
+          fi
+
       - run: flutter build apk --release --split-per-abi
       - uses: actions/upload-artifact@v4
         with:
@@ -33,6 +44,17 @@ jobs:
           channel: 'stable'
           cache: true
       - run: flutter pub get
+
+      - name: Inject llama.cpp from GitHub
+        run: |
+          PLUGIN_DIR=$(find ~/.pub-cache -type d -name "flutter_llama-*" | head -n 1)
+          if [ -d "$PLUGIN_DIR" ] && [ ! -d "$PLUGIN_DIR/llama.cpp" ]; then
+            git clone --filter=blob:none --sparse --depth 1 https://github.com/libsFlutter/flutter_llama.git /tmp/flutter_llama_repo
+            cd /tmp/flutter_llama_repo
+            git sparse-checkout set llama.cpp
+            cp -r llama.cpp "$PLUGIN_DIR/"
+          fi
+
       - run: flutter build ipa --no-codesign
       - uses: actions/upload-artifact@v4
         with:
@@ -63,7 +85,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: android
-          path: android          # 下载到 android/ 下
+          path: android
 
       - name: Download iOS artifacts
         uses: actions/download-artifact@v4
