@@ -2,10 +2,6 @@ name: Build Flutter Android APK (Release)
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-      - master
 
 jobs:
   build-android-release:
@@ -101,46 +97,20 @@ jobs:
             echo "⚠️ Warning: Could not find libvulkan.so to overwrite."
           fi
 
-      # ★★★ 核心 2：注入 ProGuard 终极保护伞 (解决 Release MissingPluginException) ★★★
-      - name: Inject Ultimate ProGuard Rules
+      # ★★★ 核心 2：Base64 注入 ProGuard 终极保护伞 (彻底免疫 YAML 缩进报错) ★★★
+      - name: Inject Ultimate ProGuard Rules (Base64 Safe)
         run: |
-          echo "🛡️ Injecting ProGuard rules to prevent R8 from stripping plugin classes..."
+          echo "🛡️ Injecting ProGuard rules safely via Base64..."
           PROGUARD_FILE="android/app/proguard-rules.pro"
           
           mkdir -p android/app
           touch "$PROGUARD_FILE"
           
-          cat << 'EOF' >> "$PROGUARD_FILE"
-
-# ==========================================
-# CI Injected Ultimate ProGuard Rules
-# ==========================================
-# 1. Flutter 引擎及官方插件全局保护
--keep class io.flutter.app.** { *; }
--keep class io.flutter.plugin.** { *; }
--keep class io.flutter.util.** { *; }
--keep class io.flutter.view.** { *; }
--keep class io.flutter.** { *; }
--keep class io.flutter.plugins.** { *; }
-
-# 2. 第三方/社区原生插件保护 (file_picker, share_plus, image_picker)
--keep class com.mr.flutter.plugin.filepicker.** { *; }
--keep class dev.fluttercommunity.plus.** { *; }
--keep class io.flutter.plugins.imagepicker.** { *; }
-
-# 3. JNI 与底层 C/C++ 库保护 (sqlite3_flutter_libs, flutter_llama)
--keepclasseswithmembernames class * {
-    native <methods>;
-}
--keep class eu.simonroos.sqlite3.** { *; }
--keep class org.sqlite.** { *; }
--keep class com.sqlite.** { *; }
-
-# 4. Android 系统组件保护 (FileProvider)
--keep class androidx.core.content.FileProvider { *; }
--keep public class * extends androidx.core.content.FileProvider { *; }
-EOF
-          echo "✅ Ultimate ProGuard rules injected into $PROGUARD_FILE"
+          # 使用 Base64 编码避免 YAML 解析器对多行文本和特殊符号的误判
+          PROGUARD_CONTENT=$(echo "CiMgQ0kgSW5qZWN0ZWQgVWx0aW1hdGUgUHJvR3VhcmQgUnVsZXMKLWtlZXAgY2xhc3MgaW8uZmx1dHRlci5hcHAuKiogeyAqOyB9Ci1rZWVwIGNsYXNzIGlvLmZsdXR0ZXIucGx1Z2luLioqIHsgKjsgfQota2VlcCBjbGFzcyBpby5mbHV0dGVyLnV0aWwuKiogeyAqOyB9Ci1rZWVwIGNsYXNzIGlvLmZsdXR0ZXIudmlldy4qKiB7ICo7IH0KLWtlZXAgY2xhc3MgaW8uZmx1dHRlci4qKiB7ICo7IH0KLWtlZXAgY2xhc3MgaW8uZmx1dHRlci5wbHVnaW5zLioqIHsgKjsgfQota2VlcCBjbGFzcyBjb20ubXIuZmx1dHRlci5wbHVnaW4uZmlsZXBpY2tlci4qKiB7ICo7IH0KLWtlZXAgY2xhc3MgZGV2LmZsdXR0ZXJjb21tdW5pdHkucGx1cy4qKiB7ICo7IH0KLWtlZXAgY2xhc3MgaW8uZmx1dHRlci5wbHVnaW5zLmltYWdlcGlja2VyLioqIHsgKjsgfQota2VlcGNsYXNzZXN3aXRobWVtYmVybmFtZXMgY2xhc3MgKiB7CiAgICBuYXRpdmUgPG1ldGhvZHM+Owp9Ci1rZWVwIGNsYXNzIGV1LnNpbW9ucm9vcy5zcWxpdGUzLioqIHsgKjsgfQota2VlcCBjbGFzcyBvcmcuc3FsaXRlLioqIHsgKjsgfQota2VlcCBjbGFzcyBjb20uc3FsaXRlLioqIHsgKjsgfQota2VlcCBjbGFzcyBhbmRyb2lkeC5jb3JlLmNvbnRlbnQuRmlsZVByb3ZpZGVyIHsgKjsgfQota2VlcCBwdWJsaWMgY2xhc3MgKiBleHRlbmRzIGFuZHJvaWR4LmNvcmUuY29udGVudC5GaWxlUHJvdmlkZXIgeyAqOyB9Cg==")
+          
+          echo "$PROGUARD_CONTENT" | base64 --decode >> "$PROGUARD_FILE"
+          echo "✅ Ultimate ProGuard rules injected successfully."
 
       # ★★★ 核心 3：应用 Flutter 官方 Kotlin Legacy 兼容模式 (消除 AGP 9.0 WARNING) ★★★
       - name: Apply Kotlin Legacy Flags
