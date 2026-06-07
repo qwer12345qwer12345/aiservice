@@ -10,7 +10,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_llama: ^1.1.2
+  flutter_llama:
+    git:
+      url: https://github.com/libsFlutter/flutter_llama.git
+      ref: main
   png_chunks_extract: ^1.0.2
   # ========== 状态管理 ==========
   flutter_riverpod: ^2.4.9

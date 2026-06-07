@@ -9,7 +9,13 @@ android {
     namespace = "com.example.aiservice"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
-
+    
+    externalNativeBuild {
+        cmake {
+            version = "3.18.1"
+        }
+    }
+    
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
