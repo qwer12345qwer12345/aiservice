@@ -13,10 +13,6 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '17'
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-      - name: Install CMake 3.18.1
-        run: yes | sdkmanager "cmake;3.18.1"
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
@@ -49,17 +45,15 @@ jobs:
           channel: 'stable'
           cache: true
       - run: flutter pub get
-      - name: Inject official llama.cpp source
+      - name: Inject official llama.cpp source (Latest)
         run: |
           PLUGIN_DIR=$(find ~/.pub-cache -type d -name "flutter_llama-*" | head -n 1)
           if [ -d "$PLUGIN_DIR" ] && [ ! -f "$PLUGIN_DIR/llama.cpp/include/llama.h" ]; then
-            echo "Injecting official llama.cpp source..."
+            echo "Cloning latest llama.cpp..."
             git clone https://github.com/ggml-org/llama.cpp.git /tmp/llama_cpp_repo
-            cd /tmp/llama_cpp_repo
-            git checkout 945501f5ea4b8ca56b181ecb035e9ee3fb31f432
             rm -rf "$PLUGIN_DIR/llama.cpp"
             mv /tmp/llama_cpp_repo "$PLUGIN_DIR/llama.cpp"
-            echo "Injection complete."
+            echo "Latest llama.cpp injected successfully."
           fi
       - run: flutter build ipa --no-codesign
       - uses: actions/upload-artifact@v4

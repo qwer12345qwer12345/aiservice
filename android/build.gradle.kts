@@ -1,3 +1,14 @@
+import com.android.build.gradle.BaseExtension
+
+subprojects {
+    afterEvaluate {
+        if (extensions.findByName("android") != null) {
+            val android = extensions.getByName("android") as BaseExtension
+            android.externalNativeBuild?.cmake?.version = "3.22.1"
+        }
+    }
+}
+
 allprojects {
     repositories {
         google()
