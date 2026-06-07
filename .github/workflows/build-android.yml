@@ -10,11 +10,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Vulkan build tools
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq glslc
-
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -33,81 +28,25 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # ★★★ 核心：预装 NDK + 注入头文件 + 物理替换桩库 (The Ultimate Hack) ★★★
-      - name: Ultimate NDK Hack & Vulkan Injection
+      - name: Configure NDK & CMake Environment
         run: |
-          echo "🚀 Step 1: Pre-installing NDK 27 & CMake 3.22.1..."
+          echo "🚀 Pre-installing NDK 27 & CMake 3.22.1..."
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;27.0.12077973" "cmake;3.22.1"
           
-          echo "🔍 Step 2: Locating flutter_llama plugin..."
-          PLUGIN_DIR=$(find $HOME/.pub-cache/hosted/pub.dev -maxdepth 1 -type d -name "flutter_llama-*" 2>/dev/null | head -n 1)
-          if [ -z "$PLUGIN_DIR" ]; then
-            echo "❌ Fatal: Could not find flutter_llama plugin directory."
-            exit 1
-          fi
-          cd "$PLUGIN_DIR"
+          # 将 NDK 自带的 glslc (shaderc) 加入 PATH，避免 apt-get 安装
+          echo "$ANDROID_HOME/ndk/27.0.12077973/shader-tools/linux-x86_64" >> $GITHUB_PATH
           
-          echo "🛠️ Step 3: Patching Plugin CMake version..."
-          GRADLE_FILE=""
-          if [ -f "android/build.gradle.kts" ]; then GRADLE_FILE="android/build.gradle.kts"
-          elif [ -f "android/build.gradle" ]; then GRADLE_FILE="android/build.gradle"; fi
-          
-          if [ -n "$GRADLE_FILE" ]; then
-            sed -i 's/"3.18.1"/"3.22.1"/g' "$GRADLE_FILE"
-            sed -i "s/'3.18.1'/'3.22.1'/g" "$GRADLE_FILE"
-          fi
-          
-          echo "🚀 Step 4: Shallow cloning llama.cpp..."
-          rm -rf llama.cpp
-          git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/ggerganov/llama.cpp.git
-          
-          echo "💉 Step 5: Injecting Vulkan Headers into NDK 27 Sysroot..."
-          SYSROOT="$ANDROID_HOME/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
-          mkdir -p $SYSROOT/usr/include/vulkan
-          mkdir -p $SYSROOT/usr/include/vk_video
-          
-          rm -rf SPIRV-Headers
-          git clone --depth 1 --branch main https://github.com/KhronosGroup/SPIRV-Headers.git
-          cd SPIRV-Headers
-          cmake -B build -DCMAKE_INSTALL_PREFIX=$SYSROOT/usr
-          cmake --build build --target install
-          cd ..
-          
-          VULKAN_TAG="v1.3.290"
-          rm -rf Vulkan-Headers
-          git clone --depth 1 --branch $VULKAN_TAG https://github.com/KhronosGroup/Vulkan-Headers.git
-          cp -r Vulkan-Headers/include/vulkan/* $SYSROOT/usr/include/vulkan/
-          cp -r Vulkan-Headers/include/vk_video/* $SYSROOT/usr/include/vk_video/
-          
-          rm -rf Vulkan-Hpp
-          git clone --depth 1 --branch $VULKAN_TAG https://github.com/KhronosGroup/Vulkan-Hpp.git
-          HPP_FILE=$(find Vulkan-Hpp -type f -name "vulkan.hpp" | head -n 1)
-          VULKAN_HPP_DIR=$(dirname "$HPP_FILE")
-          cp -r "$VULKAN_HPP_DIR"/* $SYSROOT/usr/include/vulkan/
-          
-          echo "💥 Step 6: THE ULTIMATE HACK - Overwrite API 24 libvulkan.so with API 28..."
-          # AGP 硬编码了 API 24 的 libvulkan.so 绝对路径，导致链接器找不到 Vulkan 1.1 符号
-          # 我们直接用包含 Vulkan 1.1 符号的 API 28 的 stub 库覆盖它！
-          LIB_VULKAN_24="$SYSROOT/usr/lib/aarch64-linux-android/24/libvulkan.so"
-          LIB_VULKAN_28="$SYSROOT/usr/lib/aarch64-linux-android/28/libvulkan.so"
-          
-          if [ -f "$LIB_VULKAN_28" ] && [ -f "$LIB_VULKAN_24" ]; then
-            cp "$LIB_VULKAN_28" "$LIB_VULKAN_24"
-            echo "✅ Successfully overwrote API 24 libvulkan.so with API 28 version. Linker will now find Vulkan 1.1 symbols!"
-          else
-            echo "⚠️ Warning: Could not find libvulkan.so to overwrite."
-          fi
-          
-          echo "🧹 Step 7: Cleaning CMake caches..."
+          # 清理旧的 CMake 缓存，确保使用最新的 NDK 环境
           rm -rf android/.cxx
-          rm -rf $HOME/.pub-cache/hosted/pub.dev/flutter_llama-*/android/.cxx
-          
-          echo "🛡️ Step 8: Applying Kotlin Legacy Flags..."
-          cd $GITHUB_WORKSPACE
-          GRADLE_PROPS="android/gradle.properties"
-          if [ -f "$GRADLE_PROPS" ]; then
-            grep -qxF "android.builtInKotlin=false" "$GRADLE_PROPS" || echo "android.builtInKotlin=false" >> "$GRADLE_PROPS"
-            grep -qxF "android.newDsl=false" "$GRADLE_PROPS" || echo "android.newDsl=false" >> "$GRADLE_PROPS"
+          rm -rf $HOME/.pub-cache/hosted/pub.dev/flutter_llama-*/android/.cxx || true
+
+      # 如果你的 flutter_llama 插件确实有 CMake 版本硬编码的 Bug，仅保留 Gradle 替换即可
+      - name: Patch Plugin CMake Version
+        run: |
+          PLUGIN_DIR=$(find $HOME/.pub-cache/hosted/pub.dev -maxdepth 1 -type d -name "flutter_llama-*" 2>/dev/null | head -n 1)
+          if [ -n "$PLUGIN_DIR" ] && [ -f "$PLUGIN_DIR/android/build.gradle" ]; then
+            sed -i 's/"3.18.1"/"3.22.1"/g' "$PLUGIN_DIR/android/build.gradle"
+            sed -i "s/'3.18.1'/'3.22.1'/g" "$PLUGIN_DIR/android/build.gradle"
           fi
 
       - name: Build Android APK
