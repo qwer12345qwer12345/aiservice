@@ -27,9 +27,6 @@ dependencies:
   path_provider: ^2.1.2
   path: ^1.8.3
 
-  # ========== Markdown 渲染 ==========
-  flutter_markdown_plus: ^1.0.7
-
   # ========== UUID 生成 ==========
   uuid: ^4.3.3
 
