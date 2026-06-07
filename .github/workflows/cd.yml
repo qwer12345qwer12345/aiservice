@@ -28,8 +28,10 @@ jobs:
             mv /tmp/llama_cpp_repo "$PLUGIN_DIR/llama.cpp"
             echo "Latest llama.cpp injected successfully."
           fi
-      - name: Install glslc for Vulkan shaders
-        run: sudo apt-get update && sudo apt-get install -y glslang-tools
+      - name: Install Vulkan and SPIRV dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvulkan-dev glslang-tools glslang-dev spirv-tools spirv-headers vulkan-validationlayers-dev
       - run: flutter build apk --release --split-per-abi
       - uses: actions/upload-artifact@v4
         with:
