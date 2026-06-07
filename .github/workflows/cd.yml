@@ -45,15 +45,17 @@ jobs:
           channel: 'stable'
           cache: true
       - run: flutter pub get
-      - name: Inject official llama.cpp source (Latest)
+      - name: Inject official llama.cpp source
         run: |
           PLUGIN_DIR=$(find ~/.pub-cache -type d -name "flutter_llama-*" | head -n 1)
           if [ -d "$PLUGIN_DIR" ] && [ ! -f "$PLUGIN_DIR/llama.cpp/include/llama.h" ]; then
-            echo "Cloning latest llama.cpp..."
+            echo "Injecting official llama.cpp source..."
             git clone https://github.com/ggml-org/llama.cpp.git /tmp/llama_cpp_repo
+            cd /tmp/llama_cpp_repo
+            git checkout 945501f5ea4b8ca56b181ecb035e9ee3fb31f432
             rm -rf "$PLUGIN_DIR/llama.cpp"
             mv /tmp/llama_cpp_repo "$PLUGIN_DIR/llama.cpp"
-            echo "Latest llama.cpp injected successfully."
+            echo "Injection complete."
           fi
       - run: flutter build ipa --no-codesign
       - uses: actions/upload-artifact@v4
