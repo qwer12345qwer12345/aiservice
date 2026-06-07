@@ -5,7 +5,7 @@ on:
     branches: [ main ]
 
 jobs:
-  build-android:
+  build_android:
     runs-on: ubuntu-latest
 
     steps:
@@ -117,7 +117,7 @@ jobs:
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk
+          name: android
           path: build/app/outputs/flutter-apk/
 
   build_ios:
@@ -191,3 +191,4 @@ jobs:
             windows/*.zip
           generate_release_notes: true
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
