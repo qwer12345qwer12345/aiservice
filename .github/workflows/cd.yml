@@ -17,26 +17,17 @@ jobs:
         with:
           channel: 'stable'
           cache: true
+      - name: Clone flutter_llama source
+        run: |
+          git clone --depth 1 --recursive https://github.com/libsFlutter/flutter_llama.git ../flutter_llama
+      - name: Override dependency to use local source
+        run: |
+          echo "" >> pubspec.yaml
+          echo "dependency_overrides:" >> pubspec.yaml
+          echo "  flutter_llama:" >> pubspec.yaml
+          echo "    path: ../flutter_llama" >> pubspec.yaml
       - run: flutter pub get
-      - name: Inject official llama.cpp source (Latest)
-        run: |
-          PLUGIN_DIR=$(find ~/.pub-cache -type d -name "flutter_llama-*" | head -n 1)
-          if [ -d "$PLUGIN_DIR" ] && [ ! -f "$PLUGIN_DIR/llama.cpp/include/llama.h" ]; then
-            echo "Cloning latest llama.cpp..."
-            git clone https://github.com/ggml-org/llama.cpp.git /tmp/llama_cpp_repo
-            rm -rf "$PLUGIN_DIR/llama.cpp"
-            mv /tmp/llama_cpp_repo "$PLUGIN_DIR/llama.cpp"
-            echo "Latest llama.cpp injected successfully."
-          fi
-      - name: Install Vulkan and SPIRV dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libvulkan-dev glslang-tools glslang-dev spirv-tools spirv-headers vulkan-utility-libraries-dev
       - run: flutter build apk --release --split-per-abi
-      - uses: actions/upload-artifact@v4
-        with:
-          name: android
-          path: build/app/outputs/flutter-apk/app-*.apk
 
   build_ios:
     runs-on: macos-latest
@@ -46,17 +37,19 @@ jobs:
         with:
           channel: 'stable'
           cache: true
-      - run: flutter pub get
-      - name: Inject official llama.cpp source (Latest)
+          - name: Clone flutter_llama source & Pull LFS
         run: |
-          PLUGIN_DIR=$(find ~/.pub-cache -type d -name "flutter_llama-*" | head -n 1)
-          if [ -d "$PLUGIN_DIR" ] && [ ! -f "$PLUGIN_DIR/llama.cpp/include/llama.h" ]; then
-            echo "Cloning latest llama.cpp..."
-            git clone https://github.com/ggml-org/llama.cpp.git /tmp/llama_cpp_repo
-            rm -rf "$PLUGIN_DIR/llama.cpp"
-            mv /tmp/llama_cpp_repo "$PLUGIN_DIR/llama.cpp"
-            echo "Latest llama.cpp injected successfully."
-          fi
+          git clone --depth 1 --recursive https://github.com/libsFlutter/flutter_llama.git ../flutter_llama
+          cd ../flutter_llama
+          git lfs install
+          git lfs pull
+      - name: Override dependency to use local source
+        run: |
+          echo "" >> pubspec.yaml
+          echo "dependency_overrides:" >> pubspec.yaml
+          echo "  flutter_llama:" >> pubspec.yaml
+          echo "    path: ../flutter_llama" >> pubspec.yaml
+      - run: flutter pub get
       - run: flutter build ipa --no-codesign
       - uses: actions/upload-artifact@v4
         with:
