@@ -67,7 +67,11 @@ class StreamProcessor {
 
       // 最终输出
       if (error != null) {
-        yield GenerationEvent.failed(error: error);
+        yield GenerationEvent.failed(
+          error: error,
+          content: '$contentBuffer.toString()\n\n[错误] $error'.trim(),
+          reasoning: reasoningBuffer.toString(),
+        );
       } else {
         yield GenerationEvent.completed(
           content: contentBuffer.toString(),

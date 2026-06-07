@@ -17,5 +17,7 @@ class GenerationEvent with _$GenerationEvent {
 
   const factory GenerationEvent.failed({
     required String error,
+    @Default('') String content,
+    @Default('') String reasoning,
   }) = FailedGeneration;
 }

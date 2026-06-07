@@ -17,23 +17,26 @@ final _privateConstructorUsedError = UnsupportedError(
 
 /// @nodoc
 mixin _$GenerationEvent {
+  String get content => throw _privateConstructorUsedError;
+  String get reasoning => throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
     required TResult Function(String content, String reasoning) partial,
     required TResult Function(String content, String reasoning) completed,
-    required TResult Function(String error) failed,
+    required TResult Function(String error, String content, String reasoning)
+    failed,
   }) => throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
     TResult? Function(String content, String reasoning)? partial,
     TResult? Function(String content, String reasoning)? completed,
-    TResult? Function(String error)? failed,
+    TResult? Function(String error, String content, String reasoning)? failed,
   }) => throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
     TResult Function(String content, String reasoning)? partial,
     TResult Function(String content, String reasoning)? completed,
-    TResult Function(String error)? failed,
+    TResult Function(String error, String content, String reasoning)? failed,
     required TResult orElse(),
   }) => throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -55,6 +58,12 @@ mixin _$GenerationEvent {
     TResult Function(FailedGeneration value)? failed,
     required TResult orElse(),
   }) => throw _privateConstructorUsedError;
+
+  /// Create a copy of GenerationEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $GenerationEventCopyWith<GenerationEvent> get copyWith =>
+      throw _privateConstructorUsedError;
 }
 
 /// @nodoc
@@ -63,6 +72,8 @@ abstract class $GenerationEventCopyWith<$Res> {
     GenerationEvent value,
     $Res Function(GenerationEvent) then,
   ) = _$GenerationEventCopyWithImpl<$Res, GenerationEvent>;
+  @useResult
+  $Res call({String content, String reasoning});
 }
 
 /// @nodoc
@@ -77,14 +88,33 @@ class _$GenerationEventCopyWithImpl<$Res, $Val extends GenerationEvent>
 
   /// Create a copy of GenerationEvent
   /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? content = null, Object? reasoning = null}) {
+    return _then(
+      _value.copyWith(
+            content: null == content
+                ? _value.content
+                : content // ignore: cast_nullable_to_non_nullable
+                      as String,
+            reasoning: null == reasoning
+                ? _value.reasoning
+                : reasoning // ignore: cast_nullable_to_non_nullable
+                      as String,
+          )
+          as $Val,
+    );
+  }
 }
 
 /// @nodoc
-abstract class _$$PartialGenerationImplCopyWith<$Res> {
+abstract class _$$PartialGenerationImplCopyWith<$Res>
+    implements $GenerationEventCopyWith<$Res> {
   factory _$$PartialGenerationImplCopyWith(
     _$PartialGenerationImpl value,
     $Res Function(_$PartialGenerationImpl) then,
   ) = __$$PartialGenerationImplCopyWithImpl<$Res>;
+  @override
   @useResult
   $Res call({String content, String reasoning});
 }
@@ -165,7 +195,8 @@ class _$PartialGenerationImpl implements PartialGeneration {
   TResult when<TResult extends Object?>({
     required TResult Function(String content, String reasoning) partial,
     required TResult Function(String content, String reasoning) completed,
-    required TResult Function(String error) failed,
+    required TResult Function(String error, String content, String reasoning)
+    failed,
   }) {
     return partial(content, reasoning);
   }
@@ -175,7 +206,7 @@ class _$PartialGenerationImpl implements PartialGeneration {
   TResult? whenOrNull<TResult extends Object?>({
     TResult? Function(String content, String reasoning)? partial,
     TResult? Function(String content, String reasoning)? completed,
-    TResult? Function(String error)? failed,
+    TResult? Function(String error, String content, String reasoning)? failed,
   }) {
     return partial?.call(content, reasoning);
   }
@@ -185,7 +216,7 @@ class _$PartialGenerationImpl implements PartialGeneration {
   TResult maybeWhen<TResult extends Object?>({
     TResult Function(String content, String reasoning)? partial,
     TResult Function(String content, String reasoning)? completed,
-    TResult Function(String error)? failed,
+    TResult Function(String error, String content, String reasoning)? failed,
     required TResult orElse(),
   }) {
     if (partial != null) {
@@ -235,22 +266,27 @@ abstract class PartialGeneration implements GenerationEvent {
     required final String reasoning,
   }) = _$PartialGenerationImpl;
 
+  @override
   String get content;
+  @override
   String get reasoning;
 
   /// Create a copy of GenerationEvent
   /// with the given fields replaced by the non-null parameter values.
+  @override
   @JsonKey(includeFromJson: false, includeToJson: false)
   _$$PartialGenerationImplCopyWith<_$PartialGenerationImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }
 
 /// @nodoc
-abstract class _$$CompletedGenerationImplCopyWith<$Res> {
+abstract class _$$CompletedGenerationImplCopyWith<$Res>
+    implements $GenerationEventCopyWith<$Res> {
   factory _$$CompletedGenerationImplCopyWith(
     _$CompletedGenerationImpl value,
     $Res Function(_$CompletedGenerationImpl) then,
   ) = __$$CompletedGenerationImplCopyWithImpl<$Res>;
+  @override
   @useResult
   $Res call({String content, String reasoning});
 }
@@ -331,7 +367,8 @@ class _$CompletedGenerationImpl implements CompletedGeneration {
   TResult when<TResult extends Object?>({
     required TResult Function(String content, String reasoning) partial,
     required TResult Function(String content, String reasoning) completed,
-    required TResult Function(String error) failed,
+    required TResult Function(String error, String content, String reasoning)
+    failed,
   }) {
     return completed(content, reasoning);
   }
@@ -341,7 +378,7 @@ class _$CompletedGenerationImpl implements CompletedGeneration {
   TResult? whenOrNull<TResult extends Object?>({
     TResult? Function(String content, String reasoning)? partial,
     TResult? Function(String content, String reasoning)? completed,
-    TResult? Function(String error)? failed,
+    TResult? Function(String error, String content, String reasoning)? failed,
   }) {
     return completed?.call(content, reasoning);
   }
@@ -351,7 +388,7 @@ class _$CompletedGenerationImpl implements CompletedGeneration {
   TResult maybeWhen<TResult extends Object?>({
     TResult Function(String content, String reasoning)? partial,
     TResult Function(String content, String reasoning)? completed,
-    TResult Function(String error)? failed,
+    TResult Function(String error, String content, String reasoning)? failed,
     required TResult orElse(),
   }) {
     if (completed != null) {
@@ -401,24 +438,29 @@ abstract class CompletedGeneration implements GenerationEvent {
     required final String reasoning,
   }) = _$CompletedGenerationImpl;
 
+  @override
   String get content;
+  @override
   String get reasoning;
 
   /// Create a copy of GenerationEvent
   /// with the given fields replaced by the non-null parameter values.
+  @override
   @JsonKey(includeFromJson: false, includeToJson: false)
   _$$CompletedGenerationImplCopyWith<_$CompletedGenerationImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }
 
 /// @nodoc
-abstract class _$$FailedGenerationImplCopyWith<$Res> {
+abstract class _$$FailedGenerationImplCopyWith<$Res>
+    implements $GenerationEventCopyWith<$Res> {
   factory _$$FailedGenerationImplCopyWith(
     _$FailedGenerationImpl value,
     $Res Function(_$FailedGenerationImpl) then,
   ) = __$$FailedGenerationImplCopyWithImpl<$Res>;
+  @override
   @useResult
-  $Res call({String error});
+  $Res call({String error, String content, String reasoning});
 }
 
 /// @nodoc
@@ -434,12 +476,24 @@ class __$$FailedGenerationImplCopyWithImpl<$Res>
   /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
-  $Res call({Object? error = null}) {
+  $Res call({
+    Object? error = null,
+    Object? content = null,
+    Object? reasoning = null,
+  }) {
     return _then(
       _$FailedGenerationImpl(
         error: null == error
             ? _value.error
             : error // ignore: cast_nullable_to_non_nullable
+                  as String,
+        content: null == content
+            ? _value.content
+            : content // ignore: cast_nullable_to_non_nullable
+                  as String,
+        reasoning: null == reasoning
+            ? _value.reasoning
+            : reasoning // ignore: cast_nullable_to_non_nullable
                   as String,
       ),
     );
@@ -449,14 +503,24 @@ class __$$FailedGenerationImplCopyWithImpl<$Res>
 /// @nodoc
 
 class _$FailedGenerationImpl implements FailedGeneration {
-  const _$FailedGenerationImpl({required this.error});
+  const _$FailedGenerationImpl({
+    required this.error,
+    this.content = '',
+    this.reasoning = '',
+  });
 
   @override
   final String error;
+  @override
+  @JsonKey()
+  final String content;
+  @override
+  @JsonKey()
+  final String reasoning;
 
   @override
   String toString() {
-    return 'GenerationEvent.failed(error: $error)';
+    return 'GenerationEvent.failed(error: $error, content: $content, reasoning: $reasoning)';
   }
 
   @override
@@ -464,11 +528,14 @@ class _$FailedGenerationImpl implements FailedGeneration {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
             other is _$FailedGenerationImpl &&
-            (identical(other.error, error) || other.error == error));
+            (identical(other.error, error) || other.error == error) &&
+            (identical(other.content, content) || other.content == content) &&
+            (identical(other.reasoning, reasoning) ||
+                other.reasoning == reasoning));
   }
 
   @override
-  int get hashCode => Object.hash(runtimeType, error);
+  int get hashCode => Object.hash(runtimeType, error, content, reasoning);
 
   /// Create a copy of GenerationEvent
   /// with the given fields replaced by the non-null parameter values.
@@ -486,9 +553,10 @@ class _$FailedGenerationImpl implements FailedGeneration {
   TResult when<TResult extends Object?>({
     required TResult Function(String content, String reasoning) partial,
     required TResult Function(String content, String reasoning) completed,
-    required TResult Function(String error) failed,
+    required TResult Function(String error, String content, String reasoning)
+    failed,
   }) {
-    return failed(error);
+    return failed(error, content, reasoning);
   }
 
   @override
@@ -496,9 +564,9 @@ class _$FailedGenerationImpl implements FailedGeneration {
   TResult? whenOrNull<TResult extends Object?>({
     TResult? Function(String content, String reasoning)? partial,
     TResult? Function(String content, String reasoning)? completed,
-    TResult? Function(String error)? failed,
+    TResult? Function(String error, String content, String reasoning)? failed,
   }) {
-    return failed?.call(error);
+    return failed?.call(error, content, reasoning);
   }
 
   @override
@@ -506,11 +574,11 @@ class _$FailedGenerationImpl implements FailedGeneration {
   TResult maybeWhen<TResult extends Object?>({
     TResult Function(String content, String reasoning)? partial,
     TResult Function(String content, String reasoning)? completed,
-    TResult Function(String error)? failed,
+    TResult Function(String error, String content, String reasoning)? failed,
     required TResult orElse(),
   }) {
     if (failed != null) {
-      return failed(error);
+      return failed(error, content, reasoning);
     }
     return orElse();
   }
@@ -551,13 +619,21 @@ class _$FailedGenerationImpl implements FailedGeneration {
 }
 
 abstract class FailedGeneration implements GenerationEvent {
-  const factory FailedGeneration({required final String error}) =
-      _$FailedGenerationImpl;
+  const factory FailedGeneration({
+    required final String error,
+    final String content,
+    final String reasoning,
+  }) = _$FailedGenerationImpl;
 
   String get error;
+  @override
+  String get content;
+  @override
+  String get reasoning;
 
   /// Create a copy of GenerationEvent
   /// with the given fields replaced by the non-null parameter values.
+  @override
   @JsonKey(includeFromJson: false, includeToJson: false)
   _$$FailedGenerationImplCopyWith<_$FailedGenerationImpl> get copyWith =>
       throw _privateConstructorUsedError;

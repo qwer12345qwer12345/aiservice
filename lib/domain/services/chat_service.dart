@@ -128,11 +128,11 @@ class ChatService {
           );
           _activeGenerations.remove(roundId);
         },
-        failed: (error) {
+        failed: (error, content, reasoning) {
           repository.updateRound(
             roundId: roundId,
-            assistantContent: '[错误]\n$error',
-            assistantThinking: '',
+            assistantContent: content, 
+            assistantThinking: reasoning,
             isIncomplete: false,
             hasUnseenUpdate: true,
           );
