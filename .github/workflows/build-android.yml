@@ -110,11 +110,13 @@ jobs:
             grep -qxF "android.newDsl=false" "$GRADLE_PROPS" || echo "android.newDsl=false" >> "$GRADLE_PROPS"
           fi
 
-      - name: Build Android APK
-        run: flutter build apk --release
+      # ★★★ 核心变更：使用 Debug 模式构建 ★★★
+      - name: Build Android APK (Debug Mode)
+        run: flutter build apk --debug
 
-      - name: Upload APK Artifact
+      # ★★★ 核心变更：上传 Debug APK ★★★
+      - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: android-debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk

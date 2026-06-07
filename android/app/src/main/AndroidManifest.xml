@@ -7,18 +7,6 @@
                      android:maxSdkVersion="32"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
                      android:maxSdkVersion="32"/>
-    
-    <!-- 添加 queries，解除 Android 11+ 的包可见性限制 -->
-    <queries>
-        <intent>
-            <action android:name="android.intent.action.GET_CONTENT" />
-            <data android:mimeType="*/*"/>
-        </intent>
-        <intent>
-            <action android:name="android.intent.action.OPEN_DOCUMENT" />
-            <data android:mimeType="*/*"/>
-        </intent>
-    </queries>
 
     <application
         android:label="AI Chat"
