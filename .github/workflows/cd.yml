@@ -5,125 +5,122 @@ on:
     branches: [ main ]
 
 jobs:
-  calculate_version:
-    runs-on: ubuntu-latest
-    outputs:
-      build_name: ${{ steps.calc.outputs.build_name }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Calculate Next X.Y.Z
-        id: calc
-        run: |
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.0.0")
-          echo "Latest tag found: $LATEST_TAG"
-          VERSION=${LATEST_TAG#v}
-          IFS='.' read -r -a PARTS <<< "$VERSION"
-          MAJOR=${PARTS[0]}
-          MINOR=${PARTS[1]}
-          PATCH=${PARTS[2]:-0}
-          NEW_PATCH=$((PATCH + 1))
-          NEW_BUILD_NAME="$MAJOR.$MINOR.$NEW_PATCH"
-          echo "Next Build Name will be: $NEW_BUILD_NAME"
-          echo "build_name=$NEW_BUILD_NAME" >> $GITHUB_OUTPUT
-
   build_android:
-    needs: calculate_version
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
+
       - name: Install Vulkan build tools
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq glslc
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
+
       - name: Flutter doctor
         run: flutter doctor -v
+
       - name: Install dependencies
         run: flutter pub get
+
+      # ★★★ 核心：预装 NDK + 注入头文件 + 物理替换桩库 (The Ultimate Hack) ★★★
       - name: Ultimate NDK Hack & Vulkan Injection
         run: |
-          echo "Pre-installing NDK 27 & CMake 3.22.1"
+          echo "🚀 Step 1: Pre-installing NDK 27 & CMake 3.22.1..."
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;27.0.12077973" "cmake;3.22.1"
-          echo "Locating flutter_llama plugin"
+          
+          echo "🔍 Step 2: Locating flutter_llama plugin..."
           PLUGIN_DIR=$(find $HOME/.pub-cache/hosted/pub.dev -maxdepth 1 -type d -name "flutter_llama-*" 2>/dev/null | head -n 1)
           if [ -z "$PLUGIN_DIR" ]; then
-            echo "Fatal: Could not find flutter_llama plugin directory."
+            echo "❌ Fatal: Could not find flutter_llama plugin directory."
             exit 1
           fi
           cd "$PLUGIN_DIR"
-          echo "Patching Plugin CMake version"
+          
+          echo "🛠️ Step 3: Patching Plugin CMake version..."
           GRADLE_FILE=""
           if [ -f "android/build.gradle.kts" ]; then GRADLE_FILE="android/build.gradle.kts"
           elif [ -f "android/build.gradle" ]; then GRADLE_FILE="android/build.gradle"; fi
+          
           if [ -n "$GRADLE_FILE" ]; then
             sed -i 's/"3.18.1"/"3.22.1"/g' "$GRADLE_FILE"
             sed -i "s/'3.18.1'/'3.22.1'/g" "$GRADLE_FILE"
           fi
-          echo "Shallow cloning llama.cpp"
+          
+          echo "🚀 Step 4: Shallow cloning llama.cpp..."
           rm -rf llama.cpp
-          git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/ggerganov/llama.cpp.git          
-          echo "Injecting Vulkan Headers into NDK 27 Sysroot"
+          git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/ggerganov/llama.cpp.git
+          
+          echo "💉 Step 5: Injecting Vulkan Headers into NDK 27 Sysroot..."
           SYSROOT="$ANDROID_HOME/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
           mkdir -p $SYSROOT/usr/include/vulkan
-          mkdir -p $SYSROOT/usr/include/vk_video          
+          mkdir -p $SYSROOT/usr/include/vk_video
+          
           rm -rf SPIRV-Headers
           git clone --depth 1 --branch main https://github.com/KhronosGroup/SPIRV-Headers.git
           cd SPIRV-Headers
           cmake -B build -DCMAKE_INSTALL_PREFIX=$SYSROOT/usr
           cmake --build build --target install
-          cd ..          
+          cd ..
+          
           VULKAN_TAG="v1.3.290"
           rm -rf Vulkan-Headers
           git clone --depth 1 --branch $VULKAN_TAG https://github.com/KhronosGroup/Vulkan-Headers.git
           cp -r Vulkan-Headers/include/vulkan/* $SYSROOT/usr/include/vulkan/
-          cp -r Vulkan-Headers/include/vk_video/* $SYSROOT/usr/include/vk_video/          
+          cp -r Vulkan-Headers/include/vk_video/* $SYSROOT/usr/include/vk_video/
+          
           rm -rf Vulkan-Hpp
           git clone --depth 1 --branch $VULKAN_TAG https://github.com/KhronosGroup/Vulkan-Hpp.git
           HPP_FILE=$(find Vulkan-Hpp -type f -name "vulkan.hpp" | head -n 1)
           VULKAN_HPP_DIR=$(dirname "$HPP_FILE")
-          cp -r "$VULKAN_HPP_DIR"/* $SYSROOT/usr/include/vulkan/          
-          echo "THE ULTIMATE HACK - Overwrite API 24 libvulkan.so with API 28"
+          cp -r "$VULKAN_HPP_DIR"/* $SYSROOT/usr/include/vulkan/
+          
+          echo "💥 Step 6: THE ULTIMATE HACK - Overwrite API 24 libvulkan.so with API 28..."
+          # AGP 硬编码了 API 24 的 libvulkan.so 绝对路径，导致链接器找不到 Vulkan 1.1 符号
+          # 我们直接用包含 Vulkan 1.1 符号的 API 28 的 stub 库覆盖它！
           LIB_VULKAN_24="$SYSROOT/usr/lib/aarch64-linux-android/24/libvulkan.so"
-          LIB_VULKAN_28="$SYSROOT/usr/lib/aarch64-linux-android/28/libvulkan.so"          
+          LIB_VULKAN_28="$SYSROOT/usr/lib/aarch64-linux-android/28/libvulkan.so"
+          
           if [ -f "$LIB_VULKAN_28" ] && [ -f "$LIB_VULKAN_24" ]; then
             cp "$LIB_VULKAN_28" "$LIB_VULKAN_24"
-            echo "Successfully overwrote API 24 libvulkan.so with API 28 version. Linker will now find Vulkan 1.1 symbols!"
+            echo "✅ Successfully overwrote API 24 libvulkan.so with API 28 version. Linker will now find Vulkan 1.1 symbols!"
           else
-            echo "Warning: Could not find libvulkan.so to overwrite."
-          fi          
-          echo "Cleaning CMake caches"
+            echo "⚠️ Warning: Could not find libvulkan.so to overwrite."
+          fi
+          
+          echo "🧹 Step 7: Cleaning CMake caches..."
           rm -rf android/.cxx
-          rm -rf $HOME/.pub-cache/hosted/pub.dev/flutter_llama-*/android/.cxx          
-          echo "Applying Kotlin Legacy Flags"
+          rm -rf $HOME/.pub-cache/hosted/pub.dev/flutter_llama-*/android/.cxx
+          
+          echo "🛡️ Step 8: Applying Kotlin Legacy Flags..."
           cd $GITHUB_WORKSPACE
           GRADLE_PROPS="android/gradle.properties"
           if [ -f "$GRADLE_PROPS" ]; then
             grep -qxF "android.builtInKotlin=false" "$GRADLE_PROPS" || echo "android.builtInKotlin=false" >> "$GRADLE_PROPS"
             grep -qxF "android.newDsl=false" "$GRADLE_PROPS" || echo "android.newDsl=false" >> "$GRADLE_PROPS"
           fi
+
       - name: Build Android APK
-        run: |
-          flutter build apk --release --split-per-abi \
-            --build-name=${{ needs.calculate_version.outputs.build_name }} \
-            --build-number=${{ github.run_number }}
+        run: flutter build apk --release --split-per-abi
+
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: android
           path: build/app/outputs/flutter-apk/
 
   build_ios:
-    needs: calculate_version
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -143,10 +140,7 @@ jobs:
             echo "Latest llama.cpp injected successfully."
           fi
       - name: Build iOS
-        run: |
-          flutter build ipa --no-codesign \
-            --build-name=${{ needs.calculate_version.outputs.build_name }} \
-            --build-number=${{ github.run_number }}            
+        run: flutter build ipa --no-codesign
       - name: Package .app into .ipa
         run: |
           APP_PATH=$(find build/ios/archive/Runner.xcarchive/Products/Applications -name "*.app" -maxdepth 1 | head -n 1)
@@ -164,7 +158,6 @@ jobs:
           path: ios-unsigned.ipa
 
   build_windows:
-    needs: calculate_version
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -173,12 +166,7 @@ jobs:
           channel: 'stable'
           cache: true
       - run: flutter pub get
-      - name: Build Windows
-        run: |
-          flutter build windows --release \
-            --build-name=${{ needs.calculate_version.outputs.build_name }} \
-            --build-number=${{ github.run_number }}
-        shell: bash        
+      - run: flutter build windows --release
       - run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath build\windows-app.zip
       - uses: actions/upload-artifact@v4
         with:
@@ -193,18 +181,24 @@ jobs:
     steps:
       - name: Download Android artifacts
         uses: actions/download-artifact@v4
-        with: { name: android, path: android }
+        with:
+          name: android
+          path: android
       - name: Download iOS artifacts
         uses: actions/download-artifact@v4
-        with: { name: ios, path: ios }
+        with:
+          name: ios
+          path: ios
       - name: Download Windows artifacts
         uses: actions/download-artifact@v4
-        with: { name: windows, path: windows }        
+        with:
+          name: windows
+          path: windows
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ needs.calculate_version.outputs.build_name }}
-          name: Release v${{ needs.calculate_version.outputs.build_name }}
+          tag_name: v${{ github.run_number }}
+          name: ai service
           files: |
             android/*.apk
             ios/*.ipa
