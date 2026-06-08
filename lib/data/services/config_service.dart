@@ -83,13 +83,11 @@ class ConfigService{
         .write(DbConfigProfilesCompanion(config: Value(config)));
   }
 
-  Future<void> refreshModels() async {
-    final activeConfig = await loadConfig();
+  Future<void> refreshModels(AppConfig targetConfig) async {
+    final source = _sourceRouter.getSourceFromConfig(targetConfig);
+    final remoteModels = await source.fetchModels(targetConfig);
 
-    final source = _sourceRouter.getSourceFromConfig(activeConfig);
-    final remoteModels = await source.fetchModels(activeConfig);
-
-    final oldModels = activeConfig.availableModels ?? const <ModelInfo>[];
+    final oldModels = targetConfig.availableModels ?? const <ModelInfo>[];
     final oldById = {for (final model in oldModels) model.id: model};
 
     final updatedModels = remoteModels.map((remote) {
@@ -100,7 +98,7 @@ class ConfigService{
       );
     }).toList();
 
-    final updatedConfig = activeConfig.copyWith(
+    final updatedConfig = targetConfig.copyWith(
       availableModels: updatedModels,
     );
 

@@ -371,7 +371,7 @@ class _PendingImageAttachment extends StatelessWidget {
               CupertinoPageRoute(
                 builder: (_) => ImageAttachmentViewerPage(
                   title: attachment.name,
-                  imageFile: file,
+                  filePath: file.path,
                 ),
               ),
             );
@@ -450,7 +450,7 @@ class _PendingFileAttachment extends StatelessWidget {
                   CupertinoPageRoute(
                     builder: (_) => TextAttachmentViewerPage(
                       title: attachment.name,
-                      textFile: file,
+                      filePath: file.path,
                     ),
                   ),
                 );

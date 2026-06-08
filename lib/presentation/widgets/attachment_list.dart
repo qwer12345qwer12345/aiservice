@@ -63,7 +63,6 @@ class _ImageAttachmentThumb extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 👇 同步获取 File 对象，无需异步等待，彻底消除 loading 状态
     final file = ref.read(conversationRepositoryProvider).getAttachment(attachment.relativePath);
 
     return GestureDetector(
@@ -71,11 +70,10 @@ class _ImageAttachmentThumb extends ConsumerWidget {
         CupertinoPageRoute(
           builder: (_) => ImageAttachmentViewerPage(
             title: attachment.name,
-            imageFile: file, // 👈 直接传递 File
+            filePath: file.path,
           ),
         ),
       ),
-      // 👇 零内存拷贝分享：直接把物理路径交给系统
       onLongPress: () => Share.shareXFiles([XFile(file.path)], text: attachment.name),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
@@ -111,7 +109,7 @@ class _FileAttachmentChip extends ConsumerWidget {
             CupertinoPageRoute(
               builder: (_) => TextAttachmentViewerPage(
                 title: attachment.name,
-                textFile: file, // 👈 直接传递 File
+                filePath: file.path,
               ),
             ),
           );

@@ -1163,6 +1163,498 @@ Map<String, dynamic> _$$ApiMessageImplToJson(_$ApiMessageImpl instance) =>
     };
 ````
 
+## File: lib/core/models/app_config_store.dart
+````dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+import 'app_config.dart';
+
+part 'app_config_store.freezed.dart';
+part 'app_config_store.g.dart';
+
+@freezed
+class ConfigProfile with _$ConfigProfile {
+  const factory ConfigProfile({
+    required String id,
+    required String name,
+    required AppConfig config,
+  }) = _ConfigProfile;
+
+  factory ConfigProfile.fromJson(Map<String, dynamic> json) =>
+      _$ConfigProfileFromJson(json);
+}
+
+@freezed
+class AppConfigStore with _$AppConfigStore {
+  const factory AppConfigStore({
+    required String activeProfileId,
+    @Default([]) List<ConfigProfile> profiles,
+  }) = _AppConfigStore;
+
+  factory AppConfigStore.fromJson(Map<String, dynamic> json) =>
+      _$AppConfigStoreFromJson(json);
+
+  factory AppConfigStore.defaultStore() => AppConfigStore(
+        activeProfileId: 'default',
+        profiles: [
+          ConfigProfile(
+            id: 'default',
+            name: '默认配置',
+            config: AppConfig.defaultConfig(),
+          ),
+        ],
+      );
+}
+````
+
+## File: lib/core/models/app_config_store.freezed.dart
+````dart
+// coverage:ignore-file
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint
+// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
+
+part of 'app_config_store.dart';
+
+// **************************************************************************
+// FreezedGenerator
+// **************************************************************************
+
+T _$identity<T>(T value) => value;
+
+final _privateConstructorUsedError = UnsupportedError(
+  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
+);
+
+ConfigProfile _$ConfigProfileFromJson(Map<String, dynamic> json) {
+  return _ConfigProfile.fromJson(json);
+}
+
+/// @nodoc
+mixin _$ConfigProfile {
+  String get id => throw _privateConstructorUsedError;
+  String get name => throw _privateConstructorUsedError;
+  AppConfig get config => throw _privateConstructorUsedError;
+
+  /// Serializes this ConfigProfile to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+
+  /// Create a copy of ConfigProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $ConfigProfileCopyWith<ConfigProfile> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $ConfigProfileCopyWith<$Res> {
+  factory $ConfigProfileCopyWith(
+    ConfigProfile value,
+    $Res Function(ConfigProfile) then,
+  ) = _$ConfigProfileCopyWithImpl<$Res, ConfigProfile>;
+  @useResult
+  $Res call({String id, String name, AppConfig config});
+
+  $AppConfigCopyWith<$Res> get config;
+}
+
+/// @nodoc
+class _$ConfigProfileCopyWithImpl<$Res, $Val extends ConfigProfile>
+    implements $ConfigProfileCopyWith<$Res> {
+  _$ConfigProfileCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of ConfigProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? id = null, Object? name = null, Object? config = null}) {
+    return _then(
+      _value.copyWith(
+            id: null == id
+                ? _value.id
+                : id // ignore: cast_nullable_to_non_nullable
+                      as String,
+            name: null == name
+                ? _value.name
+                : name // ignore: cast_nullable_to_non_nullable
+                      as String,
+            config: null == config
+                ? _value.config
+                : config // ignore: cast_nullable_to_non_nullable
+                      as AppConfig,
+          )
+          as $Val,
+    );
+  }
+
+  /// Create a copy of ConfigProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $AppConfigCopyWith<$Res> get config {
+    return $AppConfigCopyWith<$Res>(_value.config, (value) {
+      return _then(_value.copyWith(config: value) as $Val);
+    });
+  }
+}
+
+/// @nodoc
+abstract class _$$ConfigProfileImplCopyWith<$Res>
+    implements $ConfigProfileCopyWith<$Res> {
+  factory _$$ConfigProfileImplCopyWith(
+    _$ConfigProfileImpl value,
+    $Res Function(_$ConfigProfileImpl) then,
+  ) = __$$ConfigProfileImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({String id, String name, AppConfig config});
+
+  @override
+  $AppConfigCopyWith<$Res> get config;
+}
+
+/// @nodoc
+class __$$ConfigProfileImplCopyWithImpl<$Res>
+    extends _$ConfigProfileCopyWithImpl<$Res, _$ConfigProfileImpl>
+    implements _$$ConfigProfileImplCopyWith<$Res> {
+  __$$ConfigProfileImplCopyWithImpl(
+    _$ConfigProfileImpl _value,
+    $Res Function(_$ConfigProfileImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of ConfigProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? id = null, Object? name = null, Object? config = null}) {
+    return _then(
+      _$ConfigProfileImpl(
+        id: null == id
+            ? _value.id
+            : id // ignore: cast_nullable_to_non_nullable
+                  as String,
+        name: null == name
+            ? _value.name
+            : name // ignore: cast_nullable_to_non_nullable
+                  as String,
+        config: null == config
+            ? _value.config
+            : config // ignore: cast_nullable_to_non_nullable
+                  as AppConfig,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+@JsonSerializable()
+class _$ConfigProfileImpl implements _ConfigProfile {
+  const _$ConfigProfileImpl({
+    required this.id,
+    required this.name,
+    required this.config,
+  });
+
+  factory _$ConfigProfileImpl.fromJson(Map<String, dynamic> json) =>
+      _$$ConfigProfileImplFromJson(json);
+
+  @override
+  final String id;
+  @override
+  final String name;
+  @override
+  final AppConfig config;
+
+  @override
+  String toString() {
+    return 'ConfigProfile(id: $id, name: $name, config: $config)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$ConfigProfileImpl &&
+            (identical(other.id, id) || other.id == id) &&
+            (identical(other.name, name) || other.name == name) &&
+            (identical(other.config, config) || other.config == config));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(runtimeType, id, name, config);
+
+  /// Create a copy of ConfigProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$ConfigProfileImplCopyWith<_$ConfigProfileImpl> get copyWith =>
+      __$$ConfigProfileImplCopyWithImpl<_$ConfigProfileImpl>(this, _$identity);
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$ConfigProfileImplToJson(this);
+  }
+}
+
+abstract class _ConfigProfile implements ConfigProfile {
+  const factory _ConfigProfile({
+    required final String id,
+    required final String name,
+    required final AppConfig config,
+  }) = _$ConfigProfileImpl;
+
+  factory _ConfigProfile.fromJson(Map<String, dynamic> json) =
+      _$ConfigProfileImpl.fromJson;
+
+  @override
+  String get id;
+  @override
+  String get name;
+  @override
+  AppConfig get config;
+
+  /// Create a copy of ConfigProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$ConfigProfileImplCopyWith<_$ConfigProfileImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+AppConfigStore _$AppConfigStoreFromJson(Map<String, dynamic> json) {
+  return _AppConfigStore.fromJson(json);
+}
+
+/// @nodoc
+mixin _$AppConfigStore {
+  String get activeProfileId => throw _privateConstructorUsedError;
+  List<ConfigProfile> get profiles => throw _privateConstructorUsedError;
+
+  /// Serializes this AppConfigStore to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+
+  /// Create a copy of AppConfigStore
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $AppConfigStoreCopyWith<AppConfigStore> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $AppConfigStoreCopyWith<$Res> {
+  factory $AppConfigStoreCopyWith(
+    AppConfigStore value,
+    $Res Function(AppConfigStore) then,
+  ) = _$AppConfigStoreCopyWithImpl<$Res, AppConfigStore>;
+  @useResult
+  $Res call({String activeProfileId, List<ConfigProfile> profiles});
+}
+
+/// @nodoc
+class _$AppConfigStoreCopyWithImpl<$Res, $Val extends AppConfigStore>
+    implements $AppConfigStoreCopyWith<$Res> {
+  _$AppConfigStoreCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of AppConfigStore
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? activeProfileId = null, Object? profiles = null}) {
+    return _then(
+      _value.copyWith(
+            activeProfileId: null == activeProfileId
+                ? _value.activeProfileId
+                : activeProfileId // ignore: cast_nullable_to_non_nullable
+                      as String,
+            profiles: null == profiles
+                ? _value.profiles
+                : profiles // ignore: cast_nullable_to_non_nullable
+                      as List<ConfigProfile>,
+          )
+          as $Val,
+    );
+  }
+}
+
+/// @nodoc
+abstract class _$$AppConfigStoreImplCopyWith<$Res>
+    implements $AppConfigStoreCopyWith<$Res> {
+  factory _$$AppConfigStoreImplCopyWith(
+    _$AppConfigStoreImpl value,
+    $Res Function(_$AppConfigStoreImpl) then,
+  ) = __$$AppConfigStoreImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({String activeProfileId, List<ConfigProfile> profiles});
+}
+
+/// @nodoc
+class __$$AppConfigStoreImplCopyWithImpl<$Res>
+    extends _$AppConfigStoreCopyWithImpl<$Res, _$AppConfigStoreImpl>
+    implements _$$AppConfigStoreImplCopyWith<$Res> {
+  __$$AppConfigStoreImplCopyWithImpl(
+    _$AppConfigStoreImpl _value,
+    $Res Function(_$AppConfigStoreImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of AppConfigStore
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? activeProfileId = null, Object? profiles = null}) {
+    return _then(
+      _$AppConfigStoreImpl(
+        activeProfileId: null == activeProfileId
+            ? _value.activeProfileId
+            : activeProfileId // ignore: cast_nullable_to_non_nullable
+                  as String,
+        profiles: null == profiles
+            ? _value._profiles
+            : profiles // ignore: cast_nullable_to_non_nullable
+                  as List<ConfigProfile>,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+@JsonSerializable()
+class _$AppConfigStoreImpl implements _AppConfigStore {
+  const _$AppConfigStoreImpl({
+    required this.activeProfileId,
+    final List<ConfigProfile> profiles = const [],
+  }) : _profiles = profiles;
+
+  factory _$AppConfigStoreImpl.fromJson(Map<String, dynamic> json) =>
+      _$$AppConfigStoreImplFromJson(json);
+
+  @override
+  final String activeProfileId;
+  final List<ConfigProfile> _profiles;
+  @override
+  @JsonKey()
+  List<ConfigProfile> get profiles {
+    if (_profiles is EqualUnmodifiableListView) return _profiles;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_profiles);
+  }
+
+  @override
+  String toString() {
+    return 'AppConfigStore(activeProfileId: $activeProfileId, profiles: $profiles)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$AppConfigStoreImpl &&
+            (identical(other.activeProfileId, activeProfileId) ||
+                other.activeProfileId == activeProfileId) &&
+            const DeepCollectionEquality().equals(other._profiles, _profiles));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(
+    runtimeType,
+    activeProfileId,
+    const DeepCollectionEquality().hash(_profiles),
+  );
+
+  /// Create a copy of AppConfigStore
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$AppConfigStoreImplCopyWith<_$AppConfigStoreImpl> get copyWith =>
+      __$$AppConfigStoreImplCopyWithImpl<_$AppConfigStoreImpl>(
+        this,
+        _$identity,
+      );
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$AppConfigStoreImplToJson(this);
+  }
+}
+
+abstract class _AppConfigStore implements AppConfigStore {
+  const factory _AppConfigStore({
+    required final String activeProfileId,
+    final List<ConfigProfile> profiles,
+  }) = _$AppConfigStoreImpl;
+
+  factory _AppConfigStore.fromJson(Map<String, dynamic> json) =
+      _$AppConfigStoreImpl.fromJson;
+
+  @override
+  String get activeProfileId;
+  @override
+  List<ConfigProfile> get profiles;
+
+  /// Create a copy of AppConfigStore
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$AppConfigStoreImplCopyWith<_$AppConfigStoreImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+````
+
+## File: lib/core/models/app_config_store.g.dart
+````dart
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+part of 'app_config_store.dart';
+
+// **************************************************************************
+// JsonSerializableGenerator
+// **************************************************************************
+
+_$ConfigProfileImpl _$$ConfigProfileImplFromJson(Map<String, dynamic> json) =>
+    _$ConfigProfileImpl(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      config: AppConfig.fromJson(json['config'] as Map<String, dynamic>),
+    );
+
+Map<String, dynamic> _$$ConfigProfileImplToJson(_$ConfigProfileImpl instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'name': instance.name,
+      'config': instance.config,
+    };
+
+_$AppConfigStoreImpl _$$AppConfigStoreImplFromJson(Map<String, dynamic> json) =>
+    _$AppConfigStoreImpl(
+      activeProfileId: json['activeProfileId'] as String,
+      profiles:
+          (json['profiles'] as List<dynamic>?)
+              ?.map((e) => ConfigProfile.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const [],
+    );
+
+Map<String, dynamic> _$$AppConfigStoreImplToJson(
+  _$AppConfigStoreImpl instance,
+) => <String, dynamic>{
+  'activeProfileId': instance.activeProfileId,
+  'profiles': instance.profiles,
+};
+````
+
 ## File: lib/core/models/app_config.dart
 ````dart
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -2156,627 +2648,6 @@ abstract class _ChatChunk implements ChatChunk {
   _$$ChatChunkImplCopyWith<_$ChatChunkImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }
-````
-
-## File: lib/core/utils/sse_parser.dart
-````dart
-import '../models/sse_event.dart';
-
-/// 标准 SSE 解析器
-///
-/// 负责：
-/// - 处理 HTTP 分块不等于 SSE 事件边界的问题
-/// - 支持 event/id/data/retry
-/// - 支持多行 data 拼接
-/// - 以空行作为一个 SSE event 的结束
-class SseParser {
-  String _buffer = '';
-
-  final List<String> _dataLines = [];
-  String? _event;
-  String? _id;
-
-  /// 输入任意一段文本，输出当前能够完整解析出的 SSE 事件列表
-  List<SseEvent> addChunk(String chunk) {
-    _buffer += chunk;
-    final events = <SseEvent>[];
-
-    while (true) {
-      final newlineIndex = _buffer.indexOf('\n');
-      if (newlineIndex == -1) break;
-
-      var line = _buffer.substring(0, newlineIndex);
-      _buffer = _buffer.substring(newlineIndex + 1);
-
-      if (line.endsWith('\r')) {
-        line = line.substring(0, line.length - 1);
-      }
-
-      // 空行 => 一个事件结束
-      if (line.isEmpty) {
-        final event = _flushEvent();
-        if (event != null) {
-          events.add(event);
-        }
-        continue;
-      }
-
-      // 注释行
-      if (line.startsWith(':')) {
-        continue;
-      }
-
-      final colonIndex = line.indexOf(':');
-      String field;
-      String value;
-
-      if (colonIndex == -1) {
-        field = line;
-        value = '';
-      } else {
-        field = line.substring(0, colonIndex);
-        value = line.substring(colonIndex + 1);
-        if (value.startsWith(' ')) {
-          value = value.substring(1);
-        }
-      }
-
-      switch (field) {
-        case 'event':
-          _event = value;
-          break;
-        case 'data':
-          _dataLines.add(value);
-          break;
-        case 'id':
-          _id = value;
-          break;
-        case 'retry':
-          // 目前不处理自动重试时间
-          break;
-        default:
-          // 未知字段忽略
-          break;
-      }
-    }
-
-    return events;
-  }
-
-  /// 在底层流结束时调用，尝试 flush 最后一个未结束事件
-  SseEvent? close() {
-    return _flushEvent();
-  }
-
-  SseEvent? _flushEvent() {
-    if (_dataLines.isEmpty && _event == null && _id == null) {
-      return null;
-    }
-
-    final event = SseEvent(
-      id: _id,
-      event: _event,
-      data: _dataLines.join('\n'),
-    );
-
-    _dataLines.clear();
-    _event = null;
-    _id = null;
-
-    return event;
-  }
-}
-````
-
-## File: lib/presentation/models/pending_attachment.dart
-````dart
-class PendingAttachment {
-  final String id;
-  final String name;
-  final String path;
-  final bool isImage;
-  final String? mimeType;
-
-  const PendingAttachment({
-    required this.id,
-    required this.name,
-    required this.path,
-    required this.isImage,
-    this.mimeType,
-  });
-}
-````
-
-## File: lib/core/models/app_config_store.dart
-````dart
-import 'package:freezed_annotation/freezed_annotation.dart';
-import 'app_config.dart';
-
-part 'app_config_store.freezed.dart';
-part 'app_config_store.g.dart';
-
-@freezed
-class ConfigProfile with _$ConfigProfile {
-  const factory ConfigProfile({
-    required String id,
-    required String name,
-    required AppConfig config,
-  }) = _ConfigProfile;
-
-  factory ConfigProfile.fromJson(Map<String, dynamic> json) =>
-      _$ConfigProfileFromJson(json);
-}
-
-@freezed
-class AppConfigStore with _$AppConfigStore {
-  const factory AppConfigStore({
-    required String activeProfileId,
-    @Default([]) List<ConfigProfile> profiles,
-  }) = _AppConfigStore;
-
-  factory AppConfigStore.fromJson(Map<String, dynamic> json) =>
-      _$AppConfigStoreFromJson(json);
-
-  factory AppConfigStore.defaultStore() => AppConfigStore(
-        activeProfileId: 'default',
-        profiles: [
-          ConfigProfile(
-            id: 'default',
-            name: '默认配置',
-            config: AppConfig.defaultConfig(),
-          ),
-        ],
-      );
-}
-````
-
-## File: lib/core/models/app_config_store.freezed.dart
-````dart
-// coverage:ignore-file
-// GENERATED CODE - DO NOT MODIFY BY HAND
-// ignore_for_file: type=lint
-// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
-
-part of 'app_config_store.dart';
-
-// **************************************************************************
-// FreezedGenerator
-// **************************************************************************
-
-T _$identity<T>(T value) => value;
-
-final _privateConstructorUsedError = UnsupportedError(
-  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
-);
-
-ConfigProfile _$ConfigProfileFromJson(Map<String, dynamic> json) {
-  return _ConfigProfile.fromJson(json);
-}
-
-/// @nodoc
-mixin _$ConfigProfile {
-  String get id => throw _privateConstructorUsedError;
-  String get name => throw _privateConstructorUsedError;
-  AppConfig get config => throw _privateConstructorUsedError;
-
-  /// Serializes this ConfigProfile to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-
-  /// Create a copy of ConfigProfile
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $ConfigProfileCopyWith<ConfigProfile> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-abstract class $ConfigProfileCopyWith<$Res> {
-  factory $ConfigProfileCopyWith(
-    ConfigProfile value,
-    $Res Function(ConfigProfile) then,
-  ) = _$ConfigProfileCopyWithImpl<$Res, ConfigProfile>;
-  @useResult
-  $Res call({String id, String name, AppConfig config});
-
-  $AppConfigCopyWith<$Res> get config;
-}
-
-/// @nodoc
-class _$ConfigProfileCopyWithImpl<$Res, $Val extends ConfigProfile>
-    implements $ConfigProfileCopyWith<$Res> {
-  _$ConfigProfileCopyWithImpl(this._value, this._then);
-
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-
-  /// Create a copy of ConfigProfile
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({Object? id = null, Object? name = null, Object? config = null}) {
-    return _then(
-      _value.copyWith(
-            id: null == id
-                ? _value.id
-                : id // ignore: cast_nullable_to_non_nullable
-                      as String,
-            name: null == name
-                ? _value.name
-                : name // ignore: cast_nullable_to_non_nullable
-                      as String,
-            config: null == config
-                ? _value.config
-                : config // ignore: cast_nullable_to_non_nullable
-                      as AppConfig,
-          )
-          as $Val,
-    );
-  }
-
-  /// Create a copy of ConfigProfile
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @pragma('vm:prefer-inline')
-  $AppConfigCopyWith<$Res> get config {
-    return $AppConfigCopyWith<$Res>(_value.config, (value) {
-      return _then(_value.copyWith(config: value) as $Val);
-    });
-  }
-}
-
-/// @nodoc
-abstract class _$$ConfigProfileImplCopyWith<$Res>
-    implements $ConfigProfileCopyWith<$Res> {
-  factory _$$ConfigProfileImplCopyWith(
-    _$ConfigProfileImpl value,
-    $Res Function(_$ConfigProfileImpl) then,
-  ) = __$$ConfigProfileImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({String id, String name, AppConfig config});
-
-  @override
-  $AppConfigCopyWith<$Res> get config;
-}
-
-/// @nodoc
-class __$$ConfigProfileImplCopyWithImpl<$Res>
-    extends _$ConfigProfileCopyWithImpl<$Res, _$ConfigProfileImpl>
-    implements _$$ConfigProfileImplCopyWith<$Res> {
-  __$$ConfigProfileImplCopyWithImpl(
-    _$ConfigProfileImpl _value,
-    $Res Function(_$ConfigProfileImpl) _then,
-  ) : super(_value, _then);
-
-  /// Create a copy of ConfigProfile
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({Object? id = null, Object? name = null, Object? config = null}) {
-    return _then(
-      _$ConfigProfileImpl(
-        id: null == id
-            ? _value.id
-            : id // ignore: cast_nullable_to_non_nullable
-                  as String,
-        name: null == name
-            ? _value.name
-            : name // ignore: cast_nullable_to_non_nullable
-                  as String,
-        config: null == config
-            ? _value.config
-            : config // ignore: cast_nullable_to_non_nullable
-                  as AppConfig,
-      ),
-    );
-  }
-}
-
-/// @nodoc
-@JsonSerializable()
-class _$ConfigProfileImpl implements _ConfigProfile {
-  const _$ConfigProfileImpl({
-    required this.id,
-    required this.name,
-    required this.config,
-  });
-
-  factory _$ConfigProfileImpl.fromJson(Map<String, dynamic> json) =>
-      _$$ConfigProfileImplFromJson(json);
-
-  @override
-  final String id;
-  @override
-  final String name;
-  @override
-  final AppConfig config;
-
-  @override
-  String toString() {
-    return 'ConfigProfile(id: $id, name: $name, config: $config)';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$ConfigProfileImpl &&
-            (identical(other.id, id) || other.id == id) &&
-            (identical(other.name, name) || other.name == name) &&
-            (identical(other.config, config) || other.config == config));
-  }
-
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  int get hashCode => Object.hash(runtimeType, id, name, config);
-
-  /// Create a copy of ConfigProfile
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$ConfigProfileImplCopyWith<_$ConfigProfileImpl> get copyWith =>
-      __$$ConfigProfileImplCopyWithImpl<_$ConfigProfileImpl>(this, _$identity);
-
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$ConfigProfileImplToJson(this);
-  }
-}
-
-abstract class _ConfigProfile implements ConfigProfile {
-  const factory _ConfigProfile({
-    required final String id,
-    required final String name,
-    required final AppConfig config,
-  }) = _$ConfigProfileImpl;
-
-  factory _ConfigProfile.fromJson(Map<String, dynamic> json) =
-      _$ConfigProfileImpl.fromJson;
-
-  @override
-  String get id;
-  @override
-  String get name;
-  @override
-  AppConfig get config;
-
-  /// Create a copy of ConfigProfile
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$ConfigProfileImplCopyWith<_$ConfigProfileImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-AppConfigStore _$AppConfigStoreFromJson(Map<String, dynamic> json) {
-  return _AppConfigStore.fromJson(json);
-}
-
-/// @nodoc
-mixin _$AppConfigStore {
-  String get activeProfileId => throw _privateConstructorUsedError;
-  List<ConfigProfile> get profiles => throw _privateConstructorUsedError;
-
-  /// Serializes this AppConfigStore to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-
-  /// Create a copy of AppConfigStore
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $AppConfigStoreCopyWith<AppConfigStore> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-abstract class $AppConfigStoreCopyWith<$Res> {
-  factory $AppConfigStoreCopyWith(
-    AppConfigStore value,
-    $Res Function(AppConfigStore) then,
-  ) = _$AppConfigStoreCopyWithImpl<$Res, AppConfigStore>;
-  @useResult
-  $Res call({String activeProfileId, List<ConfigProfile> profiles});
-}
-
-/// @nodoc
-class _$AppConfigStoreCopyWithImpl<$Res, $Val extends AppConfigStore>
-    implements $AppConfigStoreCopyWith<$Res> {
-  _$AppConfigStoreCopyWithImpl(this._value, this._then);
-
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-
-  /// Create a copy of AppConfigStore
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({Object? activeProfileId = null, Object? profiles = null}) {
-    return _then(
-      _value.copyWith(
-            activeProfileId: null == activeProfileId
-                ? _value.activeProfileId
-                : activeProfileId // ignore: cast_nullable_to_non_nullable
-                      as String,
-            profiles: null == profiles
-                ? _value.profiles
-                : profiles // ignore: cast_nullable_to_non_nullable
-                      as List<ConfigProfile>,
-          )
-          as $Val,
-    );
-  }
-}
-
-/// @nodoc
-abstract class _$$AppConfigStoreImplCopyWith<$Res>
-    implements $AppConfigStoreCopyWith<$Res> {
-  factory _$$AppConfigStoreImplCopyWith(
-    _$AppConfigStoreImpl value,
-    $Res Function(_$AppConfigStoreImpl) then,
-  ) = __$$AppConfigStoreImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({String activeProfileId, List<ConfigProfile> profiles});
-}
-
-/// @nodoc
-class __$$AppConfigStoreImplCopyWithImpl<$Res>
-    extends _$AppConfigStoreCopyWithImpl<$Res, _$AppConfigStoreImpl>
-    implements _$$AppConfigStoreImplCopyWith<$Res> {
-  __$$AppConfigStoreImplCopyWithImpl(
-    _$AppConfigStoreImpl _value,
-    $Res Function(_$AppConfigStoreImpl) _then,
-  ) : super(_value, _then);
-
-  /// Create a copy of AppConfigStore
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({Object? activeProfileId = null, Object? profiles = null}) {
-    return _then(
-      _$AppConfigStoreImpl(
-        activeProfileId: null == activeProfileId
-            ? _value.activeProfileId
-            : activeProfileId // ignore: cast_nullable_to_non_nullable
-                  as String,
-        profiles: null == profiles
-            ? _value._profiles
-            : profiles // ignore: cast_nullable_to_non_nullable
-                  as List<ConfigProfile>,
-      ),
-    );
-  }
-}
-
-/// @nodoc
-@JsonSerializable()
-class _$AppConfigStoreImpl implements _AppConfigStore {
-  const _$AppConfigStoreImpl({
-    required this.activeProfileId,
-    final List<ConfigProfile> profiles = const [],
-  }) : _profiles = profiles;
-
-  factory _$AppConfigStoreImpl.fromJson(Map<String, dynamic> json) =>
-      _$$AppConfigStoreImplFromJson(json);
-
-  @override
-  final String activeProfileId;
-  final List<ConfigProfile> _profiles;
-  @override
-  @JsonKey()
-  List<ConfigProfile> get profiles {
-    if (_profiles is EqualUnmodifiableListView) return _profiles;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableListView(_profiles);
-  }
-
-  @override
-  String toString() {
-    return 'AppConfigStore(activeProfileId: $activeProfileId, profiles: $profiles)';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$AppConfigStoreImpl &&
-            (identical(other.activeProfileId, activeProfileId) ||
-                other.activeProfileId == activeProfileId) &&
-            const DeepCollectionEquality().equals(other._profiles, _profiles));
-  }
-
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  int get hashCode => Object.hash(
-    runtimeType,
-    activeProfileId,
-    const DeepCollectionEquality().hash(_profiles),
-  );
-
-  /// Create a copy of AppConfigStore
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$AppConfigStoreImplCopyWith<_$AppConfigStoreImpl> get copyWith =>
-      __$$AppConfigStoreImplCopyWithImpl<_$AppConfigStoreImpl>(
-        this,
-        _$identity,
-      );
-
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$AppConfigStoreImplToJson(this);
-  }
-}
-
-abstract class _AppConfigStore implements AppConfigStore {
-  const factory _AppConfigStore({
-    required final String activeProfileId,
-    final List<ConfigProfile> profiles,
-  }) = _$AppConfigStoreImpl;
-
-  factory _AppConfigStore.fromJson(Map<String, dynamic> json) =
-      _$AppConfigStoreImpl.fromJson;
-
-  @override
-  String get activeProfileId;
-  @override
-  List<ConfigProfile> get profiles;
-
-  /// Create a copy of AppConfigStore
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$AppConfigStoreImplCopyWith<_$AppConfigStoreImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-````
-
-## File: lib/core/models/app_config_store.g.dart
-````dart
-// GENERATED CODE - DO NOT MODIFY BY HAND
-
-part of 'app_config_store.dart';
-
-// **************************************************************************
-// JsonSerializableGenerator
-// **************************************************************************
-
-_$ConfigProfileImpl _$$ConfigProfileImplFromJson(Map<String, dynamic> json) =>
-    _$ConfigProfileImpl(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      config: AppConfig.fromJson(json['config'] as Map<String, dynamic>),
-    );
-
-Map<String, dynamic> _$$ConfigProfileImplToJson(_$ConfigProfileImpl instance) =>
-    <String, dynamic>{
-      'id': instance.id,
-      'name': instance.name,
-      'config': instance.config,
-    };
-
-_$AppConfigStoreImpl _$$AppConfigStoreImplFromJson(Map<String, dynamic> json) =>
-    _$AppConfigStoreImpl(
-      activeProfileId: json['activeProfileId'] as String,
-      profiles:
-          (json['profiles'] as List<dynamic>?)
-              ?.map((e) => ConfigProfile.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          const [],
-    );
-
-Map<String, dynamic> _$$AppConfigStoreImplToJson(
-  _$AppConfigStoreImpl instance,
-) => <String, dynamic>{
-  'activeProfileId': instance.activeProfileId,
-  'profiles': instance.profiles,
-};
 ````
 
 ## File: lib/core/models/chat_round.dart
@@ -3839,6 +3710,135 @@ Map<String, dynamic> _$$SessionConfigImplToJson(_$SessionConfigImpl instance) =>
     };
 ````
 
+## File: lib/core/utils/sse_parser.dart
+````dart
+import '../models/sse_event.dart';
+
+/// 标准 SSE 解析器
+///
+/// 负责：
+/// - 处理 HTTP 分块不等于 SSE 事件边界的问题
+/// - 支持 event/id/data/retry
+/// - 支持多行 data 拼接
+/// - 以空行作为一个 SSE event 的结束
+class SseParser {
+  String _buffer = '';
+
+  final List<String> _dataLines = [];
+  String? _event;
+  String? _id;
+
+  /// 输入任意一段文本，输出当前能够完整解析出的 SSE 事件列表
+  List<SseEvent> addChunk(String chunk) {
+    _buffer += chunk;
+    final events = <SseEvent>[];
+
+    while (true) {
+      final newlineIndex = _buffer.indexOf('\n');
+      if (newlineIndex == -1) break;
+
+      var line = _buffer.substring(0, newlineIndex);
+      _buffer = _buffer.substring(newlineIndex + 1);
+
+      if (line.endsWith('\r')) {
+        line = line.substring(0, line.length - 1);
+      }
+
+      // 空行 => 一个事件结束
+      if (line.isEmpty) {
+        final event = _flushEvent();
+        if (event != null) {
+          events.add(event);
+        }
+        continue;
+      }
+
+      // 注释行
+      if (line.startsWith(':')) {
+        continue;
+      }
+
+      final colonIndex = line.indexOf(':');
+      String field;
+      String value;
+
+      if (colonIndex == -1) {
+        field = line;
+        value = '';
+      } else {
+        field = line.substring(0, colonIndex);
+        value = line.substring(colonIndex + 1);
+        if (value.startsWith(' ')) {
+          value = value.substring(1);
+        }
+      }
+
+      switch (field) {
+        case 'event':
+          _event = value;
+          break;
+        case 'data':
+          _dataLines.add(value);
+          break;
+        case 'id':
+          _id = value;
+          break;
+        case 'retry':
+          // 目前不处理自动重试时间
+          break;
+        default:
+          // 未知字段忽略
+          break;
+      }
+    }
+
+    return events;
+  }
+
+  /// 在底层流结束时调用，尝试 flush 最后一个未结束事件
+  SseEvent? close() {
+    return _flushEvent();
+  }
+
+  SseEvent? _flushEvent() {
+    if (_dataLines.isEmpty && _event == null && _id == null) {
+      return null;
+    }
+
+    final event = SseEvent(
+      id: _id,
+      event: _event,
+      data: _dataLines.join('\n'),
+    );
+
+    _dataLines.clear();
+    _event = null;
+    _id = null;
+
+    return event;
+  }
+}
+````
+
+## File: lib/presentation/models/pending_attachment.dart
+````dart
+class PendingAttachment {
+  final String id;
+  final String name;
+  final String path;
+  final bool isImage;
+  final String? mimeType;
+
+  const PendingAttachment({
+    required this.id,
+    required this.name,
+    required this.path,
+    required this.isImage,
+    this.mimeType,
+  });
+}
+````
+
 ## File: lib/data/data_sources/api_builders/api_request_builder.dart
 ````dart
 import '../../../core/models/api_message.dart';
@@ -4021,135 +4021,6 @@ class LocalChatSource implements ChatSource {
     }
     buffer.write('Assistant $round: ');
     return buffer.toString();
-  }
-}
-````
-
-## File: lib/data/data_sources/remote_chat_source.dart
-````dart
-import 'dart:convert';
-import 'package:collection/collection.dart';
-import 'package:http/http.dart' as http;
-import '../../core/models/model_info.dart';
-import '../../core/models/api_message.dart';
-import '../../core/models/app_config.dart';
-import '../../core/models/chat_chunk.dart';
-import '../../core/utils/sse_parser.dart';
-import 'chat_source.dart';
-import 'sse_event_decoder.dart';
-import 'api_builders/api_request_builder.dart';
-import 'api_builders/google_api_builder.dart';
-import 'api_builders/chat_completions_api_builder.dart';
-import 'api_builders/responses_api_builder.dart';
-
-class RemoteChatSource implements ChatSource {
-  ApiRequestBuilder _getBuilder(String apiMode) {
-    switch (apiMode) {
-      case 'google':
-        return GoogleApiBuilder();
-      case 'responses':
-        return ResponsesApiBuilder();
-      case 'chat_completions':
-      default:
-        return ChatCompletionsApiBuilder();
-    }
-  }
-
-  @override
-  Future<List<ModelInfo>> fetchModels(AppConfig config) async {
-    final builder = _getBuilder(config.apiMode);
-    final ctx = ApiBuildContext(
-      model: '',
-      context: [],
-      enableReasoning: false,
-      apiKey: config.apiKey,
-      baseUrl: config.baseUrl,
-      chatPath: '',
-      modelsPath: config.modelsPath,
-    );
-
-    final url = builder.buildModelsUri(ctx);
-    final response = await http.get(url, headers: builder.buildHeaders(ctx));
-
-    if (response.statusCode != 200) {
-      throw Exception('获取模型列表失败：${response.statusCode}');
-    }
-
-    final json = jsonDecode(response.body) as Map<String, dynamic>;
-    return builder.parseModelsResponse(json);
-  }
-
-  @override
-  Stream<ChatChunk> chatStream({
-    required AppConfig config,
-    required List<ApiMessage> context,
-  }) async* {
-    final client = http.Client();
-    try {
-      final apiMode = config.apiMode.trim();
-      final selectedId = config.selectedModel;
-      final selectedModel = config.availableModels?.firstWhereOrNull((m) => m.id == selectedId);
-      final enableReasoning = selectedModel?.overrideSupportsReasoning == true;
-      final model = config.selectedModel?.trim() ?? '';
-
-      final builder = _getBuilder(apiMode);
-      String resolvedChatPath = config.chatPath.trim();
-      if (resolvedChatPath.contains('{model}')) {
-        resolvedChatPath = resolvedChatPath.replaceAll('{model}', model);
-      }
-
-      final ctx = ApiBuildContext(
-        model: model, context: context, enableReasoning: enableReasoning,
-        apiKey: config.apiKey.trim(), baseUrl: config.baseUrl.trim(),
-        chatPath: resolvedChatPath, modelsPath: config.modelsPath.trim(),
-      );
-
-      final uri = builder.buildUri(ctx);
-      final requestBody = builder.buildRequestBody(ctx);
-
-      final request = http.Request('POST', uri)
-        ..headers.addAll(builder.buildHeaders(ctx))
-        ..headers.addAll({'Accept': 'text/event-stream', 'Cache-Control': 'no-cache'})
-        ..body = jsonEncode(requestBody);
-
-      final streamedResponse = await client.send(request);
-
-      if (streamedResponse.statusCode < 200 || streamedResponse.statusCode >= 300) {
-        final errorBody = await streamedResponse.stream.bytesToString();
-        throw Exception('${streamedResponse.statusCode} $errorBody');
-      }
-
-      final parser = SseParser();
-      final stream = streamedResponse.stream.transform(utf8.decoder);
-
-      await for (final rawChunk in stream) {
-        final events = parser.addChunk(rawChunk);
-        for (final event in events) {
-          try {
-            final decoded = SseEventDecoder.decode(apiMode: apiMode, event: event);
-            if (decoded == null) continue;
-            yield decoded;
-            if (decoded.isDone) return;
-          } catch (_) {}
-        }
-      }
-
-      final lastEvent = parser.close();
-      if (lastEvent != null) {
-        try {
-          final decoded = SseEventDecoder.decode(apiMode: apiMode, event: lastEvent);
-          if (decoded != null) {
-            yield decoded;
-            if (decoded.isDone) return;
-          }
-        } catch (_) {}
-      }
-      yield const ChatChunk(isDone: true);
-    } catch (e) {
-      yield ChatChunk(isDone: true, error: '$e');
-    } finally {
-      client.close();
-    }
   }
 }
 ````
@@ -9840,6 +9711,135 @@ class ResponsesApiBuilder implements ApiRequestBuilder {
 }
 ````
 
+## File: lib/data/data_sources/remote_chat_source.dart
+````dart
+import 'dart:convert';
+import 'package:collection/collection.dart';
+import 'package:http/http.dart' as http;
+import '../../core/models/model_info.dart';
+import '../../core/models/api_message.dart';
+import '../../core/models/app_config.dart';
+import '../../core/models/chat_chunk.dart';
+import '../../core/utils/sse_parser.dart';
+import 'chat_source.dart';
+import 'sse_event_decoder.dart';
+import 'api_builders/api_request_builder.dart';
+import 'api_builders/google_api_builder.dart';
+import 'api_builders/chat_completions_api_builder.dart';
+import 'api_builders/responses_api_builder.dart';
+
+class RemoteChatSource implements ChatSource {
+  ApiRequestBuilder _getBuilder(String apiMode) {
+    switch (apiMode) {
+      case 'google':
+        return GoogleApiBuilder();
+      case 'responses':
+        return ResponsesApiBuilder();
+      case 'chat_completions':
+      default:
+        return ChatCompletionsApiBuilder();
+    }
+  }
+
+  @override
+  Future<List<ModelInfo>> fetchModels(AppConfig config) async {
+    final builder = _getBuilder(config.apiMode);
+    final ctx = ApiBuildContext(
+      model: '',
+      context: [],
+      enableReasoning: false,
+      apiKey: config.apiKey,
+      baseUrl: config.baseUrl,
+      chatPath: '',
+      modelsPath: config.modelsPath,
+    );
+
+    final url = builder.buildModelsUri(ctx);
+    final response = await http.get(url, headers: builder.buildHeaders(ctx));
+
+    if (response.statusCode != 200) {
+      throw Exception('获取模型列表失败：${response.statusCode}');
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return builder.parseModelsResponse(json);
+  }
+
+  @override
+  Stream<ChatChunk> chatStream({
+    required AppConfig config,
+    required List<ApiMessage> context,
+  }) async* {
+    final client = http.Client();
+    try {
+      final apiMode = config.apiMode.trim();
+      final selectedId = config.selectedModel;
+      final selectedModel = config.availableModels?.firstWhereOrNull((m) => m.id == selectedId);
+      final enableReasoning = selectedModel?.overrideSupportsReasoning == true;
+      final model = config.selectedModel?.trim() ?? '';
+
+      final builder = _getBuilder(apiMode);
+      String resolvedChatPath = config.chatPath.trim();
+      if (resolvedChatPath.contains('{model}')) {
+        resolvedChatPath = resolvedChatPath.replaceAll('{model}', model);
+      }
+
+      final ctx = ApiBuildContext(
+        model: model, context: context, enableReasoning: enableReasoning,
+        apiKey: config.apiKey.trim(), baseUrl: config.baseUrl.trim(),
+        chatPath: resolvedChatPath, modelsPath: config.modelsPath.trim(),
+      );
+
+      final uri = builder.buildUri(ctx);
+      final requestBody = builder.buildRequestBody(ctx);
+
+      final request = http.Request('POST', uri)
+        ..headers.addAll(builder.buildHeaders(ctx))
+        ..headers.addAll({'Accept': 'text/event-stream', 'Cache-Control': 'no-cache'})
+        ..body = jsonEncode(requestBody);
+
+      final streamedResponse = await client.send(request);
+
+      if (streamedResponse.statusCode < 200 || streamedResponse.statusCode >= 300) {
+        final errorBody = await streamedResponse.stream.bytesToString();
+        throw Exception('${streamedResponse.statusCode} $errorBody');
+      }
+
+      final parser = SseParser();
+      final stream = streamedResponse.stream.transform(utf8.decoder);
+
+      await for (final rawChunk in stream) {
+        final events = parser.addChunk(rawChunk);
+        for (final event in events) {
+          try {
+            final decoded = SseEventDecoder.decode(apiMode: apiMode, event: event);
+            if (decoded == null) continue;
+            yield decoded;
+            if (decoded.isDone) return;
+          } catch (_) {}
+        }
+      }
+
+      final lastEvent = parser.close();
+      if (lastEvent != null) {
+        try {
+          final decoded = SseEventDecoder.decode(apiMode: apiMode, event: lastEvent);
+          if (decoded != null) {
+            yield decoded;
+            if (decoded.isDone) return;
+          }
+        } catch (_) {}
+      }
+      yield const ChatChunk(isDone: true);
+    } catch (e) {
+      yield ChatChunk(isDone: true, error: '$e');
+    } finally {
+      client.close();
+    }
+  }
+}
+````
+
 ## File: lib/domain/models/session_card_meta.dart
 ````dart
 class SessionCardMeta {
@@ -10579,6 +10579,132 @@ class CharacterCardParser {
 }
 ````
 
+## File: lib/presentation/providers/input_notifier.dart
+````dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/input_state.dart';
+import '../models/pending_attachment.dart';
+
+/// 输入状态 Notifier
+///
+/// 职责：
+/// - 管理输入框文本和附件列表
+/// - 提供状态变更方法
+/// - 不包含发送逻辑、不包含编辑模式、不包含 isSending 状态
+class InputNotifier extends Notifier<InputState> {
+  @override
+  InputState build() => const InputState();
+
+  /// 更新输入文本
+  void updateText(String text) {
+    state = state.copyWith(text: text);
+  }
+
+  /// 添加附件
+  void addAttachment(PendingAttachment attachment) {
+    state = state.copyWith(
+      attachments: [...state.attachments, attachment],
+    );
+  }
+
+  /// 移除指定 ID 的附件
+  void removeAttachment(String id) {
+    state = state.copyWith(
+      attachments: state.attachments.where((a) => a.id != id).toList(),
+    );
+  }
+
+  /// 清空输入状态（文本和附件）
+  void clear() {
+    state = const InputState();
+  }
+}
+
+/// 全局输入状态 Provider
+///
+/// 特点：
+/// - 全局单例：所有会话共享同一份输入草稿
+/// - 自动保留：切换会话时草稿不会丢失
+final inputStateProvider =
+    NotifierProvider<InputNotifier, InputState>(InputNotifier.new);
+````
+
+## File: lib/presentation/widgets/common/app_toast.dart
+````dart
+// lib/presentation/widgets/common/app_toast.dart
+import 'package:flutter/cupertino.dart';
+import '../../../main.dart'; // 全局 navigatorKey
+
+abstract class AppToast {
+  static OverlayEntry? _entry;
+
+  static void show(String message, {Duration duration = const Duration(seconds: 1)}) {
+    _entry?.remove();
+    final overlay = navigatorKey.currentState?.overlay;
+    if (overlay == null) return;
+
+    _entry = OverlayEntry(
+      builder: (context) => Positioned.fill(
+        child: IgnorePointer(
+          child: Center(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                color: const Color(0xE6111827),
+                child: Text(
+                  message,
+                  style: const TextStyle(color: CupertinoColors.white),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    overlay.insert(_entry!);
+    Future.delayed(duration, () {
+      _entry?.remove();
+      if (_entry != null) _entry = null;
+    });
+  }
+}
+````
+
+## File: lib/core/constants/app_constants.dart
+````dart
+abstract class AppConstants {
+  // 文件夹名称
+  static const String dirAttachments = 'attachments';
+
+  // 配置键
+  static const String keyBaseUrl = 'baseUrl';
+  static const String keyApiKey = 'apiKey';
+  static const String keyTheme = 'theme';
+  static const String keyModel = 'selectedModel';
+
+  // 默认值
+  static const String defaultBaseUrl = 'https://api.openai.com';
+  static const String defaultTheme = 'system';
+}
+````
+
+## File: lib/domain/models/session_list_item.dart
+````dart
+class SessionListItem {
+  final String id;
+  final String title;
+  final int updatedAt;
+
+  const SessionListItem({
+    required this.id,
+    required this.title,
+    required this.updatedAt,
+  });
+}
+````
+
 ## File: lib/domain/services/stream_processor.dart
 ````dart
 import 'dart:async';
@@ -10668,24 +10794,95 @@ class StreamProcessor {
 }
 ````
 
+## File: lib/domain/services/tree_builder.dart
+````dart
+import '../models/tree_node.dart';
+
+List<TreeNode> buildTree(List<({String id, String? parentId})> topology) {
+  if (topology.isEmpty) return [];
+
+  final nodeMap = <String, TreeNode>{
+    for (final t in topology)
+      t.id: TreeNode(id: t.id, parentId: t.parentId, children: const [], depth: 0),
+  };
+
+  final childrenMap = <String, List<String>>{};
+  final rootIds = <String>[];
+
+  for (final t in topology) {
+    if (t.parentId == null) {
+      rootIds.add(t.id);
+    } else {
+      childrenMap.putIfAbsent(t.parentId!, () => []).add(t.id);
+    }
+  }
+
+  final roots = <TreeNode>[];
+  for (final rootId in rootIds) {
+    final root = nodeMap[rootId];
+    if (root != null) {
+      roots.add(_buildSubtreeIterative(root, childrenMap, nodeMap));
+    }
+  }
+  return roots;
+}
+
+TreeNode _buildSubtreeIterative(
+  TreeNode root,
+  Map<String, List<String>> childrenMap,
+  Map<String, TreeNode> nodeMap,
+) {
+  final postOrder = <TreeNode>[];
+  final stack = <TreeNode>[root];
+  while (stack.isNotEmpty) {
+    final node = stack.removeLast();
+    postOrder.add(node);
+    for (final cid in childrenMap[node.id] ?? []) {
+      final child = nodeMap[cid];
+      if (child != null) stack.add(child);
+    }
+  }
+
+  final updatedMap = <String, TreeNode>{};
+  for (int i = postOrder.length - 1; i >= 0; i--) {
+    final original = postOrder[i];
+    final childIds = childrenMap[original.id] ?? [];
+    final builtChildren = <TreeNode>[];
+    int maxChildDepth = -1;
+    for (final cid in childIds) {
+      final builtChild = updatedMap[cid]!;
+      builtChildren.add(builtChild);
+      if (builtChild.depth > maxChildDepth) maxChildDepth = builtChild.depth;
+    }
+    updatedMap[original.id] = original.copyWith(
+      depth: maxChildDepth + 1,
+      children: builtChildren,
+    );
+  }
+  return updatedMap[root.id]!;
+}
+````
+
 ## File: lib/presentation/pages/image_attachment_viewer_page.dart
 ````dart
 import 'dart:io';
-import 'package:aiservice/presentation/widgets/common/app_page_scaffold.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:aiservice/presentation/widgets/common/app_page_scaffold.dart';
 
 class ImageAttachmentViewerPage extends StatelessWidget {
   final String title;
-  final File imageFile;
+  final String filePath;
 
   const ImageAttachmentViewerPage({
     super.key,
     required this.title,
-    required this.imageFile,
+    required this.filePath,
   });
 
   @override
   Widget build(BuildContext context) {
+    final imageFile = File(filePath);
+    
     return AppPageScaffold(
       navigationBar: CupertinoNavigationBar(middle: Text(title, overflow: TextOverflow.ellipsis)),
       body: InteractiveViewer(
@@ -10695,7 +10892,7 @@ class ImageAttachmentViewerPage extends StatelessWidget {
           child: Image.file(
             imageFile,
             fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => const Center(child: Icon(CupertinoIcons.exclamationmark_triangle)),
+            errorBuilder: (_, _, _) => const Center(child: Icon(CupertinoIcons.exclamationmark_triangle)),
           ),
         ),
       ),
@@ -10704,71 +10901,36 @@ class ImageAttachmentViewerPage extends StatelessWidget {
 }
 ````
 
-## File: lib/presentation/providers/input_notifier.dart
+## File: lib/presentation/widgets/common/app_page_scaffold.dart
 ````dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/input_state.dart';
-import '../models/pending_attachment.dart';
+import 'package:flutter/cupertino.dart';
 
-/// 输入状态 Notifier
-///
-/// 职责：
-/// - 管理输入框文本和附件列表
-/// - 提供状态变更方法
-/// - 不包含发送逻辑、不包含编辑模式、不包含 isSending 状态
-class InputNotifier extends Notifier<InputState> {
+class AppPageScaffold extends StatelessWidget {
+  final ObstructingPreferredSizeWidget? navigationBar;
+  final Widget body;
+  final bool useSafeArea;
+
+  const AppPageScaffold({
+    super.key,
+    this.navigationBar,
+    required this.body,
+    this.useSafeArea = true,
+  });
+
   @override
-  InputState build() => const InputState();
+  Widget build(BuildContext context) {
+    return CupertinoPageScaffold(
+      backgroundColor: CupertinoDynamicColor.resolve(CupertinoColors.systemGroupedBackground, context),
+      navigationBar: navigationBar,
 
-  /// 更新输入文本
-  void updateText(String text) {
-    state = state.copyWith(text: text);
-  }
-
-  /// 添加附件
-  void addAttachment(PendingAttachment attachment) {
-    state = state.copyWith(
-      attachments: [...state.attachments, attachment],
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        
+        child: SafeArea(child: body),
+      ),
     );
   }
-
-  /// 移除指定 ID 的附件
-  void removeAttachment(String id) {
-    state = state.copyWith(
-      attachments: state.attachments.where((a) => a.id != id).toList(),
-    );
-  }
-
-  /// 清空输入状态（文本和附件）
-  void clear() {
-    state = const InputState();
-  }
-}
-
-/// 全局输入状态 Provider
-///
-/// 特点：
-/// - 全局单例：所有会话共享同一份输入草稿
-/// - 自动保留：切换会话时草稿不会丢失
-final inputStateProvider =
-    NotifierProvider<InputNotifier, InputState>(InputNotifier.new);
-````
-
-## File: lib/core/constants/app_constants.dart
-````dart
-abstract class AppConstants {
-  // 文件夹名称
-  static const String dirAttachments = 'attachments';
-
-  // 配置键
-  static const String keyBaseUrl = 'baseUrl';
-  static const String keyApiKey = 'apiKey';
-  static const String keyTheme = 'theme';
-  static const String keyModel = 'selectedModel';
-
-  // 默认值
-  static const String defaultBaseUrl = 'https://api.openai.com';
-  static const String defaultTheme = 'system';
 }
 ````
 
@@ -10830,19 +10992,56 @@ class LocalFileSource{
 }
 ````
 
-## File: lib/domain/models/session_list_item.dart
+## File: lib/di/providers.dart
 ````dart
-class SessionListItem {
-  final String id;
-  final String title;
-  final int updatedAt;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 
-  const SessionListItem({
-    required this.id,
-    required this.title,
-    required this.updatedAt,
-  });
-}
+import '../data/data_sources/local_file_source.dart';
+import '../data/data_sources/local_chat_source.dart'; // 新增
+import '../data/data_sources/remote_chat_source.dart'; // 替换原 remote_api_source
+import '../data/data_sources/chat_source_router.dart'; // 新增
+import '../data/database/database.dart';
+import '../data/services/config_service.dart';
+import '../data/repositories/conversation_repository.dart';
+
+final localFileSourceProvider = FutureProvider<LocalFileSource>((ref) async {
+  final appDir = await getApplicationDocumentsDirectory();
+  final fileSource = LocalFileSource(appDir.path);
+  await fileSource.initDirectories();
+  return fileSource;
+});
+
+final appDatabaseProvider = Provider<AppDatabase>((ref) {
+  ref.watch(localFileSourceProvider);
+  return AppDatabase();
+});
+
+// --- 新增 Data Sources ---
+final remoteChatSourceProvider = Provider<RemoteChatSource>((ref) => RemoteChatSource());
+final localChatSourceProvider = Provider<LocalChatSource>((ref) => LocalChatSource());
+
+final chatSourceRouterProvider = Provider<ChatSourceRouter>((ref) {
+  return ChatSourceRouter(
+    ref.watch(remoteChatSourceProvider),
+    ref.watch(localChatSourceProvider),
+  );
+});
+
+// --- 更新 Service 依赖 ---
+final configServiceProvider = Provider<ConfigService>((ref) {
+  return ConfigService(
+    ref.watch(appDatabaseProvider),
+    ref.watch(chatSourceRouterProvider), // 替换原 remoteApiSourceProvider
+  );
+});
+
+final conversationRepositoryProvider = Provider<ConversationRepository>((ref) {
+  return ConversationRepository(
+    ref.watch(appDatabaseProvider),
+    ref.watch(localFileSourceProvider).requireValue,
+  );
+});
 ````
 
 ## File: lib/domain/services/chat_context_builder.dart
@@ -10951,170 +11150,6 @@ Future<List<ApiMessageContentPart>> _buildAttachmentParts(
     return [ApiMessageContentPart.text(text: text)];
   }
 }
-````
-
-## File: lib/domain/services/tree_builder.dart
-````dart
-import '../models/tree_node.dart';
-
-List<TreeNode> buildTree(List<({String id, String? parentId})> topology) {
-  if (topology.isEmpty) return [];
-
-  final nodeMap = <String, TreeNode>{
-    for (final t in topology)
-      t.id: TreeNode(id: t.id, parentId: t.parentId, children: const [], depth: 0),
-  };
-
-  final childrenMap = <String, List<String>>{};
-  final rootIds = <String>[];
-
-  for (final t in topology) {
-    if (t.parentId == null) {
-      rootIds.add(t.id);
-    } else {
-      childrenMap.putIfAbsent(t.parentId!, () => []).add(t.id);
-    }
-  }
-
-  final roots = <TreeNode>[];
-  for (final rootId in rootIds) {
-    final root = nodeMap[rootId];
-    if (root != null) {
-      roots.add(_buildSubtreeIterative(root, childrenMap, nodeMap));
-    }
-  }
-  return roots;
-}
-
-TreeNode _buildSubtreeIterative(
-  TreeNode root,
-  Map<String, List<String>> childrenMap,
-  Map<String, TreeNode> nodeMap,
-) {
-  final postOrder = <TreeNode>[];
-  final stack = <TreeNode>[root];
-  while (stack.isNotEmpty) {
-    final node = stack.removeLast();
-    postOrder.add(node);
-    for (final cid in childrenMap[node.id] ?? []) {
-      final child = nodeMap[cid];
-      if (child != null) stack.add(child);
-    }
-  }
-
-  final updatedMap = <String, TreeNode>{};
-  for (int i = postOrder.length - 1; i >= 0; i--) {
-    final original = postOrder[i];
-    final childIds = childrenMap[original.id] ?? [];
-    final builtChildren = <TreeNode>[];
-    int maxChildDepth = -1;
-    for (final cid in childIds) {
-      final builtChild = updatedMap[cid]!;
-      builtChildren.add(builtChild);
-      if (builtChild.depth > maxChildDepth) maxChildDepth = builtChild.depth;
-    }
-    updatedMap[original.id] = original.copyWith(
-      depth: maxChildDepth + 1,
-      children: builtChildren,
-    );
-  }
-  return updatedMap[root.id]!;
-}
-````
-
-## File: lib/presentation/widgets/common/app_toast.dart
-````dart
-// lib/presentation/widgets/common/app_toast.dart
-import 'package:flutter/cupertino.dart';
-import '../../../main.dart'; // 全局 navigatorKey
-
-abstract class AppToast {
-  static OverlayEntry? _entry;
-
-  static void show(String message, {Duration duration = const Duration(seconds: 1)}) {
-    _entry?.remove();
-    final overlay = navigatorKey.currentState?.overlay;
-    if (overlay == null) return;
-
-    _entry = OverlayEntry(
-      builder: (context) => Positioned.fill(
-        child: IgnorePointer(
-          child: Center(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                color: const Color(0xE6111827),
-                child: Text(
-                  message,
-                  style: const TextStyle(color: CupertinoColors.white),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    overlay.insert(_entry!);
-    Future.delayed(duration, () {
-      _entry?.remove();
-      if (_entry != null) _entry = null;
-    });
-  }
-}
-````
-
-## File: lib/di/providers.dart
-````dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
-
-import '../data/data_sources/local_file_source.dart';
-import '../data/data_sources/local_chat_source.dart'; // 新增
-import '../data/data_sources/remote_chat_source.dart'; // 替换原 remote_api_source
-import '../data/data_sources/chat_source_router.dart'; // 新增
-import '../data/database/database.dart';
-import '../data/services/config_service.dart';
-import '../data/repositories/conversation_repository.dart';
-
-final localFileSourceProvider = FutureProvider<LocalFileSource>((ref) async {
-  final appDir = await getApplicationDocumentsDirectory();
-  final fileSource = LocalFileSource(appDir.path);
-  await fileSource.initDirectories();
-  return fileSource;
-});
-
-final appDatabaseProvider = Provider<AppDatabase>((ref) {
-  ref.watch(localFileSourceProvider);
-  return AppDatabase();
-});
-
-// --- 新增 Data Sources ---
-final remoteChatSourceProvider = Provider<RemoteChatSource>((ref) => RemoteChatSource());
-final localChatSourceProvider = Provider<LocalChatSource>((ref) => LocalChatSource());
-
-final chatSourceRouterProvider = Provider<ChatSourceRouter>((ref) {
-  return ChatSourceRouter(
-    ref.watch(remoteChatSourceProvider),
-    ref.watch(localChatSourceProvider),
-  );
-});
-
-// --- 更新 Service 依赖 ---
-final configServiceProvider = Provider<ConfigService>((ref) {
-  return ConfigService(
-    ref.watch(appDatabaseProvider),
-    ref.watch(chatSourceRouterProvider), // 替换原 remoteApiSourceProvider
-  );
-});
-
-final conversationRepositoryProvider = Provider<ConversationRepository>((ref) {
-  return ConversationRepository(
-    ref.watch(appDatabaseProvider),
-    ref.watch(localFileSourceProvider).requireValue,
-  );
-});
 ````
 
 ## File: lib/domain/services/chat_service.dart
@@ -11287,6 +11322,179 @@ class ChatService {
 }
 ````
 
+## File: lib/presentation/providers/config_notifier.dart
+````dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/app_config.dart';
+import '../../core/models/app_config_store.dart';
+import '../../di/providers.dart';
+
+/// 监听当前激活的配置（响应式）
+final configProvider = StreamProvider<AppConfig>((ref) {
+  return ref.read(configServiceProvider).watchConfig();
+});
+
+/// 监听配置存档列表（响应式）
+final configProfilesProvider = StreamProvider<AppConfigStore>((ref) {
+  return ref.read(configServiceProvider).watchConfigStore();
+});
+````
+
+## File: lib/presentation/widgets/thought_bubble.dart
+````dart
+import 'package:flutter/cupertino.dart';
+
+class ThoughtBubble extends StatefulWidget {
+  final String content;
+
+  const ThoughtBubble({
+    super.key,
+    required this.content,
+  });
+
+  @override
+  State<ThoughtBubble> createState() => _ThoughtBubbleState();
+}
+
+class _ThoughtBubbleState extends State<ThoughtBubble> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = widget.content.trim();
+    if (text.isEmpty) return const SizedBox.shrink();
+
+    final textTheme = CupertinoTheme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            onPressed: () => setState(() => _isExpanded = !_isExpanded),
+            child: Row(
+              children: [
+                Icon(
+                  CupertinoIcons.lightbulb,
+                  size: 16,
+                  color: CupertinoDynamicColor.resolve(CupertinoColors.systemBlue, context),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '推理过程',
+                  style: textTheme.textStyle.copyWith(
+                    color: CupertinoDynamicColor.resolve(CupertinoColors.systemBlue, context),
+                  ),
+                ),
+                const Spacer(),
+                Icon(
+                  _isExpanded ? CupertinoIcons.chevron_up : CupertinoIcons.chevron_down,
+                  size: 18,
+                  color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey, context),
+                ),
+              ],
+            ),
+          ),
+          if (_isExpanded)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: Text(
+                text,
+                style: textTheme.textStyle.copyWith(
+                  fontSize: 13,
+                  height: 1.5,
+                  color: CupertinoDynamicColor.resolve(CupertinoColors.label, context),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+````
+
+## File: lib/presentation/pages/text_attachment_viewer_page.dart
+````dart
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../widgets/common/app_page_scaffold.dart';
+import '../widgets/common/app_toast.dart';
+
+final textFileContentProvider = FutureProvider.family<String, String>((ref, filePath) async {
+  final file = File(filePath);
+  if (!await file.exists()) {
+    throw Exception('文件不存在');
+  }
+  final bytes = await file.readAsBytes();
+  return utf8.decode(bytes, allowMalformed: true);
+});
+
+class TextAttachmentViewerPage extends ConsumerWidget {
+  final String title;
+  final String filePath;
+
+  const TextAttachmentViewerPage({
+    super.key,
+    required this.title,
+    required this.filePath,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final textTheme = CupertinoTheme.of(context).textTheme;
+    final contentAsync = ref.watch(textFileContentProvider(filePath));
+
+    return AppPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        middle: Text(title, overflow: TextOverflow.ellipsis),
+        trailing: contentAsync.when(
+          data: (text) => CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: text));
+              if (context.mounted) AppToast.show('全文已复制');
+            },
+            child: const Icon(CupertinoIcons.doc_on_doc),
+          ),
+          loading: () => const SizedBox.shrink(),
+          error: (_, _) => const SizedBox.shrink(),
+        ),
+      ),
+      body: contentAsync.when(
+        data: (text) => SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              text,
+              style: textTheme.textStyle.copyWith(fontFamily: 'monospace'),
+            ),
+          ),
+        ),
+        loading: () => const Center(child: CupertinoActivityIndicator()),
+        error: (e, _) => Center(child: Text('加载失败: $e')),
+      ),
+    );
+  }
+}
+````
+
 ## File: lib/presentation/providers/settings_form_notifier.dart
 ````dart
 // lib/presentation/providers/settings_form_notifier.dart
@@ -11446,7 +11654,7 @@ class SettingsFormNotifier extends Notifier<SettingsFormState> {
 
     state = state.copyWith(isRefreshingModels: true);
     try {
-      await _configService.refreshModels();
+      await _configService.refreshModels(state.config);
       state = state.copyWith(isRefreshingModels: false);
     } catch (e) {
       state = state.copyWith(
@@ -11500,211 +11708,46 @@ final settingsFormProvider = NotifierProvider<SettingsFormNotifier, SettingsForm
 );
 ````
 
-## File: lib/presentation/widgets/common/app_page_scaffold.dart
+## File: lib/main.dart
 ````dart
 import 'package:flutter/cupertino.dart';
-
-class AppPageScaffold extends StatelessWidget {
-  final ObstructingPreferredSizeWidget? navigationBar;
-  final Widget body;
-  final bool useSafeArea;
-
-  const AppPageScaffold({
-    super.key,
-    this.navigationBar,
-    required this.body,
-    this.useSafeArea = true,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      backgroundColor: CupertinoDynamicColor.resolve(CupertinoColors.systemGroupedBackground, context),
-      navigationBar: navigationBar,
-
-      child: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-        
-        child: SafeArea(child: body),
-      ),
-    );
-  }
-}
-````
-
-## File: lib/presentation/pages/text_attachment_viewer_page.dart
-````dart
-import 'dart:convert';
-import 'dart:io';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/services.dart';
-import '../widgets/common/app_page_scaffold.dart';
-import '../widgets/common/app_toast.dart';
-
-class TextAttachmentViewerPage extends StatelessWidget {
-  final String title;
-  final File textFile;
-
-  const TextAttachmentViewerPage({
-    super.key,
-    required this.title,
-    required this.textFile,
-  });
-
-  Future<String> _readContent() async {
-    final bytes = await textFile.readAsBytes();
-    return utf8.decode(bytes, allowMalformed: true);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = CupertinoTheme.of(context).textTheme;
-
-    return AppPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        middle: Text(title, overflow: TextOverflow.ellipsis),
-        trailing: FutureBuilder<String>(
-          future: _readContent(),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) return const SizedBox.shrink();
-            return CupertinoButton(
-              padding: EdgeInsets.zero,
-              onPressed: () async {
-                await Clipboard.setData(ClipboardData(text: snapshot.data!));
-                if (context.mounted) AppToast.show('全文已复制');
-              },
-              child: const Icon(CupertinoIcons.doc_on_doc),
-            );
-          },
-        ),
-      ),
-      body: FutureBuilder<String>(
-        future: _readContent(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CupertinoActivityIndicator());
-          }
-          if (snapshot.hasError || !snapshot.hasData) {
-            return Center(child: Text('加载失败: ${snapshot.error}'));
-          }
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                snapshot.data!,
-                style: textTheme.textStyle.copyWith(fontFamily: 'monospace'),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-````
-
-## File: lib/presentation/providers/config_notifier.dart
-````dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/app_config.dart';
-import '../../core/models/app_config_store.dart';
-import '../../di/providers.dart';
+import 'di/providers.dart'; // 仅导入 providers
+import 'presentation/pages/home_page.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
 
-/// 监听当前激活的配置（响应式）
-final configProvider = StreamProvider<AppConfig>((ref) {
-  return ref.read(configServiceProvider).watchConfig();
-});
+  final container = ProviderContainer();
+  await container.read(localFileSourceProvider.future);
 
-/// 监听配置存档列表（响应式）
-final configProfilesProvider = StreamProvider<AppConfigStore>((ref) {
-  return ref.read(configServiceProvider).watchConfigStore();
-});
-````
-
-## File: lib/presentation/widgets/thought_bubble.dart
-````dart
-import 'package:flutter/cupertino.dart';
-
-class ThoughtBubble extends StatefulWidget {
-  final String content;
-
-  const ThoughtBubble({
-    super.key,
-    required this.content,
-  });
-
-  @override
-  State<ThoughtBubble> createState() => _ThoughtBubbleState();
+  runApp(
+    UncontrolledProviderScope(
+      container: container,
+      child: const MyApp(),
+    ),
+  );
 }
 
-class _ThoughtBubbleState extends State<ThoughtBubble> {
-  bool _isExpanded = false;
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final text = widget.content.trim();
-    if (text.isEmpty) return const SizedBox.shrink();
-
-    final textTheme = CupertinoTheme.of(context).textTheme;
-
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CupertinoButton(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            onPressed: () => setState(() => _isExpanded = !_isExpanded),
-            child: Row(
-              children: [
-                Icon(
-                  CupertinoIcons.lightbulb,
-                  size: 16,
-                  color: CupertinoDynamicColor.resolve(CupertinoColors.systemBlue, context),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  '推理过程',
-                  style: textTheme.textStyle.copyWith(
-                    color: CupertinoDynamicColor.resolve(CupertinoColors.systemBlue, context),
-                  ),
-                ),
-                const Spacer(),
-                Icon(
-                  _isExpanded ? CupertinoIcons.chevron_up : CupertinoIcons.chevron_down,
-                  size: 18,
-                  color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey, context),
-                ),
-              ],
-            ),
-          ),
-          if (_isExpanded)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              child: Text(
-                text,
-                style: textTheme.textStyle.copyWith(
-                  fontSize: 13,
-                  height: 1.5,
-                  color: CupertinoDynamicColor.resolve(CupertinoColors.label, context),
-                ),
-              ),
-            ),
-        ],
-      ),
+    return CupertinoApp(
+      title: 'AI Chat',
+      navigatorKey: navigatorKey,
+      home: const HomePage(),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en', 'US'),
+        Locale('zh', 'CN'),
+      ],
     );
   }
 }
@@ -11777,7 +11820,6 @@ class _ImageAttachmentThumb extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 👇 同步获取 File 对象，无需异步等待，彻底消除 loading 状态
     final file = ref.read(conversationRepositoryProvider).getAttachment(attachment.relativePath);
 
     return GestureDetector(
@@ -11785,11 +11827,10 @@ class _ImageAttachmentThumb extends ConsumerWidget {
         CupertinoPageRoute(
           builder: (_) => ImageAttachmentViewerPage(
             title: attachment.name,
-            imageFile: file, // 👈 直接传递 File
+            filePath: file.path,
           ),
         ),
       ),
-      // 👇 零内存拷贝分享：直接把物理路径交给系统
       onLongPress: () => Share.shareXFiles([XFile(file.path)], text: attachment.name),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
@@ -11825,7 +11866,7 @@ class _FileAttachmentChip extends ConsumerWidget {
             CupertinoPageRoute(
               builder: (_) => TextAttachmentViewerPage(
                 title: attachment.name,
-                textFile: file, // 👈 直接传递 File
+                filePath: file.path,
               ),
             ),
           );
@@ -11909,12 +11950,11 @@ class MessageBubble extends StatelessWidget {
     // 获取屏幕可用宽度（减去左右边距，与原气泡逻辑一致）
     final maxWidth = MediaQuery.of(context).size.width * 0.88;
 
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: maxWidth),
-      child: CupertinoContextMenu(
-        actions: actions,
+    return CupertinoContextMenu(
+      actions: actions,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
         child: Container(
-          // 移除 width 属性，让 Container 由父级 ConstrainedBox 约束
           margin: const EdgeInsets.symmetric(vertical: 4),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
@@ -11927,51 +11967,6 @@ class MessageBubble extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-````
-
-## File: lib/main.dart
-````dart
-import 'package:flutter/cupertino.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'di/providers.dart'; // 仅导入 providers
-import 'presentation/pages/home_page.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  final container = ProviderContainer();
-  await container.read(localFileSourceProvider.future);
-
-  runApp(
-    UncontrolledProviderScope(
-      container: container,
-      child: const MyApp(),
-    ),
-  );
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return CupertinoApp(
-      title: 'AI Chat',
-      navigatorKey: navigatorKey,
-      home: const HomePage(),
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: const [
-        Locale('en', 'US'),
-        Locale('zh', 'CN'),
-      ],
     );
   }
 }
@@ -12084,13 +12079,11 @@ class ConfigService{
         .write(DbConfigProfilesCompanion(config: Value(config)));
   }
 
-  Future<void> refreshModels() async {
-    final activeConfig = await loadConfig();
+  Future<void> refreshModels(AppConfig targetConfig) async {
+    final source = _sourceRouter.getSourceFromConfig(targetConfig);
+    final remoteModels = await source.fetchModels(targetConfig);
 
-    final source = _sourceRouter.getSourceFromConfig(activeConfig);
-    final remoteModels = await source.fetchModels(activeConfig);
-
-    final oldModels = activeConfig.availableModels ?? const <ModelInfo>[];
+    final oldModels = targetConfig.availableModels ?? const <ModelInfo>[];
     final oldById = {for (final model in oldModels) model.id: model};
 
     final updatedModels = remoteModels.map((remote) {
@@ -12101,7 +12094,7 @@ class ConfigService{
       );
     }).toList();
 
-    final updatedConfig = activeConfig.copyWith(
+    final updatedConfig = targetConfig.copyWith(
       availableModels: updatedModels,
     );
 
@@ -12614,7 +12607,7 @@ class _PendingImageAttachment extends StatelessWidget {
               CupertinoPageRoute(
                 builder: (_) => ImageAttachmentViewerPage(
                   title: attachment.name,
-                  imageFile: file,
+                  filePath: file.path,
                 ),
               ),
             );
@@ -12693,7 +12686,7 @@ class _PendingFileAttachment extends StatelessWidget {
                   CupertinoPageRoute(
                     builder: (_) => TextAttachmentViewerPage(
                       title: attachment.name,
-                      textFile: file,
+                      filePath: file.path,
                     ),
                   ),
                 );
@@ -14847,11 +14840,7 @@ class _UserSection extends ConsumerWidget {
         const SizedBox(height: 12),
         Align(
           alignment: Alignment.centerRight,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.88,
-            ),
-            child: MessageBubble(
+          child: MessageBubble(
               content: round.content,
               isUser: true,
               onCopy: () {
@@ -14860,7 +14849,6 @@ class _UserSection extends ConsumerWidget {
               },
               onRetryReply: onRetryReply,
             ),
-          ),
         ),
         if (round.attach.isNotEmpty) ...[
           const SizedBox(height: 8),
@@ -14924,11 +14912,7 @@ class _AiReplySection extends ConsumerWidget {
         if (ai.content != null)
           Align(
             alignment: Alignment.centerLeft,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.88,
-              ),
-              child: MessageBubble(
+            child: MessageBubble(
                 content: ai.content!,
                 isUser: false,
                 onCopy: () {
@@ -14937,7 +14921,6 @@ class _AiReplySection extends ConsumerWidget {
                 },
                 onRetryReply: ai.isIncomplete ? null : onRetryReply,
               ),
-            ),
           )
         else
           const Padding(

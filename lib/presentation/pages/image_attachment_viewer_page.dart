@@ -1,19 +1,21 @@
 import 'dart:io';
-import 'package:aiservice/presentation/widgets/common/app_page_scaffold.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:aiservice/presentation/widgets/common/app_page_scaffold.dart';
 
 class ImageAttachmentViewerPage extends StatelessWidget {
   final String title;
-  final File imageFile;
+  final String filePath;
 
   const ImageAttachmentViewerPage({
     super.key,
     required this.title,
-    required this.imageFile,
+    required this.filePath,
   });
 
   @override
   Widget build(BuildContext context) {
+    final imageFile = File(filePath);
+    
     return AppPageScaffold(
       navigationBar: CupertinoNavigationBar(middle: Text(title, overflow: TextOverflow.ellipsis)),
       body: InteractiveViewer(
@@ -23,7 +25,7 @@ class ImageAttachmentViewerPage extends StatelessWidget {
           child: Image.file(
             imageFile,
             fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => const Center(child: Icon(CupertinoIcons.exclamationmark_triangle)),
+            errorBuilder: (_, _, _) => const Center(child: Icon(CupertinoIcons.exclamationmark_triangle)),
           ),
         ),
       ),

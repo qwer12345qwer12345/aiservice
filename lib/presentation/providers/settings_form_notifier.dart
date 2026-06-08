@@ -155,7 +155,7 @@ class SettingsFormNotifier extends Notifier<SettingsFormState> {
 
     state = state.copyWith(isRefreshingModels: true);
     try {
-      await _configService.refreshModels();
+      await _configService.refreshModels(state.config);
       state = state.copyWith(isRefreshingModels: false);
     } catch (e) {
       state = state.copyWith(
