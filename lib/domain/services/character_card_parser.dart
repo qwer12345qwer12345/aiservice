@@ -1,6 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
-import 'package:png_chunks_extract/png_chunks_extract.dart' as pngExtract;
 import 'package:uuid/uuid.dart';
 import '../../core/models/chat_round.dart';
 import '../../data/repositories/conversation_repository.dart';
@@ -99,54 +99,97 @@ class CharacterData {
 
 /// 角色卡解析器
 class CharacterCardParser {
-  /// 解析文件（支持 PNG 和 JSON）
-  static Future<CharacterData> parseFile(Uint8List bytes, String fileName) async {
+  /// 解析文件（支持 PNG 和 JSON），仅传入文件路径
+  static Future<CharacterData> parseFile(String filePath, String fileName) async {
     final lowerName = fileName.toLowerCase();
+    final file = File(filePath);
+    
+    if (!await file.exists()) {
+      throw Exception('文件不存在');
+    }
+
     if (lowerName.endsWith('.png')) {
-      return _parsePngCard(bytes);
+      return _parsePngCardStream(file);
     } else if (lowerName.endsWith('.json')) {
-      return _parseJsonCard(bytes);
+      return _parseJsonCardStream(file);
     } else {
       throw Exception('不支持的文件格式，请使用 PNG 或 JSON 文件');
     }
   }
 
-  /// 解析 PNG 角色卡（V2/V3）
-  static CharacterData _parsePngCard(Uint8List bytes) {
-    final chunks = pngExtract.extractChunks(bytes);
+  /// 核心优化：流式解析 PNG，跳过巨大的像素块，杜绝 OOM
+  static Future<CharacterData> _parsePngCardStream(File file) async {
+    // PNG 标准签名
+    final signature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+    final raf = await file.open();
     
-    String? base64Data;
-    for (final chunk in chunks) {
-      final chunkName = chunk['name'] as String;
-      if (chunkName == 'tEXt') {
-        final dataBytes = chunk['data'] as List<int>;
-        // 解析 tEXt 块：keyword + 0x00 + text
-        final zeroIndex = dataBytes.indexOf(0);
-        if (zeroIndex == -1) continue;
-        final keyword = utf8.decode(dataBytes.sublist(0, zeroIndex));
-        final textBytes = dataBytes.sublist(zeroIndex + 1);
-        final text = utf8.decode(textBytes);
-        
-        if (keyword == 'ccv3') {
-          base64Data = text;
-          break;
-        } else if (keyword == 'chara' && base64Data == null) {
-          base64Data = text;
-        }
+    try {
+      final header = await raf.read(8);
+      if (header.length < 8) throw Exception('文件太小，不是有效的 PNG');
+      for (int i = 0; i < 8; i++) {
+        if (header[i] != signature[i]) throw Exception('不是有效的 PNG 文件');
       }
+
+      String? base64Data;
+      
+      // 遍历 PNG Chunks
+      while (true) {
+        // 1. 读取 Length (4 bytes)
+        final lengthBytes = await raf.read(4);
+        if (lengthBytes.length < 4) break;
+        final length = ByteData.sublistView(lengthBytes).getUint32(0, Endian.big);
+        
+        // 2. 读取 Chunk Type (4 bytes)
+        final typeBytes = await raf.read(4);
+        if (typeBytes.length < 4) break;
+        final chunkType = String.fromCharCodes(typeBytes);
+        
+        if (chunkType == 'IEND') break; // 结束块
+
+        // 3. 我们只关心 tEXt 块
+        if (chunkType == 'tEXt') {
+          final dataBytes = await raf.read(length);
+          if (dataBytes.length == length) {
+            final zeroIndex = dataBytes.indexOf(0);
+            if (zeroIndex != -1) {
+              final keyword = utf8.decode(dataBytes.sublist(0, zeroIndex));
+              final textBytes = dataBytes.sublist(zeroIndex + 1);
+              final text = utf8.decode(textBytes, allowMalformed: true);
+              
+              if (keyword == 'ccv3' || keyword == 'chara') {
+                base64Data = text;
+                break; // 找到目标数据后直接跳出，不读取后面的像素数据
+              }
+            }
+          }
+        } else {
+          // 跳过不关心的 Chunk 数据 (例如几MB到几十MB的 IDAT 像素块)
+          final currentPos = await raf.position();
+          await raf.setPosition(currentPos + length);
+        }
+        
+        // 4. 跳过 CRC 校验和 (4 bytes)
+        final posAfterData = await raf.position();
+        await raf.setPosition(posAfterData + 4);
+      }
+      
+      if (base64Data == null) {
+        throw Exception('未找到角色数据块（ccv3/chara）');
+      }
+      
+      // 清理可能存在的换行符等空白字符
+      final cleanBase64 = base64Data.replaceAll(RegExp(r'\s+'), '');
+      final jsonString = utf8.decode(base64.decode(cleanBase64));
+      return _parseJsonString(jsonString);
+      
+    } finally {
+      await raf.close();
     }
-    
-    if (base64Data == null) {
-      throw Exception('未找到角色数据块（ccv3/chara）');
-    }
-    
-    final jsonString = utf8.decode(base64.decode(base64Data));
-    return _parseJsonString(jsonString);
   }
 
   /// 解析 JSON 角色卡
-  static CharacterData _parseJsonCard(Uint8List bytes) {
-    final jsonString = utf8.decode(bytes);
+  static Future<CharacterData> _parseJsonCardStream(File file) async {
+    final jsonString = await file.readAsString();
     return _parseJsonString(jsonString);
   }
 

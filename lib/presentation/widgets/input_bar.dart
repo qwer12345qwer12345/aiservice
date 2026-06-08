@@ -160,13 +160,15 @@ class _InputBarState extends ConsumerState<InputBar> {
     );
     if (result == null || result.files.isEmpty) return;
     final file = result.files.single;
-    final bytes = file.bytes;
-    if (bytes == null) {
-      AppToast.show('无法读取文件');
+    
+    final filePath = file.path;
+    if (filePath == null || filePath.trim().isEmpty) {
+      AppToast.show('无法获取文件路径');
       return;
     }
+
     try {
-      final character = await CharacterCardParser.parseFile(bytes, file.name);
+      final character = await CharacterCardParser.parseFile(filePath, file.name);
       ref.read(currentCharacterProvider.notifier).state = character;
       ref.read(characterGreetingSentProvider.notifier).state = false;
       AppToast.show('已导入角色：${character.name}');
