@@ -69,7 +69,7 @@ class StreamProcessor {
       if (error != null) {
         yield GenerationEvent.failed(
           error: error,
-          content: '$contentBuffer.toString()\n\n[错误] $error'.trim(),
+          content: '$contentBuffer\n\n[错误] $error'.trim(),
           reasoning: reasoningBuffer.toString(),
         );
       } else {

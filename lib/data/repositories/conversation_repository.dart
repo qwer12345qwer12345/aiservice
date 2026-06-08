@@ -1,5 +1,6 @@
 // data/repositories/conversation_repository.dart
 import 'dart:async';
+import 'dart:io';
 import 'package:drift/drift.dart';
 import '../data_sources/local_file_source.dart';
 import '../../core/models/attachment.dart';
@@ -369,8 +370,7 @@ class ConversationRepository {
   Future<String> saveAttachment(Uint8List data, String fileName) async =>
       await _fileService.saveAttachment(data, fileName);
 
-  Future<Uint8List> getAttachment(String relativePath) async =>
-      await _fileService.readAttachment(relativePath);
+  File getAttachment(String relativePath) => _fileService.readAttachment(relativePath);
 
   Future<void> deleteAttachment(String relativePath) async =>
       await _fileService.deleteAttachment(relativePath);

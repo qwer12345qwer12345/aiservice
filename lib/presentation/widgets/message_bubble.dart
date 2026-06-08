@@ -48,12 +48,11 @@ class MessageBubble extends StatelessWidget {
     // 获取屏幕可用宽度（减去左右边距，与原气泡逻辑一致）
     final maxWidth = MediaQuery.of(context).size.width * 0.88;
 
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: maxWidth),
-      child: CupertinoContextMenu(
-        actions: actions,
+    return CupertinoContextMenu(
+      actions: actions,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
         child: Container(
-          // 移除 width 属性，让 Container 由父级 ConstrainedBox 约束
           margin: const EdgeInsets.symmetric(vertical: 4),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(

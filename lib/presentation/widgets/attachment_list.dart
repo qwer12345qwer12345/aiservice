@@ -1,14 +1,11 @@
-import 'dart:convert';
-import 'dart:io';
-import 'dart:typed_data';
-import 'package:aiservice/presentation/pages/image_attachment_viewer_page.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+
 import '../../core/models/attachment.dart';
+import '../../di/providers.dart';
+import '../pages/image_attachment_viewer_page.dart';
 import '../pages/text_attachment_viewer_page.dart';
-import '../providers/attachment_bytes_provider.dart';
 import 'common/app_toast.dart';
 
 class AttachmentList extends ConsumerWidget {
@@ -60,91 +57,39 @@ class AttachmentList extends ConsumerWidget {
   }
 }
 
-class _AttachmentActionHelper {
-  static Future<void> shareAttachmentFromBytes(
-    Attachment attachment,
-    Uint8List bytes,
-  ) async {
-    try {
-      final tempDir = await getTemporaryDirectory();
-      final file = File('${tempDir.path}/${attachment.name}');
-      await file.writeAsBytes(bytes, flush: true);
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        text: attachment.name,
-      );
-    } catch (e) {
-      AppToast.show('共享文件失败：$e');
-    }
-  }
-
-  static Future<void> previewImage(BuildContext context, Uint8List bytes) async {
-    await Navigator.of(context).push(
-      CupertinoPageRoute(
-        builder: (_) => ImageAttachmentViewerPage(imageBytes: bytes),
-      ),
-    );
-  }
-
-  static Future<void> openTextViewer(
-    BuildContext context,
-    String title,
-    Uint8List bytes,
-  ) async {
-    final text = utf8.decode(bytes, allowMalformed: true);
-    await Navigator.of(context).push(
-      CupertinoPageRoute(
-        builder: (_) => TextAttachmentViewerPage(
-          title: title,
-          content: text,
-        ),
-      ),
-    );
-  }
-}
-
 class _ImageAttachmentThumb extends ConsumerWidget {
   final Attachment attachment;
-
-  const _ImageAttachmentThumb({
-    required this.attachment,
-  });
+  const _ImageAttachmentThumb({required this.attachment});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final bytesAsync = ref.watch(
-      attachmentBytesProvider(attachment.relativePath),
-    );
+    // 👇 同步获取 File 对象，无需异步等待，彻底消除 loading 状态
+    final file = ref.read(conversationRepositoryProvider).getAttachment(attachment.relativePath);
 
-    return bytesAsync.when(
-      loading: () => const SizedBox(
-        width: 108,
-        height: 108,
-        child: Center(
-          child: CupertinoActivityIndicator(),
-        ),
-      ),
-      error: (e, st) => const SizedBox(
-        width: 108,
-        height: 108,
-        child: Center(
-          child: Icon(CupertinoIcons.exclamationmark_triangle),
-        ),
-      ),
-      data: (bytes) {
-        return GestureDetector(
-          onTap: () => _AttachmentActionHelper.previewImage(context, bytes),
-          onLongPress: () => _AttachmentActionHelper.shareAttachmentFromBytes(attachment, bytes),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: SizedBox(
-              width: 108,
-              height: 108,
-              child: Image.memory(bytes, fit: BoxFit.cover, gaplessPlayback: true),
-            ),
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        CupertinoPageRoute(
+          builder: (_) => ImageAttachmentViewerPage(
+            title: attachment.name,
+            imageFile: file, // 👈 直接传递 File
           ),
-        );
-      },
+        ),
+      ),
+      // 👇 零内存拷贝分享：直接把物理路径交给系统
+      onLongPress: () => Share.shareXFiles([XFile(file.path)], text: attachment.name),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: SizedBox(
+          width: 108,
+          height: 108,
+          child: Image.file(
+            file,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            errorBuilder: (_, _, _) => const Center(child: Icon(CupertinoIcons.photo)),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -152,22 +97,30 @@ class _ImageAttachmentThumb extends ConsumerWidget {
 class _FileAttachmentChip extends ConsumerWidget {
   final Attachment attachment;
   final bool isText;
-
-  const _FileAttachmentChip({
-    required this.attachment,
-    required this.isText,
-  });
+  const _FileAttachmentChip({required this.attachment, required this.isText});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final bytesAsync = ref.watch(
-      attachmentBytesProvider(attachment.relativePath),
-    );
-
+    final file = ref.read(conversationRepositoryProvider).getAttachment(attachment.relativePath);
     final leadingIcon = isText ? CupertinoIcons.doc_text : CupertinoIcons.doc;
 
-    return bytesAsync.when(
-      loading: () => Container(
+    return GestureDetector(
+      onTap: () {
+        if (isText) {
+          Navigator.of(context).push(
+            CupertinoPageRoute(
+              builder: (_) => TextAttachmentViewerPage(
+                title: attachment.name,
+                textFile: file, // 👈 直接传递 File
+              ),
+            ),
+          );
+        } else {
+          AppToast.show('该文件暂不支持直接预览，请长按进行分享');
+        }
+      },
+      onLongPress: () => Share.shareXFiles([XFile(file.path)], text: attachment.name),
+      child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey5, context),
@@ -180,72 +133,11 @@ class _FileAttachmentChip extends ConsumerWidget {
             const SizedBox(width: 6),
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 180),
-              child: Text(
-                attachment.name,
-                overflow: TextOverflow.ellipsis,
-              ),
+              child: Text(attachment.name, overflow: TextOverflow.ellipsis),
             ),
           ],
         ),
       ),
-      error: (e, st) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey5, context),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(CupertinoIcons.exclamationmark_triangle, size: 16),
-            const SizedBox(width: 6),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 180),
-              child: Text(
-                attachment.name,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-      ),
-      data: (bytes) {
-        return GestureDetector(
-          onTap: () async {
-            if (isText) {
-              await _AttachmentActionHelper.openTextViewer(
-                context,
-                attachment.name,
-                bytes,
-              );
-              return;
-            }
-            AppToast.show('该文件暂不支持直接预览，请长按进行分享');
-          },
-          onLongPress: () => _AttachmentActionHelper.shareAttachmentFromBytes(attachment, bytes),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey5, context),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(leadingIcon, size: 16),
-                const SizedBox(width: 6),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 180),
-                  child: Text(
-                    attachment.name,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 }

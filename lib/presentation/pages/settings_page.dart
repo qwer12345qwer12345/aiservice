@@ -188,14 +188,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             onChanged: notifier.toggleVision,
           ),
         ),
-        if (formState.modelsRefreshError != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              '同步错误：${formState.modelsRefreshError}',
-              style: const TextStyle(color: CupertinoColors.systemRed),
-            ),
-          ),
       ],
     );
   }
@@ -222,14 +214,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 : const Text('保存设置'),
           ),
         ),
-        if (formState.error != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              formState.error!,
-              style: const TextStyle(color: CupertinoColors.systemRed),
-            ),
-          ),
       ],
     );
   }

@@ -63,19 +63,6 @@ class RemoteChatSource implements ChatSource {
       final enableReasoning = selectedModel?.overrideSupportsReasoning == true;
       final model = config.selectedModel?.trim() ?? '';
 
-      if (config.baseUrl.isEmpty) {
-        yield const ChatChunk(isDone: true, error: 'Base URL 为空'); return;
-      }
-      if (config.apiKey.isEmpty) {
-        yield const ChatChunk(isDone: true, error: 'API Key 为空'); return;
-      }
-      if (config.chatPath.isEmpty) {
-        yield const ChatChunk(isDone: true, error: 'Chat Path 为空'); return;
-      }
-      if (model.isEmpty) {
-        yield const ChatChunk(isDone: true, error: '未选择模型'); return;
-      }
-
       final builder = _getBuilder(apiMode);
       String resolvedChatPath = config.chatPath.trim();
       if (resolvedChatPath.contains('{model}')) {

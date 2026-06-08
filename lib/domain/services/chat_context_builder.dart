@@ -89,14 +89,15 @@ Future<List<ApiMessageContentPart>> _buildAttachmentParts(
   Attachment attachment,
   ConversationRepository repository,
 ) async {
+  final file = repository.getAttachment(attachment.relativePath);
   if (attachment.isImage) {
-    final bytes = await repository.getAttachment(attachment.relativePath);
+    final bytes = await file.readAsBytes();
     final mimeType = attachment.mimeType;
     final base64Data = base64Encode(bytes);
     return [ApiMessageContentPart.imageUrl(imageUrl: ApiImageUrl(url: 'data:$mimeType;base64,$base64Data'))];
   } else {
     // 上层保证非图片一定是可读文本文件
-    final bytes = await repository.getAttachment(attachment.relativePath);
+    final bytes = await file.readAsBytes();
     final text = utf8.decode(bytes, allowMalformed: true);
     return [ApiMessageContentPart.text(text: text)];
   }

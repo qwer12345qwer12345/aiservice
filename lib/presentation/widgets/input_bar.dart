@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:aiservice/domain/services/character_card_parser.dart';
 import 'package:aiservice/presentation/models/input_state.dart';
 import 'package:aiservice/presentation/providers/character_provider.dart';
@@ -9,6 +11,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/pending_attachment.dart';
+import '../pages/image_attachment_viewer_page.dart';
+import '../pages/text_attachment_viewer_page.dart';
 import '../providers/input_notifier.dart';
 
 class InputBar extends ConsumerStatefulWidget {
@@ -194,12 +198,12 @@ class _InputBarState extends ConsumerState<InputBar> {
               child: const Text('文件'),
             ),
             CupertinoActionSheetAction(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  _pickImageFromGallery();
-                },
-                child: const Text('相册'),
-              ),              
+              onPressed: () {
+                Navigator.of(context).pop();
+                _pickImageFromGallery();
+              },
+              child: const Text('相册'),
+            ),              
           ],
           cancelButton: CupertinoActionSheetAction(
             onPressed: () => Navigator.of(context).pop(),
@@ -270,36 +274,20 @@ class _InputBarState extends ConsumerState<InputBar> {
                     spacing: 8,
                     runSpacing: 8,
                     children: attachments.map((attachment) {
-                      return CupertinoButton(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        borderRadius: BorderRadius.circular(8),
-                        color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey5, context),
-                        onPressed: () {},
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              attachment.isImage
-                                  ? CupertinoIcons.photo
-                                  : CupertinoIcons.doc,
-                              size: 16,
-                            ),
-                            const SizedBox(width: 6),
-                            ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 180),
-                              child: Text(
-                                attachment.name,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            GestureDetector(
-                              onTap: () => _removeAttachment(attachment.id),
-                              child: const Icon(CupertinoIcons.xmark_circle_fill, size: 16),
-                            ),
-                          ],
-                        ),
-                      );
+                      final file = File(attachment.path);
+                      if (attachment.isImage) {
+                        return _PendingImageAttachment(
+                          attachment: attachment,
+                          file: file,
+                          onRemove: () => _removeAttachment(attachment.id),
+                        );
+                      } else {
+                        return _PendingFileAttachment(
+                          attachment: attachment,
+                          file: file,
+                          onRemove: () => _removeAttachment(attachment.id),
+                        );
+                      }
                     }).toList(),
                   ),
                 ),
@@ -354,6 +342,141 @@ class _InputBarState extends ConsumerState<InputBar> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ================= 新增的预览组件 =================
+
+class _PendingImageAttachment extends StatelessWidget {
+  final PendingAttachment attachment;
+  final File file;
+  final VoidCallback onRemove;
+
+  const _PendingImageAttachment({
+    required this.attachment,
+    required this.file,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        // 点击图片进行全屏预览
+        GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(
+              CupertinoPageRoute(
+                builder: (_) => ImageAttachmentViewerPage(
+                  title: attachment.name,
+                  imageFile: file,
+                ),
+              ),
+            );
+          },
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.file(
+              file,
+              width: 60,
+              height: 60,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  width: 60,
+                  height: 60,
+                  color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey5, context),
+                  child: const Icon(CupertinoIcons.photo, color: CupertinoColors.systemGrey),
+                );
+              },
+            ),
+          ),
+        ),
+        // 右上角删除按钮
+        Positioned(
+          top: 2,
+          right: 2,
+          child: GestureDetector(
+            onTap: onRemove,
+            child: Container(
+              decoration: BoxDecoration(
+                color: CupertinoColors.black.withOpacity(0.5),
+                shape: BoxShape.circle,
+              ),
+              padding: const EdgeInsets.all(2),
+              child: const Icon(
+                CupertinoIcons.xmark_circle_fill,
+                color: CupertinoColors.white,
+                size: 18,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PendingFileAttachment extends StatelessWidget {
+  final PendingAttachment attachment;
+  final File file;
+  final VoidCallback onRemove;
+
+  const _PendingFileAttachment({
+    required this.attachment,
+    required this.file,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey5, context),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 点击文件名及图标区域进行文本预览
+          Flexible(
+            child: GestureDetector(
+              onTap: () {
+                // 上游已做拦截，走到这里的必然是文本文件，直接跳转预览
+                Navigator.of(context).push(
+                  CupertinoPageRoute(
+                    builder: (_) => TextAttachmentViewerPage(
+                      title: attachment.name,
+                      textFile: file,
+                    ),
+                  ),
+                );
+              },
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(CupertinoIcons.doc_text, size: 16),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      attachment.name,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          // 右侧独立的删除按钮
+          GestureDetector(
+            onTap: onRemove,
+            child: const Icon(CupertinoIcons.xmark_circle_fill, size: 16),
+          ),
+        ],
       ),
     );
   }

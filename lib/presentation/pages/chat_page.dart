@@ -339,11 +339,7 @@ class _UserSection extends ConsumerWidget {
         const SizedBox(height: 12),
         Align(
           alignment: Alignment.centerRight,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.88,
-            ),
-            child: MessageBubble(
+          child: MessageBubble(
               content: round.content,
               isUser: true,
               onCopy: () {
@@ -352,7 +348,6 @@ class _UserSection extends ConsumerWidget {
               },
               onRetryReply: onRetryReply,
             ),
-          ),
         ),
         if (round.attach.isNotEmpty) ...[
           const SizedBox(height: 8),
@@ -416,11 +411,7 @@ class _AiReplySection extends ConsumerWidget {
         if (ai.content != null)
           Align(
             alignment: Alignment.centerLeft,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.88,
-              ),
-              child: MessageBubble(
+            child: MessageBubble(
                 content: ai.content!,
                 isUser: false,
                 onCopy: () {
@@ -429,7 +420,6 @@ class _AiReplySection extends ConsumerWidget {
                 },
                 onRetryReply: ai.isIncomplete ? null : onRetryReply,
               ),
-            ),
           )
         else
           const Padding(

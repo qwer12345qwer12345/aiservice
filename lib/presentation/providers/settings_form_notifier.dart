@@ -11,16 +11,12 @@ import 'package:file_picker/file_picker.dart';
 class SettingsFormState {
   final AppConfig config;
   final bool isSaving;
-  final String? error;
   final bool isRefreshingModels;
-  final String? modelsRefreshError;
 
   const SettingsFormState({
     required this.config,
     this.isSaving = false,
-    this.error,
     this.isRefreshingModels = false,
-    this.modelsRefreshError,
   });
 
   SettingsFormState copyWith({
@@ -28,14 +24,11 @@ class SettingsFormState {
     bool? isSaving,
     String? error,
     bool? isRefreshingModels,
-    String? modelsRefreshError,
   }) {
     return SettingsFormState(
       config: config ?? this.config,
       isSaving: isSaving ?? this.isSaving,
-      error: error,
       isRefreshingModels: isRefreshingModels ?? this.isRefreshingModels,
-      modelsRefreshError: modelsRefreshError,
     );
   }
 }
@@ -72,7 +65,7 @@ class SettingsFormNotifier extends Notifier<SettingsFormState> {
   }
 
   void _load(AppConfig config) {
-    state = state.copyWith(config: config, error: null);
+    state = state.copyWith(config: config);
   }
 
   void updateBaseUrl(String value) {
@@ -139,12 +132,12 @@ class SettingsFormNotifier extends Notifier<SettingsFormState> {
   }
 
   Future<void> save() async {
-    state = state.copyWith(isSaving: true, error: null);
+    state = state.copyWith(isSaving: true);
     try {
       await _configService.saveConfig(state.config);
       state = state.copyWith(isSaving: false);
     } catch (e) {
-      state = state.copyWith(isSaving: false, error: e.toString());
+      state = state.copyWith(isSaving: false);
       rethrow;
     }
   }
@@ -160,14 +153,13 @@ class SettingsFormNotifier extends Notifier<SettingsFormState> {
       return;
     }
 
-    state = state.copyWith(isRefreshingModels: true, modelsRefreshError: null);
+    state = state.copyWith(isRefreshingModels: true);
     try {
       await _configService.refreshModels();
       state = state.copyWith(isRefreshingModels: false);
     } catch (e) {
       state = state.copyWith(
         isRefreshingModels: false,
-        modelsRefreshError: e.toString(),
       );
       rethrow;
     }

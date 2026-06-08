@@ -48,15 +48,7 @@ class LocalFileSource{
     }
   }
 
-  Future<Uint8List> readAttachment(String relativePath) async {
-    try {
-      final file = File(path.join(_baseDir, relativePath));
-      if (!await file.exists()) {
-        throw Exception('附件不存在');
-      }
-      return await file.readAsBytes();
-    } on FileSystemException catch (e) {
-      throw Exception('读取附件失败：${e.message}');
-    }
+  File readAttachment(String relativePath) {
+    return File(path.join(_baseDir, relativePath));
   }
 }

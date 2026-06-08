@@ -134,7 +134,7 @@ class HomePage extends ConsumerWidget {
               final sessionId = const Uuid().v4();
               await repository.createSession(sessionId: sessionId, title: '新对话');
               if (context.mounted) {
-                await Navigator.push(
+                Navigator.push(
                   context,
                   CupertinoPageRoute(
                     builder: (_) => ChatPage(
