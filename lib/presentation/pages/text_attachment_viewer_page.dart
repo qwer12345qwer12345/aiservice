@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart' show SelectionArea;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../widgets/common/app_page_scaffold.dart';
@@ -27,7 +28,6 @@ class TextAttachmentViewerPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final textTheme = CupertinoTheme.of(context).textTheme;
     final contentAsync = ref.watch(textFileContentProvider(filePath));
 
     return AppPageScaffold(
@@ -47,21 +47,27 @@ class TextAttachmentViewerPage extends ConsumerWidget {
         ),
       ),
       body: contentAsync.when(
-        data: (text) => SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context),
-              borderRadius: BorderRadius.circular(12),
-            ),
+        data: (text) {
+          final lines = text.split('\n');
+
+          return Padding(
             padding: const EdgeInsets.all(16),
-            child: Text(
-              text,
-              style: textTheme.textStyle.copyWith(fontFamily: 'monospace'),
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.all(16),
+              child: SelectionArea(
+                child: ListView.builder(
+                  itemCount: lines.length,
+                  itemBuilder: (context, index) => Text(lines[index]),
+                ),
+              ),
             ),
-          ),
-        ),
+          );
+        },
         loading: () => const Center(child: CupertinoActivityIndicator()),
         error: (e, _) => Center(child: Text('加载失败: $e')),
       ),

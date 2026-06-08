@@ -1,8 +1,10 @@
+import 'package:aiservice/data/repositories/conversation_repository.dart';
 import 'package:aiservice/di/providers.dart';
 import 'package:aiservice/domain/services/character_card_parser.dart';
 import 'package:aiservice/domain/services/chat_service.dart';
 import 'package:aiservice/presentation/models/pending_attachment.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart' show SelectionArea;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -282,24 +284,26 @@ class _ChatRoundPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _UserSection(
-              roundId: roundId,
-              onRetryReply: onRetryReply,
-            ),
-            _ThinkingSection(roundId: roundId),
-            _AiReplySection(
-              roundId: roundId,
-              onRetryReply: onRetryReply,
-            ),
-          ],
-        ),
-      ],
+    return SelectionArea(
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _UserSection(
+                roundId: roundId,
+                onRetryReply: onRetryReply,
+              ),
+              _ThinkingSection(roundId: roundId),
+              _AiReplySection(
+                roundId: roundId,
+                onRetryReply: onRetryReply,
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -328,6 +332,7 @@ class _UserSection extends ConsumerWidget {
     }));
 
     if (round == null) return const SizedBox.shrink();
+    final repository = ref.read(conversationRepositoryProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -347,6 +352,13 @@ class _UserSection extends ConsumerWidget {
                 AppToast.show('已复制');
               },
               onRetryReply: onRetryReply,
+              onEdit: () => showEditContentDialog(
+              context: context,
+              repository: repository, 
+              roundId: roundId,
+              initialText: round.content,
+              isUser: true,
+            ),
             ),
         ),
         if (round.attach.isNotEmpty) ...[
@@ -405,6 +417,8 @@ class _AiReplySection extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
+    final repository = ref.read(conversationRepositoryProvider);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -418,7 +432,14 @@ class _AiReplySection extends ConsumerWidget {
                   Clipboard.setData(ClipboardData(text: ai.content!));
                   AppToast.show('已复制');
                 },
-                onRetryReply: ai.isIncomplete ? null : onRetryReply,
+                onRetryReply: onRetryReply,
+                onEdit: () => showEditContentDialog(
+                context: context,
+                repository: repository,
+                roundId: roundId,
+                initialText: ai.content!,
+                isUser: false,
+              ),
               ),
           )
         else
@@ -428,5 +449,45 @@ class _AiReplySection extends ConsumerWidget {
           ),
       ],
     );
+  }
+}
+
+Future<void> showEditContentDialog({
+  required BuildContext context,
+  required ConversationRepository repository,
+  required String roundId,
+  required String initialText,
+  required bool isUser,
+}) async {
+  final controller = TextEditingController(text: initialText);
+  
+  final result = await showCupertinoDialog<String>(
+    context: context,
+    builder: (ctx) => CupertinoAlertDialog(
+      title: const Text('编辑'),
+      content: CupertinoTextField(
+        controller: controller,
+        autofocus: true,
+        maxLines: 16,
+        padding: const EdgeInsets.all(12),
+      ),
+      actions: [
+        CupertinoDialogAction(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('取消'),
+        ),
+        CupertinoDialogAction(
+          onPressed: () => Navigator.of(ctx).pop(controller.text),
+          child: const Text('保存'),
+        ),
+      ],
+    ),
+  );
+  if (result != null && result != initialText) {
+    if (isUser) {
+      await repository.updateRound(roundId: roundId, userContent: result);
+    } else {
+      await repository.updateRound(roundId: roundId, assistantContent: result);
+    }
   }
 }

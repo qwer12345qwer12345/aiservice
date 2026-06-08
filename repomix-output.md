@@ -8415,8 +8415,8 @@ class MarkdownWidget extends StatelessWidget {
 
   Widget _buildRichText(String text, TextStyle baseStyle) {
     final spans = MarkdownParser.parseInline(text);
-    return RichText(
-      text: TextSpan(
+    return Text.rich(
+      TextSpan(
         style: baseStyle,
         children: spans.map((span) {
           TextStyle style = baseStyle;
@@ -10863,44 +10863,6 @@ TreeNode _buildSubtreeIterative(
 }
 ````
 
-## File: lib/presentation/pages/image_attachment_viewer_page.dart
-````dart
-import 'dart:io';
-import 'package:flutter/cupertino.dart';
-import 'package:aiservice/presentation/widgets/common/app_page_scaffold.dart';
-
-class ImageAttachmentViewerPage extends StatelessWidget {
-  final String title;
-  final String filePath;
-
-  const ImageAttachmentViewerPage({
-    super.key,
-    required this.title,
-    required this.filePath,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final imageFile = File(filePath);
-    
-    return AppPageScaffold(
-      navigationBar: CupertinoNavigationBar(middle: Text(title, overflow: TextOverflow.ellipsis)),
-      body: InteractiveViewer(
-        minScale: 0.5,
-        maxScale: 4.0,
-        child: Center(
-          child: Image.file(
-            imageFile,
-            fit: BoxFit.contain,
-            errorBuilder: (_, _, _) => const Center(child: Icon(CupertinoIcons.exclamationmark_triangle)),
-          ),
-        ),
-      ),
-    );
-  }
-}
-````
-
 ## File: lib/presentation/widgets/common/app_page_scaffold.dart
 ````dart
 import 'package:flutter/cupertino.dart';
@@ -11322,6 +11284,44 @@ class ChatService {
 }
 ````
 
+## File: lib/presentation/pages/image_attachment_viewer_page.dart
+````dart
+import 'dart:io';
+import 'package:flutter/cupertino.dart';
+import 'package:aiservice/presentation/widgets/common/app_page_scaffold.dart';
+
+class ImageAttachmentViewerPage extends StatelessWidget {
+  final String title;
+  final String filePath;
+
+  const ImageAttachmentViewerPage({
+    super.key,
+    required this.title,
+    required this.filePath,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final imageFile = File(filePath);
+    
+    return AppPageScaffold(
+      navigationBar: CupertinoNavigationBar(middle: Text(title, overflow: TextOverflow.ellipsis)),
+      body: InteractiveViewer(
+        minScale: 0.5,
+        maxScale: 4.0,
+        child: Center(
+          child: Image.file(
+            imageFile,
+            fit: BoxFit.contain,
+            errorBuilder: (_, _, _) => const Center(child: Icon(CupertinoIcons.exclamationmark_triangle)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+````
+
 ## File: lib/presentation/providers/config_notifier.dart
 ````dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11421,11 +11421,57 @@ class _ThoughtBubbleState extends State<ThoughtBubble> {
 }
 ````
 
+## File: lib/main.dart
+````dart
+import 'package:flutter/cupertino.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'di/providers.dart'; // 仅导入 providers
+import 'presentation/pages/home_page.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final container = ProviderContainer();
+  await container.read(localFileSourceProvider.future);
+
+  runApp(
+    UncontrolledProviderScope(
+      container: container,
+      child: const MyApp(),
+    ),
+  );
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoApp(
+      title: 'AI Chat',
+      navigatorKey: navigatorKey,
+      home: const HomePage(),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en', 'US'),
+        Locale('zh', 'CN'),
+      ],
+    );
+  }
+}
+````
+
 ## File: lib/presentation/pages/text_attachment_viewer_page.dart
 ````dart
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart' show SelectionArea;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../widgets/common/app_page_scaffold.dart';
@@ -11452,7 +11498,6 @@ class TextAttachmentViewerPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final textTheme = CupertinoTheme.of(context).textTheme;
     final contentAsync = ref.watch(textFileContentProvider(filePath));
 
     return AppPageScaffold(
@@ -11472,21 +11517,27 @@ class TextAttachmentViewerPage extends ConsumerWidget {
         ),
       ),
       body: contentAsync.when(
-        data: (text) => SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context),
-              borderRadius: BorderRadius.circular(12),
-            ),
+        data: (text) {
+          final lines = text.split('\n');
+
+          return Padding(
             padding: const EdgeInsets.all(16),
-            child: Text(
-              text,
-              style: textTheme.textStyle.copyWith(fontFamily: 'monospace'),
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.all(16),
+              child: SelectionArea(
+                child: ListView.builder(
+                  itemCount: lines.length,
+                  itemBuilder: (context, index) => Text(lines[index]),
+                ),
+              ),
             ),
-          ),
-        ),
+          );
+        },
         loading: () => const Center(child: CupertinoActivityIndicator()),
         error: (e, _) => Center(child: Text('加载失败: $e')),
       ),
@@ -11708,45 +11759,104 @@ final settingsFormProvider = NotifierProvider<SettingsFormNotifier, SettingsForm
 );
 ````
 
-## File: lib/main.dart
+## File: lib/presentation/widgets/message_bubble.dart
 ````dart
 import 'package:flutter/cupertino.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'di/providers.dart'; // 仅导入 providers
-import 'presentation/pages/home_page.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+import 'markdown_widget.dart';
 
-  final container = ProviderContainer();
-  await container.read(localFileSourceProvider.future);
+class MessageBubble extends StatelessWidget {
+  final String content;
+  final bool isUser;
+  final VoidCallback onCopy;
+  final VoidCallback onRetryReply;
+  final VoidCallback? onEdit;
 
-  runApp(
-    UncontrolledProviderScope(
-      container: container,
-      child: const MyApp(),
-    ),
-  );
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MessageBubble({
+    super.key,
+    required this.content,
+    required this.isUser,
+    required this.onCopy,
+    required this.onRetryReply,
+    this.onEdit,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoApp(
-      title: 'AI Chat',
-      navigatorKey: navigatorKey,
-      home: const HomePage(),
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: const [
-        Locale('en', 'US'),
-        Locale('zh', 'CN'),
+    final bubbleColor = isUser
+        ? CupertinoDynamicColor.resolve(CupertinoColors.systemBlue, context)
+        : CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context);
+
+    final textColor = isUser
+        ? CupertinoDynamicColor.resolve(CupertinoColors.white, context)
+        : CupertinoDynamicColor.resolve(CupertinoColors.label, context);
+
+    final maxWidth = MediaQuery.of(context).size.width * 0.88;
+
+    return Column(
+      crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxWidth),
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: bubbleColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: MarkdownWidget(
+              data: content,
+              baseStyle: TextStyle(color: textColor),
+            ),
+          ),
+        ),
+        
+        Padding(
+          padding: const EdgeInsets.only(top: 4, bottom: 8, left: 4, right: 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CupertinoButton(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                onPressed: onCopy,
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(CupertinoIcons.doc_on_doc, size: 14),
+                    SizedBox(width: 4),
+                    Text('复制', style: TextStyle(fontSize: 12)),
+                  ],
+                ),
+              ),
+              CupertinoButton(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                onPressed: onRetryReply,
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(CupertinoIcons.arrow_clockwise, size: 14),
+                    SizedBox(width: 4),
+                    Text('重试', style: TextStyle(fontSize: 12)),
+                  ],
+                ),
+              ),
+              if (onEdit != null)
+                CupertinoButton(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  onPressed: onEdit,
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(CupertinoIcons.pencil, size: 14),
+                      SizedBox(width: 4),
+                      Text('编辑', style: TextStyle(fontSize: 12)),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -11891,80 +12001,6 @@ class _FileAttachmentChip extends ConsumerWidget {
               child: Text(attachment.name, overflow: TextOverflow.ellipsis),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-````
-
-## File: lib/presentation/widgets/message_bubble.dart
-````dart
-import 'package:flutter/cupertino.dart';
-import 'markdown_widget.dart';
-
-class MessageBubble extends StatelessWidget {
-  final String content;
-  final bool isUser;
-  final VoidCallback? onCopy;
-  final VoidCallback? onRetryReply;
-  final VoidCallback? onEdit;
-
-  const MessageBubble({
-    super.key,
-    required this.content,
-    required this.isUser,
-    this.onCopy,
-    this.onRetryReply,
-    this.onEdit,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final bubbleColor = isUser
-        ? CupertinoDynamicColor.resolve(CupertinoColors.systemBlue, context)
-        : CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context);
-
-    final textColor = isUser
-        ? CupertinoDynamicColor.resolve(CupertinoColors.white, context)
-        : CupertinoDynamicColor.resolve(CupertinoColors.label, context);
-
-    final actions = <Widget>[
-      CupertinoContextMenuAction(
-        child: const Text('复制'),
-        onPressed: () {
-          Navigator.of(context).pop();
-          onCopy?.call();
-        },
-      ),
-      if (onRetryReply != null)
-        CupertinoContextMenuAction(
-          child: const Text('重试回复'),
-          onPressed: () {
-            Navigator.of(context).pop();
-            onRetryReply!();
-          },
-        ),
-    ];
-
-    // 获取屏幕可用宽度（减去左右边距，与原气泡逻辑一致）
-    final maxWidth = MediaQuery.of(context).size.width * 0.88;
-
-    return CupertinoContextMenu(
-      actions: actions,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: bubbleColor,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: MarkdownWidget(
-            data: content,
-            baseStyle: TextStyle(color: textColor),
-          ),
         ),
       ),
     );
@@ -13067,26 +13103,30 @@ class ConversationRepository {
 
   Future<void> updateRound({
     required String roundId,
+    String? userContent,
     String? assistantThinking,
     String? assistantContent,
     bool? isIncomplete,
     bool? hasUnseenUpdate,
   }) async {
     await (_db.update(_db.dbChatRounds)..where((t) => t.id.equals(roundId)))
-        .write(DbChatRoundsCompanion(
-          assistantThinking: assistantThinking != null
-              ? Value(assistantThinking)
-              : const Value.absent(),
-          assistantContent: assistantContent != null
-              ? Value(assistantContent)
-              : const Value.absent(),
-          isIncomplete: isIncomplete != null
-              ? Value(isIncomplete)
-              : const Value.absent(),
-          hasUnseenUpdate: hasUnseenUpdate != null
-              ? Value(hasUnseenUpdate)
-              : const Value.absent(),
-        ));
+      .write(DbChatRoundsCompanion(
+        userContent: userContent != null 
+          ? Value(userContent) 
+          : const Value.absent(),
+        assistantThinking: assistantThinking != null
+          ? Value(assistantThinking)
+          : const Value.absent(),
+        assistantContent: assistantContent != null
+          ? Value(assistantContent)
+          : const Value.absent(),
+        isIncomplete: isIncomplete != null
+          ? Value(isIncomplete)
+          : const Value.absent(),
+        hasUnseenUpdate: hasUnseenUpdate != null
+          ? Value(hasUnseenUpdate)
+          : const Value.absent(),
+      ));
   }
 
   // ========== 附件读写接口保留 ==========
@@ -14499,11 +14539,13 @@ final visibleRoundIdsProvider =
 
 ## File: lib/presentation/pages/chat_page.dart
 ````dart
+import 'package:aiservice/data/repositories/conversation_repository.dart';
 import 'package:aiservice/di/providers.dart';
 import 'package:aiservice/domain/services/character_card_parser.dart';
 import 'package:aiservice/domain/services/chat_service.dart';
 import 'package:aiservice/presentation/models/pending_attachment.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart' show SelectionArea;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -14783,24 +14825,26 @@ class _ChatRoundPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _UserSection(
-              roundId: roundId,
-              onRetryReply: onRetryReply,
-            ),
-            _ThinkingSection(roundId: roundId),
-            _AiReplySection(
-              roundId: roundId,
-              onRetryReply: onRetryReply,
-            ),
-          ],
-        ),
-      ],
+    return SelectionArea(
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _UserSection(
+                roundId: roundId,
+                onRetryReply: onRetryReply,
+              ),
+              _ThinkingSection(roundId: roundId),
+              _AiReplySection(
+                roundId: roundId,
+                onRetryReply: onRetryReply,
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -14829,6 +14873,7 @@ class _UserSection extends ConsumerWidget {
     }));
 
     if (round == null) return const SizedBox.shrink();
+    final repository = ref.read(conversationRepositoryProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -14848,6 +14893,13 @@ class _UserSection extends ConsumerWidget {
                 AppToast.show('已复制');
               },
               onRetryReply: onRetryReply,
+              onEdit: () => showEditContentDialog(
+              context: context,
+              repository: repository, 
+              roundId: roundId,
+              initialText: round.content,
+              isUser: true,
+            ),
             ),
         ),
         if (round.attach.isNotEmpty) ...[
@@ -14906,6 +14958,8 @@ class _AiReplySection extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
+    final repository = ref.read(conversationRepositoryProvider);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -14919,7 +14973,14 @@ class _AiReplySection extends ConsumerWidget {
                   Clipboard.setData(ClipboardData(text: ai.content!));
                   AppToast.show('已复制');
                 },
-                onRetryReply: ai.isIncomplete ? null : onRetryReply,
+                onRetryReply: onRetryReply,
+                onEdit: () => showEditContentDialog(
+                context: context,
+                repository: repository,
+                roundId: roundId,
+                initialText: ai.content!,
+                isUser: false,
+              ),
               ),
           )
         else
@@ -14929,6 +14990,46 @@ class _AiReplySection extends ConsumerWidget {
           ),
       ],
     );
+  }
+}
+
+Future<void> showEditContentDialog({
+  required BuildContext context,
+  required ConversationRepository repository,
+  required String roundId,
+  required String initialText,
+  required bool isUser,
+}) async {
+  final controller = TextEditingController(text: initialText);
+  
+  final result = await showCupertinoDialog<String>(
+    context: context,
+    builder: (ctx) => CupertinoAlertDialog(
+      title: const Text('编辑'),
+      content: CupertinoTextField(
+        controller: controller,
+        autofocus: true,
+        maxLines: 16,
+        padding: const EdgeInsets.all(12),
+      ),
+      actions: [
+        CupertinoDialogAction(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('取消'),
+        ),
+        CupertinoDialogAction(
+          onPressed: () => Navigator.of(ctx).pop(controller.text),
+          child: const Text('保存'),
+        ),
+      ],
+    ),
+  );
+  if (result != null && result != initialText) {
+    if (isUser) {
+      await repository.updateRound(roundId: roundId, userContent: result);
+    } else {
+      await repository.updateRound(roundId: roundId, assistantContent: result);
+    }
   }
 }
 ````

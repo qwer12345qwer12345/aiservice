@@ -1,4 +1,6 @@
+import 'package:aiservice/presentation/widgets/common/app_toast.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'markdown_parser.dart';
 
 class MarkdownWidget extends StatelessWidget {
@@ -56,23 +58,41 @@ class MarkdownWidget extends StatelessWidget {
         );
 
       case MarkdownBlockType.code:
-        return Container(
-          margin: const EdgeInsets.symmetric(vertical: 8),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey5, context),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Text(
-              block.text ?? '',
-              style: defaultStyle.copyWith(
-                fontFamily: 'monospace',
-                fontSize: 13,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: CupertinoButton(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: block.text ?? ''));
+                  AppToast.show('代码已复制');
+                },
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(CupertinoIcons.doc_on_doc, size: 14),
+                  ],
+                ),
               ),
             ),
-          ),
+            Container(
+              margin: const EdgeInsets.only(top: 8, bottom: 4),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey5, context),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Text(
+                  block.text ?? '',
+                  style: const TextStyle(),
+                ),
+              ),
+            ),            
+          ],
         );
 
       case MarkdownBlockType.table:
@@ -105,8 +125,8 @@ class MarkdownWidget extends StatelessWidget {
 
   Widget _buildRichText(String text, TextStyle baseStyle) {
     final spans = MarkdownParser.parseInline(text);
-    return RichText(
-      text: TextSpan(
+    return Text.rich(
+      TextSpan(
         style: baseStyle,
         children: spans.map((span) {
           TextStyle style = baseStyle;

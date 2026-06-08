@@ -344,26 +344,30 @@ class ConversationRepository {
 
   Future<void> updateRound({
     required String roundId,
+    String? userContent,
     String? assistantThinking,
     String? assistantContent,
     bool? isIncomplete,
     bool? hasUnseenUpdate,
   }) async {
     await (_db.update(_db.dbChatRounds)..where((t) => t.id.equals(roundId)))
-        .write(DbChatRoundsCompanion(
-          assistantThinking: assistantThinking != null
-              ? Value(assistantThinking)
-              : const Value.absent(),
-          assistantContent: assistantContent != null
-              ? Value(assistantContent)
-              : const Value.absent(),
-          isIncomplete: isIncomplete != null
-              ? Value(isIncomplete)
-              : const Value.absent(),
-          hasUnseenUpdate: hasUnseenUpdate != null
-              ? Value(hasUnseenUpdate)
-              : const Value.absent(),
-        ));
+      .write(DbChatRoundsCompanion(
+        userContent: userContent != null 
+          ? Value(userContent) 
+          : const Value.absent(),
+        assistantThinking: assistantThinking != null
+          ? Value(assistantThinking)
+          : const Value.absent(),
+        assistantContent: assistantContent != null
+          ? Value(assistantContent)
+          : const Value.absent(),
+        isIncomplete: isIncomplete != null
+          ? Value(isIncomplete)
+          : const Value.absent(),
+        hasUnseenUpdate: hasUnseenUpdate != null
+          ? Value(hasUnseenUpdate)
+          : const Value.absent(),
+      ));
   }
 
   // ========== 附件读写接口保留 ==========
