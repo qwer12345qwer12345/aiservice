@@ -18,7 +18,6 @@ class AppConfig with _$AppConfig {
     String? selectedModel,
     @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
     List<ModelInfo>? availableModels,
-    @Default('system') String theme,
     @Default('v1/models') String modelsPath,
     @Default('v1/chat/completions') String chatPath,
     @Default('chat_completions') String apiMode,
@@ -30,7 +29,6 @@ class AppConfig with _$AppConfig {
   factory AppConfig.defaultConfig() => const AppConfig(
         baseUrl: 'https://api.openai.com',
         apiKey: '',
-        theme: 'system',
         modelsPath: 'v1/models',
         chatPath: 'v1/chat/completions',
         apiMode: 'chat_completions',

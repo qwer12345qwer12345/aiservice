@@ -35,7 +35,6 @@ The content is organized as follows:
 
 # Directory Structure
 ```
-lib/core/constants/app_constants.dart
 lib/core/models/api_message.dart
 lib/core/models/api_message.freezed.dart
 lib/core/models/api_message.g.dart
@@ -76,6 +75,7 @@ lib/data/data_sources/remote_chat_source.dart
 lib/data/data_sources/sse_event_decoder.dart
 lib/data/database/database.dart
 lib/data/database/database.g.dart
+lib/data/repositories/config_repository.dart
 lib/data/repositories/conversation_repository.dart
 lib/data/services/config_service.dart
 lib/di/providers.dart
@@ -1675,7 +1675,6 @@ class AppConfig with _$AppConfig {
     String? selectedModel,
     @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
     List<ModelInfo>? availableModels,
-    @Default('system') String theme,
     @Default('v1/models') String modelsPath,
     @Default('v1/chat/completions') String chatPath,
     @Default('chat_completions') String apiMode,
@@ -1687,7 +1686,6 @@ class AppConfig with _$AppConfig {
   factory AppConfig.defaultConfig() => const AppConfig(
         baseUrl: 'https://api.openai.com',
         apiKey: '',
-        theme: 'system',
         modelsPath: 'v1/models',
         chatPath: 'v1/chat/completions',
         apiMode: 'chat_completions',
@@ -1725,7 +1723,6 @@ mixin _$AppConfig {
   String? get selectedModel => throw _privateConstructorUsedError;
   @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
   List<ModelInfo>? get availableModels => throw _privateConstructorUsedError;
-  String get theme => throw _privateConstructorUsedError;
   String get modelsPath => throw _privateConstructorUsedError;
   String get chatPath => throw _privateConstructorUsedError;
   String get apiMode => throw _privateConstructorUsedError;
@@ -1751,7 +1748,6 @@ abstract class $AppConfigCopyWith<$Res> {
     String? selectedModel,
     @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
     List<ModelInfo>? availableModels,
-    String theme,
     String modelsPath,
     String chatPath,
     String apiMode,
@@ -1777,7 +1773,6 @@ class _$AppConfigCopyWithImpl<$Res, $Val extends AppConfig>
     Object? apiKey = null,
     Object? selectedModel = freezed,
     Object? availableModels = freezed,
-    Object? theme = null,
     Object? modelsPath = null,
     Object? chatPath = null,
     Object? apiMode = null,
@@ -1800,10 +1795,6 @@ class _$AppConfigCopyWithImpl<$Res, $Val extends AppConfig>
                 ? _value.availableModels
                 : availableModels // ignore: cast_nullable_to_non_nullable
                       as List<ModelInfo>?,
-            theme: null == theme
-                ? _value.theme
-                : theme // ignore: cast_nullable_to_non_nullable
-                      as String,
             modelsPath: null == modelsPath
                 ? _value.modelsPath
                 : modelsPath // ignore: cast_nullable_to_non_nullable
@@ -1837,7 +1828,6 @@ abstract class _$$AppConfigImplCopyWith<$Res>
     String? selectedModel,
     @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
     List<ModelInfo>? availableModels,
-    String theme,
     String modelsPath,
     String chatPath,
     String apiMode,
@@ -1862,7 +1852,6 @@ class __$$AppConfigImplCopyWithImpl<$Res>
     Object? apiKey = null,
     Object? selectedModel = freezed,
     Object? availableModels = freezed,
-    Object? theme = null,
     Object? modelsPath = null,
     Object? chatPath = null,
     Object? apiMode = null,
@@ -1885,10 +1874,6 @@ class __$$AppConfigImplCopyWithImpl<$Res>
             ? _value._availableModels
             : availableModels // ignore: cast_nullable_to_non_nullable
                   as List<ModelInfo>?,
-        theme: null == theme
-            ? _value.theme
-            : theme // ignore: cast_nullable_to_non_nullable
-                  as String,
         modelsPath: null == modelsPath
             ? _value.modelsPath
             : modelsPath // ignore: cast_nullable_to_non_nullable
@@ -1915,7 +1900,6 @@ class _$AppConfigImpl implements _AppConfig {
     this.selectedModel,
     @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
     final List<ModelInfo>? availableModels,
-    this.theme = 'system',
     this.modelsPath = 'v1/models',
     this.chatPath = 'v1/chat/completions',
     this.apiMode = 'chat_completions',
@@ -1943,9 +1927,6 @@ class _$AppConfigImpl implements _AppConfig {
 
   @override
   @JsonKey()
-  final String theme;
-  @override
-  @JsonKey()
   final String modelsPath;
   @override
   @JsonKey()
@@ -1956,7 +1937,7 @@ class _$AppConfigImpl implements _AppConfig {
 
   @override
   String toString() {
-    return 'AppConfig(baseUrl: $baseUrl, apiKey: $apiKey, selectedModel: $selectedModel, availableModels: $availableModels, theme: $theme, modelsPath: $modelsPath, chatPath: $chatPath, apiMode: $apiMode)';
+    return 'AppConfig(baseUrl: $baseUrl, apiKey: $apiKey, selectedModel: $selectedModel, availableModels: $availableModels, modelsPath: $modelsPath, chatPath: $chatPath, apiMode: $apiMode)';
   }
 
   @override
@@ -1972,7 +1953,6 @@ class _$AppConfigImpl implements _AppConfig {
               other._availableModels,
               _availableModels,
             ) &&
-            (identical(other.theme, theme) || other.theme == theme) &&
             (identical(other.modelsPath, modelsPath) ||
                 other.modelsPath == modelsPath) &&
             (identical(other.chatPath, chatPath) ||
@@ -1988,7 +1968,6 @@ class _$AppConfigImpl implements _AppConfig {
     apiKey,
     selectedModel,
     const DeepCollectionEquality().hash(_availableModels),
-    theme,
     modelsPath,
     chatPath,
     apiMode,
@@ -2015,7 +1994,6 @@ abstract class _AppConfig implements AppConfig {
     final String? selectedModel,
     @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
     final List<ModelInfo>? availableModels,
-    final String theme,
     final String modelsPath,
     final String chatPath,
     final String apiMode,
@@ -2033,8 +2011,6 @@ abstract class _AppConfig implements AppConfig {
   @override
   @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
   List<ModelInfo>? get availableModels;
-  @override
-  String get theme;
   @override
   String get modelsPath;
   @override
@@ -2067,7 +2043,6 @@ _$AppConfigImpl _$$AppConfigImplFromJson(Map<String, dynamic> json) =>
       apiKey: json['apiKey'] as String,
       selectedModel: json['selectedModel'] as String?,
       availableModels: _modelsFromJson(json['availableModels'] as List?),
-      theme: json['theme'] as String? ?? 'system',
       modelsPath: json['modelsPath'] as String? ?? 'v1/models',
       chatPath: json['chatPath'] as String? ?? 'v1/chat/completions',
       apiMode: json['apiMode'] as String? ?? 'chat_completions',
@@ -2079,7 +2054,6 @@ Map<String, dynamic> _$$AppConfigImplToJson(_$AppConfigImpl instance) =>
       'apiKey': instance.apiKey,
       'selectedModel': instance.selectedModel,
       'availableModels': _modelsToJson(instance.availableModels),
-      'theme': instance.theme,
       'modelsPath': instance.modelsPath,
       'chatPath': instance.chatPath,
       'apiMode': instance.apiMode,
@@ -3216,24 +3190,6 @@ class PendingAttachment {
 }
 ````
 
-## File: lib/core/constants/app_constants.dart
-````dart
-abstract class AppConstants {
-  // 文件夹名称
-  static const String dirAttachments = 'attachments';
-
-  // 配置键
-  static const String keyBaseUrl = 'baseUrl';
-  static const String keyApiKey = 'apiKey';
-  static const String keyTheme = 'theme';
-  static const String keyModel = 'selectedModel';
-
-  // 默认值
-  static const String defaultBaseUrl = 'https://api.openai.com';
-  static const String defaultTheme = 'system';
-}
-````
-
 ## File: lib/core/models/sse_event.dart
 ````dart
 // 保持你原有SseEvent的非空约定，避免修改下游Decoder
@@ -3610,6 +3566,113 @@ class SseEventDecoder {
       return error.toString();
     }
     return error.toString();
+  }
+}
+````
+
+## File: lib/data/repositories/config_repository.dart
+````dart
+import 'package:drift/drift.dart';
+import '../database/database.dart';
+import '../../core/models/app_config.dart';
+import '../../core/models/app_config_store.dart';
+
+class ConfigRepository {
+  final AppDatabase _db;
+
+  ConfigRepository(this._db);
+
+  /// 获取所有配置档案列表
+  Future<List<ConfigProfile>> getProfiles() async {
+    final rows = await _db.select(_db.dbConfigProfiles).get();
+    return rows.map((p) => ConfigProfile(
+      id: p.id,
+      name: p.name,
+      config: p.config,
+    )).toList();
+  }
+
+  /// 获取当前激活的配置档案 ID
+  Future<String> getActiveProfileId() async {
+    final row = await _db.select(_db.dbConfigStore).getSingle();
+    return row.activeProfileId;
+  }
+
+  /// 设置激活的配置档案 ID
+  Future<void> setActiveProfileId(String profileId) async {
+    await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
+      DbConfigStoreCompanion(
+        id: const Value(1),
+        activeProfileId: Value(profileId),
+      ),
+    );
+  }
+
+  /// 插入默认配置存档（初始化时使用）
+  Future<void> insertDefaultStore(AppConfigStore defaultStore) async {
+    await _db.transaction(() async {
+      for (final profile in defaultStore.profiles) {
+        await _db.into(_db.dbConfigProfiles).insert(
+          DbConfigProfilesCompanion.insert(
+            id: profile.id,
+            name: profile.name,
+            config: profile.config,
+          ),
+        );
+      }
+      await _db.into(_db.dbConfigStore).insert(
+        DbConfigStoreCompanion.insert(
+          id: const Value(1),
+          activeProfileId: defaultStore.activeProfileId,
+        ),
+      );
+    });
+  }
+
+  /// 更新指定配置档案的配置内容
+  Future<void> updateProfileConfig(String profileId, AppConfig config) async {
+    await (_db.update(_db.dbConfigProfiles)
+          ..where((t) => t.id.equals(profileId)))
+        .write(DbConfigProfilesCompanion(config: Value(config)));
+  }
+
+  /// 创建新的配置档案
+  Future<void> createProfile(String id, String name, AppConfig config) async {
+    await _db.into(_db.dbConfigProfiles).insert(
+      DbConfigProfilesCompanion.insert(
+        id: id,
+        name: name,
+        config: config,
+      ),
+    );
+  }
+
+  /// 重命名配置档案
+  Future<void> renameProfile(String profileId, String newName) async {
+    await (_db.update(_db.dbConfigProfiles)
+          ..where((t) => t.id.equals(profileId)))
+        .write(DbConfigProfilesCompanion(name: Value(newName)));
+  }
+
+  /// 删除配置档案
+  Future<void> deleteProfile(String profileId) async {
+    await (_db.delete(_db.dbConfigProfiles)
+          ..where((t) => t.id.equals(profileId)))
+        .go();
+  }
+
+  /// 监听配置档案列表的变化（用于响应式）
+  Stream<List<ConfigProfile>> watchProfiles() {
+    return _db.select(_db.dbConfigProfiles).watch().map((rows) => rows.map((p) => ConfigProfile(
+      id: p.id,
+      name: p.name,
+      config: p.config,
+    )).toList());
+  }
+
+  /// 监听激活的配置档案 ID 的变化
+  Stream<String?> watchActiveProfileId() {
+    return _db.select(_db.dbConfigStore).watchSingleOrNull().map((row) => row?.activeProfileId);
   }
 }
 ````
@@ -10494,6 +10557,7 @@ class MarkdownWidget extends StatelessWidget {
 
 ## File: lib/di/providers.dart
 ````dart
+import 'package:aiservice/data/repositories/config_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -10528,11 +10592,14 @@ final chatSourceRouterProvider = Provider<ChatSourceRouter>((ref) {
   );
 });
 
-// --- 更新 Service 依赖 ---
+final configRepositoryProvider = Provider<ConfigRepository>((ref) {
+  return ConfigRepository(ref.watch(appDatabaseProvider));
+});
+
 final configServiceProvider = Provider<ConfigService>((ref) {
   return ConfigService(
-    ref.watch(appDatabaseProvider),
-    ref.watch(chatSourceRouterProvider), // 替换原 remoteApiSourceProvider
+    ref.watch(configRepositoryProvider),
+    ref.watch(chatSourceRouterProvider),
   );
 });
 
@@ -10768,64 +10835,6 @@ class AppPageScaffold extends StatelessWidget {
 }
 ````
 
-## File: lib/data/data_sources/local_file_source.dart
-````dart
-import 'dart:io';
-import 'dart:typed_data';
-import 'package:crypto/crypto.dart';
-import 'package:path/path.dart' as path;
-import '../../core/constants/app_constants.dart';
-
-class LocalFileSource{
-  final String _baseDir;
-  final Directory _directory;
-
-  LocalFileSource(this._baseDir) : _directory = Directory(_baseDir);
-
-  Future<String> get basePath async => _baseDir;
-
-  Future<void> initDirectories() async {
-    await _directory.create(recursive: true);
-    await Directory(path.join(_baseDir, AppConstants.dirAttachments))
-      .create(recursive: true);
-  }
-
-  Future<void> deleteAttachment(String relativePath) async {
-    try {
-      final file = File(path.join(_baseDir, relativePath));
-      if (await file.exists()) {
-        await file.delete();
-       }
-    } on FileSystemException catch (e) {
-      throw Exception('删除文件失败：${e.message}');
-    }
-  }
-
-  Future<String> saveAttachment(Uint8List data, String fileName) async {
-    try {
-      final ext = path.extension(fileName).toLowerCase();
-      final hash = sha256.convert(data).toString();
-       final hashedFileName = '$hash$ext';
-      final relativePath = '${AppConstants.dirAttachments}/$hashedFileName';
-      final filePath = path.join(_baseDir, relativePath);
-       final file = File(filePath);
-
-      if (!await file.exists()) {
-        await file.writeAsBytes(data, flush: true);
-      }
-
-      return relativePath;
-    } on FileSystemException catch (e) {
-      throw Exception('保存附件失败：${e.message}');
-    }
-  }
-
-  File readAttachment(String relativePath) {
-    return File(path.join(_baseDir, relativePath));
-  }
-}
-````
-
 ## File: lib/presentation/pages/image_attachment_viewer_page.dart
 ````dart
 import 'dart:io';
@@ -10941,6 +10950,60 @@ class _ThoughtBubbleState extends State<ThoughtBubble> {
         ],
       ),
     );
+  }
+}
+````
+
+## File: lib/data/data_sources/local_file_source.dart
+````dart
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:crypto/crypto.dart';
+import 'package:path/path.dart' as path;
+
+class LocalFileSource{
+  final String _baseDir;
+  final Directory _directory;
+
+  LocalFileSource(this._baseDir) : _directory = Directory(_baseDir);
+
+  Future<String> get basePath async => _baseDir;
+
+  Future<void> initDirectories() async {
+    await _directory.create(recursive: true);
+  }
+
+  Future<void> deleteAttachment(String relativePath) async {
+    try {
+      final file = File(path.join(_baseDir, relativePath));
+      if (await file.exists()) {
+        await file.delete();
+       }
+    } on FileSystemException catch (e) {
+      throw Exception('删除文件失败：${e.message}');
+    }
+  }
+
+  Future<String> saveAttachment(Uint8List data, String fileName) async {
+    try {
+      final ext = path.extension(fileName).toLowerCase();
+      final hash = sha256.convert(data).toString();
+      final hashedFileName = '$hash$ext';
+      final filePath = path.join(_baseDir, hashedFileName);
+      final file = File(filePath);
+
+      if (!await file.exists()) {
+        await file.writeAsBytes(data, flush: true);
+      }
+
+      return hashedFileName;
+    } on FileSystemException catch (e) {
+      throw Exception('保存附件失败：${e.message}');
+    }
+  }
+
+  File readAttachment(String relativePath) {
+    return File(path.join(_baseDir, relativePath));
   }
 }
 ````
@@ -11811,72 +11874,32 @@ class MessageBubble extends StatelessWidget {
 ````dart
 import 'dart:async';
 import 'package:aiservice/data/data_sources/chat_source_router.dart';
-import 'package:drift/drift.dart';
+import 'package:rxdart/rxdart.dart';
 import '../../core/models/app_config.dart';
 import '../../core/models/app_config_store.dart';
 import '../../core/models/model_info.dart';
-import '../database/database.dart';
+import '../repositories/config_repository.dart';
 import 'package:uuid/uuid.dart';
 
-class ConfigService{
-  final AppDatabase _db;
+class ConfigService {
+  final ConfigRepository _repository;
   final ChatSourceRouter _sourceRouter;
 
-  ConfigService(this._db, this._sourceRouter);
-
-  Future<AppConfigStore> _ensureInitialized() async {
-    final storeRow = await _db.select(_db.dbConfigStore).getSingleOrNull();
-    var activeId = storeRow?.activeProfileId ?? 'default';
-
-    final profileRows = await _db.select(_db.dbConfigProfiles).get();
-
-    if (profileRows.isEmpty) {
-      final defaultProfile = ConfigProfile(
-        id: 'default',
-        name: '默认配置',
-        config: AppConfig.defaultConfig(),
-      );
-
-      await _db.into(_db.dbConfigProfiles).insert(
-        DbConfigProfilesCompanion.insert(
-          id: defaultProfile.id,
-          name: defaultProfile.name,
-          config: defaultProfile.config,
-        ),
-      );
-      await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
-        const DbConfigStoreCompanion(
-          id: Value(1),
-          activeProfileId: Value('default'),
-        ),
-      );
-
-      activeId = 'default';
-      return AppConfigStore(
-        activeProfileId: activeId,
-        profiles: [defaultProfile],
-      );
-    }
-
-    final profiles = profileRows
-        .map((p) => ConfigProfile(id: p.id, name: p.name, config: p.config))
-        .toList();
-
-    if (!profiles.any((p) => p.id == activeId)) {
-      activeId = profiles.first.id;
-      await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
-        DbConfigStoreCompanion(
-          id: const Value(1),
-          activeProfileId: Value(activeId),
-        ),
-      );
-    }
-
-    return AppConfigStore(activeProfileId: activeId, profiles: profiles);
-  }
+  ConfigService(this._repository, this._sourceRouter);
 
   Future<AppConfigStore> loadConfigStore() async {
-    return await _ensureInitialized();
+    final profiles = await _repository.getProfiles();
+    if (profiles.isEmpty) {
+      final defaultStore = AppConfigStore.defaultStore();
+      await _repository.insertDefaultStore(defaultStore);
+      return defaultStore;
+    }
+
+    final activeProfileId = await _repository.getActiveProfileId();
+    return AppConfigStore(
+      activeProfileId: activeProfileId,
+      profiles: profiles,
+    );
   }
 
   Future<AppConfig> loadConfig() async {
@@ -11889,9 +11912,7 @@ class ConfigService{
 
   Future<void> saveConfig(AppConfig config) async {
     final store = await loadConfigStore();
-    final activeId = store.activeProfileId;
-    await (_db.update(_db.dbConfigProfiles)..where((t) => t.id.equals(activeId)))
-        .write(DbConfigProfilesCompanion(config: Value(config)));
+    await _repository.updateProfileConfig(store.activeProfileId, config);
   }
 
   Future<void> refreshModels(AppConfig targetConfig) async {
@@ -11917,17 +11938,11 @@ class ConfigService{
   }
 
   Future<List<ConfigProfile>> getProfiles() async {
-    final store = await loadConfigStore();
-    return store.profiles;
+    return await _repository.getProfiles();
   }
 
   Future<void> switchProfile(String profileId) async {
-    await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
-      DbConfigStoreCompanion(
-        id: const Value(1),
-        activeProfileId: Value(profileId),
-      ),
-    );
+    await _repository.setActiveProfileId(profileId);
   }
 
   Future<void> createProfile(String name) async {
@@ -11935,26 +11950,17 @@ class ConfigService{
     final newId = const Uuid().v4();
     final cleanName = name.trim().isEmpty ? '新配置' : name.trim();
 
-    await _db.into(_db.dbConfigProfiles).insert(
-      DbConfigProfilesCompanion.insert(
-        id: newId,
-        name: cleanName,
-        config: activeConfig,
-      ),
-    );
+    await _repository.createProfile(newId, cleanName, activeConfig);
     await switchProfile(newId);
   }
 
   Future<void> renameProfile(String profileId, String name) async {
     if (name.trim().isEmpty) return;
-    await (_db.update(_db.dbConfigProfiles)
-          ..where((t) => t.id.equals(profileId)))
-        .write(DbConfigProfilesCompanion(name: Value(name.trim())));
+    await _repository.renameProfile(profileId, name.trim());
   }
 
   Future<void> deleteProfile(String profileId) async {
     final store = await loadConfigStore();
-
     if (store.profiles.length <= 1) return;
 
     if (store.activeProfileId == profileId) {
@@ -11964,76 +11970,21 @@ class ConfigService{
       }
     }
 
-    await (_db.delete(_db.dbConfigProfiles)
-          ..where((t) => t.id.equals(profileId)))
-        .go();
+    await _repository.deleteProfile(profileId);
   }
 
   Stream<AppConfigStore> watchConfigStore() {
-    _ensureInitialized();
+    final profilesStream = _repository.watchProfiles();
+    final activeIdStream = _repository.watchActiveProfileId();
 
-    final storeStream = _db.select(_db.dbConfigStore).watchSingleOrNull();
-    final profilesStream = _db.select(_db.dbConfigProfiles).watch();
-
-    final outputController = StreamController<AppConfigStore>();
-
-    DbConfigStoreData? latestStoreRow;
-    List<DbConfigProfile> latestProfileRows = [];
-
-    void computeAndOutput() {
-      final storeRow = latestStoreRow;
-      final profileRows = latestProfileRows;
-
-      if (storeRow == null && profileRows.isEmpty) return;
-      if (profileRows.isEmpty) return;
-
-      var activeId = storeRow?.activeProfileId ?? 'default';
-
-      final profiles = profileRows
-          .map((p) => ConfigProfile(id: p.id, name: p.name, config: p.config))
-          .toList();
-
-      if (!profiles.any((p) => p.id == activeId)) {
-        activeId = profiles.first.id;
-        _db.into(_db.dbConfigStore).insertOnConflictUpdate(
-          DbConfigStoreCompanion(
-            id: const Value(1),
-            activeProfileId: Value(activeId),
-          ),
-        );
-      }
-
-      outputController.add(
-        AppConfigStore(activeProfileId: activeId, profiles: profiles),
+    return Rx.combineLatest2(profilesStream, activeIdStream, (profiles, activeId) {
+      if (profiles.isEmpty) return null;
+      final effectiveActiveId = activeId ?? profiles.first.id;
+      return AppConfigStore(
+        activeProfileId: effectiveActiveId,
+        profiles: profiles,
       );
-    }
-
-    final storeSubscription = storeStream.listen(
-      (row) {
-        latestStoreRow = row;
-        computeAndOutput();
-      },
-      onError: (e) {
-        outputController.addError(e);
-      },
-    );
-
-    final profilesSubscription = profilesStream.listen(
-      (rows) {
-        latestProfileRows = rows;
-        computeAndOutput();
-      },
-      onError: (e) {
-        outputController.addError(e);
-      },
-    );
-
-    outputController.onCancel = () {
-      storeSubscription.cancel();
-      profilesSubscription.cancel();
-    };
-
-    return outputController.stream;
+    }).where((store) => store != null).map((store) => store!);
   }
 
   Stream<AppConfig> watchConfig() {

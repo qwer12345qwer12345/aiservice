@@ -26,7 +26,6 @@ mixin _$AppConfig {
   String? get selectedModel => throw _privateConstructorUsedError;
   @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
   List<ModelInfo>? get availableModels => throw _privateConstructorUsedError;
-  String get theme => throw _privateConstructorUsedError;
   String get modelsPath => throw _privateConstructorUsedError;
   String get chatPath => throw _privateConstructorUsedError;
   String get apiMode => throw _privateConstructorUsedError;
@@ -52,7 +51,6 @@ abstract class $AppConfigCopyWith<$Res> {
     String? selectedModel,
     @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
     List<ModelInfo>? availableModels,
-    String theme,
     String modelsPath,
     String chatPath,
     String apiMode,
@@ -78,7 +76,6 @@ class _$AppConfigCopyWithImpl<$Res, $Val extends AppConfig>
     Object? apiKey = null,
     Object? selectedModel = freezed,
     Object? availableModels = freezed,
-    Object? theme = null,
     Object? modelsPath = null,
     Object? chatPath = null,
     Object? apiMode = null,
@@ -101,10 +98,6 @@ class _$AppConfigCopyWithImpl<$Res, $Val extends AppConfig>
                 ? _value.availableModels
                 : availableModels // ignore: cast_nullable_to_non_nullable
                       as List<ModelInfo>?,
-            theme: null == theme
-                ? _value.theme
-                : theme // ignore: cast_nullable_to_non_nullable
-                      as String,
             modelsPath: null == modelsPath
                 ? _value.modelsPath
                 : modelsPath // ignore: cast_nullable_to_non_nullable
@@ -138,7 +131,6 @@ abstract class _$$AppConfigImplCopyWith<$Res>
     String? selectedModel,
     @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
     List<ModelInfo>? availableModels,
-    String theme,
     String modelsPath,
     String chatPath,
     String apiMode,
@@ -163,7 +155,6 @@ class __$$AppConfigImplCopyWithImpl<$Res>
     Object? apiKey = null,
     Object? selectedModel = freezed,
     Object? availableModels = freezed,
-    Object? theme = null,
     Object? modelsPath = null,
     Object? chatPath = null,
     Object? apiMode = null,
@@ -186,10 +177,6 @@ class __$$AppConfigImplCopyWithImpl<$Res>
             ? _value._availableModels
             : availableModels // ignore: cast_nullable_to_non_nullable
                   as List<ModelInfo>?,
-        theme: null == theme
-            ? _value.theme
-            : theme // ignore: cast_nullable_to_non_nullable
-                  as String,
         modelsPath: null == modelsPath
             ? _value.modelsPath
             : modelsPath // ignore: cast_nullable_to_non_nullable
@@ -216,7 +203,6 @@ class _$AppConfigImpl implements _AppConfig {
     this.selectedModel,
     @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
     final List<ModelInfo>? availableModels,
-    this.theme = 'system',
     this.modelsPath = 'v1/models',
     this.chatPath = 'v1/chat/completions',
     this.apiMode = 'chat_completions',
@@ -244,9 +230,6 @@ class _$AppConfigImpl implements _AppConfig {
 
   @override
   @JsonKey()
-  final String theme;
-  @override
-  @JsonKey()
   final String modelsPath;
   @override
   @JsonKey()
@@ -257,7 +240,7 @@ class _$AppConfigImpl implements _AppConfig {
 
   @override
   String toString() {
-    return 'AppConfig(baseUrl: $baseUrl, apiKey: $apiKey, selectedModel: $selectedModel, availableModels: $availableModels, theme: $theme, modelsPath: $modelsPath, chatPath: $chatPath, apiMode: $apiMode)';
+    return 'AppConfig(baseUrl: $baseUrl, apiKey: $apiKey, selectedModel: $selectedModel, availableModels: $availableModels, modelsPath: $modelsPath, chatPath: $chatPath, apiMode: $apiMode)';
   }
 
   @override
@@ -273,7 +256,6 @@ class _$AppConfigImpl implements _AppConfig {
               other._availableModels,
               _availableModels,
             ) &&
-            (identical(other.theme, theme) || other.theme == theme) &&
             (identical(other.modelsPath, modelsPath) ||
                 other.modelsPath == modelsPath) &&
             (identical(other.chatPath, chatPath) ||
@@ -289,7 +271,6 @@ class _$AppConfigImpl implements _AppConfig {
     apiKey,
     selectedModel,
     const DeepCollectionEquality().hash(_availableModels),
-    theme,
     modelsPath,
     chatPath,
     apiMode,
@@ -316,7 +297,6 @@ abstract class _AppConfig implements AppConfig {
     final String? selectedModel,
     @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
     final List<ModelInfo>? availableModels,
-    final String theme,
     final String modelsPath,
     final String chatPath,
     final String apiMode,
@@ -334,8 +314,6 @@ abstract class _AppConfig implements AppConfig {
   @override
   @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
   List<ModelInfo>? get availableModels;
-  @override
-  String get theme;
   @override
   String get modelsPath;
   @override

@@ -1,71 +1,31 @@
 import 'dart:async';
 import 'package:aiservice/data/data_sources/chat_source_router.dart';
-import 'package:drift/drift.dart';
+import 'package:rxdart/rxdart.dart';
 import '../../core/models/app_config.dart';
 import '../../core/models/app_config_store.dart';
 import '../../core/models/model_info.dart';
-import '../database/database.dart';
+import '../repositories/config_repository.dart';
 import 'package:uuid/uuid.dart';
 
-class ConfigService{
-  final AppDatabase _db;
+class ConfigService {
+  final ConfigRepository _repository;
   final ChatSourceRouter _sourceRouter;
 
-  ConfigService(this._db, this._sourceRouter);
-
-  Future<AppConfigStore> _ensureInitialized() async {
-    final storeRow = await _db.select(_db.dbConfigStore).getSingleOrNull();
-    var activeId = storeRow?.activeProfileId ?? 'default';
-
-    final profileRows = await _db.select(_db.dbConfigProfiles).get();
-
-    if (profileRows.isEmpty) {
-      final defaultProfile = ConfigProfile(
-        id: 'default',
-        name: '默认配置',
-        config: AppConfig.defaultConfig(),
-      );
-
-      await _db.into(_db.dbConfigProfiles).insert(
-        DbConfigProfilesCompanion.insert(
-          id: defaultProfile.id,
-          name: defaultProfile.name,
-          config: defaultProfile.config,
-        ),
-      );
-      await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
-        const DbConfigStoreCompanion(
-          id: Value(1),
-          activeProfileId: Value('default'),
-        ),
-      );
-
-      activeId = 'default';
-      return AppConfigStore(
-        activeProfileId: activeId,
-        profiles: [defaultProfile],
-      );
-    }
-
-    final profiles = profileRows
-        .map((p) => ConfigProfile(id: p.id, name: p.name, config: p.config))
-        .toList();
-
-    if (!profiles.any((p) => p.id == activeId)) {
-      activeId = profiles.first.id;
-      await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
-        DbConfigStoreCompanion(
-          id: const Value(1),
-          activeProfileId: Value(activeId),
-        ),
-      );
-    }
-
-    return AppConfigStore(activeProfileId: activeId, profiles: profiles);
-  }
+  ConfigService(this._repository, this._sourceRouter);
 
   Future<AppConfigStore> loadConfigStore() async {
-    return await _ensureInitialized();
+    final profiles = await _repository.getProfiles();
+    if (profiles.isEmpty) {
+      final defaultStore = AppConfigStore.defaultStore();
+      await _repository.insertDefaultStore(defaultStore);
+      return defaultStore;
+    }
+
+    final activeProfileId = await _repository.getActiveProfileId();
+    return AppConfigStore(
+      activeProfileId: activeProfileId,
+      profiles: profiles,
+    );
   }
 
   Future<AppConfig> loadConfig() async {
@@ -78,9 +38,7 @@ class ConfigService{
 
   Future<void> saveConfig(AppConfig config) async {
     final store = await loadConfigStore();
-    final activeId = store.activeProfileId;
-    await (_db.update(_db.dbConfigProfiles)..where((t) => t.id.equals(activeId)))
-        .write(DbConfigProfilesCompanion(config: Value(config)));
+    await _repository.updateProfileConfig(store.activeProfileId, config);
   }
 
   Future<void> refreshModels(AppConfig targetConfig) async {
@@ -106,17 +64,11 @@ class ConfigService{
   }
 
   Future<List<ConfigProfile>> getProfiles() async {
-    final store = await loadConfigStore();
-    return store.profiles;
+    return await _repository.getProfiles();
   }
 
   Future<void> switchProfile(String profileId) async {
-    await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
-      DbConfigStoreCompanion(
-        id: const Value(1),
-        activeProfileId: Value(profileId),
-      ),
-    );
+    await _repository.setActiveProfileId(profileId);
   }
 
   Future<void> createProfile(String name) async {
@@ -124,26 +76,17 @@ class ConfigService{
     final newId = const Uuid().v4();
     final cleanName = name.trim().isEmpty ? '新配置' : name.trim();
 
-    await _db.into(_db.dbConfigProfiles).insert(
-      DbConfigProfilesCompanion.insert(
-        id: newId,
-        name: cleanName,
-        config: activeConfig,
-      ),
-    );
+    await _repository.createProfile(newId, cleanName, activeConfig);
     await switchProfile(newId);
   }
 
   Future<void> renameProfile(String profileId, String name) async {
     if (name.trim().isEmpty) return;
-    await (_db.update(_db.dbConfigProfiles)
-          ..where((t) => t.id.equals(profileId)))
-        .write(DbConfigProfilesCompanion(name: Value(name.trim())));
+    await _repository.renameProfile(profileId, name.trim());
   }
 
   Future<void> deleteProfile(String profileId) async {
     final store = await loadConfigStore();
-
     if (store.profiles.length <= 1) return;
 
     if (store.activeProfileId == profileId) {
@@ -153,76 +96,21 @@ class ConfigService{
       }
     }
 
-    await (_db.delete(_db.dbConfigProfiles)
-          ..where((t) => t.id.equals(profileId)))
-        .go();
+    await _repository.deleteProfile(profileId);
   }
 
   Stream<AppConfigStore> watchConfigStore() {
-    _ensureInitialized();
+    final profilesStream = _repository.watchProfiles();
+    final activeIdStream = _repository.watchActiveProfileId();
 
-    final storeStream = _db.select(_db.dbConfigStore).watchSingleOrNull();
-    final profilesStream = _db.select(_db.dbConfigProfiles).watch();
-
-    final outputController = StreamController<AppConfigStore>();
-
-    DbConfigStoreData? latestStoreRow;
-    List<DbConfigProfile> latestProfileRows = [];
-
-    void computeAndOutput() {
-      final storeRow = latestStoreRow;
-      final profileRows = latestProfileRows;
-
-      if (storeRow == null && profileRows.isEmpty) return;
-      if (profileRows.isEmpty) return;
-
-      var activeId = storeRow?.activeProfileId ?? 'default';
-
-      final profiles = profileRows
-          .map((p) => ConfigProfile(id: p.id, name: p.name, config: p.config))
-          .toList();
-
-      if (!profiles.any((p) => p.id == activeId)) {
-        activeId = profiles.first.id;
-        _db.into(_db.dbConfigStore).insertOnConflictUpdate(
-          DbConfigStoreCompanion(
-            id: const Value(1),
-            activeProfileId: Value(activeId),
-          ),
-        );
-      }
-
-      outputController.add(
-        AppConfigStore(activeProfileId: activeId, profiles: profiles),
+    return Rx.combineLatest2(profilesStream, activeIdStream, (profiles, activeId) {
+      if (profiles.isEmpty) return null;
+      final effectiveActiveId = activeId ?? profiles.first.id;
+      return AppConfigStore(
+        activeProfileId: effectiveActiveId,
+        profiles: profiles,
       );
-    }
-
-    final storeSubscription = storeStream.listen(
-      (row) {
-        latestStoreRow = row;
-        computeAndOutput();
-      },
-      onError: (e) {
-        outputController.addError(e);
-      },
-    );
-
-    final profilesSubscription = profilesStream.listen(
-      (rows) {
-        latestProfileRows = rows;
-        computeAndOutput();
-      },
-      onError: (e) {
-        outputController.addError(e);
-      },
-    );
-
-    outputController.onCancel = () {
-      storeSubscription.cancel();
-      profilesSubscription.cancel();
-    };
-
-    return outputController.stream;
+    }).where((store) => store != null).map((store) => store!);
   }
 
   Stream<AppConfig> watchConfig() {

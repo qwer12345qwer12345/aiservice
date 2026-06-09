@@ -1,3 +1,4 @@
+import 'package:aiservice/data/repositories/config_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -32,11 +33,14 @@ final chatSourceRouterProvider = Provider<ChatSourceRouter>((ref) {
   );
 });
 
-// --- 更新 Service 依赖 ---
+final configRepositoryProvider = Provider<ConfigRepository>((ref) {
+  return ConfigRepository(ref.watch(appDatabaseProvider));
+});
+
 final configServiceProvider = Provider<ConfigService>((ref) {
   return ConfigService(
-    ref.watch(appDatabaseProvider),
-    ref.watch(chatSourceRouterProvider), // 替换原 remoteApiSourceProvider
+    ref.watch(configRepositoryProvider),
+    ref.watch(chatSourceRouterProvider),
   );
 });
 
