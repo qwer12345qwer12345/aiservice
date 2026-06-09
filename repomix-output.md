@@ -38,12 +38,8 @@ The content is organized as follows:
 lib/core/models/api_message.dart
 lib/core/models/api_message.freezed.dart
 lib/core/models/api_message.g.dart
-lib/core/models/app_config_store.dart
-lib/core/models/app_config_store.freezed.dart
-lib/core/models/app_config_store.g.dart
 lib/core/models/app_config.dart
 lib/core/models/app_config.freezed.dart
-lib/core/models/app_config.g.dart
 lib/core/models/attachment.dart
 lib/core/models/attachment.freezed.dart
 lib/core/models/attachment.g.dart
@@ -1158,905 +1154,6 @@ Map<String, dynamic> _$$ApiMessageImplToJson(_$ApiMessageImpl instance) =>
       'content': instance.content,
       'reasoning': instance.reasoning,
       'parts': instance.parts,
-    };
-````
-
-## File: lib/core/models/app_config_store.dart
-````dart
-import 'package:freezed_annotation/freezed_annotation.dart';
-import 'app_config.dart';
-
-part 'app_config_store.freezed.dart';
-part 'app_config_store.g.dart';
-
-@freezed
-class ConfigProfile with _$ConfigProfile {
-  const factory ConfigProfile({
-    required String id,
-    required String name,
-    required AppConfig config,
-  }) = _ConfigProfile;
-
-  factory ConfigProfile.fromJson(Map<String, dynamic> json) =>
-      _$ConfigProfileFromJson(json);
-}
-
-@freezed
-class AppConfigStore with _$AppConfigStore {
-  const factory AppConfigStore({
-    required String activeProfileId,
-    @Default([]) List<ConfigProfile> profiles,
-  }) = _AppConfigStore;
-
-  factory AppConfigStore.fromJson(Map<String, dynamic> json) =>
-      _$AppConfigStoreFromJson(json);
-
-  factory AppConfigStore.defaultStore() => AppConfigStore(
-        activeProfileId: 'default',
-        profiles: [
-          ConfigProfile(
-            id: 'default',
-            name: '默认配置',
-            config: AppConfig.defaultConfig(),
-          ),
-        ],
-      );
-}
-````
-
-## File: lib/core/models/app_config_store.freezed.dart
-````dart
-// coverage:ignore-file
-// GENERATED CODE - DO NOT MODIFY BY HAND
-// ignore_for_file: type=lint
-// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
-
-part of 'app_config_store.dart';
-
-// **************************************************************************
-// FreezedGenerator
-// **************************************************************************
-
-T _$identity<T>(T value) => value;
-
-final _privateConstructorUsedError = UnsupportedError(
-  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
-);
-
-ConfigProfile _$ConfigProfileFromJson(Map<String, dynamic> json) {
-  return _ConfigProfile.fromJson(json);
-}
-
-/// @nodoc
-mixin _$ConfigProfile {
-  String get id => throw _privateConstructorUsedError;
-  String get name => throw _privateConstructorUsedError;
-  AppConfig get config => throw _privateConstructorUsedError;
-
-  /// Serializes this ConfigProfile to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-
-  /// Create a copy of ConfigProfile
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $ConfigProfileCopyWith<ConfigProfile> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-abstract class $ConfigProfileCopyWith<$Res> {
-  factory $ConfigProfileCopyWith(
-    ConfigProfile value,
-    $Res Function(ConfigProfile) then,
-  ) = _$ConfigProfileCopyWithImpl<$Res, ConfigProfile>;
-  @useResult
-  $Res call({String id, String name, AppConfig config});
-
-  $AppConfigCopyWith<$Res> get config;
-}
-
-/// @nodoc
-class _$ConfigProfileCopyWithImpl<$Res, $Val extends ConfigProfile>
-    implements $ConfigProfileCopyWith<$Res> {
-  _$ConfigProfileCopyWithImpl(this._value, this._then);
-
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-
-  /// Create a copy of ConfigProfile
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({Object? id = null, Object? name = null, Object? config = null}) {
-    return _then(
-      _value.copyWith(
-            id: null == id
-                ? _value.id
-                : id // ignore: cast_nullable_to_non_nullable
-                      as String,
-            name: null == name
-                ? _value.name
-                : name // ignore: cast_nullable_to_non_nullable
-                      as String,
-            config: null == config
-                ? _value.config
-                : config // ignore: cast_nullable_to_non_nullable
-                      as AppConfig,
-          )
-          as $Val,
-    );
-  }
-
-  /// Create a copy of ConfigProfile
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @pragma('vm:prefer-inline')
-  $AppConfigCopyWith<$Res> get config {
-    return $AppConfigCopyWith<$Res>(_value.config, (value) {
-      return _then(_value.copyWith(config: value) as $Val);
-    });
-  }
-}
-
-/// @nodoc
-abstract class _$$ConfigProfileImplCopyWith<$Res>
-    implements $ConfigProfileCopyWith<$Res> {
-  factory _$$ConfigProfileImplCopyWith(
-    _$ConfigProfileImpl value,
-    $Res Function(_$ConfigProfileImpl) then,
-  ) = __$$ConfigProfileImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({String id, String name, AppConfig config});
-
-  @override
-  $AppConfigCopyWith<$Res> get config;
-}
-
-/// @nodoc
-class __$$ConfigProfileImplCopyWithImpl<$Res>
-    extends _$ConfigProfileCopyWithImpl<$Res, _$ConfigProfileImpl>
-    implements _$$ConfigProfileImplCopyWith<$Res> {
-  __$$ConfigProfileImplCopyWithImpl(
-    _$ConfigProfileImpl _value,
-    $Res Function(_$ConfigProfileImpl) _then,
-  ) : super(_value, _then);
-
-  /// Create a copy of ConfigProfile
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({Object? id = null, Object? name = null, Object? config = null}) {
-    return _then(
-      _$ConfigProfileImpl(
-        id: null == id
-            ? _value.id
-            : id // ignore: cast_nullable_to_non_nullable
-                  as String,
-        name: null == name
-            ? _value.name
-            : name // ignore: cast_nullable_to_non_nullable
-                  as String,
-        config: null == config
-            ? _value.config
-            : config // ignore: cast_nullable_to_non_nullable
-                  as AppConfig,
-      ),
-    );
-  }
-}
-
-/// @nodoc
-@JsonSerializable()
-class _$ConfigProfileImpl implements _ConfigProfile {
-  const _$ConfigProfileImpl({
-    required this.id,
-    required this.name,
-    required this.config,
-  });
-
-  factory _$ConfigProfileImpl.fromJson(Map<String, dynamic> json) =>
-      _$$ConfigProfileImplFromJson(json);
-
-  @override
-  final String id;
-  @override
-  final String name;
-  @override
-  final AppConfig config;
-
-  @override
-  String toString() {
-    return 'ConfigProfile(id: $id, name: $name, config: $config)';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$ConfigProfileImpl &&
-            (identical(other.id, id) || other.id == id) &&
-            (identical(other.name, name) || other.name == name) &&
-            (identical(other.config, config) || other.config == config));
-  }
-
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  int get hashCode => Object.hash(runtimeType, id, name, config);
-
-  /// Create a copy of ConfigProfile
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$ConfigProfileImplCopyWith<_$ConfigProfileImpl> get copyWith =>
-      __$$ConfigProfileImplCopyWithImpl<_$ConfigProfileImpl>(this, _$identity);
-
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$ConfigProfileImplToJson(this);
-  }
-}
-
-abstract class _ConfigProfile implements ConfigProfile {
-  const factory _ConfigProfile({
-    required final String id,
-    required final String name,
-    required final AppConfig config,
-  }) = _$ConfigProfileImpl;
-
-  factory _ConfigProfile.fromJson(Map<String, dynamic> json) =
-      _$ConfigProfileImpl.fromJson;
-
-  @override
-  String get id;
-  @override
-  String get name;
-  @override
-  AppConfig get config;
-
-  /// Create a copy of ConfigProfile
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$ConfigProfileImplCopyWith<_$ConfigProfileImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-AppConfigStore _$AppConfigStoreFromJson(Map<String, dynamic> json) {
-  return _AppConfigStore.fromJson(json);
-}
-
-/// @nodoc
-mixin _$AppConfigStore {
-  String get activeProfileId => throw _privateConstructorUsedError;
-  List<ConfigProfile> get profiles => throw _privateConstructorUsedError;
-
-  /// Serializes this AppConfigStore to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-
-  /// Create a copy of AppConfigStore
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $AppConfigStoreCopyWith<AppConfigStore> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-abstract class $AppConfigStoreCopyWith<$Res> {
-  factory $AppConfigStoreCopyWith(
-    AppConfigStore value,
-    $Res Function(AppConfigStore) then,
-  ) = _$AppConfigStoreCopyWithImpl<$Res, AppConfigStore>;
-  @useResult
-  $Res call({String activeProfileId, List<ConfigProfile> profiles});
-}
-
-/// @nodoc
-class _$AppConfigStoreCopyWithImpl<$Res, $Val extends AppConfigStore>
-    implements $AppConfigStoreCopyWith<$Res> {
-  _$AppConfigStoreCopyWithImpl(this._value, this._then);
-
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-
-  /// Create a copy of AppConfigStore
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({Object? activeProfileId = null, Object? profiles = null}) {
-    return _then(
-      _value.copyWith(
-            activeProfileId: null == activeProfileId
-                ? _value.activeProfileId
-                : activeProfileId // ignore: cast_nullable_to_non_nullable
-                      as String,
-            profiles: null == profiles
-                ? _value.profiles
-                : profiles // ignore: cast_nullable_to_non_nullable
-                      as List<ConfigProfile>,
-          )
-          as $Val,
-    );
-  }
-}
-
-/// @nodoc
-abstract class _$$AppConfigStoreImplCopyWith<$Res>
-    implements $AppConfigStoreCopyWith<$Res> {
-  factory _$$AppConfigStoreImplCopyWith(
-    _$AppConfigStoreImpl value,
-    $Res Function(_$AppConfigStoreImpl) then,
-  ) = __$$AppConfigStoreImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({String activeProfileId, List<ConfigProfile> profiles});
-}
-
-/// @nodoc
-class __$$AppConfigStoreImplCopyWithImpl<$Res>
-    extends _$AppConfigStoreCopyWithImpl<$Res, _$AppConfigStoreImpl>
-    implements _$$AppConfigStoreImplCopyWith<$Res> {
-  __$$AppConfigStoreImplCopyWithImpl(
-    _$AppConfigStoreImpl _value,
-    $Res Function(_$AppConfigStoreImpl) _then,
-  ) : super(_value, _then);
-
-  /// Create a copy of AppConfigStore
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({Object? activeProfileId = null, Object? profiles = null}) {
-    return _then(
-      _$AppConfigStoreImpl(
-        activeProfileId: null == activeProfileId
-            ? _value.activeProfileId
-            : activeProfileId // ignore: cast_nullable_to_non_nullable
-                  as String,
-        profiles: null == profiles
-            ? _value._profiles
-            : profiles // ignore: cast_nullable_to_non_nullable
-                  as List<ConfigProfile>,
-      ),
-    );
-  }
-}
-
-/// @nodoc
-@JsonSerializable()
-class _$AppConfigStoreImpl implements _AppConfigStore {
-  const _$AppConfigStoreImpl({
-    required this.activeProfileId,
-    final List<ConfigProfile> profiles = const [],
-  }) : _profiles = profiles;
-
-  factory _$AppConfigStoreImpl.fromJson(Map<String, dynamic> json) =>
-      _$$AppConfigStoreImplFromJson(json);
-
-  @override
-  final String activeProfileId;
-  final List<ConfigProfile> _profiles;
-  @override
-  @JsonKey()
-  List<ConfigProfile> get profiles {
-    if (_profiles is EqualUnmodifiableListView) return _profiles;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableListView(_profiles);
-  }
-
-  @override
-  String toString() {
-    return 'AppConfigStore(activeProfileId: $activeProfileId, profiles: $profiles)';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$AppConfigStoreImpl &&
-            (identical(other.activeProfileId, activeProfileId) ||
-                other.activeProfileId == activeProfileId) &&
-            const DeepCollectionEquality().equals(other._profiles, _profiles));
-  }
-
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  int get hashCode => Object.hash(
-    runtimeType,
-    activeProfileId,
-    const DeepCollectionEquality().hash(_profiles),
-  );
-
-  /// Create a copy of AppConfigStore
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$AppConfigStoreImplCopyWith<_$AppConfigStoreImpl> get copyWith =>
-      __$$AppConfigStoreImplCopyWithImpl<_$AppConfigStoreImpl>(
-        this,
-        _$identity,
-      );
-
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$AppConfigStoreImplToJson(this);
-  }
-}
-
-abstract class _AppConfigStore implements AppConfigStore {
-  const factory _AppConfigStore({
-    required final String activeProfileId,
-    final List<ConfigProfile> profiles,
-  }) = _$AppConfigStoreImpl;
-
-  factory _AppConfigStore.fromJson(Map<String, dynamic> json) =
-      _$AppConfigStoreImpl.fromJson;
-
-  @override
-  String get activeProfileId;
-  @override
-  List<ConfigProfile> get profiles;
-
-  /// Create a copy of AppConfigStore
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$AppConfigStoreImplCopyWith<_$AppConfigStoreImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-````
-
-## File: lib/core/models/app_config_store.g.dart
-````dart
-// GENERATED CODE - DO NOT MODIFY BY HAND
-
-part of 'app_config_store.dart';
-
-// **************************************************************************
-// JsonSerializableGenerator
-// **************************************************************************
-
-_$ConfigProfileImpl _$$ConfigProfileImplFromJson(Map<String, dynamic> json) =>
-    _$ConfigProfileImpl(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      config: AppConfig.fromJson(json['config'] as Map<String, dynamic>),
-    );
-
-Map<String, dynamic> _$$ConfigProfileImplToJson(_$ConfigProfileImpl instance) =>
-    <String, dynamic>{
-      'id': instance.id,
-      'name': instance.name,
-      'config': instance.config,
-    };
-
-_$AppConfigStoreImpl _$$AppConfigStoreImplFromJson(Map<String, dynamic> json) =>
-    _$AppConfigStoreImpl(
-      activeProfileId: json['activeProfileId'] as String,
-      profiles:
-          (json['profiles'] as List<dynamic>?)
-              ?.map((e) => ConfigProfile.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          const [],
-    );
-
-Map<String, dynamic> _$$AppConfigStoreImplToJson(
-  _$AppConfigStoreImpl instance,
-) => <String, dynamic>{
-  'activeProfileId': instance.activeProfileId,
-  'profiles': instance.profiles,
-};
-````
-
-## File: lib/core/models/app_config.dart
-````dart
-import 'package:freezed_annotation/freezed_annotation.dart';
-import 'model_info.dart';
-
-part 'app_config.freezed.dart';
-part 'app_config.g.dart';
-
-List<ModelInfo>? _modelsFromJson(List<dynamic>? json) =>
-    json?.map((e) => ModelInfo.fromJson(e as Map<String, dynamic>)).toList();
-
-List<Map<String, dynamic>>? _modelsToJson(List<ModelInfo>? models) =>
-    models?.map((e) => e.toJson()).toList();
-
-@freezed
-class AppConfig with _$AppConfig {
-  const factory AppConfig({
-    required String baseUrl,
-    required String apiKey,
-    String? selectedModel,
-    @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
-    List<ModelInfo>? availableModels,
-    @Default('v1/models') String modelsPath,
-    @Default('v1/chat/completions') String chatPath,
-    @Default('chat_completions') String apiMode,
-  }) = _AppConfig;
-
-  factory AppConfig.fromJson(Map<String, dynamic> json) =>
-      _$AppConfigFromJson(json);
-
-  factory AppConfig.defaultConfig() => const AppConfig(
-        baseUrl: 'https://api.openai.com',
-        apiKey: '',
-        modelsPath: 'v1/models',
-        chatPath: 'v1/chat/completions',
-        apiMode: 'chat_completions',
-      );
-}
-````
-
-## File: lib/core/models/app_config.freezed.dart
-````dart
-// coverage:ignore-file
-// GENERATED CODE - DO NOT MODIFY BY HAND
-// ignore_for_file: type=lint
-// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
-
-part of 'app_config.dart';
-
-// **************************************************************************
-// FreezedGenerator
-// **************************************************************************
-
-T _$identity<T>(T value) => value;
-
-final _privateConstructorUsedError = UnsupportedError(
-  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
-);
-
-AppConfig _$AppConfigFromJson(Map<String, dynamic> json) {
-  return _AppConfig.fromJson(json);
-}
-
-/// @nodoc
-mixin _$AppConfig {
-  String get baseUrl => throw _privateConstructorUsedError;
-  String get apiKey => throw _privateConstructorUsedError;
-  String? get selectedModel => throw _privateConstructorUsedError;
-  @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
-  List<ModelInfo>? get availableModels => throw _privateConstructorUsedError;
-  String get modelsPath => throw _privateConstructorUsedError;
-  String get chatPath => throw _privateConstructorUsedError;
-  String get apiMode => throw _privateConstructorUsedError;
-
-  /// Serializes this AppConfig to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-
-  /// Create a copy of AppConfig
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $AppConfigCopyWith<AppConfig> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-abstract class $AppConfigCopyWith<$Res> {
-  factory $AppConfigCopyWith(AppConfig value, $Res Function(AppConfig) then) =
-      _$AppConfigCopyWithImpl<$Res, AppConfig>;
-  @useResult
-  $Res call({
-    String baseUrl,
-    String apiKey,
-    String? selectedModel,
-    @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
-    List<ModelInfo>? availableModels,
-    String modelsPath,
-    String chatPath,
-    String apiMode,
-  });
-}
-
-/// @nodoc
-class _$AppConfigCopyWithImpl<$Res, $Val extends AppConfig>
-    implements $AppConfigCopyWith<$Res> {
-  _$AppConfigCopyWithImpl(this._value, this._then);
-
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-
-  /// Create a copy of AppConfig
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? baseUrl = null,
-    Object? apiKey = null,
-    Object? selectedModel = freezed,
-    Object? availableModels = freezed,
-    Object? modelsPath = null,
-    Object? chatPath = null,
-    Object? apiMode = null,
-  }) {
-    return _then(
-      _value.copyWith(
-            baseUrl: null == baseUrl
-                ? _value.baseUrl
-                : baseUrl // ignore: cast_nullable_to_non_nullable
-                      as String,
-            apiKey: null == apiKey
-                ? _value.apiKey
-                : apiKey // ignore: cast_nullable_to_non_nullable
-                      as String,
-            selectedModel: freezed == selectedModel
-                ? _value.selectedModel
-                : selectedModel // ignore: cast_nullable_to_non_nullable
-                      as String?,
-            availableModels: freezed == availableModels
-                ? _value.availableModels
-                : availableModels // ignore: cast_nullable_to_non_nullable
-                      as List<ModelInfo>?,
-            modelsPath: null == modelsPath
-                ? _value.modelsPath
-                : modelsPath // ignore: cast_nullable_to_non_nullable
-                      as String,
-            chatPath: null == chatPath
-                ? _value.chatPath
-                : chatPath // ignore: cast_nullable_to_non_nullable
-                      as String,
-            apiMode: null == apiMode
-                ? _value.apiMode
-                : apiMode // ignore: cast_nullable_to_non_nullable
-                      as String,
-          )
-          as $Val,
-    );
-  }
-}
-
-/// @nodoc
-abstract class _$$AppConfigImplCopyWith<$Res>
-    implements $AppConfigCopyWith<$Res> {
-  factory _$$AppConfigImplCopyWith(
-    _$AppConfigImpl value,
-    $Res Function(_$AppConfigImpl) then,
-  ) = __$$AppConfigImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({
-    String baseUrl,
-    String apiKey,
-    String? selectedModel,
-    @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
-    List<ModelInfo>? availableModels,
-    String modelsPath,
-    String chatPath,
-    String apiMode,
-  });
-}
-
-/// @nodoc
-class __$$AppConfigImplCopyWithImpl<$Res>
-    extends _$AppConfigCopyWithImpl<$Res, _$AppConfigImpl>
-    implements _$$AppConfigImplCopyWith<$Res> {
-  __$$AppConfigImplCopyWithImpl(
-    _$AppConfigImpl _value,
-    $Res Function(_$AppConfigImpl) _then,
-  ) : super(_value, _then);
-
-  /// Create a copy of AppConfig
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? baseUrl = null,
-    Object? apiKey = null,
-    Object? selectedModel = freezed,
-    Object? availableModels = freezed,
-    Object? modelsPath = null,
-    Object? chatPath = null,
-    Object? apiMode = null,
-  }) {
-    return _then(
-      _$AppConfigImpl(
-        baseUrl: null == baseUrl
-            ? _value.baseUrl
-            : baseUrl // ignore: cast_nullable_to_non_nullable
-                  as String,
-        apiKey: null == apiKey
-            ? _value.apiKey
-            : apiKey // ignore: cast_nullable_to_non_nullable
-                  as String,
-        selectedModel: freezed == selectedModel
-            ? _value.selectedModel
-            : selectedModel // ignore: cast_nullable_to_non_nullable
-                  as String?,
-        availableModels: freezed == availableModels
-            ? _value._availableModels
-            : availableModels // ignore: cast_nullable_to_non_nullable
-                  as List<ModelInfo>?,
-        modelsPath: null == modelsPath
-            ? _value.modelsPath
-            : modelsPath // ignore: cast_nullable_to_non_nullable
-                  as String,
-        chatPath: null == chatPath
-            ? _value.chatPath
-            : chatPath // ignore: cast_nullable_to_non_nullable
-                  as String,
-        apiMode: null == apiMode
-            ? _value.apiMode
-            : apiMode // ignore: cast_nullable_to_non_nullable
-                  as String,
-      ),
-    );
-  }
-}
-
-/// @nodoc
-@JsonSerializable()
-class _$AppConfigImpl implements _AppConfig {
-  const _$AppConfigImpl({
-    required this.baseUrl,
-    required this.apiKey,
-    this.selectedModel,
-    @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
-    final List<ModelInfo>? availableModels,
-    this.modelsPath = 'v1/models',
-    this.chatPath = 'v1/chat/completions',
-    this.apiMode = 'chat_completions',
-  }) : _availableModels = availableModels;
-
-  factory _$AppConfigImpl.fromJson(Map<String, dynamic> json) =>
-      _$$AppConfigImplFromJson(json);
-
-  @override
-  final String baseUrl;
-  @override
-  final String apiKey;
-  @override
-  final String? selectedModel;
-  final List<ModelInfo>? _availableModels;
-  @override
-  @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
-  List<ModelInfo>? get availableModels {
-    final value = _availableModels;
-    if (value == null) return null;
-    if (_availableModels is EqualUnmodifiableListView) return _availableModels;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableListView(value);
-  }
-
-  @override
-  @JsonKey()
-  final String modelsPath;
-  @override
-  @JsonKey()
-  final String chatPath;
-  @override
-  @JsonKey()
-  final String apiMode;
-
-  @override
-  String toString() {
-    return 'AppConfig(baseUrl: $baseUrl, apiKey: $apiKey, selectedModel: $selectedModel, availableModels: $availableModels, modelsPath: $modelsPath, chatPath: $chatPath, apiMode: $apiMode)';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$AppConfigImpl &&
-            (identical(other.baseUrl, baseUrl) || other.baseUrl == baseUrl) &&
-            (identical(other.apiKey, apiKey) || other.apiKey == apiKey) &&
-            (identical(other.selectedModel, selectedModel) ||
-                other.selectedModel == selectedModel) &&
-            const DeepCollectionEquality().equals(
-              other._availableModels,
-              _availableModels,
-            ) &&
-            (identical(other.modelsPath, modelsPath) ||
-                other.modelsPath == modelsPath) &&
-            (identical(other.chatPath, chatPath) ||
-                other.chatPath == chatPath) &&
-            (identical(other.apiMode, apiMode) || other.apiMode == apiMode));
-  }
-
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  int get hashCode => Object.hash(
-    runtimeType,
-    baseUrl,
-    apiKey,
-    selectedModel,
-    const DeepCollectionEquality().hash(_availableModels),
-    modelsPath,
-    chatPath,
-    apiMode,
-  );
-
-  /// Create a copy of AppConfig
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$AppConfigImplCopyWith<_$AppConfigImpl> get copyWith =>
-      __$$AppConfigImplCopyWithImpl<_$AppConfigImpl>(this, _$identity);
-
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$AppConfigImplToJson(this);
-  }
-}
-
-abstract class _AppConfig implements AppConfig {
-  const factory _AppConfig({
-    required final String baseUrl,
-    required final String apiKey,
-    final String? selectedModel,
-    @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
-    final List<ModelInfo>? availableModels,
-    final String modelsPath,
-    final String chatPath,
-    final String apiMode,
-  }) = _$AppConfigImpl;
-
-  factory _AppConfig.fromJson(Map<String, dynamic> json) =
-      _$AppConfigImpl.fromJson;
-
-  @override
-  String get baseUrl;
-  @override
-  String get apiKey;
-  @override
-  String? get selectedModel;
-  @override
-  @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
-  List<ModelInfo>? get availableModels;
-  @override
-  String get modelsPath;
-  @override
-  String get chatPath;
-  @override
-  String get apiMode;
-
-  /// Create a copy of AppConfig
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$AppConfigImplCopyWith<_$AppConfigImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-````
-
-## File: lib/core/models/app_config.g.dart
-````dart
-// GENERATED CODE - DO NOT MODIFY BY HAND
-
-part of 'app_config.dart';
-
-// **************************************************************************
-// JsonSerializableGenerator
-// **************************************************************************
-
-_$AppConfigImpl _$$AppConfigImplFromJson(Map<String, dynamic> json) =>
-    _$AppConfigImpl(
-      baseUrl: json['baseUrl'] as String,
-      apiKey: json['apiKey'] as String,
-      selectedModel: json['selectedModel'] as String?,
-      availableModels: _modelsFromJson(json['availableModels'] as List?),
-      modelsPath: json['modelsPath'] as String? ?? 'v1/models',
-      chatPath: json['chatPath'] as String? ?? 'v1/chat/completions',
-      apiMode: json['apiMode'] as String? ?? 'chat_completions',
-    );
-
-Map<String, dynamic> _$$AppConfigImplToJson(_$AppConfigImpl instance) =>
-    <String, dynamic>{
-      'baseUrl': instance.baseUrl,
-      'apiKey': instance.apiKey,
-      'selectedModel': instance.selectedModel,
-      'availableModels': _modelsToJson(instance.availableModels),
-      'modelsPath': instance.modelsPath,
-      'chatPath': instance.chatPath,
-      'apiMode': instance.apiMode,
     };
 ````
 
@@ -3190,6 +2287,574 @@ class PendingAttachment {
 }
 ````
 
+## File: lib/core/models/app_config.dart
+````dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+import 'model_info.dart';
+
+part 'app_config.freezed.dart';
+
+/// 配置档案（单个配置集）
+@freezed
+class ConfigProfile with _$ConfigProfile {
+  const factory ConfigProfile({
+    required String id,
+    required String name,
+    required String baseUrl,
+    required String apiKey,
+    String? selectedModel,
+    @Default('v1/models') String modelsPath,
+    @Default('v1/chat/completions') String chatPath,
+    @Default('chat_completions') String apiMode,
+    @Default([]) List<ModelInfo> availableModels,
+  }) = _ConfigProfile;
+
+  /// 默认配置档案（id = 'default'）
+  factory ConfigProfile.defaultProfile() => const ConfigProfile(
+        id: 'default',
+        name: '默认配置',
+        baseUrl: 'https://api.openai.com',
+        apiKey: '',
+        selectedModel: null,
+        modelsPath: 'v1/models',
+        chatPath: 'v1/chat/completions',
+        apiMode: 'chat_completions',
+        availableModels: [],
+      );
+}
+
+/// 全局设置（多档案 + 当前激活的档案ID）
+@freezed
+class GlobalSettings with _$GlobalSettings {
+  const factory GlobalSettings({
+    required String activeProfileId,
+    @Default([]) List<ConfigProfile> profiles,
+  }) = _GlobalSettings;
+
+  /// 默认全局设置（使用默认配置档案）
+  factory GlobalSettings.defaultSettings() => GlobalSettings(
+        activeProfileId: 'default',
+        profiles: [ConfigProfile.defaultProfile()],
+      );
+}
+````
+
+## File: lib/core/models/app_config.freezed.dart
+````dart
+// coverage:ignore-file
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint
+// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
+
+part of 'app_config.dart';
+
+// **************************************************************************
+// FreezedGenerator
+// **************************************************************************
+
+T _$identity<T>(T value) => value;
+
+final _privateConstructorUsedError = UnsupportedError(
+  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
+);
+
+/// @nodoc
+mixin _$ConfigProfile {
+  String get id => throw _privateConstructorUsedError;
+  String get name => throw _privateConstructorUsedError;
+  String get baseUrl => throw _privateConstructorUsedError;
+  String get apiKey => throw _privateConstructorUsedError;
+  String? get selectedModel => throw _privateConstructorUsedError;
+  String get modelsPath => throw _privateConstructorUsedError;
+  String get chatPath => throw _privateConstructorUsedError;
+  String get apiMode => throw _privateConstructorUsedError;
+  List<ModelInfo> get availableModels => throw _privateConstructorUsedError;
+
+  /// Create a copy of ConfigProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $ConfigProfileCopyWith<ConfigProfile> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $ConfigProfileCopyWith<$Res> {
+  factory $ConfigProfileCopyWith(
+    ConfigProfile value,
+    $Res Function(ConfigProfile) then,
+  ) = _$ConfigProfileCopyWithImpl<$Res, ConfigProfile>;
+  @useResult
+  $Res call({
+    String id,
+    String name,
+    String baseUrl,
+    String apiKey,
+    String? selectedModel,
+    String modelsPath,
+    String chatPath,
+    String apiMode,
+    List<ModelInfo> availableModels,
+  });
+}
+
+/// @nodoc
+class _$ConfigProfileCopyWithImpl<$Res, $Val extends ConfigProfile>
+    implements $ConfigProfileCopyWith<$Res> {
+  _$ConfigProfileCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of ConfigProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? name = null,
+    Object? baseUrl = null,
+    Object? apiKey = null,
+    Object? selectedModel = freezed,
+    Object? modelsPath = null,
+    Object? chatPath = null,
+    Object? apiMode = null,
+    Object? availableModels = null,
+  }) {
+    return _then(
+      _value.copyWith(
+            id: null == id
+                ? _value.id
+                : id // ignore: cast_nullable_to_non_nullable
+                      as String,
+            name: null == name
+                ? _value.name
+                : name // ignore: cast_nullable_to_non_nullable
+                      as String,
+            baseUrl: null == baseUrl
+                ? _value.baseUrl
+                : baseUrl // ignore: cast_nullable_to_non_nullable
+                      as String,
+            apiKey: null == apiKey
+                ? _value.apiKey
+                : apiKey // ignore: cast_nullable_to_non_nullable
+                      as String,
+            selectedModel: freezed == selectedModel
+                ? _value.selectedModel
+                : selectedModel // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            modelsPath: null == modelsPath
+                ? _value.modelsPath
+                : modelsPath // ignore: cast_nullable_to_non_nullable
+                      as String,
+            chatPath: null == chatPath
+                ? _value.chatPath
+                : chatPath // ignore: cast_nullable_to_non_nullable
+                      as String,
+            apiMode: null == apiMode
+                ? _value.apiMode
+                : apiMode // ignore: cast_nullable_to_non_nullable
+                      as String,
+            availableModels: null == availableModels
+                ? _value.availableModels
+                : availableModels // ignore: cast_nullable_to_non_nullable
+                      as List<ModelInfo>,
+          )
+          as $Val,
+    );
+  }
+}
+
+/// @nodoc
+abstract class _$$ConfigProfileImplCopyWith<$Res>
+    implements $ConfigProfileCopyWith<$Res> {
+  factory _$$ConfigProfileImplCopyWith(
+    _$ConfigProfileImpl value,
+    $Res Function(_$ConfigProfileImpl) then,
+  ) = __$$ConfigProfileImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({
+    String id,
+    String name,
+    String baseUrl,
+    String apiKey,
+    String? selectedModel,
+    String modelsPath,
+    String chatPath,
+    String apiMode,
+    List<ModelInfo> availableModels,
+  });
+}
+
+/// @nodoc
+class __$$ConfigProfileImplCopyWithImpl<$Res>
+    extends _$ConfigProfileCopyWithImpl<$Res, _$ConfigProfileImpl>
+    implements _$$ConfigProfileImplCopyWith<$Res> {
+  __$$ConfigProfileImplCopyWithImpl(
+    _$ConfigProfileImpl _value,
+    $Res Function(_$ConfigProfileImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of ConfigProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? name = null,
+    Object? baseUrl = null,
+    Object? apiKey = null,
+    Object? selectedModel = freezed,
+    Object? modelsPath = null,
+    Object? chatPath = null,
+    Object? apiMode = null,
+    Object? availableModels = null,
+  }) {
+    return _then(
+      _$ConfigProfileImpl(
+        id: null == id
+            ? _value.id
+            : id // ignore: cast_nullable_to_non_nullable
+                  as String,
+        name: null == name
+            ? _value.name
+            : name // ignore: cast_nullable_to_non_nullable
+                  as String,
+        baseUrl: null == baseUrl
+            ? _value.baseUrl
+            : baseUrl // ignore: cast_nullable_to_non_nullable
+                  as String,
+        apiKey: null == apiKey
+            ? _value.apiKey
+            : apiKey // ignore: cast_nullable_to_non_nullable
+                  as String,
+        selectedModel: freezed == selectedModel
+            ? _value.selectedModel
+            : selectedModel // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        modelsPath: null == modelsPath
+            ? _value.modelsPath
+            : modelsPath // ignore: cast_nullable_to_non_nullable
+                  as String,
+        chatPath: null == chatPath
+            ? _value.chatPath
+            : chatPath // ignore: cast_nullable_to_non_nullable
+                  as String,
+        apiMode: null == apiMode
+            ? _value.apiMode
+            : apiMode // ignore: cast_nullable_to_non_nullable
+                  as String,
+        availableModels: null == availableModels
+            ? _value._availableModels
+            : availableModels // ignore: cast_nullable_to_non_nullable
+                  as List<ModelInfo>,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+
+class _$ConfigProfileImpl implements _ConfigProfile {
+  const _$ConfigProfileImpl({
+    required this.id,
+    required this.name,
+    required this.baseUrl,
+    required this.apiKey,
+    this.selectedModel,
+    this.modelsPath = 'v1/models',
+    this.chatPath = 'v1/chat/completions',
+    this.apiMode = 'chat_completions',
+    final List<ModelInfo> availableModels = const [],
+  }) : _availableModels = availableModels;
+
+  @override
+  final String id;
+  @override
+  final String name;
+  @override
+  final String baseUrl;
+  @override
+  final String apiKey;
+  @override
+  final String? selectedModel;
+  @override
+  @JsonKey()
+  final String modelsPath;
+  @override
+  @JsonKey()
+  final String chatPath;
+  @override
+  @JsonKey()
+  final String apiMode;
+  final List<ModelInfo> _availableModels;
+  @override
+  @JsonKey()
+  List<ModelInfo> get availableModels {
+    if (_availableModels is EqualUnmodifiableListView) return _availableModels;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_availableModels);
+  }
+
+  @override
+  String toString() {
+    return 'ConfigProfile(id: $id, name: $name, baseUrl: $baseUrl, apiKey: $apiKey, selectedModel: $selectedModel, modelsPath: $modelsPath, chatPath: $chatPath, apiMode: $apiMode, availableModels: $availableModels)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$ConfigProfileImpl &&
+            (identical(other.id, id) || other.id == id) &&
+            (identical(other.name, name) || other.name == name) &&
+            (identical(other.baseUrl, baseUrl) || other.baseUrl == baseUrl) &&
+            (identical(other.apiKey, apiKey) || other.apiKey == apiKey) &&
+            (identical(other.selectedModel, selectedModel) ||
+                other.selectedModel == selectedModel) &&
+            (identical(other.modelsPath, modelsPath) ||
+                other.modelsPath == modelsPath) &&
+            (identical(other.chatPath, chatPath) ||
+                other.chatPath == chatPath) &&
+            (identical(other.apiMode, apiMode) || other.apiMode == apiMode) &&
+            const DeepCollectionEquality().equals(
+              other._availableModels,
+              _availableModels,
+            ));
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    runtimeType,
+    id,
+    name,
+    baseUrl,
+    apiKey,
+    selectedModel,
+    modelsPath,
+    chatPath,
+    apiMode,
+    const DeepCollectionEquality().hash(_availableModels),
+  );
+
+  /// Create a copy of ConfigProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$ConfigProfileImplCopyWith<_$ConfigProfileImpl> get copyWith =>
+      __$$ConfigProfileImplCopyWithImpl<_$ConfigProfileImpl>(this, _$identity);
+}
+
+abstract class _ConfigProfile implements ConfigProfile {
+  const factory _ConfigProfile({
+    required final String id,
+    required final String name,
+    required final String baseUrl,
+    required final String apiKey,
+    final String? selectedModel,
+    final String modelsPath,
+    final String chatPath,
+    final String apiMode,
+    final List<ModelInfo> availableModels,
+  }) = _$ConfigProfileImpl;
+
+  @override
+  String get id;
+  @override
+  String get name;
+  @override
+  String get baseUrl;
+  @override
+  String get apiKey;
+  @override
+  String? get selectedModel;
+  @override
+  String get modelsPath;
+  @override
+  String get chatPath;
+  @override
+  String get apiMode;
+  @override
+  List<ModelInfo> get availableModels;
+
+  /// Create a copy of ConfigProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$ConfigProfileImplCopyWith<_$ConfigProfileImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+mixin _$GlobalSettings {
+  String get activeProfileId => throw _privateConstructorUsedError;
+  List<ConfigProfile> get profiles => throw _privateConstructorUsedError;
+
+  /// Create a copy of GlobalSettings
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $GlobalSettingsCopyWith<GlobalSettings> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $GlobalSettingsCopyWith<$Res> {
+  factory $GlobalSettingsCopyWith(
+    GlobalSettings value,
+    $Res Function(GlobalSettings) then,
+  ) = _$GlobalSettingsCopyWithImpl<$Res, GlobalSettings>;
+  @useResult
+  $Res call({String activeProfileId, List<ConfigProfile> profiles});
+}
+
+/// @nodoc
+class _$GlobalSettingsCopyWithImpl<$Res, $Val extends GlobalSettings>
+    implements $GlobalSettingsCopyWith<$Res> {
+  _$GlobalSettingsCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of GlobalSettings
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? activeProfileId = null, Object? profiles = null}) {
+    return _then(
+      _value.copyWith(
+            activeProfileId: null == activeProfileId
+                ? _value.activeProfileId
+                : activeProfileId // ignore: cast_nullable_to_non_nullable
+                      as String,
+            profiles: null == profiles
+                ? _value.profiles
+                : profiles // ignore: cast_nullable_to_non_nullable
+                      as List<ConfigProfile>,
+          )
+          as $Val,
+    );
+  }
+}
+
+/// @nodoc
+abstract class _$$GlobalSettingsImplCopyWith<$Res>
+    implements $GlobalSettingsCopyWith<$Res> {
+  factory _$$GlobalSettingsImplCopyWith(
+    _$GlobalSettingsImpl value,
+    $Res Function(_$GlobalSettingsImpl) then,
+  ) = __$$GlobalSettingsImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({String activeProfileId, List<ConfigProfile> profiles});
+}
+
+/// @nodoc
+class __$$GlobalSettingsImplCopyWithImpl<$Res>
+    extends _$GlobalSettingsCopyWithImpl<$Res, _$GlobalSettingsImpl>
+    implements _$$GlobalSettingsImplCopyWith<$Res> {
+  __$$GlobalSettingsImplCopyWithImpl(
+    _$GlobalSettingsImpl _value,
+    $Res Function(_$GlobalSettingsImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of GlobalSettings
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? activeProfileId = null, Object? profiles = null}) {
+    return _then(
+      _$GlobalSettingsImpl(
+        activeProfileId: null == activeProfileId
+            ? _value.activeProfileId
+            : activeProfileId // ignore: cast_nullable_to_non_nullable
+                  as String,
+        profiles: null == profiles
+            ? _value._profiles
+            : profiles // ignore: cast_nullable_to_non_nullable
+                  as List<ConfigProfile>,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+
+class _$GlobalSettingsImpl implements _GlobalSettings {
+  const _$GlobalSettingsImpl({
+    required this.activeProfileId,
+    final List<ConfigProfile> profiles = const [],
+  }) : _profiles = profiles;
+
+  @override
+  final String activeProfileId;
+  final List<ConfigProfile> _profiles;
+  @override
+  @JsonKey()
+  List<ConfigProfile> get profiles {
+    if (_profiles is EqualUnmodifiableListView) return _profiles;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_profiles);
+  }
+
+  @override
+  String toString() {
+    return 'GlobalSettings(activeProfileId: $activeProfileId, profiles: $profiles)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$GlobalSettingsImpl &&
+            (identical(other.activeProfileId, activeProfileId) ||
+                other.activeProfileId == activeProfileId) &&
+            const DeepCollectionEquality().equals(other._profiles, _profiles));
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    runtimeType,
+    activeProfileId,
+    const DeepCollectionEquality().hash(_profiles),
+  );
+
+  /// Create a copy of GlobalSettings
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$GlobalSettingsImplCopyWith<_$GlobalSettingsImpl> get copyWith =>
+      __$$GlobalSettingsImplCopyWithImpl<_$GlobalSettingsImpl>(
+        this,
+        _$identity,
+      );
+}
+
+abstract class _GlobalSettings implements GlobalSettings {
+  const factory _GlobalSettings({
+    required final String activeProfileId,
+    final List<ConfigProfile> profiles,
+  }) = _$GlobalSettingsImpl;
+
+  @override
+  String get activeProfileId;
+  @override
+  List<ConfigProfile> get profiles;
+
+  /// Create a copy of GlobalSettings
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$GlobalSettingsImplCopyWith<_$GlobalSettingsImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+````
+
 ## File: lib/core/models/sse_event.dart
 ````dart
 // 保持你原有SseEvent的非空约定，避免修改下游Decoder
@@ -3209,6 +2874,7 @@ class SseEvent {
 ## File: lib/data/data_sources/api_builders/api_request_builder.dart
 ````dart
 import '../../../core/models/api_message.dart';
+import '../../../core/models/app_config.dart';  // 引入 ConfigProfile
 import '../../../core/models/model_info.dart';
 
 class ApiUriUtils {
@@ -3221,38 +2887,24 @@ class ApiUriUtils {
 
 /// 构建请求所需的上下文
 class ApiBuildContext {
+  final ConfigProfile config;   // 整体配置档案
   final String model;
   final List<ApiMessage> context;
   final bool enableReasoning;
-  final String apiKey;
-  final String baseUrl;
-  final String chatPath;
-  final String modelsPath;
 
   ApiBuildContext({
+    required this.config,
     required this.model,
     required this.context,
     required this.enableReasoning,
-    required this.apiKey,
-    required this.baseUrl,
-    required this.chatPath,
-    required this.modelsPath,
   });
 }
 
-/// API 请求构建器接口
 abstract class ApiRequestBuilder {
-  /// 构建请求 Headers
   Map<String, String> buildHeaders(ApiBuildContext ctx);
-
-  /// 构建请求 URI
   Uri buildUri(ApiBuildContext ctx);
   Uri buildModelsUri(ApiBuildContext ctx);
-  
-  /// 构建请求 Body
   Map<String, dynamic> buildRequestBody(ApiBuildContext ctx);
-
-  /// 解析模型列表响应
   List<ModelInfo> parseModelsResponse(Map<String, dynamic> json);
 }
 ````
@@ -3274,7 +2926,7 @@ class ChatSourceRouter {
     return apiMode == 'local' ? local : remote;
   }
   
-  ChatSource getSourceFromConfig(AppConfig config) {
+  ChatSource getSourceFromConfig(ConfigProfile config) {
     return getSource(config.apiMode);
   }
 }
@@ -3288,9 +2940,9 @@ import '../../core/models/chat_chunk.dart';
 import '../../core/models/model_info.dart';
 
 abstract class ChatSource {
-  Future<List<ModelInfo>> fetchModels(AppConfig config);
+  Future<List<ModelInfo>> fetchModels(ConfigProfile config);
   Stream<ChatChunk> chatStream({
-    required AppConfig config,
+    required ConfigProfile config,
     required List<ApiMessage> context,
   });
 }
@@ -3312,13 +2964,13 @@ class LocalChatSource implements ChatSource {
   static bool _isLoaded = false;
 
   @override
-  Future<List<ModelInfo>> fetchModels(AppConfig config) async {
+  Future<List<ModelInfo>> fetchModels(ConfigProfile config) async {
     return []; 
   }
 
   @override
   Stream<ChatChunk> chatStream({
-    required AppConfig config,
+    required ConfigProfile config,
     required List<ApiMessage> context,
   }) async* {
     final modelPath = config.selectedModel?.trim() ?? '';
@@ -3566,113 +3218,6 @@ class SseEventDecoder {
       return error.toString();
     }
     return error.toString();
-  }
-}
-````
-
-## File: lib/data/repositories/config_repository.dart
-````dart
-import 'package:drift/drift.dart';
-import '../database/database.dart';
-import '../../core/models/app_config.dart';
-import '../../core/models/app_config_store.dart';
-
-class ConfigRepository {
-  final AppDatabase _db;
-
-  ConfigRepository(this._db);
-
-  /// 获取所有配置档案列表
-  Future<List<ConfigProfile>> getProfiles() async {
-    final rows = await _db.select(_db.dbConfigProfiles).get();
-    return rows.map((p) => ConfigProfile(
-      id: p.id,
-      name: p.name,
-      config: p.config,
-    )).toList();
-  }
-
-  /// 获取当前激活的配置档案 ID
-  Future<String> getActiveProfileId() async {
-    final row = await _db.select(_db.dbConfigStore).getSingle();
-    return row.activeProfileId;
-  }
-
-  /// 设置激活的配置档案 ID
-  Future<void> setActiveProfileId(String profileId) async {
-    await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
-      DbConfigStoreCompanion(
-        id: const Value(1),
-        activeProfileId: Value(profileId),
-      ),
-    );
-  }
-
-  /// 插入默认配置存档（初始化时使用）
-  Future<void> insertDefaultStore(AppConfigStore defaultStore) async {
-    await _db.transaction(() async {
-      for (final profile in defaultStore.profiles) {
-        await _db.into(_db.dbConfigProfiles).insert(
-          DbConfigProfilesCompanion.insert(
-            id: profile.id,
-            name: profile.name,
-            config: profile.config,
-          ),
-        );
-      }
-      await _db.into(_db.dbConfigStore).insert(
-        DbConfigStoreCompanion.insert(
-          id: const Value(1),
-          activeProfileId: defaultStore.activeProfileId,
-        ),
-      );
-    });
-  }
-
-  /// 更新指定配置档案的配置内容
-  Future<void> updateProfileConfig(String profileId, AppConfig config) async {
-    await (_db.update(_db.dbConfigProfiles)
-          ..where((t) => t.id.equals(profileId)))
-        .write(DbConfigProfilesCompanion(config: Value(config)));
-  }
-
-  /// 创建新的配置档案
-  Future<void> createProfile(String id, String name, AppConfig config) async {
-    await _db.into(_db.dbConfigProfiles).insert(
-      DbConfigProfilesCompanion.insert(
-        id: id,
-        name: name,
-        config: config,
-      ),
-    );
-  }
-
-  /// 重命名配置档案
-  Future<void> renameProfile(String profileId, String newName) async {
-    await (_db.update(_db.dbConfigProfiles)
-          ..where((t) => t.id.equals(profileId)))
-        .write(DbConfigProfilesCompanion(name: Value(newName)));
-  }
-
-  /// 删除配置档案
-  Future<void> deleteProfile(String profileId) async {
-    await (_db.delete(_db.dbConfigProfiles)
-          ..where((t) => t.id.equals(profileId)))
-        .go();
-  }
-
-  /// 监听配置档案列表的变化（用于响应式）
-  Stream<List<ConfigProfile>> watchProfiles() {
-    return _db.select(_db.dbConfigProfiles).watch().map((rows) => rows.map((p) => ConfigProfile(
-      id: p.id,
-      name: p.name,
-      config: p.config,
-    )).toList());
-  }
-
-  /// 监听激活的配置档案 ID 的变化
-  Stream<String?> watchActiveProfileId() {
-    return _db.select(_db.dbConfigStore).watchSingleOrNull().map((row) => row?.activeProfileId);
   }
 }
 ````
@@ -5662,26 +5207,11 @@ class Session with _$Session {
   const factory Session({
     required String id,
     required String title,
-    required int createdAt,
     required int updatedAt,
     required List<ChatRound> rounds,
-    SessionConfig? config,
-    @Default(false) bool hasUnseenUpdate,
   }) = _Session;
 
   factory Session.fromJson(Map<String, dynamic> json) => _$SessionFromJson(json);
-}
-
-@freezed
-class SessionConfig with _$SessionConfig {
-  const factory SessionConfig({
-    String? model,
-    double? temperature,
-    bool? enableReasoning,
-  }) = _SessionConfig;
-
-  factory SessionConfig.fromJson(Map<String, dynamic> json) =>
-      _$SessionConfigFromJson(json);
 }
 ````
 
@@ -5712,11 +5242,8 @@ Session _$SessionFromJson(Map<String, dynamic> json) {
 mixin _$Session {
   String get id => throw _privateConstructorUsedError;
   String get title => throw _privateConstructorUsedError;
-  int get createdAt => throw _privateConstructorUsedError;
   int get updatedAt => throw _privateConstructorUsedError;
   List<ChatRound> get rounds => throw _privateConstructorUsedError;
-  SessionConfig? get config => throw _privateConstructorUsedError;
-  bool get hasUnseenUpdate => throw _privateConstructorUsedError;
 
   /// Serializes this Session to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -5732,17 +5259,7 @@ abstract class $SessionCopyWith<$Res> {
   factory $SessionCopyWith(Session value, $Res Function(Session) then) =
       _$SessionCopyWithImpl<$Res, Session>;
   @useResult
-  $Res call({
-    String id,
-    String title,
-    int createdAt,
-    int updatedAt,
-    List<ChatRound> rounds,
-    SessionConfig? config,
-    bool hasUnseenUpdate,
-  });
-
-  $SessionConfigCopyWith<$Res>? get config;
+  $Res call({String id, String title, int updatedAt, List<ChatRound> rounds});
 }
 
 /// @nodoc
@@ -5762,11 +5279,8 @@ class _$SessionCopyWithImpl<$Res, $Val extends Session>
   $Res call({
     Object? id = null,
     Object? title = null,
-    Object? createdAt = null,
     Object? updatedAt = null,
     Object? rounds = null,
-    Object? config = freezed,
-    Object? hasUnseenUpdate = null,
   }) {
     return _then(
       _value.copyWith(
@@ -5778,10 +5292,6 @@ class _$SessionCopyWithImpl<$Res, $Val extends Session>
                 ? _value.title
                 : title // ignore: cast_nullable_to_non_nullable
                       as String,
-            createdAt: null == createdAt
-                ? _value.createdAt
-                : createdAt // ignore: cast_nullable_to_non_nullable
-                      as int,
             updatedAt: null == updatedAt
                 ? _value.updatedAt
                 : updatedAt // ignore: cast_nullable_to_non_nullable
@@ -5790,31 +5300,9 @@ class _$SessionCopyWithImpl<$Res, $Val extends Session>
                 ? _value.rounds
                 : rounds // ignore: cast_nullable_to_non_nullable
                       as List<ChatRound>,
-            config: freezed == config
-                ? _value.config
-                : config // ignore: cast_nullable_to_non_nullable
-                      as SessionConfig?,
-            hasUnseenUpdate: null == hasUnseenUpdate
-                ? _value.hasUnseenUpdate
-                : hasUnseenUpdate // ignore: cast_nullable_to_non_nullable
-                      as bool,
           )
           as $Val,
     );
-  }
-
-  /// Create a copy of Session
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @pragma('vm:prefer-inline')
-  $SessionConfigCopyWith<$Res>? get config {
-    if (_value.config == null) {
-      return null;
-    }
-
-    return $SessionConfigCopyWith<$Res>(_value.config!, (value) {
-      return _then(_value.copyWith(config: value) as $Val);
-    });
   }
 }
 
@@ -5826,18 +5314,7 @@ abstract class _$$SessionImplCopyWith<$Res> implements $SessionCopyWith<$Res> {
   ) = __$$SessionImplCopyWithImpl<$Res>;
   @override
   @useResult
-  $Res call({
-    String id,
-    String title,
-    int createdAt,
-    int updatedAt,
-    List<ChatRound> rounds,
-    SessionConfig? config,
-    bool hasUnseenUpdate,
-  });
-
-  @override
-  $SessionConfigCopyWith<$Res>? get config;
+  $Res call({String id, String title, int updatedAt, List<ChatRound> rounds});
 }
 
 /// @nodoc
@@ -5856,11 +5333,8 @@ class __$$SessionImplCopyWithImpl<$Res>
   $Res call({
     Object? id = null,
     Object? title = null,
-    Object? createdAt = null,
     Object? updatedAt = null,
     Object? rounds = null,
-    Object? config = freezed,
-    Object? hasUnseenUpdate = null,
   }) {
     return _then(
       _$SessionImpl(
@@ -5872,10 +5346,6 @@ class __$$SessionImplCopyWithImpl<$Res>
             ? _value.title
             : title // ignore: cast_nullable_to_non_nullable
                   as String,
-        createdAt: null == createdAt
-            ? _value.createdAt
-            : createdAt // ignore: cast_nullable_to_non_nullable
-                  as int,
         updatedAt: null == updatedAt
             ? _value.updatedAt
             : updatedAt // ignore: cast_nullable_to_non_nullable
@@ -5884,14 +5354,6 @@ class __$$SessionImplCopyWithImpl<$Res>
             ? _value._rounds
             : rounds // ignore: cast_nullable_to_non_nullable
                   as List<ChatRound>,
-        config: freezed == config
-            ? _value.config
-            : config // ignore: cast_nullable_to_non_nullable
-                  as SessionConfig?,
-        hasUnseenUpdate: null == hasUnseenUpdate
-            ? _value.hasUnseenUpdate
-            : hasUnseenUpdate // ignore: cast_nullable_to_non_nullable
-                  as bool,
       ),
     );
   }
@@ -5903,11 +5365,8 @@ class _$SessionImpl implements _Session {
   const _$SessionImpl({
     required this.id,
     required this.title,
-    required this.createdAt,
     required this.updatedAt,
     required final List<ChatRound> rounds,
-    this.config,
-    this.hasUnseenUpdate = false,
   }) : _rounds = rounds;
 
   factory _$SessionImpl.fromJson(Map<String, dynamic> json) =>
@@ -5917,8 +5376,6 @@ class _$SessionImpl implements _Session {
   final String id;
   @override
   final String title;
-  @override
-  final int createdAt;
   @override
   final int updatedAt;
   final List<ChatRound> _rounds;
@@ -5930,14 +5387,8 @@ class _$SessionImpl implements _Session {
   }
 
   @override
-  final SessionConfig? config;
-  @override
-  @JsonKey()
-  final bool hasUnseenUpdate;
-
-  @override
   String toString() {
-    return 'Session(id: $id, title: $title, createdAt: $createdAt, updatedAt: $updatedAt, rounds: $rounds, config: $config, hasUnseenUpdate: $hasUnseenUpdate)';
+    return 'Session(id: $id, title: $title, updatedAt: $updatedAt, rounds: $rounds)';
   }
 
   @override
@@ -5947,14 +5398,9 @@ class _$SessionImpl implements _Session {
             other is _$SessionImpl &&
             (identical(other.id, id) || other.id == id) &&
             (identical(other.title, title) || other.title == title) &&
-            (identical(other.createdAt, createdAt) ||
-                other.createdAt == createdAt) &&
             (identical(other.updatedAt, updatedAt) ||
                 other.updatedAt == updatedAt) &&
-            const DeepCollectionEquality().equals(other._rounds, _rounds) &&
-            (identical(other.config, config) || other.config == config) &&
-            (identical(other.hasUnseenUpdate, hasUnseenUpdate) ||
-                other.hasUnseenUpdate == hasUnseenUpdate));
+            const DeepCollectionEquality().equals(other._rounds, _rounds));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -5963,11 +5409,8 @@ class _$SessionImpl implements _Session {
     runtimeType,
     id,
     title,
-    createdAt,
     updatedAt,
     const DeepCollectionEquality().hash(_rounds),
-    config,
-    hasUnseenUpdate,
   );
 
   /// Create a copy of Session
@@ -5988,11 +5431,8 @@ abstract class _Session implements Session {
   const factory _Session({
     required final String id,
     required final String title,
-    required final int createdAt,
     required final int updatedAt,
     required final List<ChatRound> rounds,
-    final SessionConfig? config,
-    final bool hasUnseenUpdate,
   }) = _$SessionImpl;
 
   factory _Session.fromJson(Map<String, dynamic> json) = _$SessionImpl.fromJson;
@@ -6002,219 +5442,15 @@ abstract class _Session implements Session {
   @override
   String get title;
   @override
-  int get createdAt;
-  @override
   int get updatedAt;
   @override
   List<ChatRound> get rounds;
-  @override
-  SessionConfig? get config;
-  @override
-  bool get hasUnseenUpdate;
 
   /// Create a copy of Session
   /// with the given fields replaced by the non-null parameter values.
   @override
   @JsonKey(includeFromJson: false, includeToJson: false)
   _$$SessionImplCopyWith<_$SessionImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-SessionConfig _$SessionConfigFromJson(Map<String, dynamic> json) {
-  return _SessionConfig.fromJson(json);
-}
-
-/// @nodoc
-mixin _$SessionConfig {
-  String? get model => throw _privateConstructorUsedError;
-  double? get temperature => throw _privateConstructorUsedError;
-  bool? get enableReasoning => throw _privateConstructorUsedError;
-
-  /// Serializes this SessionConfig to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-
-  /// Create a copy of SessionConfig
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $SessionConfigCopyWith<SessionConfig> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-abstract class $SessionConfigCopyWith<$Res> {
-  factory $SessionConfigCopyWith(
-    SessionConfig value,
-    $Res Function(SessionConfig) then,
-  ) = _$SessionConfigCopyWithImpl<$Res, SessionConfig>;
-  @useResult
-  $Res call({String? model, double? temperature, bool? enableReasoning});
-}
-
-/// @nodoc
-class _$SessionConfigCopyWithImpl<$Res, $Val extends SessionConfig>
-    implements $SessionConfigCopyWith<$Res> {
-  _$SessionConfigCopyWithImpl(this._value, this._then);
-
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-
-  /// Create a copy of SessionConfig
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? model = freezed,
-    Object? temperature = freezed,
-    Object? enableReasoning = freezed,
-  }) {
-    return _then(
-      _value.copyWith(
-            model: freezed == model
-                ? _value.model
-                : model // ignore: cast_nullable_to_non_nullable
-                      as String?,
-            temperature: freezed == temperature
-                ? _value.temperature
-                : temperature // ignore: cast_nullable_to_non_nullable
-                      as double?,
-            enableReasoning: freezed == enableReasoning
-                ? _value.enableReasoning
-                : enableReasoning // ignore: cast_nullable_to_non_nullable
-                      as bool?,
-          )
-          as $Val,
-    );
-  }
-}
-
-/// @nodoc
-abstract class _$$SessionConfigImplCopyWith<$Res>
-    implements $SessionConfigCopyWith<$Res> {
-  factory _$$SessionConfigImplCopyWith(
-    _$SessionConfigImpl value,
-    $Res Function(_$SessionConfigImpl) then,
-  ) = __$$SessionConfigImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({String? model, double? temperature, bool? enableReasoning});
-}
-
-/// @nodoc
-class __$$SessionConfigImplCopyWithImpl<$Res>
-    extends _$SessionConfigCopyWithImpl<$Res, _$SessionConfigImpl>
-    implements _$$SessionConfigImplCopyWith<$Res> {
-  __$$SessionConfigImplCopyWithImpl(
-    _$SessionConfigImpl _value,
-    $Res Function(_$SessionConfigImpl) _then,
-  ) : super(_value, _then);
-
-  /// Create a copy of SessionConfig
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? model = freezed,
-    Object? temperature = freezed,
-    Object? enableReasoning = freezed,
-  }) {
-    return _then(
-      _$SessionConfigImpl(
-        model: freezed == model
-            ? _value.model
-            : model // ignore: cast_nullable_to_non_nullable
-                  as String?,
-        temperature: freezed == temperature
-            ? _value.temperature
-            : temperature // ignore: cast_nullable_to_non_nullable
-                  as double?,
-        enableReasoning: freezed == enableReasoning
-            ? _value.enableReasoning
-            : enableReasoning // ignore: cast_nullable_to_non_nullable
-                  as bool?,
-      ),
-    );
-  }
-}
-
-/// @nodoc
-@JsonSerializable()
-class _$SessionConfigImpl implements _SessionConfig {
-  const _$SessionConfigImpl({
-    this.model,
-    this.temperature,
-    this.enableReasoning,
-  });
-
-  factory _$SessionConfigImpl.fromJson(Map<String, dynamic> json) =>
-      _$$SessionConfigImplFromJson(json);
-
-  @override
-  final String? model;
-  @override
-  final double? temperature;
-  @override
-  final bool? enableReasoning;
-
-  @override
-  String toString() {
-    return 'SessionConfig(model: $model, temperature: $temperature, enableReasoning: $enableReasoning)';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$SessionConfigImpl &&
-            (identical(other.model, model) || other.model == model) &&
-            (identical(other.temperature, temperature) ||
-                other.temperature == temperature) &&
-            (identical(other.enableReasoning, enableReasoning) ||
-                other.enableReasoning == enableReasoning));
-  }
-
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  int get hashCode =>
-      Object.hash(runtimeType, model, temperature, enableReasoning);
-
-  /// Create a copy of SessionConfig
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$SessionConfigImplCopyWith<_$SessionConfigImpl> get copyWith =>
-      __$$SessionConfigImplCopyWithImpl<_$SessionConfigImpl>(this, _$identity);
-
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$SessionConfigImplToJson(this);
-  }
-}
-
-abstract class _SessionConfig implements SessionConfig {
-  const factory _SessionConfig({
-    final String? model,
-    final double? temperature,
-    final bool? enableReasoning,
-  }) = _$SessionConfigImpl;
-
-  factory _SessionConfig.fromJson(Map<String, dynamic> json) =
-      _$SessionConfigImpl.fromJson;
-
-  @override
-  String? get model;
-  @override
-  double? get temperature;
-  @override
-  bool? get enableReasoning;
-
-  /// Create a copy of SessionConfig
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$SessionConfigImplCopyWith<_$SessionConfigImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }
 ````
@@ -6233,70 +5469,47 @@ _$SessionImpl _$$SessionImplFromJson(Map<String, dynamic> json) =>
     _$SessionImpl(
       id: json['id'] as String,
       title: json['title'] as String,
-      createdAt: (json['createdAt'] as num).toInt(),
       updatedAt: (json['updatedAt'] as num).toInt(),
       rounds: (json['rounds'] as List<dynamic>)
           .map((e) => ChatRound.fromJson(e as Map<String, dynamic>))
           .toList(),
-      config: json['config'] == null
-          ? null
-          : SessionConfig.fromJson(json['config'] as Map<String, dynamic>),
-      hasUnseenUpdate: json['hasUnseenUpdate'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$$SessionImplToJson(_$SessionImpl instance) =>
     <String, dynamic>{
       'id': instance.id,
       'title': instance.title,
-      'createdAt': instance.createdAt,
       'updatedAt': instance.updatedAt,
       'rounds': instance.rounds,
-      'config': instance.config,
-      'hasUnseenUpdate': instance.hasUnseenUpdate,
-    };
-
-_$SessionConfigImpl _$$SessionConfigImplFromJson(Map<String, dynamic> json) =>
-    _$SessionConfigImpl(
-      model: json['model'] as String?,
-      temperature: (json['temperature'] as num?)?.toDouble(),
-      enableReasoning: json['enableReasoning'] as bool?,
-    );
-
-Map<String, dynamic> _$$SessionConfigImplToJson(_$SessionConfigImpl instance) =>
-    <String, dynamic>{
-      'model': instance.model,
-      'temperature': instance.temperature,
-      'enableReasoning': instance.enableReasoning,
     };
 ````
 
 ## File: lib/data/data_sources/api_builders/chat_completions_api_builder.dart
 ````dart
-import 'package:aiservice/data/data_sources/api_builders/model_info_parser.dart';
-
 import 'api_request_builder.dart';
 import '../../../core/models/api_message.dart';
 import '../../../core/models/model_info.dart';
+import 'model_info_parser.dart';
 
 class ChatCompletionsApiBuilder implements ApiRequestBuilder {
   @override
   Map<String, String> buildHeaders(ApiBuildContext ctx) {
     return {
-      'Authorization': 'Bearer ${ctx.apiKey}',
+      'Authorization': 'Bearer ${ctx.config.apiKey}',      // 从 config 取 apiKey
       'Content-Type': 'application/json',
     };
   }
 
   @override
   Uri buildUri(ApiBuildContext ctx) {
-    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.chatPath);
+    return ApiUriUtils.buildNormalizedUri(ctx.config.baseUrl, ctx.config.chatPath);
   }
 
   @override
   Uri buildModelsUri(ApiBuildContext ctx) {
-    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.modelsPath);
+    return ApiUriUtils.buildNormalizedUri(ctx.config.baseUrl, ctx.config.modelsPath);
   }
-  
+
   @override
   Map<String, dynamic> buildRequestBody(ApiBuildContext ctx) {
     return {
@@ -6359,21 +5572,26 @@ class GoogleApiBuilder implements ApiRequestBuilder {
   @override
   Map<String, String> buildHeaders(ApiBuildContext ctx) {
     return {
-      'x-goog-api-key': ctx.apiKey,
+      'x-goog-api-key': ctx.config.apiKey,
       'Content-Type': 'application/json',
     };
   }
 
   @override
   Uri buildUri(ApiBuildContext ctx) {
-    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.modelsPath).replace(
-      queryParameters: {'alt': 'sse'},
-    );
+    // Google API 的聊天路径通常包含模型名，例如 'v1beta/models/{model}:streamGenerateContent'
+    // 这里需要从 config.chatPath 中解析，可能包含 {model} 占位符
+    String chatPath = ctx.config.chatPath;
+    if (chatPath.contains('{model}')) {
+      chatPath = chatPath.replaceAll('{model}', ctx.model);
+    }
+    return ApiUriUtils.buildNormalizedUri(ctx.config.baseUrl, chatPath)
+        .replace(queryParameters: {'alt': 'sse'});
   }
 
   @override
   Uri buildModelsUri(ApiBuildContext ctx) {
-    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.modelsPath);
+    return ApiUriUtils.buildNormalizedUri(ctx.config.baseUrl, ctx.config.modelsPath);
   }
 
   @override
@@ -6404,10 +5622,7 @@ class GoogleApiBuilder implements ApiRequestBuilder {
       if (methods != null && !methods.contains('generateContent')) {
         return null;
       }
-
-      return ModelInfo(
-        id: id,
-      );
+      return ModelInfo(id: id);
     }).whereType<ModelInfo>().toList();
   }
 
@@ -6496,30 +5711,30 @@ class ModelInfoParser {
 
 ## File: lib/data/data_sources/api_builders/responses_api_builder.dart
 ````dart
-import 'package:aiservice/data/data_sources/api_builders/model_info_parser.dart';
 import 'api_request_builder.dart';
 import '../../../core/models/api_message.dart';
 import '../../../core/models/model_info.dart';
+import 'model_info_parser.dart';
 
 class ResponsesApiBuilder implements ApiRequestBuilder {
   @override
   Map<String, String> buildHeaders(ApiBuildContext ctx) {
     return {
-      'Authorization': 'Bearer ${ctx.apiKey}',
+      'Authorization': 'Bearer ${ctx.config.apiKey}',
       'Content-Type': 'application/json',
     };
   }
 
   @override
   Uri buildUri(ApiBuildContext ctx) {
-    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.chatPath);
+    return ApiUriUtils.buildNormalizedUri(ctx.config.baseUrl, ctx.config.chatPath);
   }
 
   @override
   Uri buildModelsUri(ApiBuildContext ctx) {
-    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.modelsPath);
+    return ApiUriUtils.buildNormalizedUri(ctx.config.baseUrl, ctx.config.modelsPath);
   }
-  
+
   @override
   Map<String, dynamic> buildRequestBody(ApiBuildContext ctx) {
     return {
@@ -6538,7 +5753,7 @@ class ResponsesApiBuilder implements ApiRequestBuilder {
   List<ModelInfo> parseModelsResponse(Map<String, dynamic> json) {
     return ModelInfoParser.parseModelsResponse(json);
   }
-  
+
   List<Map<String, dynamic>> _buildInput(List<ApiMessage> context) {
     final result = <Map<String, dynamic>>[];
     for (final message in context) {
@@ -6555,7 +5770,6 @@ class ResponsesApiBuilder implements ApiRequestBuilder {
     if (message.parts.isEmpty) {
       return {'role': message.role, 'content': message.content ?? ''};
     }
-
     return {
       'role': message.role,
       'content': message.parts.map((part) => part.when(
@@ -6617,16 +5831,13 @@ class RemoteChatSource implements ChatSource {
   }
 
   @override
-  Future<List<ModelInfo>> fetchModels(AppConfig config) async {
+  Future<List<ModelInfo>> fetchModels(ConfigProfile config) async {
     final builder = _getBuilder(config.apiMode);
     final ctx = ApiBuildContext(
+      config: config,
       model: '',
       context: [],
       enableReasoning: false,
-      apiKey: config.apiKey,
-      baseUrl: config.baseUrl,
-      chatPath: '',
-      modelsPath: config.modelsPath,
     );
 
     final url = builder.buildModelsUri(ctx);
@@ -6642,14 +5853,14 @@ class RemoteChatSource implements ChatSource {
 
   @override
   Stream<ChatChunk> chatStream({
-    required AppConfig config,
+    required ConfigProfile config,
     required List<ApiMessage> context,
   }) async* {
     final client = http.Client();
     try {
       final apiMode = config.apiMode.trim();
       final selectedId = config.selectedModel;
-      final selectedModel = config.availableModels?.firstWhereOrNull((m) => m.id == selectedId);
+      final selectedModel = config.availableModels.firstWhereOrNull((m) => m.id == selectedId);
       final enableReasoning = selectedModel?.overrideSupportsReasoning == true;
       final model = config.selectedModel?.trim() ?? '';
 
@@ -6660,9 +5871,10 @@ class RemoteChatSource implements ChatSource {
       }
 
       final ctx = ApiBuildContext(
-        model: model, context: context, enableReasoning: enableReasoning,
-        apiKey: config.apiKey.trim(), baseUrl: config.baseUrl.trim(),
-        chatPath: resolvedChatPath, modelsPath: config.modelsPath.trim(),
+        config: config,                // 传入整个配置档案
+        model: model,
+        context: context,
+        enableReasoning: enableReasoning,
       );
 
       final uri = builder.buildUri(ctx);
@@ -6717,42 +5929,14 @@ class RemoteChatSource implements ChatSource {
 
 ## File: lib/data/database/database.dart
 ````dart
-import 'dart:convert';
 import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 
-import '../../core/models/app_config.dart';
-import '../../core/models/session.dart';
+part 'database.g.dart';
 
-part 'database.g.dart'; // 运行 build_runner 生成
-
-// ==========================================
-// Type Converters
-// ==========================================
-class AppConfigConverter extends TypeConverter<AppConfig, String> {
-  const AppConfigConverter();
-  @override
-  AppConfig fromSql(String fromDb) => 
-    AppConfig.fromJson(jsonDecode(fromDb) as Map<String, dynamic>);
-  @override
-  String toSql(AppConfig value) => jsonEncode(value.toJson());
-}
-
-class SessionConfigConverter extends TypeConverter<SessionConfig, String> {
-  const SessionConfigConverter();
-  @override
-  SessionConfig fromSql(String fromDb) => 
-    SessionConfig.fromJson(jsonDecode(fromDb) as Map<String, dynamic>);
-  @override
-  String toSql(SessionConfig value) => jsonEncode(value.toJson());
-}
-
-// ==========================================
-// Tables
-// ==========================================
 class DbConfigStore extends Table {
   IntColumn get id => integer().autoIncrement()(); // 永远只有一条记录 id=1
   TextColumn get activeProfileId => text()();
@@ -6761,19 +5945,30 @@ class DbConfigStore extends Table {
 class DbConfigProfiles extends Table {
   TextColumn get id => text()();
   TextColumn get name => text()();
-  TextColumn get config => text().map(const AppConfigConverter())();
-
+  TextColumn get baseUrl => text()();
+  TextColumn get apiKey => text()();
+  TextColumn get selectedModel => text().nullable()();
+  TextColumn get modelsPath => text()();
+  TextColumn get chatPath => text()();
+  TextColumn get apiMode => text()();
   @override
   Set<Column> get primaryKey => {id};
 }
 
+class DbAvailableModels extends Table {
+  TextColumn get profileId => text().references(DbConfigProfiles, #id, onDelete: KeyAction.cascade)();
+  TextColumn get modelId => text()();
+  BoolColumn get overrideSupportsReasoning => boolean().nullable()();
+  BoolColumn get overrideSupportsVision => boolean().nullable()();
+  @override
+  Set<Column> get primaryKey => {profileId, modelId};
+}
+
+
 class DbSessions extends Table {
   TextColumn get id => text()();
   TextColumn get title => text()();
-  IntColumn get createdAt => integer()();
   IntColumn get updatedAt => integer()();
-  TextColumn get config => text().map(const SessionConfigConverter()).nullable()();
-  BoolColumn get hasUnseenUpdate => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -6813,6 +6008,7 @@ class DbAttachments extends Table {
   tables: [
     DbConfigStore,
     DbConfigProfiles,
+    DbAvailableModels,
     DbSessions,
     DbChatRounds,
     DbAttachments,
@@ -7082,17 +6278,81 @@ class $DbConfigProfilesTable extends DbConfigProfiles
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _baseUrlMeta = const VerificationMeta(
+    'baseUrl',
+  );
   @override
-  late final GeneratedColumnWithTypeConverter<AppConfig, String> config =
-      GeneratedColumn<String>(
-        'config',
-        aliasedName,
-        false,
-        type: DriftSqlType.string,
-        requiredDuringInsert: true,
-      ).withConverter<AppConfig>($DbConfigProfilesTable.$converterconfig);
+  late final GeneratedColumn<String> baseUrl = GeneratedColumn<String>(
+    'base_url',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _apiKeyMeta = const VerificationMeta('apiKey');
   @override
-  List<GeneratedColumn> get $columns => [id, name, config];
+  late final GeneratedColumn<String> apiKey = GeneratedColumn<String>(
+    'api_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _selectedModelMeta = const VerificationMeta(
+    'selectedModel',
+  );
+  @override
+  late final GeneratedColumn<String> selectedModel = GeneratedColumn<String>(
+    'selected_model',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _modelsPathMeta = const VerificationMeta(
+    'modelsPath',
+  );
+  @override
+  late final GeneratedColumn<String> modelsPath = GeneratedColumn<String>(
+    'models_path',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _chatPathMeta = const VerificationMeta(
+    'chatPath',
+  );
+  @override
+  late final GeneratedColumn<String> chatPath = GeneratedColumn<String>(
+    'chat_path',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _apiModeMeta = const VerificationMeta(
+    'apiMode',
+  );
+  @override
+  late final GeneratedColumn<String> apiMode = GeneratedColumn<String>(
+    'api_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    baseUrl,
+    apiKey,
+    selectedModel,
+    modelsPath,
+    chatPath,
+    apiMode,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -7118,6 +6378,55 @@ class $DbConfigProfilesTable extends DbConfigProfiles
     } else if (isInserting) {
       context.missing(_nameMeta);
     }
+    if (data.containsKey('base_url')) {
+      context.handle(
+        _baseUrlMeta,
+        baseUrl.isAcceptableOrUnknown(data['base_url']!, _baseUrlMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_baseUrlMeta);
+    }
+    if (data.containsKey('api_key')) {
+      context.handle(
+        _apiKeyMeta,
+        apiKey.isAcceptableOrUnknown(data['api_key']!, _apiKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_apiKeyMeta);
+    }
+    if (data.containsKey('selected_model')) {
+      context.handle(
+        _selectedModelMeta,
+        selectedModel.isAcceptableOrUnknown(
+          data['selected_model']!,
+          _selectedModelMeta,
+        ),
+      );
+    }
+    if (data.containsKey('models_path')) {
+      context.handle(
+        _modelsPathMeta,
+        modelsPath.isAcceptableOrUnknown(data['models_path']!, _modelsPathMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_modelsPathMeta);
+    }
+    if (data.containsKey('chat_path')) {
+      context.handle(
+        _chatPathMeta,
+        chatPath.isAcceptableOrUnknown(data['chat_path']!, _chatPathMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_chatPathMeta);
+    }
+    if (data.containsKey('api_mode')) {
+      context.handle(
+        _apiModeMeta,
+        apiMode.isAcceptableOrUnknown(data['api_mode']!, _apiModeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_apiModeMeta);
+    }
     return context;
   }
 
@@ -7135,12 +6444,30 @@ class $DbConfigProfilesTable extends DbConfigProfiles
         DriftSqlType.string,
         data['${effectivePrefix}name'],
       )!,
-      config: $DbConfigProfilesTable.$converterconfig.fromSql(
-        attachedDatabase.typeMapping.read(
-          DriftSqlType.string,
-          data['${effectivePrefix}config'],
-        )!,
+      baseUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}base_url'],
+      )!,
+      apiKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}api_key'],
+      )!,
+      selectedModel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}selected_model'],
       ),
+      modelsPath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}models_path'],
+      )!,
+      chatPath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}chat_path'],
+      )!,
+      apiMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}api_mode'],
+      )!,
     );
   }
 
@@ -7148,30 +6475,40 @@ class $DbConfigProfilesTable extends DbConfigProfiles
   $DbConfigProfilesTable createAlias(String alias) {
     return $DbConfigProfilesTable(attachedDatabase, alias);
   }
-
-  static TypeConverter<AppConfig, String> $converterconfig =
-      const AppConfigConverter();
 }
 
 class DbConfigProfile extends DataClass implements Insertable<DbConfigProfile> {
   final String id;
   final String name;
-  final AppConfig config;
+  final String baseUrl;
+  final String apiKey;
+  final String? selectedModel;
+  final String modelsPath;
+  final String chatPath;
+  final String apiMode;
   const DbConfigProfile({
     required this.id,
     required this.name,
-    required this.config,
+    required this.baseUrl,
+    required this.apiKey,
+    this.selectedModel,
+    required this.modelsPath,
+    required this.chatPath,
+    required this.apiMode,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
-    {
-      map['config'] = Variable<String>(
-        $DbConfigProfilesTable.$converterconfig.toSql(config),
-      );
+    map['base_url'] = Variable<String>(baseUrl);
+    map['api_key'] = Variable<String>(apiKey);
+    if (!nullToAbsent || selectedModel != null) {
+      map['selected_model'] = Variable<String>(selectedModel);
     }
+    map['models_path'] = Variable<String>(modelsPath);
+    map['chat_path'] = Variable<String>(chatPath);
+    map['api_mode'] = Variable<String>(apiMode);
     return map;
   }
 
@@ -7179,7 +6516,14 @@ class DbConfigProfile extends DataClass implements Insertable<DbConfigProfile> {
     return DbConfigProfilesCompanion(
       id: Value(id),
       name: Value(name),
-      config: Value(config),
+      baseUrl: Value(baseUrl),
+      apiKey: Value(apiKey),
+      selectedModel: selectedModel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(selectedModel),
+      modelsPath: Value(modelsPath),
+      chatPath: Value(chatPath),
+      apiMode: Value(apiMode),
     );
   }
 
@@ -7191,7 +6535,12 @@ class DbConfigProfile extends DataClass implements Insertable<DbConfigProfile> {
     return DbConfigProfile(
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
-      config: serializer.fromJson<AppConfig>(json['config']),
+      baseUrl: serializer.fromJson<String>(json['baseUrl']),
+      apiKey: serializer.fromJson<String>(json['apiKey']),
+      selectedModel: serializer.fromJson<String?>(json['selectedModel']),
+      modelsPath: serializer.fromJson<String>(json['modelsPath']),
+      chatPath: serializer.fromJson<String>(json['chatPath']),
+      apiMode: serializer.fromJson<String>(json['apiMode']),
     );
   }
   @override
@@ -7200,21 +6549,50 @@ class DbConfigProfile extends DataClass implements Insertable<DbConfigProfile> {
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
-      'config': serializer.toJson<AppConfig>(config),
+      'baseUrl': serializer.toJson<String>(baseUrl),
+      'apiKey': serializer.toJson<String>(apiKey),
+      'selectedModel': serializer.toJson<String?>(selectedModel),
+      'modelsPath': serializer.toJson<String>(modelsPath),
+      'chatPath': serializer.toJson<String>(chatPath),
+      'apiMode': serializer.toJson<String>(apiMode),
     };
   }
 
-  DbConfigProfile copyWith({String? id, String? name, AppConfig? config}) =>
-      DbConfigProfile(
-        id: id ?? this.id,
-        name: name ?? this.name,
-        config: config ?? this.config,
-      );
+  DbConfigProfile copyWith({
+    String? id,
+    String? name,
+    String? baseUrl,
+    String? apiKey,
+    Value<String?> selectedModel = const Value.absent(),
+    String? modelsPath,
+    String? chatPath,
+    String? apiMode,
+  }) => DbConfigProfile(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    baseUrl: baseUrl ?? this.baseUrl,
+    apiKey: apiKey ?? this.apiKey,
+    selectedModel: selectedModel.present
+        ? selectedModel.value
+        : this.selectedModel,
+    modelsPath: modelsPath ?? this.modelsPath,
+    chatPath: chatPath ?? this.chatPath,
+    apiMode: apiMode ?? this.apiMode,
+  );
   DbConfigProfile copyWithCompanion(DbConfigProfilesCompanion data) {
     return DbConfigProfile(
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
-      config: data.config.present ? data.config.value : this.config,
+      baseUrl: data.baseUrl.present ? data.baseUrl.value : this.baseUrl,
+      apiKey: data.apiKey.present ? data.apiKey.value : this.apiKey,
+      selectedModel: data.selectedModel.present
+          ? data.selectedModel.value
+          : this.selectedModel,
+      modelsPath: data.modelsPath.present
+          ? data.modelsPath.value
+          : this.modelsPath,
+      chatPath: data.chatPath.present ? data.chatPath.value : this.chatPath,
+      apiMode: data.apiMode.present ? data.apiMode.value : this.apiMode,
     );
   }
 
@@ -7223,51 +6601,99 @@ class DbConfigProfile extends DataClass implements Insertable<DbConfigProfile> {
     return (StringBuffer('DbConfigProfile(')
           ..write('id: $id, ')
           ..write('name: $name, ')
-          ..write('config: $config')
+          ..write('baseUrl: $baseUrl, ')
+          ..write('apiKey: $apiKey, ')
+          ..write('selectedModel: $selectedModel, ')
+          ..write('modelsPath: $modelsPath, ')
+          ..write('chatPath: $chatPath, ')
+          ..write('apiMode: $apiMode')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, config);
+  int get hashCode => Object.hash(
+    id,
+    name,
+    baseUrl,
+    apiKey,
+    selectedModel,
+    modelsPath,
+    chatPath,
+    apiMode,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is DbConfigProfile &&
           other.id == this.id &&
           other.name == this.name &&
-          other.config == this.config);
+          other.baseUrl == this.baseUrl &&
+          other.apiKey == this.apiKey &&
+          other.selectedModel == this.selectedModel &&
+          other.modelsPath == this.modelsPath &&
+          other.chatPath == this.chatPath &&
+          other.apiMode == this.apiMode);
 }
 
 class DbConfigProfilesCompanion extends UpdateCompanion<DbConfigProfile> {
   final Value<String> id;
   final Value<String> name;
-  final Value<AppConfig> config;
+  final Value<String> baseUrl;
+  final Value<String> apiKey;
+  final Value<String?> selectedModel;
+  final Value<String> modelsPath;
+  final Value<String> chatPath;
+  final Value<String> apiMode;
   final Value<int> rowid;
   const DbConfigProfilesCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
-    this.config = const Value.absent(),
+    this.baseUrl = const Value.absent(),
+    this.apiKey = const Value.absent(),
+    this.selectedModel = const Value.absent(),
+    this.modelsPath = const Value.absent(),
+    this.chatPath = const Value.absent(),
+    this.apiMode = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   DbConfigProfilesCompanion.insert({
     required String id,
     required String name,
-    required AppConfig config,
+    required String baseUrl,
+    required String apiKey,
+    this.selectedModel = const Value.absent(),
+    required String modelsPath,
+    required String chatPath,
+    required String apiMode,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
-       config = Value(config);
+       baseUrl = Value(baseUrl),
+       apiKey = Value(apiKey),
+       modelsPath = Value(modelsPath),
+       chatPath = Value(chatPath),
+       apiMode = Value(apiMode);
   static Insertable<DbConfigProfile> custom({
     Expression<String>? id,
     Expression<String>? name,
-    Expression<String>? config,
+    Expression<String>? baseUrl,
+    Expression<String>? apiKey,
+    Expression<String>? selectedModel,
+    Expression<String>? modelsPath,
+    Expression<String>? chatPath,
+    Expression<String>? apiMode,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (name != null) 'name': name,
-      if (config != null) 'config': config,
+      if (baseUrl != null) 'base_url': baseUrl,
+      if (apiKey != null) 'api_key': apiKey,
+      if (selectedModel != null) 'selected_model': selectedModel,
+      if (modelsPath != null) 'models_path': modelsPath,
+      if (chatPath != null) 'chat_path': chatPath,
+      if (apiMode != null) 'api_mode': apiMode,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -7275,13 +6701,23 @@ class DbConfigProfilesCompanion extends UpdateCompanion<DbConfigProfile> {
   DbConfigProfilesCompanion copyWith({
     Value<String>? id,
     Value<String>? name,
-    Value<AppConfig>? config,
+    Value<String>? baseUrl,
+    Value<String>? apiKey,
+    Value<String?>? selectedModel,
+    Value<String>? modelsPath,
+    Value<String>? chatPath,
+    Value<String>? apiMode,
     Value<int>? rowid,
   }) {
     return DbConfigProfilesCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
-      config: config ?? this.config,
+      baseUrl: baseUrl ?? this.baseUrl,
+      apiKey: apiKey ?? this.apiKey,
+      selectedModel: selectedModel ?? this.selectedModel,
+      modelsPath: modelsPath ?? this.modelsPath,
+      chatPath: chatPath ?? this.chatPath,
+      apiMode: apiMode ?? this.apiMode,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -7295,10 +6731,23 @@ class DbConfigProfilesCompanion extends UpdateCompanion<DbConfigProfile> {
     if (name.present) {
       map['name'] = Variable<String>(name.value);
     }
-    if (config.present) {
-      map['config'] = Variable<String>(
-        $DbConfigProfilesTable.$converterconfig.toSql(config.value),
-      );
+    if (baseUrl.present) {
+      map['base_url'] = Variable<String>(baseUrl.value);
+    }
+    if (apiKey.present) {
+      map['api_key'] = Variable<String>(apiKey.value);
+    }
+    if (selectedModel.present) {
+      map['selected_model'] = Variable<String>(selectedModel.value);
+    }
+    if (modelsPath.present) {
+      map['models_path'] = Variable<String>(modelsPath.value);
+    }
+    if (chatPath.present) {
+      map['chat_path'] = Variable<String>(chatPath.value);
+    }
+    if (apiMode.present) {
+      map['api_mode'] = Variable<String>(apiMode.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -7311,7 +6760,382 @@ class DbConfigProfilesCompanion extends UpdateCompanion<DbConfigProfile> {
     return (StringBuffer('DbConfigProfilesCompanion(')
           ..write('id: $id, ')
           ..write('name: $name, ')
-          ..write('config: $config, ')
+          ..write('baseUrl: $baseUrl, ')
+          ..write('apiKey: $apiKey, ')
+          ..write('selectedModel: $selectedModel, ')
+          ..write('modelsPath: $modelsPath, ')
+          ..write('chatPath: $chatPath, ')
+          ..write('apiMode: $apiMode, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $DbAvailableModelsTable extends DbAvailableModels
+    with TableInfo<$DbAvailableModelsTable, DbAvailableModel> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DbAvailableModelsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _profileIdMeta = const VerificationMeta(
+    'profileId',
+  );
+  @override
+  late final GeneratedColumn<String> profileId = GeneratedColumn<String>(
+    'profile_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES db_config_profiles (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _modelIdMeta = const VerificationMeta(
+    'modelId',
+  );
+  @override
+  late final GeneratedColumn<String> modelId = GeneratedColumn<String>(
+    'model_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _overrideSupportsReasoningMeta =
+      const VerificationMeta('overrideSupportsReasoning');
+  @override
+  late final GeneratedColumn<bool> overrideSupportsReasoning =
+      GeneratedColumn<bool>(
+        'override_supports_reasoning',
+        aliasedName,
+        true,
+        type: DriftSqlType.bool,
+        requiredDuringInsert: false,
+        defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("override_supports_reasoning" IN (0, 1))',
+        ),
+      );
+  static const VerificationMeta _overrideSupportsVisionMeta =
+      const VerificationMeta('overrideSupportsVision');
+  @override
+  late final GeneratedColumn<bool> overrideSupportsVision =
+      GeneratedColumn<bool>(
+        'override_supports_vision',
+        aliasedName,
+        true,
+        type: DriftSqlType.bool,
+        requiredDuringInsert: false,
+        defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("override_supports_vision" IN (0, 1))',
+        ),
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    profileId,
+    modelId,
+    overrideSupportsReasoning,
+    overrideSupportsVision,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'db_available_models';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DbAvailableModel> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('profile_id')) {
+      context.handle(
+        _profileIdMeta,
+        profileId.isAcceptableOrUnknown(data['profile_id']!, _profileIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_profileIdMeta);
+    }
+    if (data.containsKey('model_id')) {
+      context.handle(
+        _modelIdMeta,
+        modelId.isAcceptableOrUnknown(data['model_id']!, _modelIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_modelIdMeta);
+    }
+    if (data.containsKey('override_supports_reasoning')) {
+      context.handle(
+        _overrideSupportsReasoningMeta,
+        overrideSupportsReasoning.isAcceptableOrUnknown(
+          data['override_supports_reasoning']!,
+          _overrideSupportsReasoningMeta,
+        ),
+      );
+    }
+    if (data.containsKey('override_supports_vision')) {
+      context.handle(
+        _overrideSupportsVisionMeta,
+        overrideSupportsVision.isAcceptableOrUnknown(
+          data['override_supports_vision']!,
+          _overrideSupportsVisionMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {profileId, modelId};
+  @override
+  DbAvailableModel map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DbAvailableModel(
+      profileId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}profile_id'],
+      )!,
+      modelId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}model_id'],
+      )!,
+      overrideSupportsReasoning: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}override_supports_reasoning'],
+      ),
+      overrideSupportsVision: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}override_supports_vision'],
+      ),
+    );
+  }
+
+  @override
+  $DbAvailableModelsTable createAlias(String alias) {
+    return $DbAvailableModelsTable(attachedDatabase, alias);
+  }
+}
+
+class DbAvailableModel extends DataClass
+    implements Insertable<DbAvailableModel> {
+  final String profileId;
+  final String modelId;
+  final bool? overrideSupportsReasoning;
+  final bool? overrideSupportsVision;
+  const DbAvailableModel({
+    required this.profileId,
+    required this.modelId,
+    this.overrideSupportsReasoning,
+    this.overrideSupportsVision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['profile_id'] = Variable<String>(profileId);
+    map['model_id'] = Variable<String>(modelId);
+    if (!nullToAbsent || overrideSupportsReasoning != null) {
+      map['override_supports_reasoning'] = Variable<bool>(
+        overrideSupportsReasoning,
+      );
+    }
+    if (!nullToAbsent || overrideSupportsVision != null) {
+      map['override_supports_vision'] = Variable<bool>(overrideSupportsVision);
+    }
+    return map;
+  }
+
+  DbAvailableModelsCompanion toCompanion(bool nullToAbsent) {
+    return DbAvailableModelsCompanion(
+      profileId: Value(profileId),
+      modelId: Value(modelId),
+      overrideSupportsReasoning:
+          overrideSupportsReasoning == null && nullToAbsent
+          ? const Value.absent()
+          : Value(overrideSupportsReasoning),
+      overrideSupportsVision: overrideSupportsVision == null && nullToAbsent
+          ? const Value.absent()
+          : Value(overrideSupportsVision),
+    );
+  }
+
+  factory DbAvailableModel.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DbAvailableModel(
+      profileId: serializer.fromJson<String>(json['profileId']),
+      modelId: serializer.fromJson<String>(json['modelId']),
+      overrideSupportsReasoning: serializer.fromJson<bool?>(
+        json['overrideSupportsReasoning'],
+      ),
+      overrideSupportsVision: serializer.fromJson<bool?>(
+        json['overrideSupportsVision'],
+      ),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'profileId': serializer.toJson<String>(profileId),
+      'modelId': serializer.toJson<String>(modelId),
+      'overrideSupportsReasoning': serializer.toJson<bool?>(
+        overrideSupportsReasoning,
+      ),
+      'overrideSupportsVision': serializer.toJson<bool?>(
+        overrideSupportsVision,
+      ),
+    };
+  }
+
+  DbAvailableModel copyWith({
+    String? profileId,
+    String? modelId,
+    Value<bool?> overrideSupportsReasoning = const Value.absent(),
+    Value<bool?> overrideSupportsVision = const Value.absent(),
+  }) => DbAvailableModel(
+    profileId: profileId ?? this.profileId,
+    modelId: modelId ?? this.modelId,
+    overrideSupportsReasoning: overrideSupportsReasoning.present
+        ? overrideSupportsReasoning.value
+        : this.overrideSupportsReasoning,
+    overrideSupportsVision: overrideSupportsVision.present
+        ? overrideSupportsVision.value
+        : this.overrideSupportsVision,
+  );
+  DbAvailableModel copyWithCompanion(DbAvailableModelsCompanion data) {
+    return DbAvailableModel(
+      profileId: data.profileId.present ? data.profileId.value : this.profileId,
+      modelId: data.modelId.present ? data.modelId.value : this.modelId,
+      overrideSupportsReasoning: data.overrideSupportsReasoning.present
+          ? data.overrideSupportsReasoning.value
+          : this.overrideSupportsReasoning,
+      overrideSupportsVision: data.overrideSupportsVision.present
+          ? data.overrideSupportsVision.value
+          : this.overrideSupportsVision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DbAvailableModel(')
+          ..write('profileId: $profileId, ')
+          ..write('modelId: $modelId, ')
+          ..write('overrideSupportsReasoning: $overrideSupportsReasoning, ')
+          ..write('overrideSupportsVision: $overrideSupportsVision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    profileId,
+    modelId,
+    overrideSupportsReasoning,
+    overrideSupportsVision,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DbAvailableModel &&
+          other.profileId == this.profileId &&
+          other.modelId == this.modelId &&
+          other.overrideSupportsReasoning == this.overrideSupportsReasoning &&
+          other.overrideSupportsVision == this.overrideSupportsVision);
+}
+
+class DbAvailableModelsCompanion extends UpdateCompanion<DbAvailableModel> {
+  final Value<String> profileId;
+  final Value<String> modelId;
+  final Value<bool?> overrideSupportsReasoning;
+  final Value<bool?> overrideSupportsVision;
+  final Value<int> rowid;
+  const DbAvailableModelsCompanion({
+    this.profileId = const Value.absent(),
+    this.modelId = const Value.absent(),
+    this.overrideSupportsReasoning = const Value.absent(),
+    this.overrideSupportsVision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DbAvailableModelsCompanion.insert({
+    required String profileId,
+    required String modelId,
+    this.overrideSupportsReasoning = const Value.absent(),
+    this.overrideSupportsVision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : profileId = Value(profileId),
+       modelId = Value(modelId);
+  static Insertable<DbAvailableModel> custom({
+    Expression<String>? profileId,
+    Expression<String>? modelId,
+    Expression<bool>? overrideSupportsReasoning,
+    Expression<bool>? overrideSupportsVision,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (profileId != null) 'profile_id': profileId,
+      if (modelId != null) 'model_id': modelId,
+      if (overrideSupportsReasoning != null)
+        'override_supports_reasoning': overrideSupportsReasoning,
+      if (overrideSupportsVision != null)
+        'override_supports_vision': overrideSupportsVision,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DbAvailableModelsCompanion copyWith({
+    Value<String>? profileId,
+    Value<String>? modelId,
+    Value<bool?>? overrideSupportsReasoning,
+    Value<bool?>? overrideSupportsVision,
+    Value<int>? rowid,
+  }) {
+    return DbAvailableModelsCompanion(
+      profileId: profileId ?? this.profileId,
+      modelId: modelId ?? this.modelId,
+      overrideSupportsReasoning:
+          overrideSupportsReasoning ?? this.overrideSupportsReasoning,
+      overrideSupportsVision:
+          overrideSupportsVision ?? this.overrideSupportsVision,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (profileId.present) {
+      map['profile_id'] = Variable<String>(profileId.value);
+    }
+    if (modelId.present) {
+      map['model_id'] = Variable<String>(modelId.value);
+    }
+    if (overrideSupportsReasoning.present) {
+      map['override_supports_reasoning'] = Variable<bool>(
+        overrideSupportsReasoning.value,
+      );
+    }
+    if (overrideSupportsVision.present) {
+      map['override_supports_vision'] = Variable<bool>(
+        overrideSupportsVision.value,
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DbAvailableModelsCompanion(')
+          ..write('profileId: $profileId, ')
+          ..write('modelId: $modelId, ')
+          ..write('overrideSupportsReasoning: $overrideSupportsReasoning, ')
+          ..write('overrideSupportsVision: $overrideSupportsVision, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -7342,17 +7166,6 @@ class $DbSessionsTable extends DbSessions
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _createdAtMeta = const VerificationMeta(
-    'createdAt',
-  );
-  @override
-  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
-    'created_at',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: true,
-  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -7365,38 +7178,7 @@ class $DbSessionsTable extends DbSessions
     requiredDuringInsert: true,
   );
   @override
-  late final GeneratedColumnWithTypeConverter<SessionConfig?, String> config =
-      GeneratedColumn<String>(
-        'config',
-        aliasedName,
-        true,
-        type: DriftSqlType.string,
-        requiredDuringInsert: false,
-      ).withConverter<SessionConfig?>($DbSessionsTable.$converterconfign);
-  static const VerificationMeta _hasUnseenUpdateMeta = const VerificationMeta(
-    'hasUnseenUpdate',
-  );
-  @override
-  late final GeneratedColumn<bool> hasUnseenUpdate = GeneratedColumn<bool>(
-    'has_unseen_update',
-    aliasedName,
-    false,
-    type: DriftSqlType.bool,
-    requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'CHECK ("has_unseen_update" IN (0, 1))',
-    ),
-    defaultValue: const Constant(false),
-  );
-  @override
-  List<GeneratedColumn> get $columns => [
-    id,
-    title,
-    createdAt,
-    updatedAt,
-    config,
-    hasUnseenUpdate,
-  ];
+  List<GeneratedColumn> get $columns => [id, title, updatedAt];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -7422,14 +7204,6 @@ class $DbSessionsTable extends DbSessions
     } else if (isInserting) {
       context.missing(_titleMeta);
     }
-    if (data.containsKey('created_at')) {
-      context.handle(
-        _createdAtMeta,
-        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_createdAtMeta);
-    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -7437,15 +7211,6 @@ class $DbSessionsTable extends DbSessions
       );
     } else if (isInserting) {
       context.missing(_updatedAtMeta);
-    }
-    if (data.containsKey('has_unseen_update')) {
-      context.handle(
-        _hasUnseenUpdateMeta,
-        hasUnseenUpdate.isAcceptableOrUnknown(
-          data['has_unseen_update']!,
-          _hasUnseenUpdateMeta,
-        ),
-      );
     }
     return context;
   }
@@ -7464,23 +7229,9 @@ class $DbSessionsTable extends DbSessions
         DriftSqlType.string,
         data['${effectivePrefix}title'],
       )!,
-      createdAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}created_at'],
-      )!,
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}updated_at'],
-      )!,
-      config: $DbSessionsTable.$converterconfign.fromSql(
-        attachedDatabase.typeMapping.read(
-          DriftSqlType.string,
-          data['${effectivePrefix}config'],
-        ),
-      ),
-      hasUnseenUpdate: attachedDatabase.typeMapping.read(
-        DriftSqlType.bool,
-        data['${effectivePrefix}has_unseen_update'],
       )!,
     );
   }
@@ -7489,41 +7240,23 @@ class $DbSessionsTable extends DbSessions
   $DbSessionsTable createAlias(String alias) {
     return $DbSessionsTable(attachedDatabase, alias);
   }
-
-  static TypeConverter<SessionConfig, String> $converterconfig =
-      const SessionConfigConverter();
-  static TypeConverter<SessionConfig?, String?> $converterconfign =
-      NullAwareTypeConverter.wrap($converterconfig);
 }
 
 class DbSession extends DataClass implements Insertable<DbSession> {
   final String id;
   final String title;
-  final int createdAt;
   final int updatedAt;
-  final SessionConfig? config;
-  final bool hasUnseenUpdate;
   const DbSession({
     required this.id,
     required this.title,
-    required this.createdAt,
     required this.updatedAt,
-    this.config,
-    required this.hasUnseenUpdate,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['title'] = Variable<String>(title);
-    map['created_at'] = Variable<int>(createdAt);
     map['updated_at'] = Variable<int>(updatedAt);
-    if (!nullToAbsent || config != null) {
-      map['config'] = Variable<String>(
-        $DbSessionsTable.$converterconfign.toSql(config),
-      );
-    }
-    map['has_unseen_update'] = Variable<bool>(hasUnseenUpdate);
     return map;
   }
 
@@ -7531,12 +7264,7 @@ class DbSession extends DataClass implements Insertable<DbSession> {
     return DbSessionsCompanion(
       id: Value(id),
       title: Value(title),
-      createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
-      config: config == null && nullToAbsent
-          ? const Value.absent()
-          : Value(config),
-      hasUnseenUpdate: Value(hasUnseenUpdate),
     );
   }
 
@@ -7548,10 +7276,7 @@ class DbSession extends DataClass implements Insertable<DbSession> {
     return DbSession(
       id: serializer.fromJson<String>(json['id']),
       title: serializer.fromJson<String>(json['title']),
-      createdAt: serializer.fromJson<int>(json['createdAt']),
       updatedAt: serializer.fromJson<int>(json['updatedAt']),
-      config: serializer.fromJson<SessionConfig?>(json['config']),
-      hasUnseenUpdate: serializer.fromJson<bool>(json['hasUnseenUpdate']),
     );
   }
   @override
@@ -7560,38 +7285,20 @@ class DbSession extends DataClass implements Insertable<DbSession> {
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
       'title': serializer.toJson<String>(title),
-      'createdAt': serializer.toJson<int>(createdAt),
       'updatedAt': serializer.toJson<int>(updatedAt),
-      'config': serializer.toJson<SessionConfig?>(config),
-      'hasUnseenUpdate': serializer.toJson<bool>(hasUnseenUpdate),
     };
   }
 
-  DbSession copyWith({
-    String? id,
-    String? title,
-    int? createdAt,
-    int? updatedAt,
-    Value<SessionConfig?> config = const Value.absent(),
-    bool? hasUnseenUpdate,
-  }) => DbSession(
+  DbSession copyWith({String? id, String? title, int? updatedAt}) => DbSession(
     id: id ?? this.id,
     title: title ?? this.title,
-    createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
-    config: config.present ? config.value : this.config,
-    hasUnseenUpdate: hasUnseenUpdate ?? this.hasUnseenUpdate,
   );
   DbSession copyWithCompanion(DbSessionsCompanion data) {
     return DbSession(
       id: data.id.present ? data.id.value : this.id,
       title: data.title.present ? data.title.value : this.title,
-      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
-      config: data.config.present ? data.config.value : this.config,
-      hasUnseenUpdate: data.hasUnseenUpdate.present
-          ? data.hasUnseenUpdate.value
-          : this.hasUnseenUpdate,
     );
   }
 
@@ -7600,74 +7307,51 @@ class DbSession extends DataClass implements Insertable<DbSession> {
     return (StringBuffer('DbSession(')
           ..write('id: $id, ')
           ..write('title: $title, ')
-          ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt, ')
-          ..write('config: $config, ')
-          ..write('hasUnseenUpdate: $hasUnseenUpdate')
+          ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, title, createdAt, updatedAt, config, hasUnseenUpdate);
+  int get hashCode => Object.hash(id, title, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is DbSession &&
           other.id == this.id &&
           other.title == this.title &&
-          other.createdAt == this.createdAt &&
-          other.updatedAt == this.updatedAt &&
-          other.config == this.config &&
-          other.hasUnseenUpdate == this.hasUnseenUpdate);
+          other.updatedAt == this.updatedAt);
 }
 
 class DbSessionsCompanion extends UpdateCompanion<DbSession> {
   final Value<String> id;
   final Value<String> title;
-  final Value<int> createdAt;
   final Value<int> updatedAt;
-  final Value<SessionConfig?> config;
-  final Value<bool> hasUnseenUpdate;
   final Value<int> rowid;
   const DbSessionsCompanion({
     this.id = const Value.absent(),
     this.title = const Value.absent(),
-    this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
-    this.config = const Value.absent(),
-    this.hasUnseenUpdate = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   DbSessionsCompanion.insert({
     required String id,
     required String title,
-    required int createdAt,
     required int updatedAt,
-    this.config = const Value.absent(),
-    this.hasUnseenUpdate = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        title = Value(title),
-       createdAt = Value(createdAt),
        updatedAt = Value(updatedAt);
   static Insertable<DbSession> custom({
     Expression<String>? id,
     Expression<String>? title,
-    Expression<int>? createdAt,
     Expression<int>? updatedAt,
-    Expression<String>? config,
-    Expression<bool>? hasUnseenUpdate,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (title != null) 'title': title,
-      if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
-      if (config != null) 'config': config,
-      if (hasUnseenUpdate != null) 'has_unseen_update': hasUnseenUpdate,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -7675,19 +7359,13 @@ class DbSessionsCompanion extends UpdateCompanion<DbSession> {
   DbSessionsCompanion copyWith({
     Value<String>? id,
     Value<String>? title,
-    Value<int>? createdAt,
     Value<int>? updatedAt,
-    Value<SessionConfig?>? config,
-    Value<bool>? hasUnseenUpdate,
     Value<int>? rowid,
   }) {
     return DbSessionsCompanion(
       id: id ?? this.id,
       title: title ?? this.title,
-      createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
-      config: config ?? this.config,
-      hasUnseenUpdate: hasUnseenUpdate ?? this.hasUnseenUpdate,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -7701,19 +7379,8 @@ class DbSessionsCompanion extends UpdateCompanion<DbSession> {
     if (title.present) {
       map['title'] = Variable<String>(title.value);
     }
-    if (createdAt.present) {
-      map['created_at'] = Variable<int>(createdAt.value);
-    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<int>(updatedAt.value);
-    }
-    if (config.present) {
-      map['config'] = Variable<String>(
-        $DbSessionsTable.$converterconfign.toSql(config.value),
-      );
-    }
-    if (hasUnseenUpdate.present) {
-      map['has_unseen_update'] = Variable<bool>(hasUnseenUpdate.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -7726,10 +7393,7 @@ class DbSessionsCompanion extends UpdateCompanion<DbSession> {
     return (StringBuffer('DbSessionsCompanion(')
           ..write('id: $id, ')
           ..write('title: $title, ')
-          ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
-          ..write('config: $config, ')
-          ..write('hasUnseenUpdate: $hasUnseenUpdate, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -8761,6 +8425,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $DbConfigProfilesTable dbConfigProfiles = $DbConfigProfilesTable(
     this,
   );
+  late final $DbAvailableModelsTable dbAvailableModels =
+      $DbAvailableModelsTable(this);
   late final $DbSessionsTable dbSessions = $DbSessionsTable(this);
   late final $DbChatRoundsTable dbChatRounds = $DbChatRoundsTable(this);
   late final $DbAttachmentsTable dbAttachments = $DbAttachmentsTable(this);
@@ -8771,12 +8437,20 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     dbConfigStore,
     dbConfigProfiles,
+    dbAvailableModels,
     dbSessions,
     dbChatRounds,
     dbAttachments,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'db_config_profiles',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('db_available_models', kind: UpdateKind.delete)],
+    ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
         'db_sessions',
@@ -8941,16 +8615,60 @@ typedef $$DbConfigProfilesTableCreateCompanionBuilder =
     DbConfigProfilesCompanion Function({
       required String id,
       required String name,
-      required AppConfig config,
+      required String baseUrl,
+      required String apiKey,
+      Value<String?> selectedModel,
+      required String modelsPath,
+      required String chatPath,
+      required String apiMode,
       Value<int> rowid,
     });
 typedef $$DbConfigProfilesTableUpdateCompanionBuilder =
     DbConfigProfilesCompanion Function({
       Value<String> id,
       Value<String> name,
-      Value<AppConfig> config,
+      Value<String> baseUrl,
+      Value<String> apiKey,
+      Value<String?> selectedModel,
+      Value<String> modelsPath,
+      Value<String> chatPath,
+      Value<String> apiMode,
       Value<int> rowid,
     });
+
+final class $$DbConfigProfilesTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $DbConfigProfilesTable, DbConfigProfile> {
+  $$DbConfigProfilesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static MultiTypedResultKey<$DbAvailableModelsTable, List<DbAvailableModel>>
+  _dbAvailableModelsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.dbAvailableModels,
+        aliasName: $_aliasNameGenerator(
+          db.dbConfigProfiles.id,
+          db.dbAvailableModels.profileId,
+        ),
+      );
+
+  $$DbAvailableModelsTableProcessedTableManager get dbAvailableModelsRefs {
+    final manager = $$DbAvailableModelsTableTableManager(
+      $_db,
+      $_db.dbAvailableModels,
+    ).filter((f) => f.profileId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _dbAvailableModelsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
 
 class $$DbConfigProfilesTableFilterComposer
     extends Composer<_$AppDatabase, $DbConfigProfilesTable> {
@@ -8971,11 +8689,60 @@ class $$DbConfigProfilesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnWithTypeConverterFilters<AppConfig, AppConfig, String> get config =>
-      $composableBuilder(
-        column: $table.config,
-        builder: (column) => ColumnWithTypeConverterFilters(column),
-      );
+  ColumnFilters<String> get baseUrl => $composableBuilder(
+    column: $table.baseUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get apiKey => $composableBuilder(
+    column: $table.apiKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get selectedModel => $composableBuilder(
+    column: $table.selectedModel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get modelsPath => $composableBuilder(
+    column: $table.modelsPath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get chatPath => $composableBuilder(
+    column: $table.chatPath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get apiMode => $composableBuilder(
+    column: $table.apiMode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> dbAvailableModelsRefs(
+    Expression<bool> Function($$DbAvailableModelsTableFilterComposer f) f,
+  ) {
+    final $$DbAvailableModelsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.dbAvailableModels,
+      getReferencedColumn: (t) => t.profileId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DbAvailableModelsTableFilterComposer(
+            $db: $db,
+            $table: $db.dbAvailableModels,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$DbConfigProfilesTableOrderingComposer
@@ -8997,8 +8764,33 @@ class $$DbConfigProfilesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get config => $composableBuilder(
-    column: $table.config,
+  ColumnOrderings<String> get baseUrl => $composableBuilder(
+    column: $table.baseUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get apiKey => $composableBuilder(
+    column: $table.apiKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get selectedModel => $composableBuilder(
+    column: $table.selectedModel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get modelsPath => $composableBuilder(
+    column: $table.modelsPath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get chatPath => $composableBuilder(
+    column: $table.chatPath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get apiMode => $composableBuilder(
+    column: $table.apiMode,
     builder: (column) => ColumnOrderings(column),
   );
 }
@@ -9018,8 +8810,53 @@ class $$DbConfigProfilesTableAnnotationComposer
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
 
-  GeneratedColumnWithTypeConverter<AppConfig, String> get config =>
-      $composableBuilder(column: $table.config, builder: (column) => column);
+  GeneratedColumn<String> get baseUrl =>
+      $composableBuilder(column: $table.baseUrl, builder: (column) => column);
+
+  GeneratedColumn<String> get apiKey =>
+      $composableBuilder(column: $table.apiKey, builder: (column) => column);
+
+  GeneratedColumn<String> get selectedModel => $composableBuilder(
+    column: $table.selectedModel,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get modelsPath => $composableBuilder(
+    column: $table.modelsPath,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get chatPath =>
+      $composableBuilder(column: $table.chatPath, builder: (column) => column);
+
+  GeneratedColumn<String> get apiMode =>
+      $composableBuilder(column: $table.apiMode, builder: (column) => column);
+
+  Expression<T> dbAvailableModelsRefs<T extends Object>(
+    Expression<T> Function($$DbAvailableModelsTableAnnotationComposer a) f,
+  ) {
+    final $$DbAvailableModelsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.dbAvailableModels,
+          getReferencedColumn: (t) => t.profileId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$DbAvailableModelsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.dbAvailableModels,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$DbConfigProfilesTableTableManager
@@ -9033,16 +8870,9 @@ class $$DbConfigProfilesTableTableManager
           $$DbConfigProfilesTableAnnotationComposer,
           $$DbConfigProfilesTableCreateCompanionBuilder,
           $$DbConfigProfilesTableUpdateCompanionBuilder,
-          (
-            DbConfigProfile,
-            BaseReferences<
-              _$AppDatabase,
-              $DbConfigProfilesTable,
-              DbConfigProfile
-            >,
-          ),
+          (DbConfigProfile, $$DbConfigProfilesTableReferences),
           DbConfigProfile,
-          PrefetchHooks Function()
+          PrefetchHooks Function({bool dbAvailableModelsRefs})
         > {
   $$DbConfigProfilesTableTableManager(
     _$AppDatabase db,
@@ -9061,30 +8891,86 @@ class $$DbConfigProfilesTableTableManager
               ({
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
-                Value<AppConfig> config = const Value.absent(),
+                Value<String> baseUrl = const Value.absent(),
+                Value<String> apiKey = const Value.absent(),
+                Value<String?> selectedModel = const Value.absent(),
+                Value<String> modelsPath = const Value.absent(),
+                Value<String> chatPath = const Value.absent(),
+                Value<String> apiMode = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DbConfigProfilesCompanion(
                 id: id,
                 name: name,
-                config: config,
+                baseUrl: baseUrl,
+                apiKey: apiKey,
+                selectedModel: selectedModel,
+                modelsPath: modelsPath,
+                chatPath: chatPath,
+                apiMode: apiMode,
                 rowid: rowid,
               ),
           createCompanionCallback:
               ({
                 required String id,
                 required String name,
-                required AppConfig config,
+                required String baseUrl,
+                required String apiKey,
+                Value<String?> selectedModel = const Value.absent(),
+                required String modelsPath,
+                required String chatPath,
+                required String apiMode,
                 Value<int> rowid = const Value.absent(),
               }) => DbConfigProfilesCompanion.insert(
                 id: id,
                 name: name,
-                config: config,
+                baseUrl: baseUrl,
+                apiKey: apiKey,
+                selectedModel: selectedModel,
+                modelsPath: modelsPath,
+                chatPath: chatPath,
+                apiMode: apiMode,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$DbConfigProfilesTableReferences(db, table, e),
+                ),
+              )
               .toList(),
-          prefetchHooksCallback: null,
+          prefetchHooksCallback: ({dbAvailableModelsRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (dbAvailableModelsRefs) db.dbAvailableModels,
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (dbAvailableModelsRefs)
+                    await $_getPrefetchedData<
+                      DbConfigProfile,
+                      $DbConfigProfilesTable,
+                      DbAvailableModel
+                    >(
+                      currentTable: table,
+                      referencedTable: $$DbConfigProfilesTableReferences
+                          ._dbAvailableModelsRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$DbConfigProfilesTableReferences(
+                            db,
+                            table,
+                            p0,
+                          ).dbAvailableModelsRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where((e) => e.profileId == item.id),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
         ),
       );
 }
@@ -9099,31 +8985,345 @@ typedef $$DbConfigProfilesTableProcessedTableManager =
       $$DbConfigProfilesTableAnnotationComposer,
       $$DbConfigProfilesTableCreateCompanionBuilder,
       $$DbConfigProfilesTableUpdateCompanionBuilder,
-      (
-        DbConfigProfile,
-        BaseReferences<_$AppDatabase, $DbConfigProfilesTable, DbConfigProfile>,
-      ),
+      (DbConfigProfile, $$DbConfigProfilesTableReferences),
       DbConfigProfile,
-      PrefetchHooks Function()
+      PrefetchHooks Function({bool dbAvailableModelsRefs})
+    >;
+typedef $$DbAvailableModelsTableCreateCompanionBuilder =
+    DbAvailableModelsCompanion Function({
+      required String profileId,
+      required String modelId,
+      Value<bool?> overrideSupportsReasoning,
+      Value<bool?> overrideSupportsVision,
+      Value<int> rowid,
+    });
+typedef $$DbAvailableModelsTableUpdateCompanionBuilder =
+    DbAvailableModelsCompanion Function({
+      Value<String> profileId,
+      Value<String> modelId,
+      Value<bool?> overrideSupportsReasoning,
+      Value<bool?> overrideSupportsVision,
+      Value<int> rowid,
+    });
+
+final class $$DbAvailableModelsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $DbAvailableModelsTable,
+          DbAvailableModel
+        > {
+  $$DbAvailableModelsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $DbConfigProfilesTable _profileIdTable(_$AppDatabase db) =>
+      db.dbConfigProfiles.createAlias(
+        $_aliasNameGenerator(
+          db.dbAvailableModels.profileId,
+          db.dbConfigProfiles.id,
+        ),
+      );
+
+  $$DbConfigProfilesTableProcessedTableManager get profileId {
+    final $_column = $_itemColumn<String>('profile_id')!;
+
+    final manager = $$DbConfigProfilesTableTableManager(
+      $_db,
+      $_db.dbConfigProfiles,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_profileIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$DbAvailableModelsTableFilterComposer
+    extends Composer<_$AppDatabase, $DbAvailableModelsTable> {
+  $$DbAvailableModelsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get modelId => $composableBuilder(
+    column: $table.modelId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get overrideSupportsReasoning => $composableBuilder(
+    column: $table.overrideSupportsReasoning,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get overrideSupportsVision => $composableBuilder(
+    column: $table.overrideSupportsVision,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$DbConfigProfilesTableFilterComposer get profileId {
+    final $$DbConfigProfilesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.profileId,
+      referencedTable: $db.dbConfigProfiles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DbConfigProfilesTableFilterComposer(
+            $db: $db,
+            $table: $db.dbConfigProfiles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$DbAvailableModelsTableOrderingComposer
+    extends Composer<_$AppDatabase, $DbAvailableModelsTable> {
+  $$DbAvailableModelsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get modelId => $composableBuilder(
+    column: $table.modelId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get overrideSupportsReasoning => $composableBuilder(
+    column: $table.overrideSupportsReasoning,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get overrideSupportsVision => $composableBuilder(
+    column: $table.overrideSupportsVision,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$DbConfigProfilesTableOrderingComposer get profileId {
+    final $$DbConfigProfilesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.profileId,
+      referencedTable: $db.dbConfigProfiles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DbConfigProfilesTableOrderingComposer(
+            $db: $db,
+            $table: $db.dbConfigProfiles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$DbAvailableModelsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DbAvailableModelsTable> {
+  $$DbAvailableModelsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get modelId =>
+      $composableBuilder(column: $table.modelId, builder: (column) => column);
+
+  GeneratedColumn<bool> get overrideSupportsReasoning => $composableBuilder(
+    column: $table.overrideSupportsReasoning,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get overrideSupportsVision => $composableBuilder(
+    column: $table.overrideSupportsVision,
+    builder: (column) => column,
+  );
+
+  $$DbConfigProfilesTableAnnotationComposer get profileId {
+    final $$DbConfigProfilesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.profileId,
+      referencedTable: $db.dbConfigProfiles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DbConfigProfilesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.dbConfigProfiles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$DbAvailableModelsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $DbAvailableModelsTable,
+          DbAvailableModel,
+          $$DbAvailableModelsTableFilterComposer,
+          $$DbAvailableModelsTableOrderingComposer,
+          $$DbAvailableModelsTableAnnotationComposer,
+          $$DbAvailableModelsTableCreateCompanionBuilder,
+          $$DbAvailableModelsTableUpdateCompanionBuilder,
+          (DbAvailableModel, $$DbAvailableModelsTableReferences),
+          DbAvailableModel,
+          PrefetchHooks Function({bool profileId})
+        > {
+  $$DbAvailableModelsTableTableManager(
+    _$AppDatabase db,
+    $DbAvailableModelsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DbAvailableModelsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DbAvailableModelsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$DbAvailableModelsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> profileId = const Value.absent(),
+                Value<String> modelId = const Value.absent(),
+                Value<bool?> overrideSupportsReasoning = const Value.absent(),
+                Value<bool?> overrideSupportsVision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DbAvailableModelsCompanion(
+                profileId: profileId,
+                modelId: modelId,
+                overrideSupportsReasoning: overrideSupportsReasoning,
+                overrideSupportsVision: overrideSupportsVision,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String profileId,
+                required String modelId,
+                Value<bool?> overrideSupportsReasoning = const Value.absent(),
+                Value<bool?> overrideSupportsVision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DbAvailableModelsCompanion.insert(
+                profileId: profileId,
+                modelId: modelId,
+                overrideSupportsReasoning: overrideSupportsReasoning,
+                overrideSupportsVision: overrideSupportsVision,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$DbAvailableModelsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({profileId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (profileId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.profileId,
+                                referencedTable:
+                                    $$DbAvailableModelsTableReferences
+                                        ._profileIdTable(db),
+                                referencedColumn:
+                                    $$DbAvailableModelsTableReferences
+                                        ._profileIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$DbAvailableModelsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $DbAvailableModelsTable,
+      DbAvailableModel,
+      $$DbAvailableModelsTableFilterComposer,
+      $$DbAvailableModelsTableOrderingComposer,
+      $$DbAvailableModelsTableAnnotationComposer,
+      $$DbAvailableModelsTableCreateCompanionBuilder,
+      $$DbAvailableModelsTableUpdateCompanionBuilder,
+      (DbAvailableModel, $$DbAvailableModelsTableReferences),
+      DbAvailableModel,
+      PrefetchHooks Function({bool profileId})
     >;
 typedef $$DbSessionsTableCreateCompanionBuilder =
     DbSessionsCompanion Function({
       required String id,
       required String title,
-      required int createdAt,
       required int updatedAt,
-      Value<SessionConfig?> config,
-      Value<bool> hasUnseenUpdate,
       Value<int> rowid,
     });
 typedef $$DbSessionsTableUpdateCompanionBuilder =
     DbSessionsCompanion Function({
       Value<String> id,
       Value<String> title,
-      Value<int> createdAt,
       Value<int> updatedAt,
-      Value<SessionConfig?> config,
-      Value<bool> hasUnseenUpdate,
       Value<int> rowid,
     });
 
@@ -9172,24 +9372,8 @@ class $$DbSessionsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnFilters(column),
-  );
-
   ColumnFilters<int> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnWithTypeConverterFilters<SessionConfig?, SessionConfig, String>
-  get config => $composableBuilder(
-    column: $table.config,
-    builder: (column) => ColumnWithTypeConverterFilters(column),
-  );
-
-  ColumnFilters<bool> get hasUnseenUpdate => $composableBuilder(
-    column: $table.hasUnseenUpdate,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9238,23 +9422,8 @@ class $$DbSessionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnOrderings(column),
-  );
-
   ColumnOrderings<int> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get config => $composableBuilder(
-    column: $table.config,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<bool> get hasUnseenUpdate => $composableBuilder(
-    column: $table.hasUnseenUpdate,
     builder: (column) => ColumnOrderings(column),
   );
 }
@@ -9274,19 +9443,8 @@ class $$DbSessionsTableAnnotationComposer
   GeneratedColumn<String> get title =>
       $composableBuilder(column: $table.title, builder: (column) => column);
 
-  GeneratedColumn<int> get createdAt =>
-      $composableBuilder(column: $table.createdAt, builder: (column) => column);
-
   GeneratedColumn<int> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
-
-  GeneratedColumnWithTypeConverter<SessionConfig?, String> get config =>
-      $composableBuilder(column: $table.config, builder: (column) => column);
-
-  GeneratedColumn<bool> get hasUnseenUpdate => $composableBuilder(
-    column: $table.hasUnseenUpdate,
-    builder: (column) => column,
-  );
 
   Expression<T> dbChatRoundsRefs<T extends Object>(
     Expression<T> Function($$DbChatRoundsTableAnnotationComposer a) f,
@@ -9344,36 +9502,24 @@ class $$DbSessionsTableTableManager
               ({
                 Value<String> id = const Value.absent(),
                 Value<String> title = const Value.absent(),
-                Value<int> createdAt = const Value.absent(),
                 Value<int> updatedAt = const Value.absent(),
-                Value<SessionConfig?> config = const Value.absent(),
-                Value<bool> hasUnseenUpdate = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DbSessionsCompanion(
                 id: id,
                 title: title,
-                createdAt: createdAt,
                 updatedAt: updatedAt,
-                config: config,
-                hasUnseenUpdate: hasUnseenUpdate,
                 rowid: rowid,
               ),
           createCompanionCallback:
               ({
                 required String id,
                 required String title,
-                required int createdAt,
                 required int updatedAt,
-                Value<SessionConfig?> config = const Value.absent(),
-                Value<bool> hasUnseenUpdate = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DbSessionsCompanion.insert(
                 id: id,
                 title: title,
-                createdAt: createdAt,
                 updatedAt: updatedAt,
-                config: config,
-                hasUnseenUpdate: hasUnseenUpdate,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -10287,12 +10433,182 @@ class $AppDatabaseManager {
       $$DbConfigStoreTableTableManager(_db, _db.dbConfigStore);
   $$DbConfigProfilesTableTableManager get dbConfigProfiles =>
       $$DbConfigProfilesTableTableManager(_db, _db.dbConfigProfiles);
+  $$DbAvailableModelsTableTableManager get dbAvailableModels =>
+      $$DbAvailableModelsTableTableManager(_db, _db.dbAvailableModels);
   $$DbSessionsTableTableManager get dbSessions =>
       $$DbSessionsTableTableManager(_db, _db.dbSessions);
   $$DbChatRoundsTableTableManager get dbChatRounds =>
       $$DbChatRoundsTableTableManager(_db, _db.dbChatRounds);
   $$DbAttachmentsTableTableManager get dbAttachments =>
       $$DbAttachmentsTableTableManager(_db, _db.dbAttachments);
+}
+````
+
+## File: lib/data/repositories/config_repository.dart
+````dart
+import 'package:drift/drift.dart';
+import '../database/database.dart';
+import '../../core/models/app_config.dart';
+import '../../core/models/model_info.dart';
+
+class ConfigRepository {
+  final AppDatabase _db;
+
+  ConfigRepository(this._db);
+
+  // 获取所有档案（填充 availableModels）
+  Future<List<ConfigProfile>> getProfiles() async {
+    final profilesRows = await _db.select(_db.dbConfigProfiles).get();
+    final profiles = <ConfigProfile>[];
+    for (final row in profilesRows) {
+      final models = await _getModelsForProfile(row.id);
+      profiles.add(ConfigProfile(
+        id: row.id,
+        name: row.name,
+        baseUrl: row.baseUrl,
+        apiKey: row.apiKey,
+        selectedModel: row.selectedModel,
+        modelsPath: row.modelsPath,
+        chatPath: row.chatPath,
+        apiMode: row.apiMode,
+        availableModels: models,
+      ));
+    }
+    return profiles;
+  }
+
+  Future<String> getActiveProfileId() async {
+    final row = await _db.select(_db.dbConfigStore).getSingle();
+    return row.activeProfileId;
+  }
+
+  Future<void> setActiveProfileId(String profileId) async {
+    await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
+      DbConfigStoreCompanion(
+        id: const Value(1),
+        activeProfileId: Value(profileId),
+      ),
+    );
+  }
+
+  Future<void> insertDefaultSettings(GlobalSettings defaultSettings) async {
+    await _db.transaction(() async {
+      for (final profile in defaultSettings.profiles) {
+        await _insertProfile(profile);
+      }
+      await _db.into(_db.dbConfigStore).insert(
+        DbConfigStoreCompanion.insert(
+          activeProfileId: defaultSettings.activeProfileId,
+        ),
+      );
+    });
+  }
+
+  Future<void> updateProfileConfig(String profileId, ConfigProfile config) async {
+    await _db.transaction(() async {
+      // 更新档案主表
+      await (_db.update(_db.dbConfigProfiles)..where((t) => t.id.equals(profileId)))
+          .write(DbConfigProfilesCompanion(
+            name: Value(config.name),
+            baseUrl: Value(config.baseUrl),
+            apiKey: Value(config.apiKey),
+            selectedModel: Value(config.selectedModel),
+            modelsPath: Value(config.modelsPath),
+            chatPath: Value(config.chatPath),
+            apiMode: Value(config.apiMode),
+          ));
+      // 替换 availableModels：先删除旧记录，再插入新记录
+      await (_db.delete(_db.dbAvailableModels)..where((t) => t.profileId.equals(profileId))).go();
+      for (final model in config.availableModels) {
+        await _db.into(_db.dbAvailableModels).insert(
+          DbAvailableModelsCompanion(
+            profileId: Value(profileId),
+            modelId: Value(model.id),
+            overrideSupportsReasoning: Value(model.overrideSupportsReasoning),
+            overrideSupportsVision: Value(model.overrideSupportsVision),
+          ),
+        );
+      }
+    });
+  }
+
+  Future<void> createProfile(ConfigProfile profile) async {
+    await _db.transaction(() async {
+      await _insertProfile(profile);
+    });
+  }
+
+  Future<void> renameProfile(String profileId, String newName) async {
+    await (_db.update(_db.dbConfigProfiles)..where((t) => t.id.equals(profileId)))
+        .write(DbConfigProfilesCompanion(name: Value(newName)));
+  }
+
+  Future<void> deleteProfile(String profileId) async {
+    // 由于 DbAvailableModels 设置了级联删除，删除档案时会自动删除其模型记录
+    await (_db.delete(_db.dbConfigProfiles)..where((t) => t.id.equals(profileId))).go();
+  }
+
+  Stream<List<ConfigProfile>> watchProfiles() {
+    return _db.select(_db.dbConfigProfiles).watch().asyncMap((rows) async {
+      final profiles = <ConfigProfile>[];
+      for (final row in rows) {
+        final models = await _getModelsForProfile(row.id);
+        profiles.add(ConfigProfile(
+          id: row.id,
+          name: row.name,
+          baseUrl: row.baseUrl,
+          apiKey: row.apiKey,
+          selectedModel: row.selectedModel,
+          modelsPath: row.modelsPath,
+          chatPath: row.chatPath,
+          apiMode: row.apiMode,
+          availableModels: models,
+        ));
+      }
+      return profiles;
+    });
+  }
+
+  Stream<String?> watchActiveProfileId() {
+    return _db.select(_db.dbConfigStore).watchSingleOrNull().map((row) => row?.activeProfileId);
+  }
+
+  // 内部辅助方法
+  Future<List<ModelInfo>> _getModelsForProfile(String profileId) async {
+    final rows = await (_db.select(_db.dbAvailableModels)
+          ..where((t) => t.profileId.equals(profileId)))
+        .get();
+    return rows.map((row) => ModelInfo(
+      id: row.modelId,
+      overrideSupportsReasoning: row.overrideSupportsReasoning,
+      overrideSupportsVision: row.overrideSupportsVision,
+    )).toList();
+  }
+
+  Future<void> _insertProfile(ConfigProfile profile) async {
+    await _db.into(_db.dbConfigProfiles).insert(
+      DbConfigProfilesCompanion(
+        id: Value(profile.id),
+        name: Value(profile.name),
+        baseUrl: Value(profile.baseUrl),
+        apiKey: Value(profile.apiKey),
+        selectedModel: Value(profile.selectedModel),
+        modelsPath: Value(profile.modelsPath),
+        chatPath: Value(profile.chatPath),
+        apiMode: Value(profile.apiMode),
+      ),
+    );
+    for (final model in profile.availableModels) {
+      await _db.into(_db.dbAvailableModels).insert(
+        DbAvailableModelsCompanion(
+          profileId: Value(profile.id),
+          modelId: Value(model.id),
+          overrideSupportsReasoning: Value(model.overrideSupportsReasoning),
+          overrideSupportsVision: Value(model.overrideSupportsVision),
+        ),
+      );
+    }
+  }
 }
 ````
 
@@ -10555,62 +10871,6 @@ class MarkdownWidget extends StatelessWidget {
 }
 ````
 
-## File: lib/di/providers.dart
-````dart
-import 'package:aiservice/data/repositories/config_repository.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
-
-import '../data/data_sources/local_file_source.dart';
-import '../data/data_sources/local_chat_source.dart'; // 新增
-import '../data/data_sources/remote_chat_source.dart'; // 替换原 remote_api_source
-import '../data/data_sources/chat_source_router.dart'; // 新增
-import '../data/database/database.dart';
-import '../data/services/config_service.dart';
-import '../data/repositories/conversation_repository.dart';
-
-final localFileSourceProvider = FutureProvider<LocalFileSource>((ref) async {
-  final appDir = await getApplicationDocumentsDirectory();
-  final fileSource = LocalFileSource(appDir.path);
-  await fileSource.initDirectories();
-  return fileSource;
-});
-
-final appDatabaseProvider = Provider<AppDatabase>((ref) {
-  ref.watch(localFileSourceProvider);
-  return AppDatabase();
-});
-
-// --- 新增 Data Sources ---
-final remoteChatSourceProvider = Provider<RemoteChatSource>((ref) => RemoteChatSource());
-final localChatSourceProvider = Provider<LocalChatSource>((ref) => LocalChatSource());
-
-final chatSourceRouterProvider = Provider<ChatSourceRouter>((ref) {
-  return ChatSourceRouter(
-    ref.watch(remoteChatSourceProvider),
-    ref.watch(localChatSourceProvider),
-  );
-});
-
-final configRepositoryProvider = Provider<ConfigRepository>((ref) {
-  return ConfigRepository(ref.watch(appDatabaseProvider));
-});
-
-final configServiceProvider = Provider<ConfigService>((ref) {
-  return ConfigService(
-    ref.watch(configRepositoryProvider),
-    ref.watch(chatSourceRouterProvider),
-  );
-});
-
-final conversationRepositoryProvider = Provider<ConversationRepository>((ref) {
-  return ConversationRepository(
-    ref.watch(appDatabaseProvider),
-    ref.watch(localFileSourceProvider).requireValue,
-  );
-});
-````
-
 ## File: lib/domain/models/session_list_item.dart
 ````dart
 class SessionListItem {
@@ -10788,17 +11048,14 @@ TreeNode _buildSubtreeIterative(
 ````dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/app_config.dart';
-import '../../core/models/app_config_store.dart';
 import '../../di/providers.dart';
 
-/// 监听当前激活的配置（响应式）
-final configProvider = StreamProvider<AppConfig>((ref) {
-  return ref.read(configServiceProvider).watchConfig();
+final configProvider = StreamProvider<ConfigProfile>((ref) {
+  return ref.read(configServiceProvider).watchActiveConfig();
 });
 
-/// 监听配置存档列表（响应式）
-final configProfilesProvider = StreamProvider<AppConfigStore>((ref) {
-  return ref.read(configServiceProvider).watchConfigStore();
+final globalSettingsProvider = StreamProvider<GlobalSettings>((ref) {
+  return ref.read(configServiceProvider).watchGlobalSettings();
 });
 ````
 
@@ -10835,6 +11092,62 @@ class AppPageScaffold extends StatelessWidget {
 }
 ````
 
+## File: lib/di/providers.dart
+````dart
+import 'package:aiservice/data/repositories/config_repository.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
+
+import '../data/data_sources/local_file_source.dart';
+import '../data/data_sources/local_chat_source.dart'; // 新增
+import '../data/data_sources/remote_chat_source.dart'; // 替换原 remote_api_source
+import '../data/data_sources/chat_source_router.dart'; // 新增
+import '../data/database/database.dart';
+import '../data/services/config_service.dart';
+import '../data/repositories/conversation_repository.dart';
+
+final localFileSourceProvider = FutureProvider<LocalFileSource>((ref) async {
+  final appDir = await getApplicationDocumentsDirectory();
+  final fileSource = LocalFileSource(appDir.path);
+  await fileSource.initDirectories();
+  return fileSource;
+});
+
+final appDatabaseProvider = Provider<AppDatabase>((ref) {
+  ref.watch(localFileSourceProvider);
+  return AppDatabase();
+});
+
+// --- 新增 Data Sources ---
+final remoteChatSourceProvider = Provider<RemoteChatSource>((ref) => RemoteChatSource());
+final localChatSourceProvider = Provider<LocalChatSource>((ref) => LocalChatSource());
+
+final chatSourceRouterProvider = Provider<ChatSourceRouter>((ref) {
+  return ChatSourceRouter(
+    ref.watch(remoteChatSourceProvider),
+    ref.watch(localChatSourceProvider),
+  );
+});
+
+final configRepositoryProvider = Provider<ConfigRepository>((ref) {
+  return ConfigRepository(ref.watch(appDatabaseProvider));
+});
+
+final configServiceProvider = Provider<ConfigService>((ref) {
+  return ConfigService(
+    ref.watch(configRepositoryProvider),
+    ref.watch(chatSourceRouterProvider),
+  );
+});
+
+final conversationRepositoryProvider = Provider<ConversationRepository>((ref) {
+  return ConversationRepository(
+    ref.watch(appDatabaseProvider),
+    ref.watch(localFileSourceProvider).requireValue,
+  );
+});
+````
+
 ## File: lib/presentation/pages/image_attachment_viewer_page.dart
 ````dart
 import 'dart:io';
@@ -10867,87 +11180,6 @@ class ImageAttachmentViewerPage extends StatelessWidget {
             errorBuilder: (_, _, _) => const Center(child: Icon(CupertinoIcons.exclamationmark_triangle)),
           ),
         ),
-      ),
-    );
-  }
-}
-````
-
-## File: lib/presentation/widgets/thought_bubble.dart
-````dart
-import 'package:flutter/cupertino.dart';
-
-class ThoughtBubble extends StatefulWidget {
-  final String content;
-
-  const ThoughtBubble({
-    super.key,
-    required this.content,
-  });
-
-  @override
-  State<ThoughtBubble> createState() => _ThoughtBubbleState();
-}
-
-class _ThoughtBubbleState extends State<ThoughtBubble> {
-  bool _isExpanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = widget.content.trim();
-    if (text.isEmpty) return const SizedBox.shrink();
-
-    final textTheme = CupertinoTheme.of(context).textTheme;
-
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CupertinoButton(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            onPressed: () => setState(() => _isExpanded = !_isExpanded),
-            child: Row(
-              children: [
-                Icon(
-                  CupertinoIcons.lightbulb,
-                  size: 16,
-                  color: CupertinoDynamicColor.resolve(CupertinoColors.systemBlue, context),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  '推理过程',
-                  style: textTheme.textStyle.copyWith(
-                    color: CupertinoDynamicColor.resolve(CupertinoColors.systemBlue, context),
-                  ),
-                ),
-                const Spacer(),
-                Icon(
-                  _isExpanded ? CupertinoIcons.chevron_up : CupertinoIcons.chevron_down,
-                  size: 18,
-                  color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey, context),
-                ),
-              ],
-            ),
-          ),
-          if (_isExpanded)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              child: Text(
-                text,
-                style: textTheme.textStyle.copyWith(
-                  fontSize: 13,
-                  height: 1.5,
-                  color: CupertinoDynamicColor.resolve(CupertinoColors.label, context),
-                ),
-              ),
-            ),
-        ],
       ),
     );
   }
@@ -11200,7 +11432,7 @@ class ChatService {
       repository,
     );
 
-    final config = await configService.loadConfig();
+    final config = await configService.loadActiveConfig();
     final source = sourceRouter.getSourceFromConfig(config);
     
     final chatStream = source.chatStream(
@@ -11269,6 +11501,79 @@ class ChatService {
 }
 ````
 
+## File: lib/presentation/widgets/thought_bubble.dart
+````dart
+import 'package:flutter/cupertino.dart';
+
+class ThoughtBubble extends StatefulWidget {
+  final String content;
+
+  const ThoughtBubble({
+    super.key,
+    required this.content,
+  });
+
+  @override
+  State<ThoughtBubble> createState() => _ThoughtBubbleState();
+}
+
+class _ThoughtBubbleState extends State<ThoughtBubble> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = widget.content.trim();
+    if (text.isEmpty) return const SizedBox.shrink();
+
+    final textTheme = CupertinoTheme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            onPressed: () => setState(() => _isExpanded = !_isExpanded),
+            child: Row(
+              children: [
+                Text(
+                  '推理过程',
+                  style: textTheme.textStyle.copyWith(
+                    color: CupertinoDynamicColor.resolve(CupertinoColors.systemBlue, context),
+                  ),
+                ),
+                const Spacer(),
+                Icon(
+                  _isExpanded ? CupertinoIcons.chevron_up : CupertinoIcons.chevron_down,
+                  size: 18,
+                  color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey, context),
+                ),
+              ],
+            ),
+          ),
+          if (_isExpanded)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: Text(
+                text,
+                style: textTheme.textStyle.copyWith(
+                  color: CupertinoDynamicColor.resolve(CupertinoColors.label, context),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+````
+
 ## File: lib/main.dart
 ````dart
 import 'package:flutter/cupertino.dart';
@@ -11327,7 +11632,7 @@ import 'package:file_picker/file_picker.dart';
 
 /// 设置表单的状态
 class SettingsFormState {
-  final AppConfig config;
+  final ConfigProfile config;
   final bool isSaving;
   final bool isRefreshingModels;
 
@@ -11338,7 +11643,7 @@ class SettingsFormState {
   });
 
   SettingsFormState copyWith({
-    AppConfig? config,
+    ConfigProfile? config,
     bool? isSaving,
     String? error,
     bool? isRefreshingModels,
@@ -11354,7 +11659,7 @@ class SettingsFormState {
 /// 设置表单 Notifier
 class SettingsFormNotifier extends Notifier<SettingsFormState> {
   late final ConfigService _configService;
-  AppConfig? _lastLoadedConfig;
+  ConfigProfile? _lastLoadedConfig;
 
   @override
   SettingsFormState build() {
@@ -11366,11 +11671,11 @@ class SettingsFormNotifier extends Notifier<SettingsFormState> {
       _lastLoadedConfig = initialConfig;
       state = SettingsFormState(config: initialConfig);
     } else {
-      state = SettingsFormState(config: AppConfig.defaultConfig());
+      state = SettingsFormState(config: ConfigProfile.defaultProfile());
     }
 
     // 2. 监听全局配置变化，自动同步
-    ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
+    ref.listen<AsyncValue<ConfigProfile>>(configProvider, (previous, next) {
       next.whenData((config) {
         if (_lastLoadedConfig != config) {
           _lastLoadedConfig = config;
@@ -11382,7 +11687,7 @@ class SettingsFormNotifier extends Notifier<SettingsFormState> {
     return state;
   }
 
-  void _load(AppConfig config) {
+  void _load(ConfigProfile config) {
     state = state.copyWith(config: config);
   }
 
@@ -11431,7 +11736,7 @@ class SettingsFormNotifier extends Notifier<SettingsFormState> {
     final modelId = state.config.selectedModel;
     if (modelId == null || modelId.isEmpty) return;
 
-    final models = [...(state.config.availableModels ?? const <ModelInfo>[])];
+    final models = [...(state.config.availableModels)];
     final index = models.indexWhere((m) => m.id == modelId);
     final baseModel = index >= 0 ? models[index] : ModelInfo(id: modelId);
 
@@ -11461,7 +11766,7 @@ class SettingsFormNotifier extends Notifier<SettingsFormState> {
   }
 
   void restoreDefaults() {
-    state = state.copyWith(config: AppConfig.defaultConfig());
+    state = state.copyWith(config: ConfigProfile.defaultProfile());
   }
 
   Future<void> refreshModels() async {
@@ -11494,7 +11799,7 @@ class SettingsFormNotifier extends Notifier<SettingsFormState> {
 
     final newModel = ModelInfo(id: path);
 
-    final currentModels = List<ModelInfo>.from(state.config.availableModels ?? []);
+    final currentModels = List<ModelInfo>.from(state.config.availableModels);
     if (currentModels.any((m) => m.id == path)) {
       // 已存在则直接选中
       state = state.copyWith(config: state.config.copyWith(selectedModel: path));
@@ -11874,10 +12179,9 @@ class MessageBubble extends StatelessWidget {
 ````dart
 import 'dart:async';
 import 'package:aiservice/data/data_sources/chat_source_router.dart';
+import 'package:collection/collection.dart';
 import 'package:rxdart/rxdart.dart';
 import '../../core/models/app_config.dart';
-import '../../core/models/app_config_store.dart';
-import '../../core/models/model_info.dart';
 import '../repositories/config_repository.dart';
 import 'package:uuid/uuid.dart';
 
@@ -11887,53 +12191,44 @@ class ConfigService {
 
   ConfigService(this._repository, this._sourceRouter);
 
-  Future<AppConfigStore> loadConfigStore() async {
+  Future<GlobalSettings> loadGlobalSettings() async {
     final profiles = await _repository.getProfiles();
     if (profiles.isEmpty) {
-      final defaultStore = AppConfigStore.defaultStore();
-      await _repository.insertDefaultStore(defaultStore);
-      return defaultStore;
+      final defaultSettings = GlobalSettings.defaultSettings();
+      await _repository.insertDefaultSettings(defaultSettings);
+      return defaultSettings;
     }
-
     final activeProfileId = await _repository.getActiveProfileId();
-    return AppConfigStore(
+    return GlobalSettings(
       activeProfileId: activeProfileId,
       profiles: profiles,
     );
   }
 
-  Future<AppConfig> loadConfig() async {
-    final store = await loadConfigStore();
-    return store.profiles.firstWhere(
-      (p) => p.id == store.activeProfileId,
-      orElse: () => store.profiles.first,
-    ).config;
+  Future<ConfigProfile> loadActiveConfig() async {
+    final settings = await loadGlobalSettings();
+    return settings.profiles.firstWhere(
+      (p) => p.id == settings.activeProfileId,
+      orElse: () => settings.profiles.first,
+    );
   }
 
-  Future<void> saveConfig(AppConfig config) async {
-    final store = await loadConfigStore();
-    await _repository.updateProfileConfig(store.activeProfileId, config);
+  Future<void> saveConfig(ConfigProfile config) async {
+    final settings = await loadGlobalSettings();
+    await _repository.updateProfileConfig(settings.activeProfileId, config);
   }
 
-  Future<void> refreshModels(AppConfig targetConfig) async {
+  Future<void> refreshModels(ConfigProfile targetConfig) async {
     final source = _sourceRouter.getSourceFromConfig(targetConfig);
     final remoteModels = await source.fetchModels(targetConfig);
-
-    final oldModels = targetConfig.availableModels ?? const <ModelInfo>[];
-    final oldById = {for (final model in oldModels) model.id: model};
-
     final updatedModels = remoteModels.map((remote) {
-      final old = oldById[remote.id];
+      final old = targetConfig.availableModels.firstWhereOrNull((m) => m.id == remote.id);
       return remote.copyWith(
         overrideSupportsReasoning: old?.overrideSupportsReasoning,
         overrideSupportsVision: old?.overrideSupportsVision,
       );
     }).toList();
-
-    final updatedConfig = targetConfig.copyWith(
-      availableModels: updatedModels,
-    );
-
+    final updatedConfig = targetConfig.copyWith(availableModels: updatedModels);
     await saveConfig(updatedConfig);
   }
 
@@ -11946,11 +12241,21 @@ class ConfigService {
   }
 
   Future<void> createProfile(String name) async {
-    final activeConfig = await loadConfig();
+    final activeConfig = await loadActiveConfig();
     final newId = const Uuid().v4();
     final cleanName = name.trim().isEmpty ? '新配置' : name.trim();
-
-    await _repository.createProfile(newId, cleanName, activeConfig);
+    final newProfile = ConfigProfile(
+      id: newId,
+      name: cleanName,
+      baseUrl: activeConfig.baseUrl,
+      apiKey: activeConfig.apiKey,
+      selectedModel: activeConfig.selectedModel,
+      modelsPath: activeConfig.modelsPath,
+      chatPath: activeConfig.chatPath,
+      apiMode: activeConfig.apiMode,
+      availableModels: activeConfig.availableModels,
+    );
+    await _repository.createProfile(newProfile);
     await switchProfile(newId);
   }
 
@@ -11960,39 +12265,36 @@ class ConfigService {
   }
 
   Future<void> deleteProfile(String profileId) async {
-    final store = await loadConfigStore();
-    if (store.profiles.length <= 1) return;
-
-    if (store.activeProfileId == profileId) {
-      final remaining = store.profiles.where((p) => p.id != profileId).toList();
+    final settings = await loadGlobalSettings();
+    if (settings.profiles.length <= 1) return;
+    if (settings.activeProfileId == profileId) {
+      final remaining = settings.profiles.where((p) => p.id != profileId).toList();
       if (remaining.isNotEmpty) {
         await switchProfile(remaining.first.id);
       }
     }
-
     await _repository.deleteProfile(profileId);
   }
 
-  Stream<AppConfigStore> watchConfigStore() {
+  Stream<GlobalSettings> watchGlobalSettings() {
     final profilesStream = _repository.watchProfiles();
     final activeIdStream = _repository.watchActiveProfileId();
-
     return Rx.combineLatest2(profilesStream, activeIdStream, (profiles, activeId) {
       if (profiles.isEmpty) return null;
       final effectiveActiveId = activeId ?? profiles.first.id;
-      return AppConfigStore(
+      return GlobalSettings(
         activeProfileId: effectiveActiveId,
         profiles: profiles,
       );
     }).where((store) => store != null).map((store) => store!);
   }
 
-  Stream<AppConfig> watchConfig() {
-    return watchConfigStore().map((store) {
-      return store.profiles.firstWhere(
-        (p) => p.id == store.activeProfileId,
-        orElse: () => store.profiles.first,
-      ).config;
+  Stream<ConfigProfile> watchActiveConfig() {
+    return watchGlobalSettings().map((settings) {
+      return settings.profiles.firstWhere(
+        (p) => p.id == settings.activeProfileId,
+        orElse: () => settings.profiles.first,
+      );
     });
   }
 }
@@ -12001,9 +12303,9 @@ class ConfigService {
 ## File: lib/presentation/pages/settings_page.dart
 ````dart
 // lib/presentation/pages/settings_page.dart
+import 'package:aiservice/core/models/app_config.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/app_config_store.dart';
 import '../../core/models/model_info.dart';
 import '../../data/services/config_service.dart';
 import '../../di/providers.dart';
@@ -12025,7 +12327,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget build(BuildContext context) {
     final formState = ref.watch(settingsFormProvider);
     final formNotifier = ref.read(settingsFormProvider.notifier);
-    final profilesAsync = ref.watch(configProfilesProvider);
+    final profilesAsync = ref.watch(globalSettingsProvider);
     final configService = ref.read(configServiceProvider);
 
     return AppPageScaffold(
@@ -12056,7 +12358,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Widget _buildProfileSection(
     BuildContext context,
-    AppConfigStore store,
+    GlobalSettings store,
     ConfigService configService,
   ) {
     final activeProfile = store.profiles.firstWhere((p) => p.id == store.activeProfileId);
@@ -12125,7 +12427,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Widget _buildModelSection(SettingsFormState formState, SettingsFormNotifier notifier) {
-    final models = formState.config.availableModels ?? const <ModelInfo>[];
+    final models = formState.config.availableModels;
     final currentModelId = formState.config.selectedModel;
     final currentModel = currentModelId != null
         ? models.where((m) => m.id == currentModelId).firstOrNull
@@ -12296,7 +12598,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   void _showProfileManagementSheet(
     BuildContext context,
-    AppConfigStore store,
+    GlobalSettings store,
     ConfigService configService,
   ) {
     final activeProfile = store.profiles.firstWhere((p) => p.id == store.activeProfileId);
@@ -13354,6 +13656,47 @@ class _PreviewLine extends StatelessWidget {
 }
 ````
 
+## File: lib/presentation/providers/chat_notifier.dart
+````dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/chat_round.dart';
+import '../../di/providers.dart';
+
+final sessionTitleProvider = StreamProvider.family<String, String>((ref, sessionId) {
+  return ref.watch(conversationRepositoryProvider).watchSessionTitle(sessionId)
+      .map((title) => title ?? '对话');
+});
+
+final chatTopologyProvider =
+    StreamProvider.family<List<({String id, String? parentId})>, String>(
+  (ref, sessionId) {
+    return ref.watch(conversationRepositoryProvider).watchSessionTopology(sessionId);
+  },
+);
+
+final roundDetailProvider = StreamProvider.family<ChatRound?, String>((ref, roundId) {
+  return ref.watch(conversationRepositoryProvider).watchSingleRound(roundId);
+});
+
+final visibleRoundIdsProvider =
+    Provider.family<List<String>, ({String sessionId, String? roundId})>(
+  (ref, args) {
+    final topology = ref.watch(chatTopologyProvider(args.sessionId)).valueOrNull ?? [];
+    if (args.roundId == null) return const [];
+
+    final idToParent = {for (var t in topology) t.id: t.parentId};
+    final path = <String>[];
+    String? currentId = args.roundId;
+
+    while (currentId != null && idToParent.containsKey(currentId)) {
+      path.add(currentId);
+      currentId = idToParent[currentId];
+    }
+    return path.reversed.toList();
+  },
+);
+````
+
 ## File: lib/presentation/widgets/input_bar.dart
 ````dart
 import 'dart:io';
@@ -14095,7 +14438,6 @@ class ConversationRepository {
     final session = Session(
       id: sessionId,
       title: title,
-      createdAt: now,
       updatedAt: now,
       rounds: [],
     );
@@ -14103,7 +14445,6 @@ class ConversationRepository {
           DbSessionsCompanion.insert(
             id: session.id,
             title: session.title,
-            createdAt: session.createdAt,
             updatedAt: session.updatedAt,
           ),
         );
@@ -14193,47 +14534,6 @@ class ConversationRepository {
   Future<void> deleteAttachment(String relativePath) async =>
       await _fileService.deleteAttachment(relativePath);
 }
-````
-
-## File: lib/presentation/providers/chat_notifier.dart
-````dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/chat_round.dart';
-import '../../di/providers.dart';
-
-final sessionTitleProvider = StreamProvider.family<String, String>((ref, sessionId) {
-  return ref.watch(conversationRepositoryProvider).watchSessionTitle(sessionId)
-      .map((title) => title ?? '对话');
-});
-
-final chatTopologyProvider =
-    StreamProvider.family<List<({String id, String? parentId})>, String>(
-  (ref, sessionId) {
-    return ref.watch(conversationRepositoryProvider).watchSessionTopology(sessionId);
-  },
-);
-
-final roundDetailProvider = StreamProvider.family<ChatRound?, String>((ref, roundId) {
-  return ref.watch(conversationRepositoryProvider).watchSingleRound(roundId);
-});
-
-final visibleRoundIdsProvider =
-    Provider.family<List<String>, ({String sessionId, String? roundId})>(
-  (ref, args) {
-    final topology = ref.watch(chatTopologyProvider(args.sessionId)).valueOrNull ?? [];
-    if (args.roundId == null) return const [];
-
-    final idToParent = {for (var t in topology) t.id: t.parentId};
-    final path = <String>[];
-    String? currentId = args.roundId;
-
-    while (currentId != null && idToParent.containsKey(currentId)) {
-      path.add(currentId);
-      currentId = idToParent[currentId];
-    }
-    return path.reversed.toList();
-  },
-);
 ````
 
 ## File: lib/presentation/pages/chat_page.dart

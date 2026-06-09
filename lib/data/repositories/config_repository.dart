@@ -1,30 +1,39 @@
 import 'package:drift/drift.dart';
 import '../database/database.dart';
 import '../../core/models/app_config.dart';
-import '../../core/models/app_config_store.dart';
+import '../../core/models/model_info.dart';
 
 class ConfigRepository {
   final AppDatabase _db;
 
   ConfigRepository(this._db);
 
-  /// 获取所有配置档案列表
+  // 获取所有档案（填充 availableModels）
   Future<List<ConfigProfile>> getProfiles() async {
-    final rows = await _db.select(_db.dbConfigProfiles).get();
-    return rows.map((p) => ConfigProfile(
-      id: p.id,
-      name: p.name,
-      config: p.config,
-    )).toList();
+    final profilesRows = await _db.select(_db.dbConfigProfiles).get();
+    final profiles = <ConfigProfile>[];
+    for (final row in profilesRows) {
+      final models = await _getModelsForProfile(row.id);
+      profiles.add(ConfigProfile(
+        id: row.id,
+        name: row.name,
+        baseUrl: row.baseUrl,
+        apiKey: row.apiKey,
+        selectedModel: row.selectedModel,
+        modelsPath: row.modelsPath,
+        chatPath: row.chatPath,
+        apiMode: row.apiMode,
+        availableModels: models,
+      ));
+    }
+    return profiles;
   }
 
-  /// 获取当前激活的配置档案 ID
   Future<String> getActiveProfileId() async {
     final row = await _db.select(_db.dbConfigStore).getSingle();
     return row.activeProfileId;
   }
 
-  /// 设置激活的配置档案 ID
   Future<void> setActiveProfileId(String profileId) async {
     await _db.into(_db.dbConfigStore).insertOnConflictUpdate(
       DbConfigStoreCompanion(
@@ -34,70 +43,122 @@ class ConfigRepository {
     );
   }
 
-  /// 插入默认配置存档（初始化时使用）
-  Future<void> insertDefaultStore(AppConfigStore defaultStore) async {
+  Future<void> insertDefaultSettings(GlobalSettings defaultSettings) async {
     await _db.transaction(() async {
-      for (final profile in defaultStore.profiles) {
-        await _db.into(_db.dbConfigProfiles).insert(
-          DbConfigProfilesCompanion.insert(
-            id: profile.id,
-            name: profile.name,
-            config: profile.config,
-          ),
-        );
+      for (final profile in defaultSettings.profiles) {
+        await _insertProfile(profile);
       }
       await _db.into(_db.dbConfigStore).insert(
         DbConfigStoreCompanion.insert(
-          id: const Value(1),
-          activeProfileId: defaultStore.activeProfileId,
+          activeProfileId: defaultSettings.activeProfileId,
         ),
       );
     });
   }
 
-  /// 更新指定配置档案的配置内容
-  Future<void> updateProfileConfig(String profileId, AppConfig config) async {
-    await (_db.update(_db.dbConfigProfiles)
-          ..where((t) => t.id.equals(profileId)))
-        .write(DbConfigProfilesCompanion(config: Value(config)));
+  Future<void> updateProfileConfig(String profileId, ConfigProfile config) async {
+    await _db.transaction(() async {
+      // 更新档案主表
+      await (_db.update(_db.dbConfigProfiles)..where((t) => t.id.equals(profileId)))
+          .write(DbConfigProfilesCompanion(
+            name: Value(config.name),
+            baseUrl: Value(config.baseUrl),
+            apiKey: Value(config.apiKey),
+            selectedModel: Value(config.selectedModel),
+            modelsPath: Value(config.modelsPath),
+            chatPath: Value(config.chatPath),
+            apiMode: Value(config.apiMode),
+          ));
+      // 替换 availableModels：先删除旧记录，再插入新记录
+      await (_db.delete(_db.dbAvailableModels)..where((t) => t.profileId.equals(profileId))).go();
+      for (final model in config.availableModels) {
+        await _db.into(_db.dbAvailableModels).insert(
+          DbAvailableModelsCompanion(
+            profileId: Value(profileId),
+            modelId: Value(model.id),
+            overrideSupportsReasoning: Value(model.overrideSupportsReasoning),
+            overrideSupportsVision: Value(model.overrideSupportsVision),
+          ),
+        );
+      }
+    });
   }
 
-  /// 创建新的配置档案
-  Future<void> createProfile(String id, String name, AppConfig config) async {
-    await _db.into(_db.dbConfigProfiles).insert(
-      DbConfigProfilesCompanion.insert(
-        id: id,
-        name: name,
-        config: config,
-      ),
-    );
+  Future<void> createProfile(ConfigProfile profile) async {
+    await _db.transaction(() async {
+      await _insertProfile(profile);
+    });
   }
 
-  /// 重命名配置档案
   Future<void> renameProfile(String profileId, String newName) async {
-    await (_db.update(_db.dbConfigProfiles)
-          ..where((t) => t.id.equals(profileId)))
+    await (_db.update(_db.dbConfigProfiles)..where((t) => t.id.equals(profileId)))
         .write(DbConfigProfilesCompanion(name: Value(newName)));
   }
 
-  /// 删除配置档案
   Future<void> deleteProfile(String profileId) async {
-    await (_db.delete(_db.dbConfigProfiles)
-          ..where((t) => t.id.equals(profileId)))
-        .go();
+    // 由于 DbAvailableModels 设置了级联删除，删除档案时会自动删除其模型记录
+    await (_db.delete(_db.dbConfigProfiles)..where((t) => t.id.equals(profileId))).go();
   }
 
-  /// 监听配置档案列表的变化（用于响应式）
   Stream<List<ConfigProfile>> watchProfiles() {
-    return _db.select(_db.dbConfigProfiles).watch().map((rows) => rows.map((p) => ConfigProfile(
-      id: p.id,
-      name: p.name,
-      config: p.config,
-    )).toList());
+    return _db.select(_db.dbConfigProfiles).watch().asyncMap((rows) async {
+      final profiles = <ConfigProfile>[];
+      for (final row in rows) {
+        final models = await _getModelsForProfile(row.id);
+        profiles.add(ConfigProfile(
+          id: row.id,
+          name: row.name,
+          baseUrl: row.baseUrl,
+          apiKey: row.apiKey,
+          selectedModel: row.selectedModel,
+          modelsPath: row.modelsPath,
+          chatPath: row.chatPath,
+          apiMode: row.apiMode,
+          availableModels: models,
+        ));
+      }
+      return profiles;
+    });
   }
 
-  /// 监听激活的配置档案 ID 的变化
   Stream<String?> watchActiveProfileId() {
     return _db.select(_db.dbConfigStore).watchSingleOrNull().map((row) => row?.activeProfileId);
+  }
+
+  // 内部辅助方法
+  Future<List<ModelInfo>> _getModelsForProfile(String profileId) async {
+    final rows = await (_db.select(_db.dbAvailableModels)
+          ..where((t) => t.profileId.equals(profileId)))
+        .get();
+    return rows.map((row) => ModelInfo(
+      id: row.modelId,
+      overrideSupportsReasoning: row.overrideSupportsReasoning,
+      overrideSupportsVision: row.overrideSupportsVision,
+    )).toList();
+  }
+
+  Future<void> _insertProfile(ConfigProfile profile) async {
+    await _db.into(_db.dbConfigProfiles).insert(
+      DbConfigProfilesCompanion(
+        id: Value(profile.id),
+        name: Value(profile.name),
+        baseUrl: Value(profile.baseUrl),
+        apiKey: Value(profile.apiKey),
+        selectedModel: Value(profile.selectedModel),
+        modelsPath: Value(profile.modelsPath),
+        chatPath: Value(profile.chatPath),
+        apiMode: Value(profile.apiMode),
+      ),
+    );
+    for (final model in profile.availableModels) {
+      await _db.into(_db.dbAvailableModels).insert(
+        DbAvailableModelsCompanion(
+          profileId: Value(profile.id),
+          modelId: Value(model.id),
+          overrideSupportsReasoning: Value(model.overrideSupportsReasoning),
+          overrideSupportsVision: Value(model.overrideSupportsVision),
+        ),
+      );
+    }
   }
 }

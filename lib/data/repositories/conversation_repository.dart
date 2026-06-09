@@ -281,7 +281,6 @@ class ConversationRepository {
     final session = Session(
       id: sessionId,
       title: title,
-      createdAt: now,
       updatedAt: now,
       rounds: [],
     );
@@ -289,7 +288,6 @@ class ConversationRepository {
           DbSessionsCompanion.insert(
             id: session.id,
             title: session.title,
-            createdAt: session.createdAt,
             updatedAt: session.updatedAt,
           ),
         );

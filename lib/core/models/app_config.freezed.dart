@@ -15,73 +15,80 @@ final _privateConstructorUsedError = UnsupportedError(
   'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
 );
 
-AppConfig _$AppConfigFromJson(Map<String, dynamic> json) {
-  return _AppConfig.fromJson(json);
-}
-
 /// @nodoc
-mixin _$AppConfig {
+mixin _$ConfigProfile {
+  String get id => throw _privateConstructorUsedError;
+  String get name => throw _privateConstructorUsedError;
   String get baseUrl => throw _privateConstructorUsedError;
   String get apiKey => throw _privateConstructorUsedError;
   String? get selectedModel => throw _privateConstructorUsedError;
-  @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
-  List<ModelInfo>? get availableModels => throw _privateConstructorUsedError;
   String get modelsPath => throw _privateConstructorUsedError;
   String get chatPath => throw _privateConstructorUsedError;
   String get apiMode => throw _privateConstructorUsedError;
+  List<ModelInfo> get availableModels => throw _privateConstructorUsedError;
 
-  /// Serializes this AppConfig to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-
-  /// Create a copy of AppConfig
+  /// Create a copy of ConfigProfile
   /// with the given fields replaced by the non-null parameter values.
   @JsonKey(includeFromJson: false, includeToJson: false)
-  $AppConfigCopyWith<AppConfig> get copyWith =>
+  $ConfigProfileCopyWith<ConfigProfile> get copyWith =>
       throw _privateConstructorUsedError;
 }
 
 /// @nodoc
-abstract class $AppConfigCopyWith<$Res> {
-  factory $AppConfigCopyWith(AppConfig value, $Res Function(AppConfig) then) =
-      _$AppConfigCopyWithImpl<$Res, AppConfig>;
+abstract class $ConfigProfileCopyWith<$Res> {
+  factory $ConfigProfileCopyWith(
+    ConfigProfile value,
+    $Res Function(ConfigProfile) then,
+  ) = _$ConfigProfileCopyWithImpl<$Res, ConfigProfile>;
   @useResult
   $Res call({
+    String id,
+    String name,
     String baseUrl,
     String apiKey,
     String? selectedModel,
-    @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
-    List<ModelInfo>? availableModels,
     String modelsPath,
     String chatPath,
     String apiMode,
+    List<ModelInfo> availableModels,
   });
 }
 
 /// @nodoc
-class _$AppConfigCopyWithImpl<$Res, $Val extends AppConfig>
-    implements $AppConfigCopyWith<$Res> {
-  _$AppConfigCopyWithImpl(this._value, this._then);
+class _$ConfigProfileCopyWithImpl<$Res, $Val extends ConfigProfile>
+    implements $ConfigProfileCopyWith<$Res> {
+  _$ConfigProfileCopyWithImpl(this._value, this._then);
 
   // ignore: unused_field
   final $Val _value;
   // ignore: unused_field
   final $Res Function($Val) _then;
 
-  /// Create a copy of AppConfig
+  /// Create a copy of ConfigProfile
   /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
+    Object? id = null,
+    Object? name = null,
     Object? baseUrl = null,
     Object? apiKey = null,
     Object? selectedModel = freezed,
-    Object? availableModels = freezed,
     Object? modelsPath = null,
     Object? chatPath = null,
     Object? apiMode = null,
+    Object? availableModels = null,
   }) {
     return _then(
       _value.copyWith(
+            id: null == id
+                ? _value.id
+                : id // ignore: cast_nullable_to_non_nullable
+                      as String,
+            name: null == name
+                ? _value.name
+                : name // ignore: cast_nullable_to_non_nullable
+                      as String,
             baseUrl: null == baseUrl
                 ? _value.baseUrl
                 : baseUrl // ignore: cast_nullable_to_non_nullable
@@ -94,10 +101,6 @@ class _$AppConfigCopyWithImpl<$Res, $Val extends AppConfig>
                 ? _value.selectedModel
                 : selectedModel // ignore: cast_nullable_to_non_nullable
                       as String?,
-            availableModels: freezed == availableModels
-                ? _value.availableModels
-                : availableModels // ignore: cast_nullable_to_non_nullable
-                      as List<ModelInfo>?,
             modelsPath: null == modelsPath
                 ? _value.modelsPath
                 : modelsPath // ignore: cast_nullable_to_non_nullable
@@ -110,6 +113,10 @@ class _$AppConfigCopyWithImpl<$Res, $Val extends AppConfig>
                 ? _value.apiMode
                 : apiMode // ignore: cast_nullable_to_non_nullable
                       as String,
+            availableModels: null == availableModels
+                ? _value.availableModels
+                : availableModels // ignore: cast_nullable_to_non_nullable
+                      as List<ModelInfo>,
           )
           as $Val,
     );
@@ -117,50 +124,61 @@ class _$AppConfigCopyWithImpl<$Res, $Val extends AppConfig>
 }
 
 /// @nodoc
-abstract class _$$AppConfigImplCopyWith<$Res>
-    implements $AppConfigCopyWith<$Res> {
-  factory _$$AppConfigImplCopyWith(
-    _$AppConfigImpl value,
-    $Res Function(_$AppConfigImpl) then,
-  ) = __$$AppConfigImplCopyWithImpl<$Res>;
+abstract class _$$ConfigProfileImplCopyWith<$Res>
+    implements $ConfigProfileCopyWith<$Res> {
+  factory _$$ConfigProfileImplCopyWith(
+    _$ConfigProfileImpl value,
+    $Res Function(_$ConfigProfileImpl) then,
+  ) = __$$ConfigProfileImplCopyWithImpl<$Res>;
   @override
   @useResult
   $Res call({
+    String id,
+    String name,
     String baseUrl,
     String apiKey,
     String? selectedModel,
-    @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
-    List<ModelInfo>? availableModels,
     String modelsPath,
     String chatPath,
     String apiMode,
+    List<ModelInfo> availableModels,
   });
 }
 
 /// @nodoc
-class __$$AppConfigImplCopyWithImpl<$Res>
-    extends _$AppConfigCopyWithImpl<$Res, _$AppConfigImpl>
-    implements _$$AppConfigImplCopyWith<$Res> {
-  __$$AppConfigImplCopyWithImpl(
-    _$AppConfigImpl _value,
-    $Res Function(_$AppConfigImpl) _then,
+class __$$ConfigProfileImplCopyWithImpl<$Res>
+    extends _$ConfigProfileCopyWithImpl<$Res, _$ConfigProfileImpl>
+    implements _$$ConfigProfileImplCopyWith<$Res> {
+  __$$ConfigProfileImplCopyWithImpl(
+    _$ConfigProfileImpl _value,
+    $Res Function(_$ConfigProfileImpl) _then,
   ) : super(_value, _then);
 
-  /// Create a copy of AppConfig
+  /// Create a copy of ConfigProfile
   /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
+    Object? id = null,
+    Object? name = null,
     Object? baseUrl = null,
     Object? apiKey = null,
     Object? selectedModel = freezed,
-    Object? availableModels = freezed,
     Object? modelsPath = null,
     Object? chatPath = null,
     Object? apiMode = null,
+    Object? availableModels = null,
   }) {
     return _then(
-      _$AppConfigImpl(
+      _$ConfigProfileImpl(
+        id: null == id
+            ? _value.id
+            : id // ignore: cast_nullable_to_non_nullable
+                  as String,
+        name: null == name
+            ? _value.name
+            : name // ignore: cast_nullable_to_non_nullable
+                  as String,
         baseUrl: null == baseUrl
             ? _value.baseUrl
             : baseUrl // ignore: cast_nullable_to_non_nullable
@@ -173,10 +191,6 @@ class __$$AppConfigImplCopyWithImpl<$Res>
             ? _value.selectedModel
             : selectedModel // ignore: cast_nullable_to_non_nullable
                   as String?,
-        availableModels: freezed == availableModels
-            ? _value._availableModels
-            : availableModels // ignore: cast_nullable_to_non_nullable
-                  as List<ModelInfo>?,
         modelsPath: null == modelsPath
             ? _value.modelsPath
             : modelsPath // ignore: cast_nullable_to_non_nullable
@@ -189,45 +203,40 @@ class __$$AppConfigImplCopyWithImpl<$Res>
             ? _value.apiMode
             : apiMode // ignore: cast_nullable_to_non_nullable
                   as String,
+        availableModels: null == availableModels
+            ? _value._availableModels
+            : availableModels // ignore: cast_nullable_to_non_nullable
+                  as List<ModelInfo>,
       ),
     );
   }
 }
 
 /// @nodoc
-@JsonSerializable()
-class _$AppConfigImpl implements _AppConfig {
-  const _$AppConfigImpl({
+
+class _$ConfigProfileImpl implements _ConfigProfile {
+  const _$ConfigProfileImpl({
+    required this.id,
+    required this.name,
     required this.baseUrl,
     required this.apiKey,
     this.selectedModel,
-    @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
-    final List<ModelInfo>? availableModels,
     this.modelsPath = 'v1/models',
     this.chatPath = 'v1/chat/completions',
     this.apiMode = 'chat_completions',
+    final List<ModelInfo> availableModels = const [],
   }) : _availableModels = availableModels;
 
-  factory _$AppConfigImpl.fromJson(Map<String, dynamic> json) =>
-      _$$AppConfigImplFromJson(json);
-
+  @override
+  final String id;
+  @override
+  final String name;
   @override
   final String baseUrl;
   @override
   final String apiKey;
   @override
   final String? selectedModel;
-  final List<ModelInfo>? _availableModels;
-  @override
-  @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
-  List<ModelInfo>? get availableModels {
-    final value = _availableModels;
-    if (value == null) return null;
-    if (_availableModels is EqualUnmodifiableListView) return _availableModels;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableListView(value);
-  }
-
   @override
   @JsonKey()
   final String modelsPath;
@@ -237,74 +246,82 @@ class _$AppConfigImpl implements _AppConfig {
   @override
   @JsonKey()
   final String apiMode;
+  final List<ModelInfo> _availableModels;
+  @override
+  @JsonKey()
+  List<ModelInfo> get availableModels {
+    if (_availableModels is EqualUnmodifiableListView) return _availableModels;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_availableModels);
+  }
 
   @override
   String toString() {
-    return 'AppConfig(baseUrl: $baseUrl, apiKey: $apiKey, selectedModel: $selectedModel, availableModels: $availableModels, modelsPath: $modelsPath, chatPath: $chatPath, apiMode: $apiMode)';
+    return 'ConfigProfile(id: $id, name: $name, baseUrl: $baseUrl, apiKey: $apiKey, selectedModel: $selectedModel, modelsPath: $modelsPath, chatPath: $chatPath, apiMode: $apiMode, availableModels: $availableModels)';
   }
 
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
-            other is _$AppConfigImpl &&
+            other is _$ConfigProfileImpl &&
+            (identical(other.id, id) || other.id == id) &&
+            (identical(other.name, name) || other.name == name) &&
             (identical(other.baseUrl, baseUrl) || other.baseUrl == baseUrl) &&
             (identical(other.apiKey, apiKey) || other.apiKey == apiKey) &&
             (identical(other.selectedModel, selectedModel) ||
                 other.selectedModel == selectedModel) &&
-            const DeepCollectionEquality().equals(
-              other._availableModels,
-              _availableModels,
-            ) &&
             (identical(other.modelsPath, modelsPath) ||
                 other.modelsPath == modelsPath) &&
             (identical(other.chatPath, chatPath) ||
                 other.chatPath == chatPath) &&
-            (identical(other.apiMode, apiMode) || other.apiMode == apiMode));
+            (identical(other.apiMode, apiMode) || other.apiMode == apiMode) &&
+            const DeepCollectionEquality().equals(
+              other._availableModels,
+              _availableModels,
+            ));
   }
 
-  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hash(
     runtimeType,
+    id,
+    name,
     baseUrl,
     apiKey,
     selectedModel,
-    const DeepCollectionEquality().hash(_availableModels),
     modelsPath,
     chatPath,
     apiMode,
+    const DeepCollectionEquality().hash(_availableModels),
   );
 
-  /// Create a copy of AppConfig
+  /// Create a copy of ConfigProfile
   /// with the given fields replaced by the non-null parameter values.
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   @pragma('vm:prefer-inline')
-  _$$AppConfigImplCopyWith<_$AppConfigImpl> get copyWith =>
-      __$$AppConfigImplCopyWithImpl<_$AppConfigImpl>(this, _$identity);
-
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$AppConfigImplToJson(this);
-  }
+  _$$ConfigProfileImplCopyWith<_$ConfigProfileImpl> get copyWith =>
+      __$$ConfigProfileImplCopyWithImpl<_$ConfigProfileImpl>(this, _$identity);
 }
 
-abstract class _AppConfig implements AppConfig {
-  const factory _AppConfig({
+abstract class _ConfigProfile implements ConfigProfile {
+  const factory _ConfigProfile({
+    required final String id,
+    required final String name,
     required final String baseUrl,
     required final String apiKey,
     final String? selectedModel,
-    @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
-    final List<ModelInfo>? availableModels,
     final String modelsPath,
     final String chatPath,
     final String apiMode,
-  }) = _$AppConfigImpl;
+    final List<ModelInfo> availableModels,
+  }) = _$ConfigProfileImpl;
 
-  factory _AppConfig.fromJson(Map<String, dynamic> json) =
-      _$AppConfigImpl.fromJson;
-
+  @override
+  String get id;
+  @override
+  String get name;
   @override
   String get baseUrl;
   @override
@@ -312,19 +329,184 @@ abstract class _AppConfig implements AppConfig {
   @override
   String? get selectedModel;
   @override
-  @JsonKey(fromJson: _modelsFromJson, toJson: _modelsToJson)
-  List<ModelInfo>? get availableModels;
-  @override
   String get modelsPath;
   @override
   String get chatPath;
   @override
   String get apiMode;
+  @override
+  List<ModelInfo> get availableModels;
 
-  /// Create a copy of AppConfig
+  /// Create a copy of ConfigProfile
   /// with the given fields replaced by the non-null parameter values.
   @override
   @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$AppConfigImplCopyWith<_$AppConfigImpl> get copyWith =>
+  _$$ConfigProfileImplCopyWith<_$ConfigProfileImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+mixin _$GlobalSettings {
+  String get activeProfileId => throw _privateConstructorUsedError;
+  List<ConfigProfile> get profiles => throw _privateConstructorUsedError;
+
+  /// Create a copy of GlobalSettings
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $GlobalSettingsCopyWith<GlobalSettings> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $GlobalSettingsCopyWith<$Res> {
+  factory $GlobalSettingsCopyWith(
+    GlobalSettings value,
+    $Res Function(GlobalSettings) then,
+  ) = _$GlobalSettingsCopyWithImpl<$Res, GlobalSettings>;
+  @useResult
+  $Res call({String activeProfileId, List<ConfigProfile> profiles});
+}
+
+/// @nodoc
+class _$GlobalSettingsCopyWithImpl<$Res, $Val extends GlobalSettings>
+    implements $GlobalSettingsCopyWith<$Res> {
+  _$GlobalSettingsCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of GlobalSettings
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? activeProfileId = null, Object? profiles = null}) {
+    return _then(
+      _value.copyWith(
+            activeProfileId: null == activeProfileId
+                ? _value.activeProfileId
+                : activeProfileId // ignore: cast_nullable_to_non_nullable
+                      as String,
+            profiles: null == profiles
+                ? _value.profiles
+                : profiles // ignore: cast_nullable_to_non_nullable
+                      as List<ConfigProfile>,
+          )
+          as $Val,
+    );
+  }
+}
+
+/// @nodoc
+abstract class _$$GlobalSettingsImplCopyWith<$Res>
+    implements $GlobalSettingsCopyWith<$Res> {
+  factory _$$GlobalSettingsImplCopyWith(
+    _$GlobalSettingsImpl value,
+    $Res Function(_$GlobalSettingsImpl) then,
+  ) = __$$GlobalSettingsImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({String activeProfileId, List<ConfigProfile> profiles});
+}
+
+/// @nodoc
+class __$$GlobalSettingsImplCopyWithImpl<$Res>
+    extends _$GlobalSettingsCopyWithImpl<$Res, _$GlobalSettingsImpl>
+    implements _$$GlobalSettingsImplCopyWith<$Res> {
+  __$$GlobalSettingsImplCopyWithImpl(
+    _$GlobalSettingsImpl _value,
+    $Res Function(_$GlobalSettingsImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of GlobalSettings
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? activeProfileId = null, Object? profiles = null}) {
+    return _then(
+      _$GlobalSettingsImpl(
+        activeProfileId: null == activeProfileId
+            ? _value.activeProfileId
+            : activeProfileId // ignore: cast_nullable_to_non_nullable
+                  as String,
+        profiles: null == profiles
+            ? _value._profiles
+            : profiles // ignore: cast_nullable_to_non_nullable
+                  as List<ConfigProfile>,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+
+class _$GlobalSettingsImpl implements _GlobalSettings {
+  const _$GlobalSettingsImpl({
+    required this.activeProfileId,
+    final List<ConfigProfile> profiles = const [],
+  }) : _profiles = profiles;
+
+  @override
+  final String activeProfileId;
+  final List<ConfigProfile> _profiles;
+  @override
+  @JsonKey()
+  List<ConfigProfile> get profiles {
+    if (_profiles is EqualUnmodifiableListView) return _profiles;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_profiles);
+  }
+
+  @override
+  String toString() {
+    return 'GlobalSettings(activeProfileId: $activeProfileId, profiles: $profiles)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$GlobalSettingsImpl &&
+            (identical(other.activeProfileId, activeProfileId) ||
+                other.activeProfileId == activeProfileId) &&
+            const DeepCollectionEquality().equals(other._profiles, _profiles));
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    runtimeType,
+    activeProfileId,
+    const DeepCollectionEquality().hash(_profiles),
+  );
+
+  /// Create a copy of GlobalSettings
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$GlobalSettingsImplCopyWith<_$GlobalSettingsImpl> get copyWith =>
+      __$$GlobalSettingsImplCopyWithImpl<_$GlobalSettingsImpl>(
+        this,
+        _$identity,
+      );
+}
+
+abstract class _GlobalSettings implements GlobalSettings {
+  const factory _GlobalSettings({
+    required final String activeProfileId,
+    final List<ConfigProfile> profiles,
+  }) = _$GlobalSettingsImpl;
+
+  @override
+  String get activeProfileId;
+  @override
+  List<ConfigProfile> get profiles;
+
+  /// Create a copy of GlobalSettings
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$GlobalSettingsImplCopyWith<_$GlobalSettingsImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }

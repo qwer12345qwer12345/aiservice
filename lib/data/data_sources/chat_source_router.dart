@@ -13,7 +13,7 @@ class ChatSourceRouter {
     return apiMode == 'local' ? local : remote;
   }
   
-  ChatSource getSourceFromConfig(AppConfig config) {
+  ChatSource getSourceFromConfig(ConfigProfile config) {
     return getSource(config.apiMode);
   }
 }

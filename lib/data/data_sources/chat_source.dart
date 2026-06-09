@@ -4,9 +4,9 @@ import '../../core/models/chat_chunk.dart';
 import '../../core/models/model_info.dart';
 
 abstract class ChatSource {
-  Future<List<ModelInfo>> fetchModels(AppConfig config);
+  Future<List<ModelInfo>> fetchModels(ConfigProfile config);
   Stream<ChatChunk> chatStream({
-    required AppConfig config,
+    required ConfigProfile config,
     required List<ApiMessage> context,
   });
 }

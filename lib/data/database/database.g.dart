@@ -236,17 +236,81 @@ class $DbConfigProfilesTable extends DbConfigProfiles
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _baseUrlMeta = const VerificationMeta(
+    'baseUrl',
+  );
   @override
-  late final GeneratedColumnWithTypeConverter<AppConfig, String> config =
-      GeneratedColumn<String>(
-        'config',
-        aliasedName,
-        false,
-        type: DriftSqlType.string,
-        requiredDuringInsert: true,
-      ).withConverter<AppConfig>($DbConfigProfilesTable.$converterconfig);
+  late final GeneratedColumn<String> baseUrl = GeneratedColumn<String>(
+    'base_url',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _apiKeyMeta = const VerificationMeta('apiKey');
   @override
-  List<GeneratedColumn> get $columns => [id, name, config];
+  late final GeneratedColumn<String> apiKey = GeneratedColumn<String>(
+    'api_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _selectedModelMeta = const VerificationMeta(
+    'selectedModel',
+  );
+  @override
+  late final GeneratedColumn<String> selectedModel = GeneratedColumn<String>(
+    'selected_model',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _modelsPathMeta = const VerificationMeta(
+    'modelsPath',
+  );
+  @override
+  late final GeneratedColumn<String> modelsPath = GeneratedColumn<String>(
+    'models_path',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _chatPathMeta = const VerificationMeta(
+    'chatPath',
+  );
+  @override
+  late final GeneratedColumn<String> chatPath = GeneratedColumn<String>(
+    'chat_path',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _apiModeMeta = const VerificationMeta(
+    'apiMode',
+  );
+  @override
+  late final GeneratedColumn<String> apiMode = GeneratedColumn<String>(
+    'api_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    baseUrl,
+    apiKey,
+    selectedModel,
+    modelsPath,
+    chatPath,
+    apiMode,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -272,6 +336,55 @@ class $DbConfigProfilesTable extends DbConfigProfiles
     } else if (isInserting) {
       context.missing(_nameMeta);
     }
+    if (data.containsKey('base_url')) {
+      context.handle(
+        _baseUrlMeta,
+        baseUrl.isAcceptableOrUnknown(data['base_url']!, _baseUrlMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_baseUrlMeta);
+    }
+    if (data.containsKey('api_key')) {
+      context.handle(
+        _apiKeyMeta,
+        apiKey.isAcceptableOrUnknown(data['api_key']!, _apiKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_apiKeyMeta);
+    }
+    if (data.containsKey('selected_model')) {
+      context.handle(
+        _selectedModelMeta,
+        selectedModel.isAcceptableOrUnknown(
+          data['selected_model']!,
+          _selectedModelMeta,
+        ),
+      );
+    }
+    if (data.containsKey('models_path')) {
+      context.handle(
+        _modelsPathMeta,
+        modelsPath.isAcceptableOrUnknown(data['models_path']!, _modelsPathMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_modelsPathMeta);
+    }
+    if (data.containsKey('chat_path')) {
+      context.handle(
+        _chatPathMeta,
+        chatPath.isAcceptableOrUnknown(data['chat_path']!, _chatPathMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_chatPathMeta);
+    }
+    if (data.containsKey('api_mode')) {
+      context.handle(
+        _apiModeMeta,
+        apiMode.isAcceptableOrUnknown(data['api_mode']!, _apiModeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_apiModeMeta);
+    }
     return context;
   }
 
@@ -289,12 +402,30 @@ class $DbConfigProfilesTable extends DbConfigProfiles
         DriftSqlType.string,
         data['${effectivePrefix}name'],
       )!,
-      config: $DbConfigProfilesTable.$converterconfig.fromSql(
-        attachedDatabase.typeMapping.read(
-          DriftSqlType.string,
-          data['${effectivePrefix}config'],
-        )!,
+      baseUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}base_url'],
+      )!,
+      apiKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}api_key'],
+      )!,
+      selectedModel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}selected_model'],
       ),
+      modelsPath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}models_path'],
+      )!,
+      chatPath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}chat_path'],
+      )!,
+      apiMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}api_mode'],
+      )!,
     );
   }
 
@@ -302,30 +433,40 @@ class $DbConfigProfilesTable extends DbConfigProfiles
   $DbConfigProfilesTable createAlias(String alias) {
     return $DbConfigProfilesTable(attachedDatabase, alias);
   }
-
-  static TypeConverter<AppConfig, String> $converterconfig =
-      const AppConfigConverter();
 }
 
 class DbConfigProfile extends DataClass implements Insertable<DbConfigProfile> {
   final String id;
   final String name;
-  final AppConfig config;
+  final String baseUrl;
+  final String apiKey;
+  final String? selectedModel;
+  final String modelsPath;
+  final String chatPath;
+  final String apiMode;
   const DbConfigProfile({
     required this.id,
     required this.name,
-    required this.config,
+    required this.baseUrl,
+    required this.apiKey,
+    this.selectedModel,
+    required this.modelsPath,
+    required this.chatPath,
+    required this.apiMode,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
-    {
-      map['config'] = Variable<String>(
-        $DbConfigProfilesTable.$converterconfig.toSql(config),
-      );
+    map['base_url'] = Variable<String>(baseUrl);
+    map['api_key'] = Variable<String>(apiKey);
+    if (!nullToAbsent || selectedModel != null) {
+      map['selected_model'] = Variable<String>(selectedModel);
     }
+    map['models_path'] = Variable<String>(modelsPath);
+    map['chat_path'] = Variable<String>(chatPath);
+    map['api_mode'] = Variable<String>(apiMode);
     return map;
   }
 
@@ -333,7 +474,14 @@ class DbConfigProfile extends DataClass implements Insertable<DbConfigProfile> {
     return DbConfigProfilesCompanion(
       id: Value(id),
       name: Value(name),
-      config: Value(config),
+      baseUrl: Value(baseUrl),
+      apiKey: Value(apiKey),
+      selectedModel: selectedModel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(selectedModel),
+      modelsPath: Value(modelsPath),
+      chatPath: Value(chatPath),
+      apiMode: Value(apiMode),
     );
   }
 
@@ -345,7 +493,12 @@ class DbConfigProfile extends DataClass implements Insertable<DbConfigProfile> {
     return DbConfigProfile(
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
-      config: serializer.fromJson<AppConfig>(json['config']),
+      baseUrl: serializer.fromJson<String>(json['baseUrl']),
+      apiKey: serializer.fromJson<String>(json['apiKey']),
+      selectedModel: serializer.fromJson<String?>(json['selectedModel']),
+      modelsPath: serializer.fromJson<String>(json['modelsPath']),
+      chatPath: serializer.fromJson<String>(json['chatPath']),
+      apiMode: serializer.fromJson<String>(json['apiMode']),
     );
   }
   @override
@@ -354,21 +507,50 @@ class DbConfigProfile extends DataClass implements Insertable<DbConfigProfile> {
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
-      'config': serializer.toJson<AppConfig>(config),
+      'baseUrl': serializer.toJson<String>(baseUrl),
+      'apiKey': serializer.toJson<String>(apiKey),
+      'selectedModel': serializer.toJson<String?>(selectedModel),
+      'modelsPath': serializer.toJson<String>(modelsPath),
+      'chatPath': serializer.toJson<String>(chatPath),
+      'apiMode': serializer.toJson<String>(apiMode),
     };
   }
 
-  DbConfigProfile copyWith({String? id, String? name, AppConfig? config}) =>
-      DbConfigProfile(
-        id: id ?? this.id,
-        name: name ?? this.name,
-        config: config ?? this.config,
-      );
+  DbConfigProfile copyWith({
+    String? id,
+    String? name,
+    String? baseUrl,
+    String? apiKey,
+    Value<String?> selectedModel = const Value.absent(),
+    String? modelsPath,
+    String? chatPath,
+    String? apiMode,
+  }) => DbConfigProfile(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    baseUrl: baseUrl ?? this.baseUrl,
+    apiKey: apiKey ?? this.apiKey,
+    selectedModel: selectedModel.present
+        ? selectedModel.value
+        : this.selectedModel,
+    modelsPath: modelsPath ?? this.modelsPath,
+    chatPath: chatPath ?? this.chatPath,
+    apiMode: apiMode ?? this.apiMode,
+  );
   DbConfigProfile copyWithCompanion(DbConfigProfilesCompanion data) {
     return DbConfigProfile(
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
-      config: data.config.present ? data.config.value : this.config,
+      baseUrl: data.baseUrl.present ? data.baseUrl.value : this.baseUrl,
+      apiKey: data.apiKey.present ? data.apiKey.value : this.apiKey,
+      selectedModel: data.selectedModel.present
+          ? data.selectedModel.value
+          : this.selectedModel,
+      modelsPath: data.modelsPath.present
+          ? data.modelsPath.value
+          : this.modelsPath,
+      chatPath: data.chatPath.present ? data.chatPath.value : this.chatPath,
+      apiMode: data.apiMode.present ? data.apiMode.value : this.apiMode,
     );
   }
 
@@ -377,51 +559,99 @@ class DbConfigProfile extends DataClass implements Insertable<DbConfigProfile> {
     return (StringBuffer('DbConfigProfile(')
           ..write('id: $id, ')
           ..write('name: $name, ')
-          ..write('config: $config')
+          ..write('baseUrl: $baseUrl, ')
+          ..write('apiKey: $apiKey, ')
+          ..write('selectedModel: $selectedModel, ')
+          ..write('modelsPath: $modelsPath, ')
+          ..write('chatPath: $chatPath, ')
+          ..write('apiMode: $apiMode')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, config);
+  int get hashCode => Object.hash(
+    id,
+    name,
+    baseUrl,
+    apiKey,
+    selectedModel,
+    modelsPath,
+    chatPath,
+    apiMode,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is DbConfigProfile &&
           other.id == this.id &&
           other.name == this.name &&
-          other.config == this.config);
+          other.baseUrl == this.baseUrl &&
+          other.apiKey == this.apiKey &&
+          other.selectedModel == this.selectedModel &&
+          other.modelsPath == this.modelsPath &&
+          other.chatPath == this.chatPath &&
+          other.apiMode == this.apiMode);
 }
 
 class DbConfigProfilesCompanion extends UpdateCompanion<DbConfigProfile> {
   final Value<String> id;
   final Value<String> name;
-  final Value<AppConfig> config;
+  final Value<String> baseUrl;
+  final Value<String> apiKey;
+  final Value<String?> selectedModel;
+  final Value<String> modelsPath;
+  final Value<String> chatPath;
+  final Value<String> apiMode;
   final Value<int> rowid;
   const DbConfigProfilesCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
-    this.config = const Value.absent(),
+    this.baseUrl = const Value.absent(),
+    this.apiKey = const Value.absent(),
+    this.selectedModel = const Value.absent(),
+    this.modelsPath = const Value.absent(),
+    this.chatPath = const Value.absent(),
+    this.apiMode = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   DbConfigProfilesCompanion.insert({
     required String id,
     required String name,
-    required AppConfig config,
+    required String baseUrl,
+    required String apiKey,
+    this.selectedModel = const Value.absent(),
+    required String modelsPath,
+    required String chatPath,
+    required String apiMode,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
-       config = Value(config);
+       baseUrl = Value(baseUrl),
+       apiKey = Value(apiKey),
+       modelsPath = Value(modelsPath),
+       chatPath = Value(chatPath),
+       apiMode = Value(apiMode);
   static Insertable<DbConfigProfile> custom({
     Expression<String>? id,
     Expression<String>? name,
-    Expression<String>? config,
+    Expression<String>? baseUrl,
+    Expression<String>? apiKey,
+    Expression<String>? selectedModel,
+    Expression<String>? modelsPath,
+    Expression<String>? chatPath,
+    Expression<String>? apiMode,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (name != null) 'name': name,
-      if (config != null) 'config': config,
+      if (baseUrl != null) 'base_url': baseUrl,
+      if (apiKey != null) 'api_key': apiKey,
+      if (selectedModel != null) 'selected_model': selectedModel,
+      if (modelsPath != null) 'models_path': modelsPath,
+      if (chatPath != null) 'chat_path': chatPath,
+      if (apiMode != null) 'api_mode': apiMode,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -429,13 +659,23 @@ class DbConfigProfilesCompanion extends UpdateCompanion<DbConfigProfile> {
   DbConfigProfilesCompanion copyWith({
     Value<String>? id,
     Value<String>? name,
-    Value<AppConfig>? config,
+    Value<String>? baseUrl,
+    Value<String>? apiKey,
+    Value<String?>? selectedModel,
+    Value<String>? modelsPath,
+    Value<String>? chatPath,
+    Value<String>? apiMode,
     Value<int>? rowid,
   }) {
     return DbConfigProfilesCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
-      config: config ?? this.config,
+      baseUrl: baseUrl ?? this.baseUrl,
+      apiKey: apiKey ?? this.apiKey,
+      selectedModel: selectedModel ?? this.selectedModel,
+      modelsPath: modelsPath ?? this.modelsPath,
+      chatPath: chatPath ?? this.chatPath,
+      apiMode: apiMode ?? this.apiMode,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -449,10 +689,23 @@ class DbConfigProfilesCompanion extends UpdateCompanion<DbConfigProfile> {
     if (name.present) {
       map['name'] = Variable<String>(name.value);
     }
-    if (config.present) {
-      map['config'] = Variable<String>(
-        $DbConfigProfilesTable.$converterconfig.toSql(config.value),
-      );
+    if (baseUrl.present) {
+      map['base_url'] = Variable<String>(baseUrl.value);
+    }
+    if (apiKey.present) {
+      map['api_key'] = Variable<String>(apiKey.value);
+    }
+    if (selectedModel.present) {
+      map['selected_model'] = Variable<String>(selectedModel.value);
+    }
+    if (modelsPath.present) {
+      map['models_path'] = Variable<String>(modelsPath.value);
+    }
+    if (chatPath.present) {
+      map['chat_path'] = Variable<String>(chatPath.value);
+    }
+    if (apiMode.present) {
+      map['api_mode'] = Variable<String>(apiMode.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -465,7 +718,382 @@ class DbConfigProfilesCompanion extends UpdateCompanion<DbConfigProfile> {
     return (StringBuffer('DbConfigProfilesCompanion(')
           ..write('id: $id, ')
           ..write('name: $name, ')
-          ..write('config: $config, ')
+          ..write('baseUrl: $baseUrl, ')
+          ..write('apiKey: $apiKey, ')
+          ..write('selectedModel: $selectedModel, ')
+          ..write('modelsPath: $modelsPath, ')
+          ..write('chatPath: $chatPath, ')
+          ..write('apiMode: $apiMode, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $DbAvailableModelsTable extends DbAvailableModels
+    with TableInfo<$DbAvailableModelsTable, DbAvailableModel> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DbAvailableModelsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _profileIdMeta = const VerificationMeta(
+    'profileId',
+  );
+  @override
+  late final GeneratedColumn<String> profileId = GeneratedColumn<String>(
+    'profile_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES db_config_profiles (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _modelIdMeta = const VerificationMeta(
+    'modelId',
+  );
+  @override
+  late final GeneratedColumn<String> modelId = GeneratedColumn<String>(
+    'model_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _overrideSupportsReasoningMeta =
+      const VerificationMeta('overrideSupportsReasoning');
+  @override
+  late final GeneratedColumn<bool> overrideSupportsReasoning =
+      GeneratedColumn<bool>(
+        'override_supports_reasoning',
+        aliasedName,
+        true,
+        type: DriftSqlType.bool,
+        requiredDuringInsert: false,
+        defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("override_supports_reasoning" IN (0, 1))',
+        ),
+      );
+  static const VerificationMeta _overrideSupportsVisionMeta =
+      const VerificationMeta('overrideSupportsVision');
+  @override
+  late final GeneratedColumn<bool> overrideSupportsVision =
+      GeneratedColumn<bool>(
+        'override_supports_vision',
+        aliasedName,
+        true,
+        type: DriftSqlType.bool,
+        requiredDuringInsert: false,
+        defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("override_supports_vision" IN (0, 1))',
+        ),
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    profileId,
+    modelId,
+    overrideSupportsReasoning,
+    overrideSupportsVision,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'db_available_models';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DbAvailableModel> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('profile_id')) {
+      context.handle(
+        _profileIdMeta,
+        profileId.isAcceptableOrUnknown(data['profile_id']!, _profileIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_profileIdMeta);
+    }
+    if (data.containsKey('model_id')) {
+      context.handle(
+        _modelIdMeta,
+        modelId.isAcceptableOrUnknown(data['model_id']!, _modelIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_modelIdMeta);
+    }
+    if (data.containsKey('override_supports_reasoning')) {
+      context.handle(
+        _overrideSupportsReasoningMeta,
+        overrideSupportsReasoning.isAcceptableOrUnknown(
+          data['override_supports_reasoning']!,
+          _overrideSupportsReasoningMeta,
+        ),
+      );
+    }
+    if (data.containsKey('override_supports_vision')) {
+      context.handle(
+        _overrideSupportsVisionMeta,
+        overrideSupportsVision.isAcceptableOrUnknown(
+          data['override_supports_vision']!,
+          _overrideSupportsVisionMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {profileId, modelId};
+  @override
+  DbAvailableModel map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DbAvailableModel(
+      profileId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}profile_id'],
+      )!,
+      modelId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}model_id'],
+      )!,
+      overrideSupportsReasoning: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}override_supports_reasoning'],
+      ),
+      overrideSupportsVision: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}override_supports_vision'],
+      ),
+    );
+  }
+
+  @override
+  $DbAvailableModelsTable createAlias(String alias) {
+    return $DbAvailableModelsTable(attachedDatabase, alias);
+  }
+}
+
+class DbAvailableModel extends DataClass
+    implements Insertable<DbAvailableModel> {
+  final String profileId;
+  final String modelId;
+  final bool? overrideSupportsReasoning;
+  final bool? overrideSupportsVision;
+  const DbAvailableModel({
+    required this.profileId,
+    required this.modelId,
+    this.overrideSupportsReasoning,
+    this.overrideSupportsVision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['profile_id'] = Variable<String>(profileId);
+    map['model_id'] = Variable<String>(modelId);
+    if (!nullToAbsent || overrideSupportsReasoning != null) {
+      map['override_supports_reasoning'] = Variable<bool>(
+        overrideSupportsReasoning,
+      );
+    }
+    if (!nullToAbsent || overrideSupportsVision != null) {
+      map['override_supports_vision'] = Variable<bool>(overrideSupportsVision);
+    }
+    return map;
+  }
+
+  DbAvailableModelsCompanion toCompanion(bool nullToAbsent) {
+    return DbAvailableModelsCompanion(
+      profileId: Value(profileId),
+      modelId: Value(modelId),
+      overrideSupportsReasoning:
+          overrideSupportsReasoning == null && nullToAbsent
+          ? const Value.absent()
+          : Value(overrideSupportsReasoning),
+      overrideSupportsVision: overrideSupportsVision == null && nullToAbsent
+          ? const Value.absent()
+          : Value(overrideSupportsVision),
+    );
+  }
+
+  factory DbAvailableModel.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DbAvailableModel(
+      profileId: serializer.fromJson<String>(json['profileId']),
+      modelId: serializer.fromJson<String>(json['modelId']),
+      overrideSupportsReasoning: serializer.fromJson<bool?>(
+        json['overrideSupportsReasoning'],
+      ),
+      overrideSupportsVision: serializer.fromJson<bool?>(
+        json['overrideSupportsVision'],
+      ),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'profileId': serializer.toJson<String>(profileId),
+      'modelId': serializer.toJson<String>(modelId),
+      'overrideSupportsReasoning': serializer.toJson<bool?>(
+        overrideSupportsReasoning,
+      ),
+      'overrideSupportsVision': serializer.toJson<bool?>(
+        overrideSupportsVision,
+      ),
+    };
+  }
+
+  DbAvailableModel copyWith({
+    String? profileId,
+    String? modelId,
+    Value<bool?> overrideSupportsReasoning = const Value.absent(),
+    Value<bool?> overrideSupportsVision = const Value.absent(),
+  }) => DbAvailableModel(
+    profileId: profileId ?? this.profileId,
+    modelId: modelId ?? this.modelId,
+    overrideSupportsReasoning: overrideSupportsReasoning.present
+        ? overrideSupportsReasoning.value
+        : this.overrideSupportsReasoning,
+    overrideSupportsVision: overrideSupportsVision.present
+        ? overrideSupportsVision.value
+        : this.overrideSupportsVision,
+  );
+  DbAvailableModel copyWithCompanion(DbAvailableModelsCompanion data) {
+    return DbAvailableModel(
+      profileId: data.profileId.present ? data.profileId.value : this.profileId,
+      modelId: data.modelId.present ? data.modelId.value : this.modelId,
+      overrideSupportsReasoning: data.overrideSupportsReasoning.present
+          ? data.overrideSupportsReasoning.value
+          : this.overrideSupportsReasoning,
+      overrideSupportsVision: data.overrideSupportsVision.present
+          ? data.overrideSupportsVision.value
+          : this.overrideSupportsVision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DbAvailableModel(')
+          ..write('profileId: $profileId, ')
+          ..write('modelId: $modelId, ')
+          ..write('overrideSupportsReasoning: $overrideSupportsReasoning, ')
+          ..write('overrideSupportsVision: $overrideSupportsVision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    profileId,
+    modelId,
+    overrideSupportsReasoning,
+    overrideSupportsVision,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DbAvailableModel &&
+          other.profileId == this.profileId &&
+          other.modelId == this.modelId &&
+          other.overrideSupportsReasoning == this.overrideSupportsReasoning &&
+          other.overrideSupportsVision == this.overrideSupportsVision);
+}
+
+class DbAvailableModelsCompanion extends UpdateCompanion<DbAvailableModel> {
+  final Value<String> profileId;
+  final Value<String> modelId;
+  final Value<bool?> overrideSupportsReasoning;
+  final Value<bool?> overrideSupportsVision;
+  final Value<int> rowid;
+  const DbAvailableModelsCompanion({
+    this.profileId = const Value.absent(),
+    this.modelId = const Value.absent(),
+    this.overrideSupportsReasoning = const Value.absent(),
+    this.overrideSupportsVision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DbAvailableModelsCompanion.insert({
+    required String profileId,
+    required String modelId,
+    this.overrideSupportsReasoning = const Value.absent(),
+    this.overrideSupportsVision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : profileId = Value(profileId),
+       modelId = Value(modelId);
+  static Insertable<DbAvailableModel> custom({
+    Expression<String>? profileId,
+    Expression<String>? modelId,
+    Expression<bool>? overrideSupportsReasoning,
+    Expression<bool>? overrideSupportsVision,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (profileId != null) 'profile_id': profileId,
+      if (modelId != null) 'model_id': modelId,
+      if (overrideSupportsReasoning != null)
+        'override_supports_reasoning': overrideSupportsReasoning,
+      if (overrideSupportsVision != null)
+        'override_supports_vision': overrideSupportsVision,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DbAvailableModelsCompanion copyWith({
+    Value<String>? profileId,
+    Value<String>? modelId,
+    Value<bool?>? overrideSupportsReasoning,
+    Value<bool?>? overrideSupportsVision,
+    Value<int>? rowid,
+  }) {
+    return DbAvailableModelsCompanion(
+      profileId: profileId ?? this.profileId,
+      modelId: modelId ?? this.modelId,
+      overrideSupportsReasoning:
+          overrideSupportsReasoning ?? this.overrideSupportsReasoning,
+      overrideSupportsVision:
+          overrideSupportsVision ?? this.overrideSupportsVision,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (profileId.present) {
+      map['profile_id'] = Variable<String>(profileId.value);
+    }
+    if (modelId.present) {
+      map['model_id'] = Variable<String>(modelId.value);
+    }
+    if (overrideSupportsReasoning.present) {
+      map['override_supports_reasoning'] = Variable<bool>(
+        overrideSupportsReasoning.value,
+      );
+    }
+    if (overrideSupportsVision.present) {
+      map['override_supports_vision'] = Variable<bool>(
+        overrideSupportsVision.value,
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DbAvailableModelsCompanion(')
+          ..write('profileId: $profileId, ')
+          ..write('modelId: $modelId, ')
+          ..write('overrideSupportsReasoning: $overrideSupportsReasoning, ')
+          ..write('overrideSupportsVision: $overrideSupportsVision, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -496,17 +1124,6 @@ class $DbSessionsTable extends DbSessions
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _createdAtMeta = const VerificationMeta(
-    'createdAt',
-  );
-  @override
-  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
-    'created_at',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: true,
-  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -519,38 +1136,7 @@ class $DbSessionsTable extends DbSessions
     requiredDuringInsert: true,
   );
   @override
-  late final GeneratedColumnWithTypeConverter<SessionConfig?, String> config =
-      GeneratedColumn<String>(
-        'config',
-        aliasedName,
-        true,
-        type: DriftSqlType.string,
-        requiredDuringInsert: false,
-      ).withConverter<SessionConfig?>($DbSessionsTable.$converterconfign);
-  static const VerificationMeta _hasUnseenUpdateMeta = const VerificationMeta(
-    'hasUnseenUpdate',
-  );
-  @override
-  late final GeneratedColumn<bool> hasUnseenUpdate = GeneratedColumn<bool>(
-    'has_unseen_update',
-    aliasedName,
-    false,
-    type: DriftSqlType.bool,
-    requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'CHECK ("has_unseen_update" IN (0, 1))',
-    ),
-    defaultValue: const Constant(false),
-  );
-  @override
-  List<GeneratedColumn> get $columns => [
-    id,
-    title,
-    createdAt,
-    updatedAt,
-    config,
-    hasUnseenUpdate,
-  ];
+  List<GeneratedColumn> get $columns => [id, title, updatedAt];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -576,14 +1162,6 @@ class $DbSessionsTable extends DbSessions
     } else if (isInserting) {
       context.missing(_titleMeta);
     }
-    if (data.containsKey('created_at')) {
-      context.handle(
-        _createdAtMeta,
-        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_createdAtMeta);
-    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -591,15 +1169,6 @@ class $DbSessionsTable extends DbSessions
       );
     } else if (isInserting) {
       context.missing(_updatedAtMeta);
-    }
-    if (data.containsKey('has_unseen_update')) {
-      context.handle(
-        _hasUnseenUpdateMeta,
-        hasUnseenUpdate.isAcceptableOrUnknown(
-          data['has_unseen_update']!,
-          _hasUnseenUpdateMeta,
-        ),
-      );
     }
     return context;
   }
@@ -618,23 +1187,9 @@ class $DbSessionsTable extends DbSessions
         DriftSqlType.string,
         data['${effectivePrefix}title'],
       )!,
-      createdAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}created_at'],
-      )!,
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}updated_at'],
-      )!,
-      config: $DbSessionsTable.$converterconfign.fromSql(
-        attachedDatabase.typeMapping.read(
-          DriftSqlType.string,
-          data['${effectivePrefix}config'],
-        ),
-      ),
-      hasUnseenUpdate: attachedDatabase.typeMapping.read(
-        DriftSqlType.bool,
-        data['${effectivePrefix}has_unseen_update'],
       )!,
     );
   }
@@ -643,41 +1198,23 @@ class $DbSessionsTable extends DbSessions
   $DbSessionsTable createAlias(String alias) {
     return $DbSessionsTable(attachedDatabase, alias);
   }
-
-  static TypeConverter<SessionConfig, String> $converterconfig =
-      const SessionConfigConverter();
-  static TypeConverter<SessionConfig?, String?> $converterconfign =
-      NullAwareTypeConverter.wrap($converterconfig);
 }
 
 class DbSession extends DataClass implements Insertable<DbSession> {
   final String id;
   final String title;
-  final int createdAt;
   final int updatedAt;
-  final SessionConfig? config;
-  final bool hasUnseenUpdate;
   const DbSession({
     required this.id,
     required this.title,
-    required this.createdAt,
     required this.updatedAt,
-    this.config,
-    required this.hasUnseenUpdate,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['title'] = Variable<String>(title);
-    map['created_at'] = Variable<int>(createdAt);
     map['updated_at'] = Variable<int>(updatedAt);
-    if (!nullToAbsent || config != null) {
-      map['config'] = Variable<String>(
-        $DbSessionsTable.$converterconfign.toSql(config),
-      );
-    }
-    map['has_unseen_update'] = Variable<bool>(hasUnseenUpdate);
     return map;
   }
 
@@ -685,12 +1222,7 @@ class DbSession extends DataClass implements Insertable<DbSession> {
     return DbSessionsCompanion(
       id: Value(id),
       title: Value(title),
-      createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
-      config: config == null && nullToAbsent
-          ? const Value.absent()
-          : Value(config),
-      hasUnseenUpdate: Value(hasUnseenUpdate),
     );
   }
 
@@ -702,10 +1234,7 @@ class DbSession extends DataClass implements Insertable<DbSession> {
     return DbSession(
       id: serializer.fromJson<String>(json['id']),
       title: serializer.fromJson<String>(json['title']),
-      createdAt: serializer.fromJson<int>(json['createdAt']),
       updatedAt: serializer.fromJson<int>(json['updatedAt']),
-      config: serializer.fromJson<SessionConfig?>(json['config']),
-      hasUnseenUpdate: serializer.fromJson<bool>(json['hasUnseenUpdate']),
     );
   }
   @override
@@ -714,38 +1243,20 @@ class DbSession extends DataClass implements Insertable<DbSession> {
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
       'title': serializer.toJson<String>(title),
-      'createdAt': serializer.toJson<int>(createdAt),
       'updatedAt': serializer.toJson<int>(updatedAt),
-      'config': serializer.toJson<SessionConfig?>(config),
-      'hasUnseenUpdate': serializer.toJson<bool>(hasUnseenUpdate),
     };
   }
 
-  DbSession copyWith({
-    String? id,
-    String? title,
-    int? createdAt,
-    int? updatedAt,
-    Value<SessionConfig?> config = const Value.absent(),
-    bool? hasUnseenUpdate,
-  }) => DbSession(
+  DbSession copyWith({String? id, String? title, int? updatedAt}) => DbSession(
     id: id ?? this.id,
     title: title ?? this.title,
-    createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
-    config: config.present ? config.value : this.config,
-    hasUnseenUpdate: hasUnseenUpdate ?? this.hasUnseenUpdate,
   );
   DbSession copyWithCompanion(DbSessionsCompanion data) {
     return DbSession(
       id: data.id.present ? data.id.value : this.id,
       title: data.title.present ? data.title.value : this.title,
-      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
-      config: data.config.present ? data.config.value : this.config,
-      hasUnseenUpdate: data.hasUnseenUpdate.present
-          ? data.hasUnseenUpdate.value
-          : this.hasUnseenUpdate,
     );
   }
 
@@ -754,74 +1265,51 @@ class DbSession extends DataClass implements Insertable<DbSession> {
     return (StringBuffer('DbSession(')
           ..write('id: $id, ')
           ..write('title: $title, ')
-          ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt, ')
-          ..write('config: $config, ')
-          ..write('hasUnseenUpdate: $hasUnseenUpdate')
+          ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, title, createdAt, updatedAt, config, hasUnseenUpdate);
+  int get hashCode => Object.hash(id, title, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is DbSession &&
           other.id == this.id &&
           other.title == this.title &&
-          other.createdAt == this.createdAt &&
-          other.updatedAt == this.updatedAt &&
-          other.config == this.config &&
-          other.hasUnseenUpdate == this.hasUnseenUpdate);
+          other.updatedAt == this.updatedAt);
 }
 
 class DbSessionsCompanion extends UpdateCompanion<DbSession> {
   final Value<String> id;
   final Value<String> title;
-  final Value<int> createdAt;
   final Value<int> updatedAt;
-  final Value<SessionConfig?> config;
-  final Value<bool> hasUnseenUpdate;
   final Value<int> rowid;
   const DbSessionsCompanion({
     this.id = const Value.absent(),
     this.title = const Value.absent(),
-    this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
-    this.config = const Value.absent(),
-    this.hasUnseenUpdate = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   DbSessionsCompanion.insert({
     required String id,
     required String title,
-    required int createdAt,
     required int updatedAt,
-    this.config = const Value.absent(),
-    this.hasUnseenUpdate = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        title = Value(title),
-       createdAt = Value(createdAt),
        updatedAt = Value(updatedAt);
   static Insertable<DbSession> custom({
     Expression<String>? id,
     Expression<String>? title,
-    Expression<int>? createdAt,
     Expression<int>? updatedAt,
-    Expression<String>? config,
-    Expression<bool>? hasUnseenUpdate,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (title != null) 'title': title,
-      if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
-      if (config != null) 'config': config,
-      if (hasUnseenUpdate != null) 'has_unseen_update': hasUnseenUpdate,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -829,19 +1317,13 @@ class DbSessionsCompanion extends UpdateCompanion<DbSession> {
   DbSessionsCompanion copyWith({
     Value<String>? id,
     Value<String>? title,
-    Value<int>? createdAt,
     Value<int>? updatedAt,
-    Value<SessionConfig?>? config,
-    Value<bool>? hasUnseenUpdate,
     Value<int>? rowid,
   }) {
     return DbSessionsCompanion(
       id: id ?? this.id,
       title: title ?? this.title,
-      createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
-      config: config ?? this.config,
-      hasUnseenUpdate: hasUnseenUpdate ?? this.hasUnseenUpdate,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -855,19 +1337,8 @@ class DbSessionsCompanion extends UpdateCompanion<DbSession> {
     if (title.present) {
       map['title'] = Variable<String>(title.value);
     }
-    if (createdAt.present) {
-      map['created_at'] = Variable<int>(createdAt.value);
-    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<int>(updatedAt.value);
-    }
-    if (config.present) {
-      map['config'] = Variable<String>(
-        $DbSessionsTable.$converterconfign.toSql(config.value),
-      );
-    }
-    if (hasUnseenUpdate.present) {
-      map['has_unseen_update'] = Variable<bool>(hasUnseenUpdate.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -880,10 +1351,7 @@ class DbSessionsCompanion extends UpdateCompanion<DbSession> {
     return (StringBuffer('DbSessionsCompanion(')
           ..write('id: $id, ')
           ..write('title: $title, ')
-          ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
-          ..write('config: $config, ')
-          ..write('hasUnseenUpdate: $hasUnseenUpdate, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1915,6 +2383,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $DbConfigProfilesTable dbConfigProfiles = $DbConfigProfilesTable(
     this,
   );
+  late final $DbAvailableModelsTable dbAvailableModels =
+      $DbAvailableModelsTable(this);
   late final $DbSessionsTable dbSessions = $DbSessionsTable(this);
   late final $DbChatRoundsTable dbChatRounds = $DbChatRoundsTable(this);
   late final $DbAttachmentsTable dbAttachments = $DbAttachmentsTable(this);
@@ -1925,12 +2395,20 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     dbConfigStore,
     dbConfigProfiles,
+    dbAvailableModels,
     dbSessions,
     dbChatRounds,
     dbAttachments,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'db_config_profiles',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('db_available_models', kind: UpdateKind.delete)],
+    ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
         'db_sessions',
@@ -2095,16 +2573,60 @@ typedef $$DbConfigProfilesTableCreateCompanionBuilder =
     DbConfigProfilesCompanion Function({
       required String id,
       required String name,
-      required AppConfig config,
+      required String baseUrl,
+      required String apiKey,
+      Value<String?> selectedModel,
+      required String modelsPath,
+      required String chatPath,
+      required String apiMode,
       Value<int> rowid,
     });
 typedef $$DbConfigProfilesTableUpdateCompanionBuilder =
     DbConfigProfilesCompanion Function({
       Value<String> id,
       Value<String> name,
-      Value<AppConfig> config,
+      Value<String> baseUrl,
+      Value<String> apiKey,
+      Value<String?> selectedModel,
+      Value<String> modelsPath,
+      Value<String> chatPath,
+      Value<String> apiMode,
       Value<int> rowid,
     });
+
+final class $$DbConfigProfilesTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $DbConfigProfilesTable, DbConfigProfile> {
+  $$DbConfigProfilesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static MultiTypedResultKey<$DbAvailableModelsTable, List<DbAvailableModel>>
+  _dbAvailableModelsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.dbAvailableModels,
+        aliasName: $_aliasNameGenerator(
+          db.dbConfigProfiles.id,
+          db.dbAvailableModels.profileId,
+        ),
+      );
+
+  $$DbAvailableModelsTableProcessedTableManager get dbAvailableModelsRefs {
+    final manager = $$DbAvailableModelsTableTableManager(
+      $_db,
+      $_db.dbAvailableModels,
+    ).filter((f) => f.profileId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _dbAvailableModelsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
 
 class $$DbConfigProfilesTableFilterComposer
     extends Composer<_$AppDatabase, $DbConfigProfilesTable> {
@@ -2125,11 +2647,60 @@ class $$DbConfigProfilesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnWithTypeConverterFilters<AppConfig, AppConfig, String> get config =>
-      $composableBuilder(
-        column: $table.config,
-        builder: (column) => ColumnWithTypeConverterFilters(column),
-      );
+  ColumnFilters<String> get baseUrl => $composableBuilder(
+    column: $table.baseUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get apiKey => $composableBuilder(
+    column: $table.apiKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get selectedModel => $composableBuilder(
+    column: $table.selectedModel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get modelsPath => $composableBuilder(
+    column: $table.modelsPath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get chatPath => $composableBuilder(
+    column: $table.chatPath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get apiMode => $composableBuilder(
+    column: $table.apiMode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> dbAvailableModelsRefs(
+    Expression<bool> Function($$DbAvailableModelsTableFilterComposer f) f,
+  ) {
+    final $$DbAvailableModelsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.dbAvailableModels,
+      getReferencedColumn: (t) => t.profileId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DbAvailableModelsTableFilterComposer(
+            $db: $db,
+            $table: $db.dbAvailableModels,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$DbConfigProfilesTableOrderingComposer
@@ -2151,8 +2722,33 @@ class $$DbConfigProfilesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get config => $composableBuilder(
-    column: $table.config,
+  ColumnOrderings<String> get baseUrl => $composableBuilder(
+    column: $table.baseUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get apiKey => $composableBuilder(
+    column: $table.apiKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get selectedModel => $composableBuilder(
+    column: $table.selectedModel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get modelsPath => $composableBuilder(
+    column: $table.modelsPath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get chatPath => $composableBuilder(
+    column: $table.chatPath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get apiMode => $composableBuilder(
+    column: $table.apiMode,
     builder: (column) => ColumnOrderings(column),
   );
 }
@@ -2172,8 +2768,53 @@ class $$DbConfigProfilesTableAnnotationComposer
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
 
-  GeneratedColumnWithTypeConverter<AppConfig, String> get config =>
-      $composableBuilder(column: $table.config, builder: (column) => column);
+  GeneratedColumn<String> get baseUrl =>
+      $composableBuilder(column: $table.baseUrl, builder: (column) => column);
+
+  GeneratedColumn<String> get apiKey =>
+      $composableBuilder(column: $table.apiKey, builder: (column) => column);
+
+  GeneratedColumn<String> get selectedModel => $composableBuilder(
+    column: $table.selectedModel,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get modelsPath => $composableBuilder(
+    column: $table.modelsPath,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get chatPath =>
+      $composableBuilder(column: $table.chatPath, builder: (column) => column);
+
+  GeneratedColumn<String> get apiMode =>
+      $composableBuilder(column: $table.apiMode, builder: (column) => column);
+
+  Expression<T> dbAvailableModelsRefs<T extends Object>(
+    Expression<T> Function($$DbAvailableModelsTableAnnotationComposer a) f,
+  ) {
+    final $$DbAvailableModelsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.dbAvailableModels,
+          getReferencedColumn: (t) => t.profileId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$DbAvailableModelsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.dbAvailableModels,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$DbConfigProfilesTableTableManager
@@ -2187,16 +2828,9 @@ class $$DbConfigProfilesTableTableManager
           $$DbConfigProfilesTableAnnotationComposer,
           $$DbConfigProfilesTableCreateCompanionBuilder,
           $$DbConfigProfilesTableUpdateCompanionBuilder,
-          (
-            DbConfigProfile,
-            BaseReferences<
-              _$AppDatabase,
-              $DbConfigProfilesTable,
-              DbConfigProfile
-            >,
-          ),
+          (DbConfigProfile, $$DbConfigProfilesTableReferences),
           DbConfigProfile,
-          PrefetchHooks Function()
+          PrefetchHooks Function({bool dbAvailableModelsRefs})
         > {
   $$DbConfigProfilesTableTableManager(
     _$AppDatabase db,
@@ -2215,30 +2849,86 @@ class $$DbConfigProfilesTableTableManager
               ({
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
-                Value<AppConfig> config = const Value.absent(),
+                Value<String> baseUrl = const Value.absent(),
+                Value<String> apiKey = const Value.absent(),
+                Value<String?> selectedModel = const Value.absent(),
+                Value<String> modelsPath = const Value.absent(),
+                Value<String> chatPath = const Value.absent(),
+                Value<String> apiMode = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DbConfigProfilesCompanion(
                 id: id,
                 name: name,
-                config: config,
+                baseUrl: baseUrl,
+                apiKey: apiKey,
+                selectedModel: selectedModel,
+                modelsPath: modelsPath,
+                chatPath: chatPath,
+                apiMode: apiMode,
                 rowid: rowid,
               ),
           createCompanionCallback:
               ({
                 required String id,
                 required String name,
-                required AppConfig config,
+                required String baseUrl,
+                required String apiKey,
+                Value<String?> selectedModel = const Value.absent(),
+                required String modelsPath,
+                required String chatPath,
+                required String apiMode,
                 Value<int> rowid = const Value.absent(),
               }) => DbConfigProfilesCompanion.insert(
                 id: id,
                 name: name,
-                config: config,
+                baseUrl: baseUrl,
+                apiKey: apiKey,
+                selectedModel: selectedModel,
+                modelsPath: modelsPath,
+                chatPath: chatPath,
+                apiMode: apiMode,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$DbConfigProfilesTableReferences(db, table, e),
+                ),
+              )
               .toList(),
-          prefetchHooksCallback: null,
+          prefetchHooksCallback: ({dbAvailableModelsRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (dbAvailableModelsRefs) db.dbAvailableModels,
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (dbAvailableModelsRefs)
+                    await $_getPrefetchedData<
+                      DbConfigProfile,
+                      $DbConfigProfilesTable,
+                      DbAvailableModel
+                    >(
+                      currentTable: table,
+                      referencedTable: $$DbConfigProfilesTableReferences
+                          ._dbAvailableModelsRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$DbConfigProfilesTableReferences(
+                            db,
+                            table,
+                            p0,
+                          ).dbAvailableModelsRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where((e) => e.profileId == item.id),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
         ),
       );
 }
@@ -2253,31 +2943,345 @@ typedef $$DbConfigProfilesTableProcessedTableManager =
       $$DbConfigProfilesTableAnnotationComposer,
       $$DbConfigProfilesTableCreateCompanionBuilder,
       $$DbConfigProfilesTableUpdateCompanionBuilder,
-      (
-        DbConfigProfile,
-        BaseReferences<_$AppDatabase, $DbConfigProfilesTable, DbConfigProfile>,
-      ),
+      (DbConfigProfile, $$DbConfigProfilesTableReferences),
       DbConfigProfile,
-      PrefetchHooks Function()
+      PrefetchHooks Function({bool dbAvailableModelsRefs})
+    >;
+typedef $$DbAvailableModelsTableCreateCompanionBuilder =
+    DbAvailableModelsCompanion Function({
+      required String profileId,
+      required String modelId,
+      Value<bool?> overrideSupportsReasoning,
+      Value<bool?> overrideSupportsVision,
+      Value<int> rowid,
+    });
+typedef $$DbAvailableModelsTableUpdateCompanionBuilder =
+    DbAvailableModelsCompanion Function({
+      Value<String> profileId,
+      Value<String> modelId,
+      Value<bool?> overrideSupportsReasoning,
+      Value<bool?> overrideSupportsVision,
+      Value<int> rowid,
+    });
+
+final class $$DbAvailableModelsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $DbAvailableModelsTable,
+          DbAvailableModel
+        > {
+  $$DbAvailableModelsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $DbConfigProfilesTable _profileIdTable(_$AppDatabase db) =>
+      db.dbConfigProfiles.createAlias(
+        $_aliasNameGenerator(
+          db.dbAvailableModels.profileId,
+          db.dbConfigProfiles.id,
+        ),
+      );
+
+  $$DbConfigProfilesTableProcessedTableManager get profileId {
+    final $_column = $_itemColumn<String>('profile_id')!;
+
+    final manager = $$DbConfigProfilesTableTableManager(
+      $_db,
+      $_db.dbConfigProfiles,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_profileIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$DbAvailableModelsTableFilterComposer
+    extends Composer<_$AppDatabase, $DbAvailableModelsTable> {
+  $$DbAvailableModelsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get modelId => $composableBuilder(
+    column: $table.modelId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get overrideSupportsReasoning => $composableBuilder(
+    column: $table.overrideSupportsReasoning,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get overrideSupportsVision => $composableBuilder(
+    column: $table.overrideSupportsVision,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$DbConfigProfilesTableFilterComposer get profileId {
+    final $$DbConfigProfilesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.profileId,
+      referencedTable: $db.dbConfigProfiles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DbConfigProfilesTableFilterComposer(
+            $db: $db,
+            $table: $db.dbConfigProfiles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$DbAvailableModelsTableOrderingComposer
+    extends Composer<_$AppDatabase, $DbAvailableModelsTable> {
+  $$DbAvailableModelsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get modelId => $composableBuilder(
+    column: $table.modelId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get overrideSupportsReasoning => $composableBuilder(
+    column: $table.overrideSupportsReasoning,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get overrideSupportsVision => $composableBuilder(
+    column: $table.overrideSupportsVision,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$DbConfigProfilesTableOrderingComposer get profileId {
+    final $$DbConfigProfilesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.profileId,
+      referencedTable: $db.dbConfigProfiles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DbConfigProfilesTableOrderingComposer(
+            $db: $db,
+            $table: $db.dbConfigProfiles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$DbAvailableModelsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DbAvailableModelsTable> {
+  $$DbAvailableModelsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get modelId =>
+      $composableBuilder(column: $table.modelId, builder: (column) => column);
+
+  GeneratedColumn<bool> get overrideSupportsReasoning => $composableBuilder(
+    column: $table.overrideSupportsReasoning,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get overrideSupportsVision => $composableBuilder(
+    column: $table.overrideSupportsVision,
+    builder: (column) => column,
+  );
+
+  $$DbConfigProfilesTableAnnotationComposer get profileId {
+    final $$DbConfigProfilesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.profileId,
+      referencedTable: $db.dbConfigProfiles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DbConfigProfilesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.dbConfigProfiles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$DbAvailableModelsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $DbAvailableModelsTable,
+          DbAvailableModel,
+          $$DbAvailableModelsTableFilterComposer,
+          $$DbAvailableModelsTableOrderingComposer,
+          $$DbAvailableModelsTableAnnotationComposer,
+          $$DbAvailableModelsTableCreateCompanionBuilder,
+          $$DbAvailableModelsTableUpdateCompanionBuilder,
+          (DbAvailableModel, $$DbAvailableModelsTableReferences),
+          DbAvailableModel,
+          PrefetchHooks Function({bool profileId})
+        > {
+  $$DbAvailableModelsTableTableManager(
+    _$AppDatabase db,
+    $DbAvailableModelsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DbAvailableModelsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DbAvailableModelsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$DbAvailableModelsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> profileId = const Value.absent(),
+                Value<String> modelId = const Value.absent(),
+                Value<bool?> overrideSupportsReasoning = const Value.absent(),
+                Value<bool?> overrideSupportsVision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DbAvailableModelsCompanion(
+                profileId: profileId,
+                modelId: modelId,
+                overrideSupportsReasoning: overrideSupportsReasoning,
+                overrideSupportsVision: overrideSupportsVision,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String profileId,
+                required String modelId,
+                Value<bool?> overrideSupportsReasoning = const Value.absent(),
+                Value<bool?> overrideSupportsVision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DbAvailableModelsCompanion.insert(
+                profileId: profileId,
+                modelId: modelId,
+                overrideSupportsReasoning: overrideSupportsReasoning,
+                overrideSupportsVision: overrideSupportsVision,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$DbAvailableModelsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({profileId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (profileId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.profileId,
+                                referencedTable:
+                                    $$DbAvailableModelsTableReferences
+                                        ._profileIdTable(db),
+                                referencedColumn:
+                                    $$DbAvailableModelsTableReferences
+                                        ._profileIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$DbAvailableModelsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $DbAvailableModelsTable,
+      DbAvailableModel,
+      $$DbAvailableModelsTableFilterComposer,
+      $$DbAvailableModelsTableOrderingComposer,
+      $$DbAvailableModelsTableAnnotationComposer,
+      $$DbAvailableModelsTableCreateCompanionBuilder,
+      $$DbAvailableModelsTableUpdateCompanionBuilder,
+      (DbAvailableModel, $$DbAvailableModelsTableReferences),
+      DbAvailableModel,
+      PrefetchHooks Function({bool profileId})
     >;
 typedef $$DbSessionsTableCreateCompanionBuilder =
     DbSessionsCompanion Function({
       required String id,
       required String title,
-      required int createdAt,
       required int updatedAt,
-      Value<SessionConfig?> config,
-      Value<bool> hasUnseenUpdate,
       Value<int> rowid,
     });
 typedef $$DbSessionsTableUpdateCompanionBuilder =
     DbSessionsCompanion Function({
       Value<String> id,
       Value<String> title,
-      Value<int> createdAt,
       Value<int> updatedAt,
-      Value<SessionConfig?> config,
-      Value<bool> hasUnseenUpdate,
       Value<int> rowid,
     });
 
@@ -2326,24 +3330,8 @@ class $$DbSessionsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnFilters(column),
-  );
-
   ColumnFilters<int> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnWithTypeConverterFilters<SessionConfig?, SessionConfig, String>
-  get config => $composableBuilder(
-    column: $table.config,
-    builder: (column) => ColumnWithTypeConverterFilters(column),
-  );
-
-  ColumnFilters<bool> get hasUnseenUpdate => $composableBuilder(
-    column: $table.hasUnseenUpdate,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2392,23 +3380,8 @@ class $$DbSessionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnOrderings(column),
-  );
-
   ColumnOrderings<int> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get config => $composableBuilder(
-    column: $table.config,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<bool> get hasUnseenUpdate => $composableBuilder(
-    column: $table.hasUnseenUpdate,
     builder: (column) => ColumnOrderings(column),
   );
 }
@@ -2428,19 +3401,8 @@ class $$DbSessionsTableAnnotationComposer
   GeneratedColumn<String> get title =>
       $composableBuilder(column: $table.title, builder: (column) => column);
 
-  GeneratedColumn<int> get createdAt =>
-      $composableBuilder(column: $table.createdAt, builder: (column) => column);
-
   GeneratedColumn<int> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
-
-  GeneratedColumnWithTypeConverter<SessionConfig?, String> get config =>
-      $composableBuilder(column: $table.config, builder: (column) => column);
-
-  GeneratedColumn<bool> get hasUnseenUpdate => $composableBuilder(
-    column: $table.hasUnseenUpdate,
-    builder: (column) => column,
-  );
 
   Expression<T> dbChatRoundsRefs<T extends Object>(
     Expression<T> Function($$DbChatRoundsTableAnnotationComposer a) f,
@@ -2498,36 +3460,24 @@ class $$DbSessionsTableTableManager
               ({
                 Value<String> id = const Value.absent(),
                 Value<String> title = const Value.absent(),
-                Value<int> createdAt = const Value.absent(),
                 Value<int> updatedAt = const Value.absent(),
-                Value<SessionConfig?> config = const Value.absent(),
-                Value<bool> hasUnseenUpdate = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DbSessionsCompanion(
                 id: id,
                 title: title,
-                createdAt: createdAt,
                 updatedAt: updatedAt,
-                config: config,
-                hasUnseenUpdate: hasUnseenUpdate,
                 rowid: rowid,
               ),
           createCompanionCallback:
               ({
                 required String id,
                 required String title,
-                required int createdAt,
                 required int updatedAt,
-                Value<SessionConfig?> config = const Value.absent(),
-                Value<bool> hasUnseenUpdate = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DbSessionsCompanion.insert(
                 id: id,
                 title: title,
-                createdAt: createdAt,
                 updatedAt: updatedAt,
-                config: config,
-                hasUnseenUpdate: hasUnseenUpdate,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -3441,6 +4391,8 @@ class $AppDatabaseManager {
       $$DbConfigStoreTableTableManager(_db, _db.dbConfigStore);
   $$DbConfigProfilesTableTableManager get dbConfigProfiles =>
       $$DbConfigProfilesTableTableManager(_db, _db.dbConfigProfiles);
+  $$DbAvailableModelsTableTableManager get dbAvailableModels =>
+      $$DbAvailableModelsTableTableManager(_db, _db.dbAvailableModels);
   $$DbSessionsTableTableManager get dbSessions =>
       $$DbSessionsTableTableManager(_db, _db.dbSessions);
   $$DbChatRoundsTableTableManager get dbChatRounds =>

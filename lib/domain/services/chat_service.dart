@@ -90,7 +90,7 @@ class ChatService {
       repository,
     );
 
-    final config = await configService.loadConfig();
+    final config = await configService.loadActiveConfig();
     final source = sourceRouter.getSourceFromConfig(config);
     
     final chatStream = source.chatStream(

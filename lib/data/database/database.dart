@@ -1,39 +1,11 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 
-import '../../core/models/app_config.dart';
-import '../../core/models/session.dart';
+part 'database.g.dart';
 
-part 'database.g.dart'; // 运行 build_runner 生成
-
-// ==========================================
-// Type Converters
-// ==========================================
-class AppConfigConverter extends TypeConverter<AppConfig, String> {
-  const AppConfigConverter();
-  @override
-  AppConfig fromSql(String fromDb) => 
-    AppConfig.fromJson(jsonDecode(fromDb) as Map<String, dynamic>);
-  @override
-  String toSql(AppConfig value) => jsonEncode(value.toJson());
-}
-
-class SessionConfigConverter extends TypeConverter<SessionConfig, String> {
-  const SessionConfigConverter();
-  @override
-  SessionConfig fromSql(String fromDb) => 
-    SessionConfig.fromJson(jsonDecode(fromDb) as Map<String, dynamic>);
-  @override
-  String toSql(SessionConfig value) => jsonEncode(value.toJson());
-}
-
-// ==========================================
-// Tables
-// ==========================================
 class DbConfigStore extends Table {
   IntColumn get id => integer().autoIncrement()(); // 永远只有一条记录 id=1
   TextColumn get activeProfileId => text()();
@@ -42,19 +14,30 @@ class DbConfigStore extends Table {
 class DbConfigProfiles extends Table {
   TextColumn get id => text()();
   TextColumn get name => text()();
-  TextColumn get config => text().map(const AppConfigConverter())();
-
+  TextColumn get baseUrl => text()();
+  TextColumn get apiKey => text()();
+  TextColumn get selectedModel => text().nullable()();
+  TextColumn get modelsPath => text()();
+  TextColumn get chatPath => text()();
+  TextColumn get apiMode => text()();
   @override
   Set<Column> get primaryKey => {id};
 }
 
+class DbAvailableModels extends Table {
+  TextColumn get profileId => text().references(DbConfigProfiles, #id, onDelete: KeyAction.cascade)();
+  TextColumn get modelId => text()();
+  BoolColumn get overrideSupportsReasoning => boolean().nullable()();
+  BoolColumn get overrideSupportsVision => boolean().nullable()();
+  @override
+  Set<Column> get primaryKey => {profileId, modelId};
+}
+
+
 class DbSessions extends Table {
   TextColumn get id => text()();
   TextColumn get title => text()();
-  IntColumn get createdAt => integer()();
   IntColumn get updatedAt => integer()();
-  TextColumn get config => text().map(const SessionConfigConverter()).nullable()();
-  BoolColumn get hasUnseenUpdate => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -94,6 +77,7 @@ class DbAttachments extends Table {
   tables: [
     DbConfigStore,
     DbConfigProfiles,
+    DbAvailableModels,
     DbSessions,
     DbChatRounds,
     DbAttachments,

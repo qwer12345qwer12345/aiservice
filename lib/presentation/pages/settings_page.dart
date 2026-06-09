@@ -1,7 +1,7 @@
 // lib/presentation/pages/settings_page.dart
+import 'package:aiservice/core/models/app_config.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/app_config_store.dart';
 import '../../core/models/model_info.dart';
 import '../../data/services/config_service.dart';
 import '../../di/providers.dart';
@@ -23,7 +23,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget build(BuildContext context) {
     final formState = ref.watch(settingsFormProvider);
     final formNotifier = ref.read(settingsFormProvider.notifier);
-    final profilesAsync = ref.watch(configProfilesProvider);
+    final profilesAsync = ref.watch(globalSettingsProvider);
     final configService = ref.read(configServiceProvider);
 
     return AppPageScaffold(
@@ -54,7 +54,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Widget _buildProfileSection(
     BuildContext context,
-    AppConfigStore store,
+    GlobalSettings store,
     ConfigService configService,
   ) {
     final activeProfile = store.profiles.firstWhere((p) => p.id == store.activeProfileId);
@@ -123,7 +123,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Widget _buildModelSection(SettingsFormState formState, SettingsFormNotifier notifier) {
-    final models = formState.config.availableModels ?? const <ModelInfo>[];
+    final models = formState.config.availableModels;
     final currentModelId = formState.config.selectedModel;
     final currentModel = currentModelId != null
         ? models.where((m) => m.id == currentModelId).firstOrNull
@@ -294,7 +294,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   void _showProfileManagementSheet(
     BuildContext context,
-    AppConfigStore store,
+    GlobalSettings store,
     ConfigService configService,
   ) {
     final activeProfile = store.profiles.firstWhere((p) => p.id == store.activeProfileId);

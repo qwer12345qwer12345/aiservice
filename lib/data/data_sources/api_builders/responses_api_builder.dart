@@ -1,27 +1,27 @@
-import 'package:aiservice/data/data_sources/api_builders/model_info_parser.dart';
 import 'api_request_builder.dart';
 import '../../../core/models/api_message.dart';
 import '../../../core/models/model_info.dart';
+import 'model_info_parser.dart';
 
 class ResponsesApiBuilder implements ApiRequestBuilder {
   @override
   Map<String, String> buildHeaders(ApiBuildContext ctx) {
     return {
-      'Authorization': 'Bearer ${ctx.apiKey}',
+      'Authorization': 'Bearer ${ctx.config.apiKey}',
       'Content-Type': 'application/json',
     };
   }
 
   @override
   Uri buildUri(ApiBuildContext ctx) {
-    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.chatPath);
+    return ApiUriUtils.buildNormalizedUri(ctx.config.baseUrl, ctx.config.chatPath);
   }
 
   @override
   Uri buildModelsUri(ApiBuildContext ctx) {
-    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.modelsPath);
+    return ApiUriUtils.buildNormalizedUri(ctx.config.baseUrl, ctx.config.modelsPath);
   }
-  
+
   @override
   Map<String, dynamic> buildRequestBody(ApiBuildContext ctx) {
     return {
@@ -40,7 +40,7 @@ class ResponsesApiBuilder implements ApiRequestBuilder {
   List<ModelInfo> parseModelsResponse(Map<String, dynamic> json) {
     return ModelInfoParser.parseModelsResponse(json);
   }
-  
+
   List<Map<String, dynamic>> _buildInput(List<ApiMessage> context) {
     final result = <Map<String, dynamic>>[];
     for (final message in context) {
@@ -57,7 +57,6 @@ class ResponsesApiBuilder implements ApiRequestBuilder {
     if (message.parts.isEmpty) {
       return {'role': message.role, 'content': message.content ?? ''};
     }
-
     return {
       'role': message.role,
       'content': message.parts.map((part) => part.when(

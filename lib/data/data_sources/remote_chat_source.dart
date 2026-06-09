@@ -27,16 +27,13 @@ class RemoteChatSource implements ChatSource {
   }
 
   @override
-  Future<List<ModelInfo>> fetchModels(AppConfig config) async {
+  Future<List<ModelInfo>> fetchModels(ConfigProfile config) async {
     final builder = _getBuilder(config.apiMode);
     final ctx = ApiBuildContext(
+      config: config,
       model: '',
       context: [],
       enableReasoning: false,
-      apiKey: config.apiKey,
-      baseUrl: config.baseUrl,
-      chatPath: '',
-      modelsPath: config.modelsPath,
     );
 
     final url = builder.buildModelsUri(ctx);
@@ -52,14 +49,14 @@ class RemoteChatSource implements ChatSource {
 
   @override
   Stream<ChatChunk> chatStream({
-    required AppConfig config,
+    required ConfigProfile config,
     required List<ApiMessage> context,
   }) async* {
     final client = http.Client();
     try {
       final apiMode = config.apiMode.trim();
       final selectedId = config.selectedModel;
-      final selectedModel = config.availableModels?.firstWhereOrNull((m) => m.id == selectedId);
+      final selectedModel = config.availableModels.firstWhereOrNull((m) => m.id == selectedId);
       final enableReasoning = selectedModel?.overrideSupportsReasoning == true;
       final model = config.selectedModel?.trim() ?? '';
 
@@ -70,9 +67,10 @@ class RemoteChatSource implements ChatSource {
       }
 
       final ctx = ApiBuildContext(
-        model: model, context: context, enableReasoning: enableReasoning,
-        apiKey: config.apiKey.trim(), baseUrl: config.baseUrl.trim(),
-        chatPath: resolvedChatPath, modelsPath: config.modelsPath.trim(),
+        config: config,                // 传入整个配置档案
+        model: model,
+        context: context,
+        enableReasoning: enableReasoning,
       );
 
       final uri = builder.buildUri(ctx);

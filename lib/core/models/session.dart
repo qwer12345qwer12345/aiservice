@@ -9,24 +9,9 @@ class Session with _$Session {
   const factory Session({
     required String id,
     required String title,
-    required int createdAt,
     required int updatedAt,
     required List<ChatRound> rounds,
-    SessionConfig? config,
-    @Default(false) bool hasUnseenUpdate,
   }) = _Session;
 
   factory Session.fromJson(Map<String, dynamic> json) => _$SessionFromJson(json);
-}
-
-@freezed
-class SessionConfig with _$SessionConfig {
-  const factory SessionConfig({
-    String? model,
-    double? temperature,
-    bool? enableReasoning,
-  }) = _SessionConfig;
-
-  factory SessionConfig.fromJson(Map<String, dynamic> json) =>
-      _$SessionConfigFromJson(json);
 }

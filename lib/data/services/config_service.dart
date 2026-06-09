@@ -1,9 +1,8 @@
 import 'dart:async';
 import 'package:aiservice/data/data_sources/chat_source_router.dart';
+import 'package:collection/collection.dart';
 import 'package:rxdart/rxdart.dart';
 import '../../core/models/app_config.dart';
-import '../../core/models/app_config_store.dart';
-import '../../core/models/model_info.dart';
 import '../repositories/config_repository.dart';
 import 'package:uuid/uuid.dart';
 
@@ -13,53 +12,44 @@ class ConfigService {
 
   ConfigService(this._repository, this._sourceRouter);
 
-  Future<AppConfigStore> loadConfigStore() async {
+  Future<GlobalSettings> loadGlobalSettings() async {
     final profiles = await _repository.getProfiles();
     if (profiles.isEmpty) {
-      final defaultStore = AppConfigStore.defaultStore();
-      await _repository.insertDefaultStore(defaultStore);
-      return defaultStore;
+      final defaultSettings = GlobalSettings.defaultSettings();
+      await _repository.insertDefaultSettings(defaultSettings);
+      return defaultSettings;
     }
-
     final activeProfileId = await _repository.getActiveProfileId();
-    return AppConfigStore(
+    return GlobalSettings(
       activeProfileId: activeProfileId,
       profiles: profiles,
     );
   }
 
-  Future<AppConfig> loadConfig() async {
-    final store = await loadConfigStore();
-    return store.profiles.firstWhere(
-      (p) => p.id == store.activeProfileId,
-      orElse: () => store.profiles.first,
-    ).config;
+  Future<ConfigProfile> loadActiveConfig() async {
+    final settings = await loadGlobalSettings();
+    return settings.profiles.firstWhere(
+      (p) => p.id == settings.activeProfileId,
+      orElse: () => settings.profiles.first,
+    );
   }
 
-  Future<void> saveConfig(AppConfig config) async {
-    final store = await loadConfigStore();
-    await _repository.updateProfileConfig(store.activeProfileId, config);
+  Future<void> saveConfig(ConfigProfile config) async {
+    final settings = await loadGlobalSettings();
+    await _repository.updateProfileConfig(settings.activeProfileId, config);
   }
 
-  Future<void> refreshModels(AppConfig targetConfig) async {
+  Future<void> refreshModels(ConfigProfile targetConfig) async {
     final source = _sourceRouter.getSourceFromConfig(targetConfig);
     final remoteModels = await source.fetchModels(targetConfig);
-
-    final oldModels = targetConfig.availableModels ?? const <ModelInfo>[];
-    final oldById = {for (final model in oldModels) model.id: model};
-
     final updatedModels = remoteModels.map((remote) {
-      final old = oldById[remote.id];
+      final old = targetConfig.availableModels.firstWhereOrNull((m) => m.id == remote.id);
       return remote.copyWith(
         overrideSupportsReasoning: old?.overrideSupportsReasoning,
         overrideSupportsVision: old?.overrideSupportsVision,
       );
     }).toList();
-
-    final updatedConfig = targetConfig.copyWith(
-      availableModels: updatedModels,
-    );
-
+    final updatedConfig = targetConfig.copyWith(availableModels: updatedModels);
     await saveConfig(updatedConfig);
   }
 
@@ -72,11 +62,21 @@ class ConfigService {
   }
 
   Future<void> createProfile(String name) async {
-    final activeConfig = await loadConfig();
+    final activeConfig = await loadActiveConfig();
     final newId = const Uuid().v4();
     final cleanName = name.trim().isEmpty ? '新配置' : name.trim();
-
-    await _repository.createProfile(newId, cleanName, activeConfig);
+    final newProfile = ConfigProfile(
+      id: newId,
+      name: cleanName,
+      baseUrl: activeConfig.baseUrl,
+      apiKey: activeConfig.apiKey,
+      selectedModel: activeConfig.selectedModel,
+      modelsPath: activeConfig.modelsPath,
+      chatPath: activeConfig.chatPath,
+      apiMode: activeConfig.apiMode,
+      availableModels: activeConfig.availableModels,
+    );
+    await _repository.createProfile(newProfile);
     await switchProfile(newId);
   }
 
@@ -86,39 +86,36 @@ class ConfigService {
   }
 
   Future<void> deleteProfile(String profileId) async {
-    final store = await loadConfigStore();
-    if (store.profiles.length <= 1) return;
-
-    if (store.activeProfileId == profileId) {
-      final remaining = store.profiles.where((p) => p.id != profileId).toList();
+    final settings = await loadGlobalSettings();
+    if (settings.profiles.length <= 1) return;
+    if (settings.activeProfileId == profileId) {
+      final remaining = settings.profiles.where((p) => p.id != profileId).toList();
       if (remaining.isNotEmpty) {
         await switchProfile(remaining.first.id);
       }
     }
-
     await _repository.deleteProfile(profileId);
   }
 
-  Stream<AppConfigStore> watchConfigStore() {
+  Stream<GlobalSettings> watchGlobalSettings() {
     final profilesStream = _repository.watchProfiles();
     final activeIdStream = _repository.watchActiveProfileId();
-
     return Rx.combineLatest2(profilesStream, activeIdStream, (profiles, activeId) {
       if (profiles.isEmpty) return null;
       final effectiveActiveId = activeId ?? profiles.first.id;
-      return AppConfigStore(
+      return GlobalSettings(
         activeProfileId: effectiveActiveId,
         profiles: profiles,
       );
     }).where((store) => store != null).map((store) => store!);
   }
 
-  Stream<AppConfig> watchConfig() {
-    return watchConfigStore().map((store) {
-      return store.profiles.firstWhere(
-        (p) => p.id == store.activeProfileId,
-        orElse: () => store.profiles.first,
-      ).config;
+  Stream<ConfigProfile> watchActiveConfig() {
+    return watchGlobalSettings().map((settings) {
+      return settings.profiles.firstWhere(
+        (p) => p.id == settings.activeProfileId,
+        orElse: () => settings.profiles.first,
+      );
     });
   }
 }

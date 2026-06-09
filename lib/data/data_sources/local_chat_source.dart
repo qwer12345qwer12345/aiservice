@@ -12,13 +12,13 @@ class LocalChatSource implements ChatSource {
   static bool _isLoaded = false;
 
   @override
-  Future<List<ModelInfo>> fetchModels(AppConfig config) async {
+  Future<List<ModelInfo>> fetchModels(ConfigProfile config) async {
     return []; 
   }
 
   @override
   Stream<ChatChunk> chatStream({
-    required AppConfig config,
+    required ConfigProfile config,
     required List<ApiMessage> context,
   }) async* {
     final modelPath = config.selectedModel?.trim() ?? '';

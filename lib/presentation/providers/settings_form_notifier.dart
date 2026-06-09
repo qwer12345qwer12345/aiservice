@@ -9,7 +9,7 @@ import 'package:file_picker/file_picker.dart';
 
 /// 设置表单的状态
 class SettingsFormState {
-  final AppConfig config;
+  final ConfigProfile config;
   final bool isSaving;
   final bool isRefreshingModels;
 
@@ -20,7 +20,7 @@ class SettingsFormState {
   });
 
   SettingsFormState copyWith({
-    AppConfig? config,
+    ConfigProfile? config,
     bool? isSaving,
     String? error,
     bool? isRefreshingModels,
@@ -36,7 +36,7 @@ class SettingsFormState {
 /// 设置表单 Notifier
 class SettingsFormNotifier extends Notifier<SettingsFormState> {
   late final ConfigService _configService;
-  AppConfig? _lastLoadedConfig;
+  ConfigProfile? _lastLoadedConfig;
 
   @override
   SettingsFormState build() {
@@ -48,11 +48,11 @@ class SettingsFormNotifier extends Notifier<SettingsFormState> {
       _lastLoadedConfig = initialConfig;
       state = SettingsFormState(config: initialConfig);
     } else {
-      state = SettingsFormState(config: AppConfig.defaultConfig());
+      state = SettingsFormState(config: ConfigProfile.defaultProfile());
     }
 
     // 2. 监听全局配置变化，自动同步
-    ref.listen<AsyncValue<AppConfig>>(configProvider, (previous, next) {
+    ref.listen<AsyncValue<ConfigProfile>>(configProvider, (previous, next) {
       next.whenData((config) {
         if (_lastLoadedConfig != config) {
           _lastLoadedConfig = config;
@@ -64,7 +64,7 @@ class SettingsFormNotifier extends Notifier<SettingsFormState> {
     return state;
   }
 
-  void _load(AppConfig config) {
+  void _load(ConfigProfile config) {
     state = state.copyWith(config: config);
   }
 
@@ -113,7 +113,7 @@ class SettingsFormNotifier extends Notifier<SettingsFormState> {
     final modelId = state.config.selectedModel;
     if (modelId == null || modelId.isEmpty) return;
 
-    final models = [...(state.config.availableModels ?? const <ModelInfo>[])];
+    final models = [...(state.config.availableModels)];
     final index = models.indexWhere((m) => m.id == modelId);
     final baseModel = index >= 0 ? models[index] : ModelInfo(id: modelId);
 
@@ -143,7 +143,7 @@ class SettingsFormNotifier extends Notifier<SettingsFormState> {
   }
 
   void restoreDefaults() {
-    state = state.copyWith(config: AppConfig.defaultConfig());
+    state = state.copyWith(config: ConfigProfile.defaultProfile());
   }
 
   Future<void> refreshModels() async {
@@ -176,7 +176,7 @@ class SettingsFormNotifier extends Notifier<SettingsFormState> {
 
     final newModel = ModelInfo(id: path);
 
-    final currentModels = List<ModelInfo>.from(state.config.availableModels ?? []);
+    final currentModels = List<ModelInfo>.from(state.config.availableModels);
     if (currentModels.any((m) => m.id == path)) {
       // 已存在则直接选中
       state = state.copyWith(config: state.config.copyWith(selectedModel: path));

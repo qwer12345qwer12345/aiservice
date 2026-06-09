@@ -6,21 +6,26 @@ class GoogleApiBuilder implements ApiRequestBuilder {
   @override
   Map<String, String> buildHeaders(ApiBuildContext ctx) {
     return {
-      'x-goog-api-key': ctx.apiKey,
+      'x-goog-api-key': ctx.config.apiKey,
       'Content-Type': 'application/json',
     };
   }
 
   @override
   Uri buildUri(ApiBuildContext ctx) {
-    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.modelsPath).replace(
-      queryParameters: {'alt': 'sse'},
-    );
+    // Google API 的聊天路径通常包含模型名，例如 'v1beta/models/{model}:streamGenerateContent'
+    // 这里需要从 config.chatPath 中解析，可能包含 {model} 占位符
+    String chatPath = ctx.config.chatPath;
+    if (chatPath.contains('{model}')) {
+      chatPath = chatPath.replaceAll('{model}', ctx.model);
+    }
+    return ApiUriUtils.buildNormalizedUri(ctx.config.baseUrl, chatPath)
+        .replace(queryParameters: {'alt': 'sse'});
   }
 
   @override
   Uri buildModelsUri(ApiBuildContext ctx) {
-    return ApiUriUtils.buildNormalizedUri(ctx.baseUrl, ctx.modelsPath);
+    return ApiUriUtils.buildNormalizedUri(ctx.config.baseUrl, ctx.config.modelsPath);
   }
 
   @override
@@ -51,10 +56,7 @@ class GoogleApiBuilder implements ApiRequestBuilder {
       if (methods != null && !methods.contains('generateContent')) {
         return null;
       }
-
-      return ModelInfo(
-        id: id,
-      );
+      return ModelInfo(id: id);
     }).whereType<ModelInfo>().toList();
   }
 
