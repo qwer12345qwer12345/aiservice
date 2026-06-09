@@ -54,6 +54,7 @@ class DbSessions extends Table {
   IntColumn get createdAt => integer()();
   IntColumn get updatedAt => integer()();
   TextColumn get config => text().map(const SessionConfigConverter()).nullable()();
+  TextColumn get systemPrompt => text().nullable()();
   BoolColumn get hasUnseenUpdate => boolean().withDefault(const Constant(false))();
 
   @override

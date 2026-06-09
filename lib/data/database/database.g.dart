@@ -527,6 +527,17 @@ class $DbSessionsTable extends DbSessions
         type: DriftSqlType.string,
         requiredDuringInsert: false,
       ).withConverter<SessionConfig?>($DbSessionsTable.$converterconfign);
+  static const VerificationMeta _systemPromptMeta = const VerificationMeta(
+    'systemPrompt',
+  );
+  @override
+  late final GeneratedColumn<String> systemPrompt = GeneratedColumn<String>(
+    'system_prompt',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _hasUnseenUpdateMeta = const VerificationMeta(
     'hasUnseenUpdate',
   );
@@ -549,6 +560,7 @@ class $DbSessionsTable extends DbSessions
     createdAt,
     updatedAt,
     config,
+    systemPrompt,
     hasUnseenUpdate,
   ];
   @override
@@ -592,6 +604,15 @@ class $DbSessionsTable extends DbSessions
     } else if (isInserting) {
       context.missing(_updatedAtMeta);
     }
+    if (data.containsKey('system_prompt')) {
+      context.handle(
+        _systemPromptMeta,
+        systemPrompt.isAcceptableOrUnknown(
+          data['system_prompt']!,
+          _systemPromptMeta,
+        ),
+      );
+    }
     if (data.containsKey('has_unseen_update')) {
       context.handle(
         _hasUnseenUpdateMeta,
@@ -632,6 +653,10 @@ class $DbSessionsTable extends DbSessions
           data['${effectivePrefix}config'],
         ),
       ),
+      systemPrompt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}system_prompt'],
+      ),
       hasUnseenUpdate: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}has_unseen_update'],
@@ -656,6 +681,7 @@ class DbSession extends DataClass implements Insertable<DbSession> {
   final int createdAt;
   final int updatedAt;
   final SessionConfig? config;
+  final String? systemPrompt;
   final bool hasUnseenUpdate;
   const DbSession({
     required this.id,
@@ -663,6 +689,7 @@ class DbSession extends DataClass implements Insertable<DbSession> {
     required this.createdAt,
     required this.updatedAt,
     this.config,
+    this.systemPrompt,
     required this.hasUnseenUpdate,
   });
   @override
@@ -677,6 +704,9 @@ class DbSession extends DataClass implements Insertable<DbSession> {
         $DbSessionsTable.$converterconfign.toSql(config),
       );
     }
+    if (!nullToAbsent || systemPrompt != null) {
+      map['system_prompt'] = Variable<String>(systemPrompt);
+    }
     map['has_unseen_update'] = Variable<bool>(hasUnseenUpdate);
     return map;
   }
@@ -690,6 +720,9 @@ class DbSession extends DataClass implements Insertable<DbSession> {
       config: config == null && nullToAbsent
           ? const Value.absent()
           : Value(config),
+      systemPrompt: systemPrompt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(systemPrompt),
       hasUnseenUpdate: Value(hasUnseenUpdate),
     );
   }
@@ -705,6 +738,7 @@ class DbSession extends DataClass implements Insertable<DbSession> {
       createdAt: serializer.fromJson<int>(json['createdAt']),
       updatedAt: serializer.fromJson<int>(json['updatedAt']),
       config: serializer.fromJson<SessionConfig?>(json['config']),
+      systemPrompt: serializer.fromJson<String?>(json['systemPrompt']),
       hasUnseenUpdate: serializer.fromJson<bool>(json['hasUnseenUpdate']),
     );
   }
@@ -717,6 +751,7 @@ class DbSession extends DataClass implements Insertable<DbSession> {
       'createdAt': serializer.toJson<int>(createdAt),
       'updatedAt': serializer.toJson<int>(updatedAt),
       'config': serializer.toJson<SessionConfig?>(config),
+      'systemPrompt': serializer.toJson<String?>(systemPrompt),
       'hasUnseenUpdate': serializer.toJson<bool>(hasUnseenUpdate),
     };
   }
@@ -727,6 +762,7 @@ class DbSession extends DataClass implements Insertable<DbSession> {
     int? createdAt,
     int? updatedAt,
     Value<SessionConfig?> config = const Value.absent(),
+    Value<String?> systemPrompt = const Value.absent(),
     bool? hasUnseenUpdate,
   }) => DbSession(
     id: id ?? this.id,
@@ -734,6 +770,7 @@ class DbSession extends DataClass implements Insertable<DbSession> {
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     config: config.present ? config.value : this.config,
+    systemPrompt: systemPrompt.present ? systemPrompt.value : this.systemPrompt,
     hasUnseenUpdate: hasUnseenUpdate ?? this.hasUnseenUpdate,
   );
   DbSession copyWithCompanion(DbSessionsCompanion data) {
@@ -743,6 +780,9 @@ class DbSession extends DataClass implements Insertable<DbSession> {
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       config: data.config.present ? data.config.value : this.config,
+      systemPrompt: data.systemPrompt.present
+          ? data.systemPrompt.value
+          : this.systemPrompt,
       hasUnseenUpdate: data.hasUnseenUpdate.present
           ? data.hasUnseenUpdate.value
           : this.hasUnseenUpdate,
@@ -757,14 +797,22 @@ class DbSession extends DataClass implements Insertable<DbSession> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('config: $config, ')
+          ..write('systemPrompt: $systemPrompt, ')
           ..write('hasUnseenUpdate: $hasUnseenUpdate')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, title, createdAt, updatedAt, config, hasUnseenUpdate);
+  int get hashCode => Object.hash(
+    id,
+    title,
+    createdAt,
+    updatedAt,
+    config,
+    systemPrompt,
+    hasUnseenUpdate,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -774,6 +822,7 @@ class DbSession extends DataClass implements Insertable<DbSession> {
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.config == this.config &&
+          other.systemPrompt == this.systemPrompt &&
           other.hasUnseenUpdate == this.hasUnseenUpdate);
 }
 
@@ -783,6 +832,7 @@ class DbSessionsCompanion extends UpdateCompanion<DbSession> {
   final Value<int> createdAt;
   final Value<int> updatedAt;
   final Value<SessionConfig?> config;
+  final Value<String?> systemPrompt;
   final Value<bool> hasUnseenUpdate;
   final Value<int> rowid;
   const DbSessionsCompanion({
@@ -791,6 +841,7 @@ class DbSessionsCompanion extends UpdateCompanion<DbSession> {
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.config = const Value.absent(),
+    this.systemPrompt = const Value.absent(),
     this.hasUnseenUpdate = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -800,6 +851,7 @@ class DbSessionsCompanion extends UpdateCompanion<DbSession> {
     required int createdAt,
     required int updatedAt,
     this.config = const Value.absent(),
+    this.systemPrompt = const Value.absent(),
     this.hasUnseenUpdate = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -812,6 +864,7 @@ class DbSessionsCompanion extends UpdateCompanion<DbSession> {
     Expression<int>? createdAt,
     Expression<int>? updatedAt,
     Expression<String>? config,
+    Expression<String>? systemPrompt,
     Expression<bool>? hasUnseenUpdate,
     Expression<int>? rowid,
   }) {
@@ -821,6 +874,7 @@ class DbSessionsCompanion extends UpdateCompanion<DbSession> {
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (config != null) 'config': config,
+      if (systemPrompt != null) 'system_prompt': systemPrompt,
       if (hasUnseenUpdate != null) 'has_unseen_update': hasUnseenUpdate,
       if (rowid != null) 'rowid': rowid,
     });
@@ -832,6 +886,7 @@ class DbSessionsCompanion extends UpdateCompanion<DbSession> {
     Value<int>? createdAt,
     Value<int>? updatedAt,
     Value<SessionConfig?>? config,
+    Value<String?>? systemPrompt,
     Value<bool>? hasUnseenUpdate,
     Value<int>? rowid,
   }) {
@@ -841,6 +896,7 @@ class DbSessionsCompanion extends UpdateCompanion<DbSession> {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       config: config ?? this.config,
+      systemPrompt: systemPrompt ?? this.systemPrompt,
       hasUnseenUpdate: hasUnseenUpdate ?? this.hasUnseenUpdate,
       rowid: rowid ?? this.rowid,
     );
@@ -866,6 +922,9 @@ class DbSessionsCompanion extends UpdateCompanion<DbSession> {
         $DbSessionsTable.$converterconfign.toSql(config.value),
       );
     }
+    if (systemPrompt.present) {
+      map['system_prompt'] = Variable<String>(systemPrompt.value);
+    }
     if (hasUnseenUpdate.present) {
       map['has_unseen_update'] = Variable<bool>(hasUnseenUpdate.value);
     }
@@ -883,6 +942,7 @@ class DbSessionsCompanion extends UpdateCompanion<DbSession> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('config: $config, ')
+          ..write('systemPrompt: $systemPrompt, ')
           ..write('hasUnseenUpdate: $hasUnseenUpdate, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -2267,6 +2327,7 @@ typedef $$DbSessionsTableCreateCompanionBuilder =
       required int createdAt,
       required int updatedAt,
       Value<SessionConfig?> config,
+      Value<String?> systemPrompt,
       Value<bool> hasUnseenUpdate,
       Value<int> rowid,
     });
@@ -2277,6 +2338,7 @@ typedef $$DbSessionsTableUpdateCompanionBuilder =
       Value<int> createdAt,
       Value<int> updatedAt,
       Value<SessionConfig?> config,
+      Value<String?> systemPrompt,
       Value<bool> hasUnseenUpdate,
       Value<int> rowid,
     });
@@ -2340,6 +2402,11 @@ class $$DbSessionsTableFilterComposer
   get config => $composableBuilder(
     column: $table.config,
     builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<String> get systemPrompt => $composableBuilder(
+    column: $table.systemPrompt,
+    builder: (column) => ColumnFilters(column),
   );
 
   ColumnFilters<bool> get hasUnseenUpdate => $composableBuilder(
@@ -2407,6 +2474,11 @@ class $$DbSessionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get systemPrompt => $composableBuilder(
+    column: $table.systemPrompt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get hasUnseenUpdate => $composableBuilder(
     column: $table.hasUnseenUpdate,
     builder: (column) => ColumnOrderings(column),
@@ -2436,6 +2508,11 @@ class $$DbSessionsTableAnnotationComposer
 
   GeneratedColumnWithTypeConverter<SessionConfig?, String> get config =>
       $composableBuilder(column: $table.config, builder: (column) => column);
+
+  GeneratedColumn<String> get systemPrompt => $composableBuilder(
+    column: $table.systemPrompt,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<bool> get hasUnseenUpdate => $composableBuilder(
     column: $table.hasUnseenUpdate,
@@ -2501,6 +2578,7 @@ class $$DbSessionsTableTableManager
                 Value<int> createdAt = const Value.absent(),
                 Value<int> updatedAt = const Value.absent(),
                 Value<SessionConfig?> config = const Value.absent(),
+                Value<String?> systemPrompt = const Value.absent(),
                 Value<bool> hasUnseenUpdate = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DbSessionsCompanion(
@@ -2509,6 +2587,7 @@ class $$DbSessionsTableTableManager
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 config: config,
+                systemPrompt: systemPrompt,
                 hasUnseenUpdate: hasUnseenUpdate,
                 rowid: rowid,
               ),
@@ -2519,6 +2598,7 @@ class $$DbSessionsTableTableManager
                 required int createdAt,
                 required int updatedAt,
                 Value<SessionConfig?> config = const Value.absent(),
+                Value<String?> systemPrompt = const Value.absent(),
                 Value<bool> hasUnseenUpdate = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DbSessionsCompanion.insert(
@@ -2527,6 +2607,7 @@ class $$DbSessionsTableTableManager
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 config: config,
+                systemPrompt: systemPrompt,
                 hasUnseenUpdate: hasUnseenUpdate,
                 rowid: rowid,
               ),

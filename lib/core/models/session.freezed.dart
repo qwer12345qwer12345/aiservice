@@ -27,6 +27,7 @@ mixin _$Session {
   int get updatedAt => throw _privateConstructorUsedError;
   List<ChatRound> get rounds => throw _privateConstructorUsedError;
   SessionConfig? get config => throw _privateConstructorUsedError;
+  String? get systemPrompt => throw _privateConstructorUsedError;
   bool get hasUnseenUpdate => throw _privateConstructorUsedError;
 
   /// Serializes this Session to a JSON map.
@@ -50,6 +51,7 @@ abstract class $SessionCopyWith<$Res> {
     int updatedAt,
     List<ChatRound> rounds,
     SessionConfig? config,
+    String? systemPrompt,
     bool hasUnseenUpdate,
   });
 
@@ -77,6 +79,7 @@ class _$SessionCopyWithImpl<$Res, $Val extends Session>
     Object? updatedAt = null,
     Object? rounds = null,
     Object? config = freezed,
+    Object? systemPrompt = freezed,
     Object? hasUnseenUpdate = null,
   }) {
     return _then(
@@ -105,6 +108,10 @@ class _$SessionCopyWithImpl<$Res, $Val extends Session>
                 ? _value.config
                 : config // ignore: cast_nullable_to_non_nullable
                       as SessionConfig?,
+            systemPrompt: freezed == systemPrompt
+                ? _value.systemPrompt
+                : systemPrompt // ignore: cast_nullable_to_non_nullable
+                      as String?,
             hasUnseenUpdate: null == hasUnseenUpdate
                 ? _value.hasUnseenUpdate
                 : hasUnseenUpdate // ignore: cast_nullable_to_non_nullable
@@ -144,6 +151,7 @@ abstract class _$$SessionImplCopyWith<$Res> implements $SessionCopyWith<$Res> {
     int updatedAt,
     List<ChatRound> rounds,
     SessionConfig? config,
+    String? systemPrompt,
     bool hasUnseenUpdate,
   });
 
@@ -171,6 +179,7 @@ class __$$SessionImplCopyWithImpl<$Res>
     Object? updatedAt = null,
     Object? rounds = null,
     Object? config = freezed,
+    Object? systemPrompt = freezed,
     Object? hasUnseenUpdate = null,
   }) {
     return _then(
@@ -199,6 +208,10 @@ class __$$SessionImplCopyWithImpl<$Res>
             ? _value.config
             : config // ignore: cast_nullable_to_non_nullable
                   as SessionConfig?,
+        systemPrompt: freezed == systemPrompt
+            ? _value.systemPrompt
+            : systemPrompt // ignore: cast_nullable_to_non_nullable
+                  as String?,
         hasUnseenUpdate: null == hasUnseenUpdate
             ? _value.hasUnseenUpdate
             : hasUnseenUpdate // ignore: cast_nullable_to_non_nullable
@@ -218,6 +231,7 @@ class _$SessionImpl implements _Session {
     required this.updatedAt,
     required final List<ChatRound> rounds,
     this.config,
+    this.systemPrompt,
     this.hasUnseenUpdate = false,
   }) : _rounds = rounds;
 
@@ -243,12 +257,14 @@ class _$SessionImpl implements _Session {
   @override
   final SessionConfig? config;
   @override
+  final String? systemPrompt;
+  @override
   @JsonKey()
   final bool hasUnseenUpdate;
 
   @override
   String toString() {
-    return 'Session(id: $id, title: $title, createdAt: $createdAt, updatedAt: $updatedAt, rounds: $rounds, config: $config, hasUnseenUpdate: $hasUnseenUpdate)';
+    return 'Session(id: $id, title: $title, createdAt: $createdAt, updatedAt: $updatedAt, rounds: $rounds, config: $config, systemPrompt: $systemPrompt, hasUnseenUpdate: $hasUnseenUpdate)';
   }
 
   @override
@@ -264,6 +280,8 @@ class _$SessionImpl implements _Session {
                 other.updatedAt == updatedAt) &&
             const DeepCollectionEquality().equals(other._rounds, _rounds) &&
             (identical(other.config, config) || other.config == config) &&
+            (identical(other.systemPrompt, systemPrompt) ||
+                other.systemPrompt == systemPrompt) &&
             (identical(other.hasUnseenUpdate, hasUnseenUpdate) ||
                 other.hasUnseenUpdate == hasUnseenUpdate));
   }
@@ -278,6 +296,7 @@ class _$SessionImpl implements _Session {
     updatedAt,
     const DeepCollectionEquality().hash(_rounds),
     config,
+    systemPrompt,
     hasUnseenUpdate,
   );
 
@@ -303,6 +322,7 @@ abstract class _Session implements Session {
     required final int updatedAt,
     required final List<ChatRound> rounds,
     final SessionConfig? config,
+    final String? systemPrompt,
     final bool hasUnseenUpdate,
   }) = _$SessionImpl;
 
@@ -320,6 +340,8 @@ abstract class _Session implements Session {
   List<ChatRound> get rounds;
   @override
   SessionConfig? get config;
+  @override
+  String? get systemPrompt;
   @override
   bool get hasUnseenUpdate;
 
