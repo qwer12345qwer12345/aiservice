@@ -37,12 +37,6 @@ class _ThoughtBubbleState extends State<ThoughtBubble> {
             onPressed: () => setState(() => _isExpanded = !_isExpanded),
             child: Row(
               children: [
-                Icon(
-                  CupertinoIcons.lightbulb,
-                  size: 16,
-                  color: CupertinoDynamicColor.resolve(CupertinoColors.systemBlue, context),
-                ),
-                const SizedBox(width: 6),
                 Text(
                   '推理过程',
                   style: textTheme.textStyle.copyWith(
@@ -64,8 +58,6 @@ class _ThoughtBubbleState extends State<ThoughtBubble> {
               child: Text(
                 text,
                 style: textTheme.textStyle.copyWith(
-                  fontSize: 13,
-                  height: 1.5,
                   color: CupertinoDynamicColor.resolve(CupertinoColors.label, context),
                 ),
               ),
