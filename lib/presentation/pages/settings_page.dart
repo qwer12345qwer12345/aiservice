@@ -256,10 +256,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             onPressed: () { notifier.updateApiMode('google'); Navigator.pop(context); },
             child: const Text('google'),
           ),
-          CupertinoActionSheetAction(
-            onPressed: () { notifier.updateApiMode('local'); Navigator.pop(context); },
-            child: const Text('local'),
-          ),
         ],
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.pop(context),

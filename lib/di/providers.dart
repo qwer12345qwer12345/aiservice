@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../data/data_sources/local_file_source.dart';
-import '../data/data_sources/local_chat_source.dart'; // 新增
 import '../data/data_sources/remote_chat_source.dart'; // 替换原 remote_api_source
 import '../data/data_sources/chat_source_router.dart'; // 新增
 import '../data/database/database.dart';
@@ -24,12 +23,10 @@ final appDatabaseProvider = Provider<AppDatabase>((ref) {
 
 // --- 新增 Data Sources ---
 final remoteChatSourceProvider = Provider<RemoteChatSource>((ref) => RemoteChatSource());
-final localChatSourceProvider = Provider<LocalChatSource>((ref) => LocalChatSource());
 
 final chatSourceRouterProvider = Provider<ChatSourceRouter>((ref) {
   return ChatSourceRouter(
     ref.watch(remoteChatSourceProvider),
-    ref.watch(localChatSourceProvider),
   );
 });
 
