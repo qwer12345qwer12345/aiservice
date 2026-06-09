@@ -276,7 +276,6 @@ class ConversationRepository {
   Future<Session> createSession({
     required String sessionId,
     required String title,
-    String? systemPrompt,
   }) async {
     final now = DateTime.now().millisecondsSinceEpoch;
     final session = Session(
@@ -285,7 +284,6 @@ class ConversationRepository {
       createdAt: now,
       updatedAt: now,
       rounds: [],
-      systemPrompt: systemPrompt,
     );
     await _db.into(_db.dbSessions).insert(
           DbSessionsCompanion.insert(
@@ -293,17 +291,9 @@ class ConversationRepository {
             title: session.title,
             createdAt: session.createdAt,
             updatedAt: session.updatedAt,
-            systemPrompt: Value(systemPrompt),
           ),
         );
     return session;
-  }
-
-  Future<String?> getSystemPrompt(String sessionId) async {
-    return await (_db.select(_db.dbSessions)
-          ..where((t) => t.id.equals(sessionId)))
-        .map((t) => t.systemPrompt)
-        .getSingleOrNull();
   }
 
   Future<void> updateSessionTitle(String sessionId, String title) async {

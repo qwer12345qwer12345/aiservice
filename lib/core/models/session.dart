@@ -13,7 +13,6 @@ class Session with _$Session {
     required int updatedAt,
     required List<ChatRound> rounds,
     SessionConfig? config,
-    String? systemPrompt,
     @Default(false) bool hasUnseenUpdate,
   }) = _Session;
 
