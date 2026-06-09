@@ -3089,6 +3089,135 @@ Map<String, dynamic> _$$ChatRoundImplToJson(_$ChatRoundImpl instance) =>
     };
 ````
 
+## File: lib/core/utils/sse_parser.dart
+````dart
+import '../models/sse_event.dart';
+
+/// 标准 SSE 解析器
+///
+/// 负责：
+/// - 处理 HTTP 分块不等于 SSE 事件边界的问题
+/// - 支持 event/id/data/retry
+/// - 支持多行 data 拼接
+/// - 以空行作为一个 SSE event 的结束
+class SseParser {
+  String _buffer = '';
+
+  final List<String> _dataLines = [];
+  String? _event;
+  String? _id;
+
+  /// 输入任意一段文本，输出当前能够完整解析出的 SSE 事件列表
+  List<SseEvent> addChunk(String chunk) {
+    _buffer += chunk;
+    final events = <SseEvent>[];
+
+    while (true) {
+      final newlineIndex = _buffer.indexOf('\n');
+      if (newlineIndex == -1) break;
+
+      var line = _buffer.substring(0, newlineIndex);
+      _buffer = _buffer.substring(newlineIndex + 1);
+
+      if (line.endsWith('\r')) {
+        line = line.substring(0, line.length - 1);
+      }
+
+      // 空行 => 一个事件结束
+      if (line.isEmpty) {
+        final event = _flushEvent();
+        if (event != null) {
+          events.add(event);
+        }
+        continue;
+      }
+
+      // 注释行
+      if (line.startsWith(':')) {
+        continue;
+      }
+
+      final colonIndex = line.indexOf(':');
+      String field;
+      String value;
+
+      if (colonIndex == -1) {
+        field = line;
+        value = '';
+      } else {
+        field = line.substring(0, colonIndex);
+        value = line.substring(colonIndex + 1);
+        if (value.startsWith(' ')) {
+          value = value.substring(1);
+        }
+      }
+
+      switch (field) {
+        case 'event':
+          _event = value;
+          break;
+        case 'data':
+          _dataLines.add(value);
+          break;
+        case 'id':
+          _id = value;
+          break;
+        case 'retry':
+          // 目前不处理自动重试时间
+          break;
+        default:
+          // 未知字段忽略
+          break;
+      }
+    }
+
+    return events;
+  }
+
+  /// 在底层流结束时调用，尝试 flush 最后一个未结束事件
+  SseEvent? close() {
+    return _flushEvent();
+  }
+
+  SseEvent? _flushEvent() {
+    if (_dataLines.isEmpty && _event == null && _id == null) {
+      return null;
+    }
+
+    final event = SseEvent(
+      id: _id,
+      event: _event,
+      data: _dataLines.join('\n'),
+    );
+
+    _dataLines.clear();
+    _event = null;
+    _id = null;
+
+    return event;
+  }
+}
+````
+
+## File: lib/presentation/models/pending_attachment.dart
+````dart
+class PendingAttachment {
+  final String id;
+  final String name;
+  final String path;
+  final bool isImage;
+  final String? mimeType;
+
+  const PendingAttachment({
+    required this.id,
+    required this.name,
+    required this.path,
+    required this.isImage,
+    this.mimeType,
+  });
+}
+````
+
 ## File: lib/core/models/session.dart
 ````dart
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -3106,6 +3235,7 @@ class Session with _$Session {
     required int updatedAt,
     required List<ChatRound> rounds,
     SessionConfig? config,
+    String? systemPrompt,
     @Default(false) bool hasUnseenUpdate,
   }) = _Session;
 
@@ -3156,6 +3286,7 @@ mixin _$Session {
   int get updatedAt => throw _privateConstructorUsedError;
   List<ChatRound> get rounds => throw _privateConstructorUsedError;
   SessionConfig? get config => throw _privateConstructorUsedError;
+  String? get systemPrompt => throw _privateConstructorUsedError;
   bool get hasUnseenUpdate => throw _privateConstructorUsedError;
 
   /// Serializes this Session to a JSON map.
@@ -3179,6 +3310,7 @@ abstract class $SessionCopyWith<$Res> {
     int updatedAt,
     List<ChatRound> rounds,
     SessionConfig? config,
+    String? systemPrompt,
     bool hasUnseenUpdate,
   });
 
@@ -3206,6 +3338,7 @@ class _$SessionCopyWithImpl<$Res, $Val extends Session>
     Object? updatedAt = null,
     Object? rounds = null,
     Object? config = freezed,
+    Object? systemPrompt = freezed,
     Object? hasUnseenUpdate = null,
   }) {
     return _then(
@@ -3234,6 +3367,10 @@ class _$SessionCopyWithImpl<$Res, $Val extends Session>
                 ? _value.config
                 : config // ignore: cast_nullable_to_non_nullable
                       as SessionConfig?,
+            systemPrompt: freezed == systemPrompt
+                ? _value.systemPrompt
+                : systemPrompt // ignore: cast_nullable_to_non_nullable
+                      as String?,
             hasUnseenUpdate: null == hasUnseenUpdate
                 ? _value.hasUnseenUpdate
                 : hasUnseenUpdate // ignore: cast_nullable_to_non_nullable
@@ -3273,6 +3410,7 @@ abstract class _$$SessionImplCopyWith<$Res> implements $SessionCopyWith<$Res> {
     int updatedAt,
     List<ChatRound> rounds,
     SessionConfig? config,
+    String? systemPrompt,
     bool hasUnseenUpdate,
   });
 
@@ -3300,6 +3438,7 @@ class __$$SessionImplCopyWithImpl<$Res>
     Object? updatedAt = null,
     Object? rounds = null,
     Object? config = freezed,
+    Object? systemPrompt = freezed,
     Object? hasUnseenUpdate = null,
   }) {
     return _then(
@@ -3328,6 +3467,10 @@ class __$$SessionImplCopyWithImpl<$Res>
             ? _value.config
             : config // ignore: cast_nullable_to_non_nullable
                   as SessionConfig?,
+        systemPrompt: freezed == systemPrompt
+            ? _value.systemPrompt
+            : systemPrompt // ignore: cast_nullable_to_non_nullable
+                  as String?,
         hasUnseenUpdate: null == hasUnseenUpdate
             ? _value.hasUnseenUpdate
             : hasUnseenUpdate // ignore: cast_nullable_to_non_nullable
@@ -3347,6 +3490,7 @@ class _$SessionImpl implements _Session {
     required this.updatedAt,
     required final List<ChatRound> rounds,
     this.config,
+    this.systemPrompt,
     this.hasUnseenUpdate = false,
   }) : _rounds = rounds;
 
@@ -3372,12 +3516,14 @@ class _$SessionImpl implements _Session {
   @override
   final SessionConfig? config;
   @override
+  final String? systemPrompt;
+  @override
   @JsonKey()
   final bool hasUnseenUpdate;
 
   @override
   String toString() {
-    return 'Session(id: $id, title: $title, createdAt: $createdAt, updatedAt: $updatedAt, rounds: $rounds, config: $config, hasUnseenUpdate: $hasUnseenUpdate)';
+    return 'Session(id: $id, title: $title, createdAt: $createdAt, updatedAt: $updatedAt, rounds: $rounds, config: $config, systemPrompt: $systemPrompt, hasUnseenUpdate: $hasUnseenUpdate)';
   }
 
   @override
@@ -3393,6 +3539,8 @@ class _$SessionImpl implements _Session {
                 other.updatedAt == updatedAt) &&
             const DeepCollectionEquality().equals(other._rounds, _rounds) &&
             (identical(other.config, config) || other.config == config) &&
+            (identical(other.systemPrompt, systemPrompt) ||
+                other.systemPrompt == systemPrompt) &&
             (identical(other.hasUnseenUpdate, hasUnseenUpdate) ||
                 other.hasUnseenUpdate == hasUnseenUpdate));
   }
@@ -3407,6 +3555,7 @@ class _$SessionImpl implements _Session {
     updatedAt,
     const DeepCollectionEquality().hash(_rounds),
     config,
+    systemPrompt,
     hasUnseenUpdate,
   );
 
@@ -3432,6 +3581,7 @@ abstract class _Session implements Session {
     required final int updatedAt,
     required final List<ChatRound> rounds,
     final SessionConfig? config,
+    final String? systemPrompt,
     final bool hasUnseenUpdate,
   }) = _$SessionImpl;
 
@@ -3449,6 +3599,8 @@ abstract class _Session implements Session {
   List<ChatRound> get rounds;
   @override
   SessionConfig? get config;
+  @override
+  String? get systemPrompt;
   @override
   bool get hasUnseenUpdate;
 
@@ -3681,6 +3833,7 @@ _$SessionImpl _$$SessionImplFromJson(Map<String, dynamic> json) =>
       config: json['config'] == null
           ? null
           : SessionConfig.fromJson(json['config'] as Map<String, dynamic>),
+      systemPrompt: json['systemPrompt'] as String?,
       hasUnseenUpdate: json['hasUnseenUpdate'] as bool? ?? false,
     );
 
@@ -3692,6 +3845,7 @@ Map<String, dynamic> _$$SessionImplToJson(_$SessionImpl instance) =>
       'updatedAt': instance.updatedAt,
       'rounds': instance.rounds,
       'config': instance.config,
+      'systemPrompt': instance.systemPrompt,
       'hasUnseenUpdate': instance.hasUnseenUpdate,
     };
 
@@ -3708,135 +3862,6 @@ Map<String, dynamic> _$$SessionConfigImplToJson(_$SessionConfigImpl instance) =>
       'temperature': instance.temperature,
       'enableReasoning': instance.enableReasoning,
     };
-````
-
-## File: lib/core/utils/sse_parser.dart
-````dart
-import '../models/sse_event.dart';
-
-/// 标准 SSE 解析器
-///
-/// 负责：
-/// - 处理 HTTP 分块不等于 SSE 事件边界的问题
-/// - 支持 event/id/data/retry
-/// - 支持多行 data 拼接
-/// - 以空行作为一个 SSE event 的结束
-class SseParser {
-  String _buffer = '';
-
-  final List<String> _dataLines = [];
-  String? _event;
-  String? _id;
-
-  /// 输入任意一段文本，输出当前能够完整解析出的 SSE 事件列表
-  List<SseEvent> addChunk(String chunk) {
-    _buffer += chunk;
-    final events = <SseEvent>[];
-
-    while (true) {
-      final newlineIndex = _buffer.indexOf('\n');
-      if (newlineIndex == -1) break;
-
-      var line = _buffer.substring(0, newlineIndex);
-      _buffer = _buffer.substring(newlineIndex + 1);
-
-      if (line.endsWith('\r')) {
-        line = line.substring(0, line.length - 1);
-      }
-
-      // 空行 => 一个事件结束
-      if (line.isEmpty) {
-        final event = _flushEvent();
-        if (event != null) {
-          events.add(event);
-        }
-        continue;
-      }
-
-      // 注释行
-      if (line.startsWith(':')) {
-        continue;
-      }
-
-      final colonIndex = line.indexOf(':');
-      String field;
-      String value;
-
-      if (colonIndex == -1) {
-        field = line;
-        value = '';
-      } else {
-        field = line.substring(0, colonIndex);
-        value = line.substring(colonIndex + 1);
-        if (value.startsWith(' ')) {
-          value = value.substring(1);
-        }
-      }
-
-      switch (field) {
-        case 'event':
-          _event = value;
-          break;
-        case 'data':
-          _dataLines.add(value);
-          break;
-        case 'id':
-          _id = value;
-          break;
-        case 'retry':
-          // 目前不处理自动重试时间
-          break;
-        default:
-          // 未知字段忽略
-          break;
-      }
-    }
-
-    return events;
-  }
-
-  /// 在底层流结束时调用，尝试 flush 最后一个未结束事件
-  SseEvent? close() {
-    return _flushEvent();
-  }
-
-  SseEvent? _flushEvent() {
-    if (_dataLines.isEmpty && _event == null && _id == null) {
-      return null;
-    }
-
-    final event = SseEvent(
-      id: _id,
-      event: _event,
-      data: _dataLines.join('\n'),
-    );
-
-    _dataLines.clear();
-    _event = null;
-    _id = null;
-
-    return event;
-  }
-}
-````
-
-## File: lib/presentation/models/pending_attachment.dart
-````dart
-class PendingAttachment {
-  final String id;
-  final String name;
-  final String path;
-  final bool isImage;
-  final String? mimeType;
-
-  const PendingAttachment({
-    required this.id,
-    required this.name,
-    required this.path,
-    required this.isImage,
-    this.mimeType,
-  });
-}
 ````
 
 ## File: lib/data/data_sources/api_builders/api_request_builder.dart
@@ -4200,3587 +4225,6 @@ class SseEventDecoder {
     }
     return error.toString();
   }
-}
-````
-
-## File: lib/data/database/database.dart
-````dart
-import 'dart:convert';
-import 'dart:io';
-import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as p;
-
-import '../../core/models/app_config.dart';
-import '../../core/models/session.dart';
-
-part 'database.g.dart'; // 运行 build_runner 生成
-
-// ==========================================
-// Type Converters
-// ==========================================
-class AppConfigConverter extends TypeConverter<AppConfig, String> {
-  const AppConfigConverter();
-  @override
-  AppConfig fromSql(String fromDb) => 
-    AppConfig.fromJson(jsonDecode(fromDb) as Map<String, dynamic>);
-  @override
-  String toSql(AppConfig value) => jsonEncode(value.toJson());
-}
-
-class SessionConfigConverter extends TypeConverter<SessionConfig, String> {
-  const SessionConfigConverter();
-  @override
-  SessionConfig fromSql(String fromDb) => 
-    SessionConfig.fromJson(jsonDecode(fromDb) as Map<String, dynamic>);
-  @override
-  String toSql(SessionConfig value) => jsonEncode(value.toJson());
-}
-
-// ==========================================
-// Tables
-// ==========================================
-class DbConfigStore extends Table {
-  IntColumn get id => integer().autoIncrement()(); // 永远只有一条记录 id=1
-  TextColumn get activeProfileId => text()();
-}
-
-class DbConfigProfiles extends Table {
-  TextColumn get id => text()();
-  TextColumn get name => text()();
-  TextColumn get config => text().map(const AppConfigConverter())();
-
-  @override
-  Set<Column> get primaryKey => {id};
-}
-
-class DbSessions extends Table {
-  TextColumn get id => text()();
-  TextColumn get title => text()();
-  IntColumn get createdAt => integer()();
-  IntColumn get updatedAt => integer()();
-  TextColumn get config => text().map(const SessionConfigConverter()).nullable()();
-  BoolColumn get hasUnseenUpdate => boolean().withDefault(const Constant(false))();
-
-  @override
-  Set<Column> get primaryKey => {id};
-}
-
-class DbChatRounds extends Table {
-  TextColumn get id => text()();
-  TextColumn get sessionId => text().references(DbSessions, #id, onDelete: KeyAction.cascade)();
-  TextColumn get parentId => text().nullable()();
-  IntColumn get createdAt => integer()();
-  TextColumn get userContent => text()();
-  TextColumn get assistantThinking => text().nullable()();
-  TextColumn get assistantContent => text().nullable()();
-  BoolColumn get isIncomplete => boolean().withDefault(const Constant(false))();
-  BoolColumn get hasUnseenUpdate => boolean().withDefault(const Constant(false))();
-
-  @override
-  Set<Column> get primaryKey => {id};
-}
-
-class DbAttachments extends Table {
-  TextColumn get id => text()();
-  TextColumn get roundId => text().references(DbChatRounds, #id, onDelete: KeyAction.cascade)();
-  TextColumn get name => text()();
-  TextColumn get relativePath => text()();
-  BoolColumn get isImage => boolean().withDefault(const Constant(false))();
-  TextColumn get mimeType => text().nullable()();
-
-  @override
-  Set<Column> get primaryKey => {id};
-}
-
-// ==========================================
-// Database
-// ==========================================
-@DriftDatabase(
-  tables: [
-    DbConfigStore,
-    DbConfigProfiles,
-    DbSessions,
-    DbChatRounds,
-    DbAttachments,
-  ],
-)
-class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(_openConnection());
-
-  @override
-  int get schemaVersion => 1;
-
-  @override
-  MigrationStrategy get migration => MigrationStrategy(
-        beforeOpen: (details) async {
-          // 开启 SQLite 外键约束，实现级联删除
-          await customStatement('PRAGMA foreign_keys = ON');
-        },
-      );
-}
-
-LazyDatabase _openConnection() {
-  return LazyDatabase(() async {
-    final dbFolder = await getApplicationDocumentsDirectory();
-    final file = File(p.join(dbFolder.path, 'ai_chat_v1.sqlite'));
-    return NativeDatabase.createInBackground(file);
-  });
-}
-````
-
-## File: lib/data/database/database.g.dart
-````dart
-// GENERATED CODE - DO NOT MODIFY BY HAND
-
-part of 'database.dart';
-
-// ignore_for_file: type=lint
-class $DbConfigStoreTable extends DbConfigStore
-    with TableInfo<$DbConfigStoreTable, DbConfigStoreData> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  $DbConfigStoreTable(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
-  @override
-  late final GeneratedColumn<int> id = GeneratedColumn<int>(
-    'id',
-    aliasedName,
-    false,
-    hasAutoIncrement: true,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'PRIMARY KEY AUTOINCREMENT',
-    ),
-  );
-  static const VerificationMeta _activeProfileIdMeta = const VerificationMeta(
-    'activeProfileId',
-  );
-  @override
-  late final GeneratedColumn<String> activeProfileId = GeneratedColumn<String>(
-    'active_profile_id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  @override
-  List<GeneratedColumn> get $columns => [id, activeProfileId];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'db_config_store';
-  @override
-  VerificationContext validateIntegrity(
-    Insertable<DbConfigStoreData> instance, {
-    bool isInserting = false,
-  }) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    }
-    if (data.containsKey('active_profile_id')) {
-      context.handle(
-        _activeProfileIdMeta,
-        activeProfileId.isAcceptableOrUnknown(
-          data['active_profile_id']!,
-          _activeProfileIdMeta,
-        ),
-      );
-    } else if (isInserting) {
-      context.missing(_activeProfileIdMeta);
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => {id};
-  @override
-  DbConfigStoreData map(Map<String, dynamic> data, {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return DbConfigStoreData(
-      id: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}id'],
-      )!,
-      activeProfileId: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}active_profile_id'],
-      )!,
-    );
-  }
-
-  @override
-  $DbConfigStoreTable createAlias(String alias) {
-    return $DbConfigStoreTable(attachedDatabase, alias);
-  }
-}
-
-class DbConfigStoreData extends DataClass
-    implements Insertable<DbConfigStoreData> {
-  final int id;
-  final String activeProfileId;
-  const DbConfigStoreData({required this.id, required this.activeProfileId});
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    map['id'] = Variable<int>(id);
-    map['active_profile_id'] = Variable<String>(activeProfileId);
-    return map;
-  }
-
-  DbConfigStoreCompanion toCompanion(bool nullToAbsent) {
-    return DbConfigStoreCompanion(
-      id: Value(id),
-      activeProfileId: Value(activeProfileId),
-    );
-  }
-
-  factory DbConfigStoreData.fromJson(
-    Map<String, dynamic> json, {
-    ValueSerializer? serializer,
-  }) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return DbConfigStoreData(
-      id: serializer.fromJson<int>(json['id']),
-      activeProfileId: serializer.fromJson<String>(json['activeProfileId']),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'id': serializer.toJson<int>(id),
-      'activeProfileId': serializer.toJson<String>(activeProfileId),
-    };
-  }
-
-  DbConfigStoreData copyWith({int? id, String? activeProfileId}) =>
-      DbConfigStoreData(
-        id: id ?? this.id,
-        activeProfileId: activeProfileId ?? this.activeProfileId,
-      );
-  DbConfigStoreData copyWithCompanion(DbConfigStoreCompanion data) {
-    return DbConfigStoreData(
-      id: data.id.present ? data.id.value : this.id,
-      activeProfileId: data.activeProfileId.present
-          ? data.activeProfileId.value
-          : this.activeProfileId,
-    );
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('DbConfigStoreData(')
-          ..write('id: $id, ')
-          ..write('activeProfileId: $activeProfileId')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode => Object.hash(id, activeProfileId);
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is DbConfigStoreData &&
-          other.id == this.id &&
-          other.activeProfileId == this.activeProfileId);
-}
-
-class DbConfigStoreCompanion extends UpdateCompanion<DbConfigStoreData> {
-  final Value<int> id;
-  final Value<String> activeProfileId;
-  const DbConfigStoreCompanion({
-    this.id = const Value.absent(),
-    this.activeProfileId = const Value.absent(),
-  });
-  DbConfigStoreCompanion.insert({
-    this.id = const Value.absent(),
-    required String activeProfileId,
-  }) : activeProfileId = Value(activeProfileId);
-  static Insertable<DbConfigStoreData> custom({
-    Expression<int>? id,
-    Expression<String>? activeProfileId,
-  }) {
-    return RawValuesInsertable({
-      if (id != null) 'id': id,
-      if (activeProfileId != null) 'active_profile_id': activeProfileId,
-    });
-  }
-
-  DbConfigStoreCompanion copyWith({
-    Value<int>? id,
-    Value<String>? activeProfileId,
-  }) {
-    return DbConfigStoreCompanion(
-      id: id ?? this.id,
-      activeProfileId: activeProfileId ?? this.activeProfileId,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (id.present) {
-      map['id'] = Variable<int>(id.value);
-    }
-    if (activeProfileId.present) {
-      map['active_profile_id'] = Variable<String>(activeProfileId.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('DbConfigStoreCompanion(')
-          ..write('id: $id, ')
-          ..write('activeProfileId: $activeProfileId')
-          ..write(')'))
-        .toString();
-  }
-}
-
-class $DbConfigProfilesTable extends DbConfigProfiles
-    with TableInfo<$DbConfigProfilesTable, DbConfigProfile> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  $DbConfigProfilesTable(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
-  @override
-  late final GeneratedColumn<String> id = GeneratedColumn<String>(
-    'id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _nameMeta = const VerificationMeta('name');
-  @override
-  late final GeneratedColumn<String> name = GeneratedColumn<String>(
-    'name',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  @override
-  late final GeneratedColumnWithTypeConverter<AppConfig, String> config =
-      GeneratedColumn<String>(
-        'config',
-        aliasedName,
-        false,
-        type: DriftSqlType.string,
-        requiredDuringInsert: true,
-      ).withConverter<AppConfig>($DbConfigProfilesTable.$converterconfig);
-  @override
-  List<GeneratedColumn> get $columns => [id, name, config];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'db_config_profiles';
-  @override
-  VerificationContext validateIntegrity(
-    Insertable<DbConfigProfile> instance, {
-    bool isInserting = false,
-  }) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    } else if (isInserting) {
-      context.missing(_idMeta);
-    }
-    if (data.containsKey('name')) {
-      context.handle(
-        _nameMeta,
-        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_nameMeta);
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => {id};
-  @override
-  DbConfigProfile map(Map<String, dynamic> data, {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return DbConfigProfile(
-      id: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}id'],
-      )!,
-      name: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}name'],
-      )!,
-      config: $DbConfigProfilesTable.$converterconfig.fromSql(
-        attachedDatabase.typeMapping.read(
-          DriftSqlType.string,
-          data['${effectivePrefix}config'],
-        )!,
-      ),
-    );
-  }
-
-  @override
-  $DbConfigProfilesTable createAlias(String alias) {
-    return $DbConfigProfilesTable(attachedDatabase, alias);
-  }
-
-  static TypeConverter<AppConfig, String> $converterconfig =
-      const AppConfigConverter();
-}
-
-class DbConfigProfile extends DataClass implements Insertable<DbConfigProfile> {
-  final String id;
-  final String name;
-  final AppConfig config;
-  const DbConfigProfile({
-    required this.id,
-    required this.name,
-    required this.config,
-  });
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    map['id'] = Variable<String>(id);
-    map['name'] = Variable<String>(name);
-    {
-      map['config'] = Variable<String>(
-        $DbConfigProfilesTable.$converterconfig.toSql(config),
-      );
-    }
-    return map;
-  }
-
-  DbConfigProfilesCompanion toCompanion(bool nullToAbsent) {
-    return DbConfigProfilesCompanion(
-      id: Value(id),
-      name: Value(name),
-      config: Value(config),
-    );
-  }
-
-  factory DbConfigProfile.fromJson(
-    Map<String, dynamic> json, {
-    ValueSerializer? serializer,
-  }) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return DbConfigProfile(
-      id: serializer.fromJson<String>(json['id']),
-      name: serializer.fromJson<String>(json['name']),
-      config: serializer.fromJson<AppConfig>(json['config']),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'id': serializer.toJson<String>(id),
-      'name': serializer.toJson<String>(name),
-      'config': serializer.toJson<AppConfig>(config),
-    };
-  }
-
-  DbConfigProfile copyWith({String? id, String? name, AppConfig? config}) =>
-      DbConfigProfile(
-        id: id ?? this.id,
-        name: name ?? this.name,
-        config: config ?? this.config,
-      );
-  DbConfigProfile copyWithCompanion(DbConfigProfilesCompanion data) {
-    return DbConfigProfile(
-      id: data.id.present ? data.id.value : this.id,
-      name: data.name.present ? data.name.value : this.name,
-      config: data.config.present ? data.config.value : this.config,
-    );
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('DbConfigProfile(')
-          ..write('id: $id, ')
-          ..write('name: $name, ')
-          ..write('config: $config')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode => Object.hash(id, name, config);
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is DbConfigProfile &&
-          other.id == this.id &&
-          other.name == this.name &&
-          other.config == this.config);
-}
-
-class DbConfigProfilesCompanion extends UpdateCompanion<DbConfigProfile> {
-  final Value<String> id;
-  final Value<String> name;
-  final Value<AppConfig> config;
-  final Value<int> rowid;
-  const DbConfigProfilesCompanion({
-    this.id = const Value.absent(),
-    this.name = const Value.absent(),
-    this.config = const Value.absent(),
-    this.rowid = const Value.absent(),
-  });
-  DbConfigProfilesCompanion.insert({
-    required String id,
-    required String name,
-    required AppConfig config,
-    this.rowid = const Value.absent(),
-  }) : id = Value(id),
-       name = Value(name),
-       config = Value(config);
-  static Insertable<DbConfigProfile> custom({
-    Expression<String>? id,
-    Expression<String>? name,
-    Expression<String>? config,
-    Expression<int>? rowid,
-  }) {
-    return RawValuesInsertable({
-      if (id != null) 'id': id,
-      if (name != null) 'name': name,
-      if (config != null) 'config': config,
-      if (rowid != null) 'rowid': rowid,
-    });
-  }
-
-  DbConfigProfilesCompanion copyWith({
-    Value<String>? id,
-    Value<String>? name,
-    Value<AppConfig>? config,
-    Value<int>? rowid,
-  }) {
-    return DbConfigProfilesCompanion(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      config: config ?? this.config,
-      rowid: rowid ?? this.rowid,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (id.present) {
-      map['id'] = Variable<String>(id.value);
-    }
-    if (name.present) {
-      map['name'] = Variable<String>(name.value);
-    }
-    if (config.present) {
-      map['config'] = Variable<String>(
-        $DbConfigProfilesTable.$converterconfig.toSql(config.value),
-      );
-    }
-    if (rowid.present) {
-      map['rowid'] = Variable<int>(rowid.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('DbConfigProfilesCompanion(')
-          ..write('id: $id, ')
-          ..write('name: $name, ')
-          ..write('config: $config, ')
-          ..write('rowid: $rowid')
-          ..write(')'))
-        .toString();
-  }
-}
-
-class $DbSessionsTable extends DbSessions
-    with TableInfo<$DbSessionsTable, DbSession> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  $DbSessionsTable(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
-  @override
-  late final GeneratedColumn<String> id = GeneratedColumn<String>(
-    'id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _titleMeta = const VerificationMeta('title');
-  @override
-  late final GeneratedColumn<String> title = GeneratedColumn<String>(
-    'title',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _createdAtMeta = const VerificationMeta(
-    'createdAt',
-  );
-  @override
-  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
-    'created_at',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
-    'updatedAt',
-  );
-  @override
-  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
-    'updated_at',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: true,
-  );
-  @override
-  late final GeneratedColumnWithTypeConverter<SessionConfig?, String> config =
-      GeneratedColumn<String>(
-        'config',
-        aliasedName,
-        true,
-        type: DriftSqlType.string,
-        requiredDuringInsert: false,
-      ).withConverter<SessionConfig?>($DbSessionsTable.$converterconfign);
-  static const VerificationMeta _hasUnseenUpdateMeta = const VerificationMeta(
-    'hasUnseenUpdate',
-  );
-  @override
-  late final GeneratedColumn<bool> hasUnseenUpdate = GeneratedColumn<bool>(
-    'has_unseen_update',
-    aliasedName,
-    false,
-    type: DriftSqlType.bool,
-    requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'CHECK ("has_unseen_update" IN (0, 1))',
-    ),
-    defaultValue: const Constant(false),
-  );
-  @override
-  List<GeneratedColumn> get $columns => [
-    id,
-    title,
-    createdAt,
-    updatedAt,
-    config,
-    hasUnseenUpdate,
-  ];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'db_sessions';
-  @override
-  VerificationContext validateIntegrity(
-    Insertable<DbSession> instance, {
-    bool isInserting = false,
-  }) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    } else if (isInserting) {
-      context.missing(_idMeta);
-    }
-    if (data.containsKey('title')) {
-      context.handle(
-        _titleMeta,
-        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_titleMeta);
-    }
-    if (data.containsKey('created_at')) {
-      context.handle(
-        _createdAtMeta,
-        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_createdAtMeta);
-    }
-    if (data.containsKey('updated_at')) {
-      context.handle(
-        _updatedAtMeta,
-        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_updatedAtMeta);
-    }
-    if (data.containsKey('has_unseen_update')) {
-      context.handle(
-        _hasUnseenUpdateMeta,
-        hasUnseenUpdate.isAcceptableOrUnknown(
-          data['has_unseen_update']!,
-          _hasUnseenUpdateMeta,
-        ),
-      );
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => {id};
-  @override
-  DbSession map(Map<String, dynamic> data, {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return DbSession(
-      id: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}id'],
-      )!,
-      title: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}title'],
-      )!,
-      createdAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}created_at'],
-      )!,
-      updatedAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}updated_at'],
-      )!,
-      config: $DbSessionsTable.$converterconfign.fromSql(
-        attachedDatabase.typeMapping.read(
-          DriftSqlType.string,
-          data['${effectivePrefix}config'],
-        ),
-      ),
-      hasUnseenUpdate: attachedDatabase.typeMapping.read(
-        DriftSqlType.bool,
-        data['${effectivePrefix}has_unseen_update'],
-      )!,
-    );
-  }
-
-  @override
-  $DbSessionsTable createAlias(String alias) {
-    return $DbSessionsTable(attachedDatabase, alias);
-  }
-
-  static TypeConverter<SessionConfig, String> $converterconfig =
-      const SessionConfigConverter();
-  static TypeConverter<SessionConfig?, String?> $converterconfign =
-      NullAwareTypeConverter.wrap($converterconfig);
-}
-
-class DbSession extends DataClass implements Insertable<DbSession> {
-  final String id;
-  final String title;
-  final int createdAt;
-  final int updatedAt;
-  final SessionConfig? config;
-  final bool hasUnseenUpdate;
-  const DbSession({
-    required this.id,
-    required this.title,
-    required this.createdAt,
-    required this.updatedAt,
-    this.config,
-    required this.hasUnseenUpdate,
-  });
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    map['id'] = Variable<String>(id);
-    map['title'] = Variable<String>(title);
-    map['created_at'] = Variable<int>(createdAt);
-    map['updated_at'] = Variable<int>(updatedAt);
-    if (!nullToAbsent || config != null) {
-      map['config'] = Variable<String>(
-        $DbSessionsTable.$converterconfign.toSql(config),
-      );
-    }
-    map['has_unseen_update'] = Variable<bool>(hasUnseenUpdate);
-    return map;
-  }
-
-  DbSessionsCompanion toCompanion(bool nullToAbsent) {
-    return DbSessionsCompanion(
-      id: Value(id),
-      title: Value(title),
-      createdAt: Value(createdAt),
-      updatedAt: Value(updatedAt),
-      config: config == null && nullToAbsent
-          ? const Value.absent()
-          : Value(config),
-      hasUnseenUpdate: Value(hasUnseenUpdate),
-    );
-  }
-
-  factory DbSession.fromJson(
-    Map<String, dynamic> json, {
-    ValueSerializer? serializer,
-  }) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return DbSession(
-      id: serializer.fromJson<String>(json['id']),
-      title: serializer.fromJson<String>(json['title']),
-      createdAt: serializer.fromJson<int>(json['createdAt']),
-      updatedAt: serializer.fromJson<int>(json['updatedAt']),
-      config: serializer.fromJson<SessionConfig?>(json['config']),
-      hasUnseenUpdate: serializer.fromJson<bool>(json['hasUnseenUpdate']),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'id': serializer.toJson<String>(id),
-      'title': serializer.toJson<String>(title),
-      'createdAt': serializer.toJson<int>(createdAt),
-      'updatedAt': serializer.toJson<int>(updatedAt),
-      'config': serializer.toJson<SessionConfig?>(config),
-      'hasUnseenUpdate': serializer.toJson<bool>(hasUnseenUpdate),
-    };
-  }
-
-  DbSession copyWith({
-    String? id,
-    String? title,
-    int? createdAt,
-    int? updatedAt,
-    Value<SessionConfig?> config = const Value.absent(),
-    bool? hasUnseenUpdate,
-  }) => DbSession(
-    id: id ?? this.id,
-    title: title ?? this.title,
-    createdAt: createdAt ?? this.createdAt,
-    updatedAt: updatedAt ?? this.updatedAt,
-    config: config.present ? config.value : this.config,
-    hasUnseenUpdate: hasUnseenUpdate ?? this.hasUnseenUpdate,
-  );
-  DbSession copyWithCompanion(DbSessionsCompanion data) {
-    return DbSession(
-      id: data.id.present ? data.id.value : this.id,
-      title: data.title.present ? data.title.value : this.title,
-      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
-      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
-      config: data.config.present ? data.config.value : this.config,
-      hasUnseenUpdate: data.hasUnseenUpdate.present
-          ? data.hasUnseenUpdate.value
-          : this.hasUnseenUpdate,
-    );
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('DbSession(')
-          ..write('id: $id, ')
-          ..write('title: $title, ')
-          ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt, ')
-          ..write('config: $config, ')
-          ..write('hasUnseenUpdate: $hasUnseenUpdate')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode =>
-      Object.hash(id, title, createdAt, updatedAt, config, hasUnseenUpdate);
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is DbSession &&
-          other.id == this.id &&
-          other.title == this.title &&
-          other.createdAt == this.createdAt &&
-          other.updatedAt == this.updatedAt &&
-          other.config == this.config &&
-          other.hasUnseenUpdate == this.hasUnseenUpdate);
-}
-
-class DbSessionsCompanion extends UpdateCompanion<DbSession> {
-  final Value<String> id;
-  final Value<String> title;
-  final Value<int> createdAt;
-  final Value<int> updatedAt;
-  final Value<SessionConfig?> config;
-  final Value<bool> hasUnseenUpdate;
-  final Value<int> rowid;
-  const DbSessionsCompanion({
-    this.id = const Value.absent(),
-    this.title = const Value.absent(),
-    this.createdAt = const Value.absent(),
-    this.updatedAt = const Value.absent(),
-    this.config = const Value.absent(),
-    this.hasUnseenUpdate = const Value.absent(),
-    this.rowid = const Value.absent(),
-  });
-  DbSessionsCompanion.insert({
-    required String id,
-    required String title,
-    required int createdAt,
-    required int updatedAt,
-    this.config = const Value.absent(),
-    this.hasUnseenUpdate = const Value.absent(),
-    this.rowid = const Value.absent(),
-  }) : id = Value(id),
-       title = Value(title),
-       createdAt = Value(createdAt),
-       updatedAt = Value(updatedAt);
-  static Insertable<DbSession> custom({
-    Expression<String>? id,
-    Expression<String>? title,
-    Expression<int>? createdAt,
-    Expression<int>? updatedAt,
-    Expression<String>? config,
-    Expression<bool>? hasUnseenUpdate,
-    Expression<int>? rowid,
-  }) {
-    return RawValuesInsertable({
-      if (id != null) 'id': id,
-      if (title != null) 'title': title,
-      if (createdAt != null) 'created_at': createdAt,
-      if (updatedAt != null) 'updated_at': updatedAt,
-      if (config != null) 'config': config,
-      if (hasUnseenUpdate != null) 'has_unseen_update': hasUnseenUpdate,
-      if (rowid != null) 'rowid': rowid,
-    });
-  }
-
-  DbSessionsCompanion copyWith({
-    Value<String>? id,
-    Value<String>? title,
-    Value<int>? createdAt,
-    Value<int>? updatedAt,
-    Value<SessionConfig?>? config,
-    Value<bool>? hasUnseenUpdate,
-    Value<int>? rowid,
-  }) {
-    return DbSessionsCompanion(
-      id: id ?? this.id,
-      title: title ?? this.title,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-      config: config ?? this.config,
-      hasUnseenUpdate: hasUnseenUpdate ?? this.hasUnseenUpdate,
-      rowid: rowid ?? this.rowid,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (id.present) {
-      map['id'] = Variable<String>(id.value);
-    }
-    if (title.present) {
-      map['title'] = Variable<String>(title.value);
-    }
-    if (createdAt.present) {
-      map['created_at'] = Variable<int>(createdAt.value);
-    }
-    if (updatedAt.present) {
-      map['updated_at'] = Variable<int>(updatedAt.value);
-    }
-    if (config.present) {
-      map['config'] = Variable<String>(
-        $DbSessionsTable.$converterconfign.toSql(config.value),
-      );
-    }
-    if (hasUnseenUpdate.present) {
-      map['has_unseen_update'] = Variable<bool>(hasUnseenUpdate.value);
-    }
-    if (rowid.present) {
-      map['rowid'] = Variable<int>(rowid.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('DbSessionsCompanion(')
-          ..write('id: $id, ')
-          ..write('title: $title, ')
-          ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt, ')
-          ..write('config: $config, ')
-          ..write('hasUnseenUpdate: $hasUnseenUpdate, ')
-          ..write('rowid: $rowid')
-          ..write(')'))
-        .toString();
-  }
-}
-
-class $DbChatRoundsTable extends DbChatRounds
-    with TableInfo<$DbChatRoundsTable, DbChatRound> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  $DbChatRoundsTable(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
-  @override
-  late final GeneratedColumn<String> id = GeneratedColumn<String>(
-    'id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _sessionIdMeta = const VerificationMeta(
-    'sessionId',
-  );
-  @override
-  late final GeneratedColumn<String> sessionId = GeneratedColumn<String>(
-    'session_id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES db_sessions (id) ON DELETE CASCADE',
-    ),
-  );
-  static const VerificationMeta _parentIdMeta = const VerificationMeta(
-    'parentId',
-  );
-  @override
-  late final GeneratedColumn<String> parentId = GeneratedColumn<String>(
-    'parent_id',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-  );
-  static const VerificationMeta _createdAtMeta = const VerificationMeta(
-    'createdAt',
-  );
-  @override
-  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
-    'created_at',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _userContentMeta = const VerificationMeta(
-    'userContent',
-  );
-  @override
-  late final GeneratedColumn<String> userContent = GeneratedColumn<String>(
-    'user_content',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _assistantThinkingMeta = const VerificationMeta(
-    'assistantThinking',
-  );
-  @override
-  late final GeneratedColumn<String> assistantThinking =
-      GeneratedColumn<String>(
-        'assistant_thinking',
-        aliasedName,
-        true,
-        type: DriftSqlType.string,
-        requiredDuringInsert: false,
-      );
-  static const VerificationMeta _assistantContentMeta = const VerificationMeta(
-    'assistantContent',
-  );
-  @override
-  late final GeneratedColumn<String> assistantContent = GeneratedColumn<String>(
-    'assistant_content',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-  );
-  static const VerificationMeta _isIncompleteMeta = const VerificationMeta(
-    'isIncomplete',
-  );
-  @override
-  late final GeneratedColumn<bool> isIncomplete = GeneratedColumn<bool>(
-    'is_incomplete',
-    aliasedName,
-    false,
-    type: DriftSqlType.bool,
-    requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'CHECK ("is_incomplete" IN (0, 1))',
-    ),
-    defaultValue: const Constant(false),
-  );
-  static const VerificationMeta _hasUnseenUpdateMeta = const VerificationMeta(
-    'hasUnseenUpdate',
-  );
-  @override
-  late final GeneratedColumn<bool> hasUnseenUpdate = GeneratedColumn<bool>(
-    'has_unseen_update',
-    aliasedName,
-    false,
-    type: DriftSqlType.bool,
-    requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'CHECK ("has_unseen_update" IN (0, 1))',
-    ),
-    defaultValue: const Constant(false),
-  );
-  @override
-  List<GeneratedColumn> get $columns => [
-    id,
-    sessionId,
-    parentId,
-    createdAt,
-    userContent,
-    assistantThinking,
-    assistantContent,
-    isIncomplete,
-    hasUnseenUpdate,
-  ];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'db_chat_rounds';
-  @override
-  VerificationContext validateIntegrity(
-    Insertable<DbChatRound> instance, {
-    bool isInserting = false,
-  }) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    } else if (isInserting) {
-      context.missing(_idMeta);
-    }
-    if (data.containsKey('session_id')) {
-      context.handle(
-        _sessionIdMeta,
-        sessionId.isAcceptableOrUnknown(data['session_id']!, _sessionIdMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_sessionIdMeta);
-    }
-    if (data.containsKey('parent_id')) {
-      context.handle(
-        _parentIdMeta,
-        parentId.isAcceptableOrUnknown(data['parent_id']!, _parentIdMeta),
-      );
-    }
-    if (data.containsKey('created_at')) {
-      context.handle(
-        _createdAtMeta,
-        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_createdAtMeta);
-    }
-    if (data.containsKey('user_content')) {
-      context.handle(
-        _userContentMeta,
-        userContent.isAcceptableOrUnknown(
-          data['user_content']!,
-          _userContentMeta,
-        ),
-      );
-    } else if (isInserting) {
-      context.missing(_userContentMeta);
-    }
-    if (data.containsKey('assistant_thinking')) {
-      context.handle(
-        _assistantThinkingMeta,
-        assistantThinking.isAcceptableOrUnknown(
-          data['assistant_thinking']!,
-          _assistantThinkingMeta,
-        ),
-      );
-    }
-    if (data.containsKey('assistant_content')) {
-      context.handle(
-        _assistantContentMeta,
-        assistantContent.isAcceptableOrUnknown(
-          data['assistant_content']!,
-          _assistantContentMeta,
-        ),
-      );
-    }
-    if (data.containsKey('is_incomplete')) {
-      context.handle(
-        _isIncompleteMeta,
-        isIncomplete.isAcceptableOrUnknown(
-          data['is_incomplete']!,
-          _isIncompleteMeta,
-        ),
-      );
-    }
-    if (data.containsKey('has_unseen_update')) {
-      context.handle(
-        _hasUnseenUpdateMeta,
-        hasUnseenUpdate.isAcceptableOrUnknown(
-          data['has_unseen_update']!,
-          _hasUnseenUpdateMeta,
-        ),
-      );
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => {id};
-  @override
-  DbChatRound map(Map<String, dynamic> data, {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return DbChatRound(
-      id: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}id'],
-      )!,
-      sessionId: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}session_id'],
-      )!,
-      parentId: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}parent_id'],
-      ),
-      createdAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}created_at'],
-      )!,
-      userContent: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}user_content'],
-      )!,
-      assistantThinking: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}assistant_thinking'],
-      ),
-      assistantContent: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}assistant_content'],
-      ),
-      isIncomplete: attachedDatabase.typeMapping.read(
-        DriftSqlType.bool,
-        data['${effectivePrefix}is_incomplete'],
-      )!,
-      hasUnseenUpdate: attachedDatabase.typeMapping.read(
-        DriftSqlType.bool,
-        data['${effectivePrefix}has_unseen_update'],
-      )!,
-    );
-  }
-
-  @override
-  $DbChatRoundsTable createAlias(String alias) {
-    return $DbChatRoundsTable(attachedDatabase, alias);
-  }
-}
-
-class DbChatRound extends DataClass implements Insertable<DbChatRound> {
-  final String id;
-  final String sessionId;
-  final String? parentId;
-  final int createdAt;
-  final String userContent;
-  final String? assistantThinking;
-  final String? assistantContent;
-  final bool isIncomplete;
-  final bool hasUnseenUpdate;
-  const DbChatRound({
-    required this.id,
-    required this.sessionId,
-    this.parentId,
-    required this.createdAt,
-    required this.userContent,
-    this.assistantThinking,
-    this.assistantContent,
-    required this.isIncomplete,
-    required this.hasUnseenUpdate,
-  });
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    map['id'] = Variable<String>(id);
-    map['session_id'] = Variable<String>(sessionId);
-    if (!nullToAbsent || parentId != null) {
-      map['parent_id'] = Variable<String>(parentId);
-    }
-    map['created_at'] = Variable<int>(createdAt);
-    map['user_content'] = Variable<String>(userContent);
-    if (!nullToAbsent || assistantThinking != null) {
-      map['assistant_thinking'] = Variable<String>(assistantThinking);
-    }
-    if (!nullToAbsent || assistantContent != null) {
-      map['assistant_content'] = Variable<String>(assistantContent);
-    }
-    map['is_incomplete'] = Variable<bool>(isIncomplete);
-    map['has_unseen_update'] = Variable<bool>(hasUnseenUpdate);
-    return map;
-  }
-
-  DbChatRoundsCompanion toCompanion(bool nullToAbsent) {
-    return DbChatRoundsCompanion(
-      id: Value(id),
-      sessionId: Value(sessionId),
-      parentId: parentId == null && nullToAbsent
-          ? const Value.absent()
-          : Value(parentId),
-      createdAt: Value(createdAt),
-      userContent: Value(userContent),
-      assistantThinking: assistantThinking == null && nullToAbsent
-          ? const Value.absent()
-          : Value(assistantThinking),
-      assistantContent: assistantContent == null && nullToAbsent
-          ? const Value.absent()
-          : Value(assistantContent),
-      isIncomplete: Value(isIncomplete),
-      hasUnseenUpdate: Value(hasUnseenUpdate),
-    );
-  }
-
-  factory DbChatRound.fromJson(
-    Map<String, dynamic> json, {
-    ValueSerializer? serializer,
-  }) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return DbChatRound(
-      id: serializer.fromJson<String>(json['id']),
-      sessionId: serializer.fromJson<String>(json['sessionId']),
-      parentId: serializer.fromJson<String?>(json['parentId']),
-      createdAt: serializer.fromJson<int>(json['createdAt']),
-      userContent: serializer.fromJson<String>(json['userContent']),
-      assistantThinking: serializer.fromJson<String?>(
-        json['assistantThinking'],
-      ),
-      assistantContent: serializer.fromJson<String?>(json['assistantContent']),
-      isIncomplete: serializer.fromJson<bool>(json['isIncomplete']),
-      hasUnseenUpdate: serializer.fromJson<bool>(json['hasUnseenUpdate']),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'id': serializer.toJson<String>(id),
-      'sessionId': serializer.toJson<String>(sessionId),
-      'parentId': serializer.toJson<String?>(parentId),
-      'createdAt': serializer.toJson<int>(createdAt),
-      'userContent': serializer.toJson<String>(userContent),
-      'assistantThinking': serializer.toJson<String?>(assistantThinking),
-      'assistantContent': serializer.toJson<String?>(assistantContent),
-      'isIncomplete': serializer.toJson<bool>(isIncomplete),
-      'hasUnseenUpdate': serializer.toJson<bool>(hasUnseenUpdate),
-    };
-  }
-
-  DbChatRound copyWith({
-    String? id,
-    String? sessionId,
-    Value<String?> parentId = const Value.absent(),
-    int? createdAt,
-    String? userContent,
-    Value<String?> assistantThinking = const Value.absent(),
-    Value<String?> assistantContent = const Value.absent(),
-    bool? isIncomplete,
-    bool? hasUnseenUpdate,
-  }) => DbChatRound(
-    id: id ?? this.id,
-    sessionId: sessionId ?? this.sessionId,
-    parentId: parentId.present ? parentId.value : this.parentId,
-    createdAt: createdAt ?? this.createdAt,
-    userContent: userContent ?? this.userContent,
-    assistantThinking: assistantThinking.present
-        ? assistantThinking.value
-        : this.assistantThinking,
-    assistantContent: assistantContent.present
-        ? assistantContent.value
-        : this.assistantContent,
-    isIncomplete: isIncomplete ?? this.isIncomplete,
-    hasUnseenUpdate: hasUnseenUpdate ?? this.hasUnseenUpdate,
-  );
-  DbChatRound copyWithCompanion(DbChatRoundsCompanion data) {
-    return DbChatRound(
-      id: data.id.present ? data.id.value : this.id,
-      sessionId: data.sessionId.present ? data.sessionId.value : this.sessionId,
-      parentId: data.parentId.present ? data.parentId.value : this.parentId,
-      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
-      userContent: data.userContent.present
-          ? data.userContent.value
-          : this.userContent,
-      assistantThinking: data.assistantThinking.present
-          ? data.assistantThinking.value
-          : this.assistantThinking,
-      assistantContent: data.assistantContent.present
-          ? data.assistantContent.value
-          : this.assistantContent,
-      isIncomplete: data.isIncomplete.present
-          ? data.isIncomplete.value
-          : this.isIncomplete,
-      hasUnseenUpdate: data.hasUnseenUpdate.present
-          ? data.hasUnseenUpdate.value
-          : this.hasUnseenUpdate,
-    );
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('DbChatRound(')
-          ..write('id: $id, ')
-          ..write('sessionId: $sessionId, ')
-          ..write('parentId: $parentId, ')
-          ..write('createdAt: $createdAt, ')
-          ..write('userContent: $userContent, ')
-          ..write('assistantThinking: $assistantThinking, ')
-          ..write('assistantContent: $assistantContent, ')
-          ..write('isIncomplete: $isIncomplete, ')
-          ..write('hasUnseenUpdate: $hasUnseenUpdate')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode => Object.hash(
-    id,
-    sessionId,
-    parentId,
-    createdAt,
-    userContent,
-    assistantThinking,
-    assistantContent,
-    isIncomplete,
-    hasUnseenUpdate,
-  );
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is DbChatRound &&
-          other.id == this.id &&
-          other.sessionId == this.sessionId &&
-          other.parentId == this.parentId &&
-          other.createdAt == this.createdAt &&
-          other.userContent == this.userContent &&
-          other.assistantThinking == this.assistantThinking &&
-          other.assistantContent == this.assistantContent &&
-          other.isIncomplete == this.isIncomplete &&
-          other.hasUnseenUpdate == this.hasUnseenUpdate);
-}
-
-class DbChatRoundsCompanion extends UpdateCompanion<DbChatRound> {
-  final Value<String> id;
-  final Value<String> sessionId;
-  final Value<String?> parentId;
-  final Value<int> createdAt;
-  final Value<String> userContent;
-  final Value<String?> assistantThinking;
-  final Value<String?> assistantContent;
-  final Value<bool> isIncomplete;
-  final Value<bool> hasUnseenUpdate;
-  final Value<int> rowid;
-  const DbChatRoundsCompanion({
-    this.id = const Value.absent(),
-    this.sessionId = const Value.absent(),
-    this.parentId = const Value.absent(),
-    this.createdAt = const Value.absent(),
-    this.userContent = const Value.absent(),
-    this.assistantThinking = const Value.absent(),
-    this.assistantContent = const Value.absent(),
-    this.isIncomplete = const Value.absent(),
-    this.hasUnseenUpdate = const Value.absent(),
-    this.rowid = const Value.absent(),
-  });
-  DbChatRoundsCompanion.insert({
-    required String id,
-    required String sessionId,
-    this.parentId = const Value.absent(),
-    required int createdAt,
-    required String userContent,
-    this.assistantThinking = const Value.absent(),
-    this.assistantContent = const Value.absent(),
-    this.isIncomplete = const Value.absent(),
-    this.hasUnseenUpdate = const Value.absent(),
-    this.rowid = const Value.absent(),
-  }) : id = Value(id),
-       sessionId = Value(sessionId),
-       createdAt = Value(createdAt),
-       userContent = Value(userContent);
-  static Insertable<DbChatRound> custom({
-    Expression<String>? id,
-    Expression<String>? sessionId,
-    Expression<String>? parentId,
-    Expression<int>? createdAt,
-    Expression<String>? userContent,
-    Expression<String>? assistantThinking,
-    Expression<String>? assistantContent,
-    Expression<bool>? isIncomplete,
-    Expression<bool>? hasUnseenUpdate,
-    Expression<int>? rowid,
-  }) {
-    return RawValuesInsertable({
-      if (id != null) 'id': id,
-      if (sessionId != null) 'session_id': sessionId,
-      if (parentId != null) 'parent_id': parentId,
-      if (createdAt != null) 'created_at': createdAt,
-      if (userContent != null) 'user_content': userContent,
-      if (assistantThinking != null) 'assistant_thinking': assistantThinking,
-      if (assistantContent != null) 'assistant_content': assistantContent,
-      if (isIncomplete != null) 'is_incomplete': isIncomplete,
-      if (hasUnseenUpdate != null) 'has_unseen_update': hasUnseenUpdate,
-      if (rowid != null) 'rowid': rowid,
-    });
-  }
-
-  DbChatRoundsCompanion copyWith({
-    Value<String>? id,
-    Value<String>? sessionId,
-    Value<String?>? parentId,
-    Value<int>? createdAt,
-    Value<String>? userContent,
-    Value<String?>? assistantThinking,
-    Value<String?>? assistantContent,
-    Value<bool>? isIncomplete,
-    Value<bool>? hasUnseenUpdate,
-    Value<int>? rowid,
-  }) {
-    return DbChatRoundsCompanion(
-      id: id ?? this.id,
-      sessionId: sessionId ?? this.sessionId,
-      parentId: parentId ?? this.parentId,
-      createdAt: createdAt ?? this.createdAt,
-      userContent: userContent ?? this.userContent,
-      assistantThinking: assistantThinking ?? this.assistantThinking,
-      assistantContent: assistantContent ?? this.assistantContent,
-      isIncomplete: isIncomplete ?? this.isIncomplete,
-      hasUnseenUpdate: hasUnseenUpdate ?? this.hasUnseenUpdate,
-      rowid: rowid ?? this.rowid,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (id.present) {
-      map['id'] = Variable<String>(id.value);
-    }
-    if (sessionId.present) {
-      map['session_id'] = Variable<String>(sessionId.value);
-    }
-    if (parentId.present) {
-      map['parent_id'] = Variable<String>(parentId.value);
-    }
-    if (createdAt.present) {
-      map['created_at'] = Variable<int>(createdAt.value);
-    }
-    if (userContent.present) {
-      map['user_content'] = Variable<String>(userContent.value);
-    }
-    if (assistantThinking.present) {
-      map['assistant_thinking'] = Variable<String>(assistantThinking.value);
-    }
-    if (assistantContent.present) {
-      map['assistant_content'] = Variable<String>(assistantContent.value);
-    }
-    if (isIncomplete.present) {
-      map['is_incomplete'] = Variable<bool>(isIncomplete.value);
-    }
-    if (hasUnseenUpdate.present) {
-      map['has_unseen_update'] = Variable<bool>(hasUnseenUpdate.value);
-    }
-    if (rowid.present) {
-      map['rowid'] = Variable<int>(rowid.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('DbChatRoundsCompanion(')
-          ..write('id: $id, ')
-          ..write('sessionId: $sessionId, ')
-          ..write('parentId: $parentId, ')
-          ..write('createdAt: $createdAt, ')
-          ..write('userContent: $userContent, ')
-          ..write('assistantThinking: $assistantThinking, ')
-          ..write('assistantContent: $assistantContent, ')
-          ..write('isIncomplete: $isIncomplete, ')
-          ..write('hasUnseenUpdate: $hasUnseenUpdate, ')
-          ..write('rowid: $rowid')
-          ..write(')'))
-        .toString();
-  }
-}
-
-class $DbAttachmentsTable extends DbAttachments
-    with TableInfo<$DbAttachmentsTable, DbAttachment> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  $DbAttachmentsTable(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
-  @override
-  late final GeneratedColumn<String> id = GeneratedColumn<String>(
-    'id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _roundIdMeta = const VerificationMeta(
-    'roundId',
-  );
-  @override
-  late final GeneratedColumn<String> roundId = GeneratedColumn<String>(
-    'round_id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES db_chat_rounds (id) ON DELETE CASCADE',
-    ),
-  );
-  static const VerificationMeta _nameMeta = const VerificationMeta('name');
-  @override
-  late final GeneratedColumn<String> name = GeneratedColumn<String>(
-    'name',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _relativePathMeta = const VerificationMeta(
-    'relativePath',
-  );
-  @override
-  late final GeneratedColumn<String> relativePath = GeneratedColumn<String>(
-    'relative_path',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _isImageMeta = const VerificationMeta(
-    'isImage',
-  );
-  @override
-  late final GeneratedColumn<bool> isImage = GeneratedColumn<bool>(
-    'is_image',
-    aliasedName,
-    false,
-    type: DriftSqlType.bool,
-    requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'CHECK ("is_image" IN (0, 1))',
-    ),
-    defaultValue: const Constant(false),
-  );
-  static const VerificationMeta _mimeTypeMeta = const VerificationMeta(
-    'mimeType',
-  );
-  @override
-  late final GeneratedColumn<String> mimeType = GeneratedColumn<String>(
-    'mime_type',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-  );
-  @override
-  List<GeneratedColumn> get $columns => [
-    id,
-    roundId,
-    name,
-    relativePath,
-    isImage,
-    mimeType,
-  ];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'db_attachments';
-  @override
-  VerificationContext validateIntegrity(
-    Insertable<DbAttachment> instance, {
-    bool isInserting = false,
-  }) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    } else if (isInserting) {
-      context.missing(_idMeta);
-    }
-    if (data.containsKey('round_id')) {
-      context.handle(
-        _roundIdMeta,
-        roundId.isAcceptableOrUnknown(data['round_id']!, _roundIdMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_roundIdMeta);
-    }
-    if (data.containsKey('name')) {
-      context.handle(
-        _nameMeta,
-        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_nameMeta);
-    }
-    if (data.containsKey('relative_path')) {
-      context.handle(
-        _relativePathMeta,
-        relativePath.isAcceptableOrUnknown(
-          data['relative_path']!,
-          _relativePathMeta,
-        ),
-      );
-    } else if (isInserting) {
-      context.missing(_relativePathMeta);
-    }
-    if (data.containsKey('is_image')) {
-      context.handle(
-        _isImageMeta,
-        isImage.isAcceptableOrUnknown(data['is_image']!, _isImageMeta),
-      );
-    }
-    if (data.containsKey('mime_type')) {
-      context.handle(
-        _mimeTypeMeta,
-        mimeType.isAcceptableOrUnknown(data['mime_type']!, _mimeTypeMeta),
-      );
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => {id};
-  @override
-  DbAttachment map(Map<String, dynamic> data, {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return DbAttachment(
-      id: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}id'],
-      )!,
-      roundId: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}round_id'],
-      )!,
-      name: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}name'],
-      )!,
-      relativePath: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}relative_path'],
-      )!,
-      isImage: attachedDatabase.typeMapping.read(
-        DriftSqlType.bool,
-        data['${effectivePrefix}is_image'],
-      )!,
-      mimeType: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}mime_type'],
-      ),
-    );
-  }
-
-  @override
-  $DbAttachmentsTable createAlias(String alias) {
-    return $DbAttachmentsTable(attachedDatabase, alias);
-  }
-}
-
-class DbAttachment extends DataClass implements Insertable<DbAttachment> {
-  final String id;
-  final String roundId;
-  final String name;
-  final String relativePath;
-  final bool isImage;
-  final String? mimeType;
-  const DbAttachment({
-    required this.id,
-    required this.roundId,
-    required this.name,
-    required this.relativePath,
-    required this.isImage,
-    this.mimeType,
-  });
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    map['id'] = Variable<String>(id);
-    map['round_id'] = Variable<String>(roundId);
-    map['name'] = Variable<String>(name);
-    map['relative_path'] = Variable<String>(relativePath);
-    map['is_image'] = Variable<bool>(isImage);
-    if (!nullToAbsent || mimeType != null) {
-      map['mime_type'] = Variable<String>(mimeType);
-    }
-    return map;
-  }
-
-  DbAttachmentsCompanion toCompanion(bool nullToAbsent) {
-    return DbAttachmentsCompanion(
-      id: Value(id),
-      roundId: Value(roundId),
-      name: Value(name),
-      relativePath: Value(relativePath),
-      isImage: Value(isImage),
-      mimeType: mimeType == null && nullToAbsent
-          ? const Value.absent()
-          : Value(mimeType),
-    );
-  }
-
-  factory DbAttachment.fromJson(
-    Map<String, dynamic> json, {
-    ValueSerializer? serializer,
-  }) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return DbAttachment(
-      id: serializer.fromJson<String>(json['id']),
-      roundId: serializer.fromJson<String>(json['roundId']),
-      name: serializer.fromJson<String>(json['name']),
-      relativePath: serializer.fromJson<String>(json['relativePath']),
-      isImage: serializer.fromJson<bool>(json['isImage']),
-      mimeType: serializer.fromJson<String?>(json['mimeType']),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'id': serializer.toJson<String>(id),
-      'roundId': serializer.toJson<String>(roundId),
-      'name': serializer.toJson<String>(name),
-      'relativePath': serializer.toJson<String>(relativePath),
-      'isImage': serializer.toJson<bool>(isImage),
-      'mimeType': serializer.toJson<String?>(mimeType),
-    };
-  }
-
-  DbAttachment copyWith({
-    String? id,
-    String? roundId,
-    String? name,
-    String? relativePath,
-    bool? isImage,
-    Value<String?> mimeType = const Value.absent(),
-  }) => DbAttachment(
-    id: id ?? this.id,
-    roundId: roundId ?? this.roundId,
-    name: name ?? this.name,
-    relativePath: relativePath ?? this.relativePath,
-    isImage: isImage ?? this.isImage,
-    mimeType: mimeType.present ? mimeType.value : this.mimeType,
-  );
-  DbAttachment copyWithCompanion(DbAttachmentsCompanion data) {
-    return DbAttachment(
-      id: data.id.present ? data.id.value : this.id,
-      roundId: data.roundId.present ? data.roundId.value : this.roundId,
-      name: data.name.present ? data.name.value : this.name,
-      relativePath: data.relativePath.present
-          ? data.relativePath.value
-          : this.relativePath,
-      isImage: data.isImage.present ? data.isImage.value : this.isImage,
-      mimeType: data.mimeType.present ? data.mimeType.value : this.mimeType,
-    );
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('DbAttachment(')
-          ..write('id: $id, ')
-          ..write('roundId: $roundId, ')
-          ..write('name: $name, ')
-          ..write('relativePath: $relativePath, ')
-          ..write('isImage: $isImage, ')
-          ..write('mimeType: $mimeType')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode =>
-      Object.hash(id, roundId, name, relativePath, isImage, mimeType);
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is DbAttachment &&
-          other.id == this.id &&
-          other.roundId == this.roundId &&
-          other.name == this.name &&
-          other.relativePath == this.relativePath &&
-          other.isImage == this.isImage &&
-          other.mimeType == this.mimeType);
-}
-
-class DbAttachmentsCompanion extends UpdateCompanion<DbAttachment> {
-  final Value<String> id;
-  final Value<String> roundId;
-  final Value<String> name;
-  final Value<String> relativePath;
-  final Value<bool> isImage;
-  final Value<String?> mimeType;
-  final Value<int> rowid;
-  const DbAttachmentsCompanion({
-    this.id = const Value.absent(),
-    this.roundId = const Value.absent(),
-    this.name = const Value.absent(),
-    this.relativePath = const Value.absent(),
-    this.isImage = const Value.absent(),
-    this.mimeType = const Value.absent(),
-    this.rowid = const Value.absent(),
-  });
-  DbAttachmentsCompanion.insert({
-    required String id,
-    required String roundId,
-    required String name,
-    required String relativePath,
-    this.isImage = const Value.absent(),
-    this.mimeType = const Value.absent(),
-    this.rowid = const Value.absent(),
-  }) : id = Value(id),
-       roundId = Value(roundId),
-       name = Value(name),
-       relativePath = Value(relativePath);
-  static Insertable<DbAttachment> custom({
-    Expression<String>? id,
-    Expression<String>? roundId,
-    Expression<String>? name,
-    Expression<String>? relativePath,
-    Expression<bool>? isImage,
-    Expression<String>? mimeType,
-    Expression<int>? rowid,
-  }) {
-    return RawValuesInsertable({
-      if (id != null) 'id': id,
-      if (roundId != null) 'round_id': roundId,
-      if (name != null) 'name': name,
-      if (relativePath != null) 'relative_path': relativePath,
-      if (isImage != null) 'is_image': isImage,
-      if (mimeType != null) 'mime_type': mimeType,
-      if (rowid != null) 'rowid': rowid,
-    });
-  }
-
-  DbAttachmentsCompanion copyWith({
-    Value<String>? id,
-    Value<String>? roundId,
-    Value<String>? name,
-    Value<String>? relativePath,
-    Value<bool>? isImage,
-    Value<String?>? mimeType,
-    Value<int>? rowid,
-  }) {
-    return DbAttachmentsCompanion(
-      id: id ?? this.id,
-      roundId: roundId ?? this.roundId,
-      name: name ?? this.name,
-      relativePath: relativePath ?? this.relativePath,
-      isImage: isImage ?? this.isImage,
-      mimeType: mimeType ?? this.mimeType,
-      rowid: rowid ?? this.rowid,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (id.present) {
-      map['id'] = Variable<String>(id.value);
-    }
-    if (roundId.present) {
-      map['round_id'] = Variable<String>(roundId.value);
-    }
-    if (name.present) {
-      map['name'] = Variable<String>(name.value);
-    }
-    if (relativePath.present) {
-      map['relative_path'] = Variable<String>(relativePath.value);
-    }
-    if (isImage.present) {
-      map['is_image'] = Variable<bool>(isImage.value);
-    }
-    if (mimeType.present) {
-      map['mime_type'] = Variable<String>(mimeType.value);
-    }
-    if (rowid.present) {
-      map['rowid'] = Variable<int>(rowid.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('DbAttachmentsCompanion(')
-          ..write('id: $id, ')
-          ..write('roundId: $roundId, ')
-          ..write('name: $name, ')
-          ..write('relativePath: $relativePath, ')
-          ..write('isImage: $isImage, ')
-          ..write('mimeType: $mimeType, ')
-          ..write('rowid: $rowid')
-          ..write(')'))
-        .toString();
-  }
-}
-
-abstract class _$AppDatabase extends GeneratedDatabase {
-  _$AppDatabase(QueryExecutor e) : super(e);
-  $AppDatabaseManager get managers => $AppDatabaseManager(this);
-  late final $DbConfigStoreTable dbConfigStore = $DbConfigStoreTable(this);
-  late final $DbConfigProfilesTable dbConfigProfiles = $DbConfigProfilesTable(
-    this,
-  );
-  late final $DbSessionsTable dbSessions = $DbSessionsTable(this);
-  late final $DbChatRoundsTable dbChatRounds = $DbChatRoundsTable(this);
-  late final $DbAttachmentsTable dbAttachments = $DbAttachmentsTable(this);
-  @override
-  Iterable<TableInfo<Table, Object?>> get allTables =>
-      allSchemaEntities.whereType<TableInfo<Table, Object?>>();
-  @override
-  List<DatabaseSchemaEntity> get allSchemaEntities => [
-    dbConfigStore,
-    dbConfigProfiles,
-    dbSessions,
-    dbChatRounds,
-    dbAttachments,
-  ];
-  @override
-  StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'db_sessions',
-        limitUpdateKind: UpdateKind.delete,
-      ),
-      result: [TableUpdate('db_chat_rounds', kind: UpdateKind.delete)],
-    ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'db_chat_rounds',
-        limitUpdateKind: UpdateKind.delete,
-      ),
-      result: [TableUpdate('db_attachments', kind: UpdateKind.delete)],
-    ),
-  ]);
-}
-
-typedef $$DbConfigStoreTableCreateCompanionBuilder =
-    DbConfigStoreCompanion Function({
-      Value<int> id,
-      required String activeProfileId,
-    });
-typedef $$DbConfigStoreTableUpdateCompanionBuilder =
-    DbConfigStoreCompanion Function({
-      Value<int> id,
-      Value<String> activeProfileId,
-    });
-
-class $$DbConfigStoreTableFilterComposer
-    extends Composer<_$AppDatabase, $DbConfigStoreTable> {
-  $$DbConfigStoreTableFilterComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnFilters<int> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get activeProfileId => $composableBuilder(
-    column: $table.activeProfileId,
-    builder: (column) => ColumnFilters(column),
-  );
-}
-
-class $$DbConfigStoreTableOrderingComposer
-    extends Composer<_$AppDatabase, $DbConfigStoreTable> {
-  $$DbConfigStoreTableOrderingComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnOrderings<int> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get activeProfileId => $composableBuilder(
-    column: $table.activeProfileId,
-    builder: (column) => ColumnOrderings(column),
-  );
-}
-
-class $$DbConfigStoreTableAnnotationComposer
-    extends Composer<_$AppDatabase, $DbConfigStoreTable> {
-  $$DbConfigStoreTableAnnotationComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  GeneratedColumn<int> get id =>
-      $composableBuilder(column: $table.id, builder: (column) => column);
-
-  GeneratedColumn<String> get activeProfileId => $composableBuilder(
-    column: $table.activeProfileId,
-    builder: (column) => column,
-  );
-}
-
-class $$DbConfigStoreTableTableManager
-    extends
-        RootTableManager<
-          _$AppDatabase,
-          $DbConfigStoreTable,
-          DbConfigStoreData,
-          $$DbConfigStoreTableFilterComposer,
-          $$DbConfigStoreTableOrderingComposer,
-          $$DbConfigStoreTableAnnotationComposer,
-          $$DbConfigStoreTableCreateCompanionBuilder,
-          $$DbConfigStoreTableUpdateCompanionBuilder,
-          (
-            DbConfigStoreData,
-            BaseReferences<
-              _$AppDatabase,
-              $DbConfigStoreTable,
-              DbConfigStoreData
-            >,
-          ),
-          DbConfigStoreData,
-          PrefetchHooks Function()
-        > {
-  $$DbConfigStoreTableTableManager(_$AppDatabase db, $DbConfigStoreTable table)
-    : super(
-        TableManagerState(
-          db: db,
-          table: table,
-          createFilteringComposer: () =>
-              $$DbConfigStoreTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $$DbConfigStoreTableOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $$DbConfigStoreTableAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback:
-              ({
-                Value<int> id = const Value.absent(),
-                Value<String> activeProfileId = const Value.absent(),
-              }) => DbConfigStoreCompanion(
-                id: id,
-                activeProfileId: activeProfileId,
-              ),
-          createCompanionCallback:
-              ({
-                Value<int> id = const Value.absent(),
-                required String activeProfileId,
-              }) => DbConfigStoreCompanion.insert(
-                id: id,
-                activeProfileId: activeProfileId,
-              ),
-          withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
-              .toList(),
-          prefetchHooksCallback: null,
-        ),
-      );
-}
-
-typedef $$DbConfigStoreTableProcessedTableManager =
-    ProcessedTableManager<
-      _$AppDatabase,
-      $DbConfigStoreTable,
-      DbConfigStoreData,
-      $$DbConfigStoreTableFilterComposer,
-      $$DbConfigStoreTableOrderingComposer,
-      $$DbConfigStoreTableAnnotationComposer,
-      $$DbConfigStoreTableCreateCompanionBuilder,
-      $$DbConfigStoreTableUpdateCompanionBuilder,
-      (
-        DbConfigStoreData,
-        BaseReferences<_$AppDatabase, $DbConfigStoreTable, DbConfigStoreData>,
-      ),
-      DbConfigStoreData,
-      PrefetchHooks Function()
-    >;
-typedef $$DbConfigProfilesTableCreateCompanionBuilder =
-    DbConfigProfilesCompanion Function({
-      required String id,
-      required String name,
-      required AppConfig config,
-      Value<int> rowid,
-    });
-typedef $$DbConfigProfilesTableUpdateCompanionBuilder =
-    DbConfigProfilesCompanion Function({
-      Value<String> id,
-      Value<String> name,
-      Value<AppConfig> config,
-      Value<int> rowid,
-    });
-
-class $$DbConfigProfilesTableFilterComposer
-    extends Composer<_$AppDatabase, $DbConfigProfilesTable> {
-  $$DbConfigProfilesTableFilterComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnFilters<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get name => $composableBuilder(
-    column: $table.name,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnWithTypeConverterFilters<AppConfig, AppConfig, String> get config =>
-      $composableBuilder(
-        column: $table.config,
-        builder: (column) => ColumnWithTypeConverterFilters(column),
-      );
-}
-
-class $$DbConfigProfilesTableOrderingComposer
-    extends Composer<_$AppDatabase, $DbConfigProfilesTable> {
-  $$DbConfigProfilesTableOrderingComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnOrderings<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get name => $composableBuilder(
-    column: $table.name,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get config => $composableBuilder(
-    column: $table.config,
-    builder: (column) => ColumnOrderings(column),
-  );
-}
-
-class $$DbConfigProfilesTableAnnotationComposer
-    extends Composer<_$AppDatabase, $DbConfigProfilesTable> {
-  $$DbConfigProfilesTableAnnotationComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  GeneratedColumn<String> get id =>
-      $composableBuilder(column: $table.id, builder: (column) => column);
-
-  GeneratedColumn<String> get name =>
-      $composableBuilder(column: $table.name, builder: (column) => column);
-
-  GeneratedColumnWithTypeConverter<AppConfig, String> get config =>
-      $composableBuilder(column: $table.config, builder: (column) => column);
-}
-
-class $$DbConfigProfilesTableTableManager
-    extends
-        RootTableManager<
-          _$AppDatabase,
-          $DbConfigProfilesTable,
-          DbConfigProfile,
-          $$DbConfigProfilesTableFilterComposer,
-          $$DbConfigProfilesTableOrderingComposer,
-          $$DbConfigProfilesTableAnnotationComposer,
-          $$DbConfigProfilesTableCreateCompanionBuilder,
-          $$DbConfigProfilesTableUpdateCompanionBuilder,
-          (
-            DbConfigProfile,
-            BaseReferences<
-              _$AppDatabase,
-              $DbConfigProfilesTable,
-              DbConfigProfile
-            >,
-          ),
-          DbConfigProfile,
-          PrefetchHooks Function()
-        > {
-  $$DbConfigProfilesTableTableManager(
-    _$AppDatabase db,
-    $DbConfigProfilesTable table,
-  ) : super(
-        TableManagerState(
-          db: db,
-          table: table,
-          createFilteringComposer: () =>
-              $$DbConfigProfilesTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $$DbConfigProfilesTableOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $$DbConfigProfilesTableAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback:
-              ({
-                Value<String> id = const Value.absent(),
-                Value<String> name = const Value.absent(),
-                Value<AppConfig> config = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => DbConfigProfilesCompanion(
-                id: id,
-                name: name,
-                config: config,
-                rowid: rowid,
-              ),
-          createCompanionCallback:
-              ({
-                required String id,
-                required String name,
-                required AppConfig config,
-                Value<int> rowid = const Value.absent(),
-              }) => DbConfigProfilesCompanion.insert(
-                id: id,
-                name: name,
-                config: config,
-                rowid: rowid,
-              ),
-          withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
-              .toList(),
-          prefetchHooksCallback: null,
-        ),
-      );
-}
-
-typedef $$DbConfigProfilesTableProcessedTableManager =
-    ProcessedTableManager<
-      _$AppDatabase,
-      $DbConfigProfilesTable,
-      DbConfigProfile,
-      $$DbConfigProfilesTableFilterComposer,
-      $$DbConfigProfilesTableOrderingComposer,
-      $$DbConfigProfilesTableAnnotationComposer,
-      $$DbConfigProfilesTableCreateCompanionBuilder,
-      $$DbConfigProfilesTableUpdateCompanionBuilder,
-      (
-        DbConfigProfile,
-        BaseReferences<_$AppDatabase, $DbConfigProfilesTable, DbConfigProfile>,
-      ),
-      DbConfigProfile,
-      PrefetchHooks Function()
-    >;
-typedef $$DbSessionsTableCreateCompanionBuilder =
-    DbSessionsCompanion Function({
-      required String id,
-      required String title,
-      required int createdAt,
-      required int updatedAt,
-      Value<SessionConfig?> config,
-      Value<bool> hasUnseenUpdate,
-      Value<int> rowid,
-    });
-typedef $$DbSessionsTableUpdateCompanionBuilder =
-    DbSessionsCompanion Function({
-      Value<String> id,
-      Value<String> title,
-      Value<int> createdAt,
-      Value<int> updatedAt,
-      Value<SessionConfig?> config,
-      Value<bool> hasUnseenUpdate,
-      Value<int> rowid,
-    });
-
-final class $$DbSessionsTableReferences
-    extends BaseReferences<_$AppDatabase, $DbSessionsTable, DbSession> {
-  $$DbSessionsTableReferences(super.$_db, super.$_table, super.$_typedResult);
-
-  static MultiTypedResultKey<$DbChatRoundsTable, List<DbChatRound>>
-  _dbChatRoundsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
-    db.dbChatRounds,
-    aliasName: $_aliasNameGenerator(
-      db.dbSessions.id,
-      db.dbChatRounds.sessionId,
-    ),
-  );
-
-  $$DbChatRoundsTableProcessedTableManager get dbChatRoundsRefs {
-    final manager = $$DbChatRoundsTableTableManager(
-      $_db,
-      $_db.dbChatRounds,
-    ).filter((f) => f.sessionId.id.sqlEquals($_itemColumn<String>('id')!));
-
-    final cache = $_typedResult.readTableOrNull(_dbChatRoundsRefsTable($_db));
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: cache),
-    );
-  }
-}
-
-class $$DbSessionsTableFilterComposer
-    extends Composer<_$AppDatabase, $DbSessionsTable> {
-  $$DbSessionsTableFilterComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnFilters<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get title => $composableBuilder(
-    column: $table.title,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get updatedAt => $composableBuilder(
-    column: $table.updatedAt,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnWithTypeConverterFilters<SessionConfig?, SessionConfig, String>
-  get config => $composableBuilder(
-    column: $table.config,
-    builder: (column) => ColumnWithTypeConverterFilters(column),
-  );
-
-  ColumnFilters<bool> get hasUnseenUpdate => $composableBuilder(
-    column: $table.hasUnseenUpdate,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  Expression<bool> dbChatRoundsRefs(
-    Expression<bool> Function($$DbChatRoundsTableFilterComposer f) f,
-  ) {
-    final $$DbChatRoundsTableFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.dbChatRounds,
-      getReferencedColumn: (t) => t.sessionId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$DbChatRoundsTableFilterComposer(
-            $db: $db,
-            $table: $db.dbChatRounds,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
-}
-
-class $$DbSessionsTableOrderingComposer
-    extends Composer<_$AppDatabase, $DbSessionsTable> {
-  $$DbSessionsTableOrderingComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnOrderings<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get title => $composableBuilder(
-    column: $table.title,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get updatedAt => $composableBuilder(
-    column: $table.updatedAt,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get config => $composableBuilder(
-    column: $table.config,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<bool> get hasUnseenUpdate => $composableBuilder(
-    column: $table.hasUnseenUpdate,
-    builder: (column) => ColumnOrderings(column),
-  );
-}
-
-class $$DbSessionsTableAnnotationComposer
-    extends Composer<_$AppDatabase, $DbSessionsTable> {
-  $$DbSessionsTableAnnotationComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  GeneratedColumn<String> get id =>
-      $composableBuilder(column: $table.id, builder: (column) => column);
-
-  GeneratedColumn<String> get title =>
-      $composableBuilder(column: $table.title, builder: (column) => column);
-
-  GeneratedColumn<int> get createdAt =>
-      $composableBuilder(column: $table.createdAt, builder: (column) => column);
-
-  GeneratedColumn<int> get updatedAt =>
-      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
-
-  GeneratedColumnWithTypeConverter<SessionConfig?, String> get config =>
-      $composableBuilder(column: $table.config, builder: (column) => column);
-
-  GeneratedColumn<bool> get hasUnseenUpdate => $composableBuilder(
-    column: $table.hasUnseenUpdate,
-    builder: (column) => column,
-  );
-
-  Expression<T> dbChatRoundsRefs<T extends Object>(
-    Expression<T> Function($$DbChatRoundsTableAnnotationComposer a) f,
-  ) {
-    final $$DbChatRoundsTableAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.dbChatRounds,
-      getReferencedColumn: (t) => t.sessionId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$DbChatRoundsTableAnnotationComposer(
-            $db: $db,
-            $table: $db.dbChatRounds,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
-}
-
-class $$DbSessionsTableTableManager
-    extends
-        RootTableManager<
-          _$AppDatabase,
-          $DbSessionsTable,
-          DbSession,
-          $$DbSessionsTableFilterComposer,
-          $$DbSessionsTableOrderingComposer,
-          $$DbSessionsTableAnnotationComposer,
-          $$DbSessionsTableCreateCompanionBuilder,
-          $$DbSessionsTableUpdateCompanionBuilder,
-          (DbSession, $$DbSessionsTableReferences),
-          DbSession,
-          PrefetchHooks Function({bool dbChatRoundsRefs})
-        > {
-  $$DbSessionsTableTableManager(_$AppDatabase db, $DbSessionsTable table)
-    : super(
-        TableManagerState(
-          db: db,
-          table: table,
-          createFilteringComposer: () =>
-              $$DbSessionsTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $$DbSessionsTableOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $$DbSessionsTableAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback:
-              ({
-                Value<String> id = const Value.absent(),
-                Value<String> title = const Value.absent(),
-                Value<int> createdAt = const Value.absent(),
-                Value<int> updatedAt = const Value.absent(),
-                Value<SessionConfig?> config = const Value.absent(),
-                Value<bool> hasUnseenUpdate = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => DbSessionsCompanion(
-                id: id,
-                title: title,
-                createdAt: createdAt,
-                updatedAt: updatedAt,
-                config: config,
-                hasUnseenUpdate: hasUnseenUpdate,
-                rowid: rowid,
-              ),
-          createCompanionCallback:
-              ({
-                required String id,
-                required String title,
-                required int createdAt,
-                required int updatedAt,
-                Value<SessionConfig?> config = const Value.absent(),
-                Value<bool> hasUnseenUpdate = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => DbSessionsCompanion.insert(
-                id: id,
-                title: title,
-                createdAt: createdAt,
-                updatedAt: updatedAt,
-                config: config,
-                hasUnseenUpdate: hasUnseenUpdate,
-                rowid: rowid,
-              ),
-          withReferenceMapper: (p0) => p0
-              .map(
-                (e) => (
-                  e.readTable(table),
-                  $$DbSessionsTableReferences(db, table, e),
-                ),
-              )
-              .toList(),
-          prefetchHooksCallback: ({dbChatRoundsRefs = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [if (dbChatRoundsRefs) db.dbChatRounds],
-              addJoins: null,
-              getPrefetchedDataCallback: (items) async {
-                return [
-                  if (dbChatRoundsRefs)
-                    await $_getPrefetchedData<
-                      DbSession,
-                      $DbSessionsTable,
-                      DbChatRound
-                    >(
-                      currentTable: table,
-                      referencedTable: $$DbSessionsTableReferences
-                          ._dbChatRoundsRefsTable(db),
-                      managerFromTypedResult: (p0) =>
-                          $$DbSessionsTableReferences(
-                            db,
-                            table,
-                            p0,
-                          ).dbChatRoundsRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where((e) => e.sessionId == item.id),
-                      typedResults: items,
-                    ),
-                ];
-              },
-            );
-          },
-        ),
-      );
-}
-
-typedef $$DbSessionsTableProcessedTableManager =
-    ProcessedTableManager<
-      _$AppDatabase,
-      $DbSessionsTable,
-      DbSession,
-      $$DbSessionsTableFilterComposer,
-      $$DbSessionsTableOrderingComposer,
-      $$DbSessionsTableAnnotationComposer,
-      $$DbSessionsTableCreateCompanionBuilder,
-      $$DbSessionsTableUpdateCompanionBuilder,
-      (DbSession, $$DbSessionsTableReferences),
-      DbSession,
-      PrefetchHooks Function({bool dbChatRoundsRefs})
-    >;
-typedef $$DbChatRoundsTableCreateCompanionBuilder =
-    DbChatRoundsCompanion Function({
-      required String id,
-      required String sessionId,
-      Value<String?> parentId,
-      required int createdAt,
-      required String userContent,
-      Value<String?> assistantThinking,
-      Value<String?> assistantContent,
-      Value<bool> isIncomplete,
-      Value<bool> hasUnseenUpdate,
-      Value<int> rowid,
-    });
-typedef $$DbChatRoundsTableUpdateCompanionBuilder =
-    DbChatRoundsCompanion Function({
-      Value<String> id,
-      Value<String> sessionId,
-      Value<String?> parentId,
-      Value<int> createdAt,
-      Value<String> userContent,
-      Value<String?> assistantThinking,
-      Value<String?> assistantContent,
-      Value<bool> isIncomplete,
-      Value<bool> hasUnseenUpdate,
-      Value<int> rowid,
-    });
-
-final class $$DbChatRoundsTableReferences
-    extends BaseReferences<_$AppDatabase, $DbChatRoundsTable, DbChatRound> {
-  $$DbChatRoundsTableReferences(super.$_db, super.$_table, super.$_typedResult);
-
-  static $DbSessionsTable _sessionIdTable(_$AppDatabase db) =>
-      db.dbSessions.createAlias(
-        $_aliasNameGenerator(db.dbChatRounds.sessionId, db.dbSessions.id),
-      );
-
-  $$DbSessionsTableProcessedTableManager get sessionId {
-    final $_column = $_itemColumn<String>('session_id')!;
-
-    final manager = $$DbSessionsTableTableManager(
-      $_db,
-      $_db.dbSessions,
-    ).filter((f) => f.id.sqlEquals($_column));
-    final item = $_typedResult.readTableOrNull(_sessionIdTable($_db));
-    if (item == null) return manager;
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: [item]),
-    );
-  }
-
-  static MultiTypedResultKey<$DbAttachmentsTable, List<DbAttachment>>
-  _dbAttachmentsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
-    db.dbAttachments,
-    aliasName: $_aliasNameGenerator(
-      db.dbChatRounds.id,
-      db.dbAttachments.roundId,
-    ),
-  );
-
-  $$DbAttachmentsTableProcessedTableManager get dbAttachmentsRefs {
-    final manager = $$DbAttachmentsTableTableManager(
-      $_db,
-      $_db.dbAttachments,
-    ).filter((f) => f.roundId.id.sqlEquals($_itemColumn<String>('id')!));
-
-    final cache = $_typedResult.readTableOrNull(_dbAttachmentsRefsTable($_db));
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: cache),
-    );
-  }
-}
-
-class $$DbChatRoundsTableFilterComposer
-    extends Composer<_$AppDatabase, $DbChatRoundsTable> {
-  $$DbChatRoundsTableFilterComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnFilters<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get parentId => $composableBuilder(
-    column: $table.parentId,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get userContent => $composableBuilder(
-    column: $table.userContent,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get assistantThinking => $composableBuilder(
-    column: $table.assistantThinking,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get assistantContent => $composableBuilder(
-    column: $table.assistantContent,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<bool> get isIncomplete => $composableBuilder(
-    column: $table.isIncomplete,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<bool> get hasUnseenUpdate => $composableBuilder(
-    column: $table.hasUnseenUpdate,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  $$DbSessionsTableFilterComposer get sessionId {
-    final $$DbSessionsTableFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.sessionId,
-      referencedTable: $db.dbSessions,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$DbSessionsTableFilterComposer(
-            $db: $db,
-            $table: $db.dbSessions,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  Expression<bool> dbAttachmentsRefs(
-    Expression<bool> Function($$DbAttachmentsTableFilterComposer f) f,
-  ) {
-    final $$DbAttachmentsTableFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.dbAttachments,
-      getReferencedColumn: (t) => t.roundId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$DbAttachmentsTableFilterComposer(
-            $db: $db,
-            $table: $db.dbAttachments,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
-}
-
-class $$DbChatRoundsTableOrderingComposer
-    extends Composer<_$AppDatabase, $DbChatRoundsTable> {
-  $$DbChatRoundsTableOrderingComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnOrderings<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get parentId => $composableBuilder(
-    column: $table.parentId,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get userContent => $composableBuilder(
-    column: $table.userContent,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get assistantThinking => $composableBuilder(
-    column: $table.assistantThinking,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get assistantContent => $composableBuilder(
-    column: $table.assistantContent,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<bool> get isIncomplete => $composableBuilder(
-    column: $table.isIncomplete,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<bool> get hasUnseenUpdate => $composableBuilder(
-    column: $table.hasUnseenUpdate,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  $$DbSessionsTableOrderingComposer get sessionId {
-    final $$DbSessionsTableOrderingComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.sessionId,
-      referencedTable: $db.dbSessions,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$DbSessionsTableOrderingComposer(
-            $db: $db,
-            $table: $db.dbSessions,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-}
-
-class $$DbChatRoundsTableAnnotationComposer
-    extends Composer<_$AppDatabase, $DbChatRoundsTable> {
-  $$DbChatRoundsTableAnnotationComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  GeneratedColumn<String> get id =>
-      $composableBuilder(column: $table.id, builder: (column) => column);
-
-  GeneratedColumn<String> get parentId =>
-      $composableBuilder(column: $table.parentId, builder: (column) => column);
-
-  GeneratedColumn<int> get createdAt =>
-      $composableBuilder(column: $table.createdAt, builder: (column) => column);
-
-  GeneratedColumn<String> get userContent => $composableBuilder(
-    column: $table.userContent,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<String> get assistantThinking => $composableBuilder(
-    column: $table.assistantThinking,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<String> get assistantContent => $composableBuilder(
-    column: $table.assistantContent,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<bool> get isIncomplete => $composableBuilder(
-    column: $table.isIncomplete,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<bool> get hasUnseenUpdate => $composableBuilder(
-    column: $table.hasUnseenUpdate,
-    builder: (column) => column,
-  );
-
-  $$DbSessionsTableAnnotationComposer get sessionId {
-    final $$DbSessionsTableAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.sessionId,
-      referencedTable: $db.dbSessions,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$DbSessionsTableAnnotationComposer(
-            $db: $db,
-            $table: $db.dbSessions,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  Expression<T> dbAttachmentsRefs<T extends Object>(
-    Expression<T> Function($$DbAttachmentsTableAnnotationComposer a) f,
-  ) {
-    final $$DbAttachmentsTableAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.dbAttachments,
-      getReferencedColumn: (t) => t.roundId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$DbAttachmentsTableAnnotationComposer(
-            $db: $db,
-            $table: $db.dbAttachments,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
-}
-
-class $$DbChatRoundsTableTableManager
-    extends
-        RootTableManager<
-          _$AppDatabase,
-          $DbChatRoundsTable,
-          DbChatRound,
-          $$DbChatRoundsTableFilterComposer,
-          $$DbChatRoundsTableOrderingComposer,
-          $$DbChatRoundsTableAnnotationComposer,
-          $$DbChatRoundsTableCreateCompanionBuilder,
-          $$DbChatRoundsTableUpdateCompanionBuilder,
-          (DbChatRound, $$DbChatRoundsTableReferences),
-          DbChatRound,
-          PrefetchHooks Function({bool sessionId, bool dbAttachmentsRefs})
-        > {
-  $$DbChatRoundsTableTableManager(_$AppDatabase db, $DbChatRoundsTable table)
-    : super(
-        TableManagerState(
-          db: db,
-          table: table,
-          createFilteringComposer: () =>
-              $$DbChatRoundsTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $$DbChatRoundsTableOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $$DbChatRoundsTableAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback:
-              ({
-                Value<String> id = const Value.absent(),
-                Value<String> sessionId = const Value.absent(),
-                Value<String?> parentId = const Value.absent(),
-                Value<int> createdAt = const Value.absent(),
-                Value<String> userContent = const Value.absent(),
-                Value<String?> assistantThinking = const Value.absent(),
-                Value<String?> assistantContent = const Value.absent(),
-                Value<bool> isIncomplete = const Value.absent(),
-                Value<bool> hasUnseenUpdate = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => DbChatRoundsCompanion(
-                id: id,
-                sessionId: sessionId,
-                parentId: parentId,
-                createdAt: createdAt,
-                userContent: userContent,
-                assistantThinking: assistantThinking,
-                assistantContent: assistantContent,
-                isIncomplete: isIncomplete,
-                hasUnseenUpdate: hasUnseenUpdate,
-                rowid: rowid,
-              ),
-          createCompanionCallback:
-              ({
-                required String id,
-                required String sessionId,
-                Value<String?> parentId = const Value.absent(),
-                required int createdAt,
-                required String userContent,
-                Value<String?> assistantThinking = const Value.absent(),
-                Value<String?> assistantContent = const Value.absent(),
-                Value<bool> isIncomplete = const Value.absent(),
-                Value<bool> hasUnseenUpdate = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => DbChatRoundsCompanion.insert(
-                id: id,
-                sessionId: sessionId,
-                parentId: parentId,
-                createdAt: createdAt,
-                userContent: userContent,
-                assistantThinking: assistantThinking,
-                assistantContent: assistantContent,
-                isIncomplete: isIncomplete,
-                hasUnseenUpdate: hasUnseenUpdate,
-                rowid: rowid,
-              ),
-          withReferenceMapper: (p0) => p0
-              .map(
-                (e) => (
-                  e.readTable(table),
-                  $$DbChatRoundsTableReferences(db, table, e),
-                ),
-              )
-              .toList(),
-          prefetchHooksCallback:
-              ({sessionId = false, dbAttachmentsRefs = false}) {
-                return PrefetchHooks(
-                  db: db,
-                  explicitlyWatchedTables: [
-                    if (dbAttachmentsRefs) db.dbAttachments,
-                  ],
-                  addJoins:
-                      <
-                        T extends TableManagerState<
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic
-                        >
-                      >(state) {
-                        if (sessionId) {
-                          state =
-                              state.withJoin(
-                                    currentTable: table,
-                                    currentColumn: table.sessionId,
-                                    referencedTable:
-                                        $$DbChatRoundsTableReferences
-                                            ._sessionIdTable(db),
-                                    referencedColumn:
-                                        $$DbChatRoundsTableReferences
-                                            ._sessionIdTable(db)
-                                            .id,
-                                  )
-                                  as T;
-                        }
-
-                        return state;
-                      },
-                  getPrefetchedDataCallback: (items) async {
-                    return [
-                      if (dbAttachmentsRefs)
-                        await $_getPrefetchedData<
-                          DbChatRound,
-                          $DbChatRoundsTable,
-                          DbAttachment
-                        >(
-                          currentTable: table,
-                          referencedTable: $$DbChatRoundsTableReferences
-                              ._dbAttachmentsRefsTable(db),
-                          managerFromTypedResult: (p0) =>
-                              $$DbChatRoundsTableReferences(
-                                db,
-                                table,
-                                p0,
-                              ).dbAttachmentsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.roundId == item.id,
-                              ),
-                          typedResults: items,
-                        ),
-                    ];
-                  },
-                );
-              },
-        ),
-      );
-}
-
-typedef $$DbChatRoundsTableProcessedTableManager =
-    ProcessedTableManager<
-      _$AppDatabase,
-      $DbChatRoundsTable,
-      DbChatRound,
-      $$DbChatRoundsTableFilterComposer,
-      $$DbChatRoundsTableOrderingComposer,
-      $$DbChatRoundsTableAnnotationComposer,
-      $$DbChatRoundsTableCreateCompanionBuilder,
-      $$DbChatRoundsTableUpdateCompanionBuilder,
-      (DbChatRound, $$DbChatRoundsTableReferences),
-      DbChatRound,
-      PrefetchHooks Function({bool sessionId, bool dbAttachmentsRefs})
-    >;
-typedef $$DbAttachmentsTableCreateCompanionBuilder =
-    DbAttachmentsCompanion Function({
-      required String id,
-      required String roundId,
-      required String name,
-      required String relativePath,
-      Value<bool> isImage,
-      Value<String?> mimeType,
-      Value<int> rowid,
-    });
-typedef $$DbAttachmentsTableUpdateCompanionBuilder =
-    DbAttachmentsCompanion Function({
-      Value<String> id,
-      Value<String> roundId,
-      Value<String> name,
-      Value<String> relativePath,
-      Value<bool> isImage,
-      Value<String?> mimeType,
-      Value<int> rowid,
-    });
-
-final class $$DbAttachmentsTableReferences
-    extends BaseReferences<_$AppDatabase, $DbAttachmentsTable, DbAttachment> {
-  $$DbAttachmentsTableReferences(
-    super.$_db,
-    super.$_table,
-    super.$_typedResult,
-  );
-
-  static $DbChatRoundsTable _roundIdTable(_$AppDatabase db) =>
-      db.dbChatRounds.createAlias(
-        $_aliasNameGenerator(db.dbAttachments.roundId, db.dbChatRounds.id),
-      );
-
-  $$DbChatRoundsTableProcessedTableManager get roundId {
-    final $_column = $_itemColumn<String>('round_id')!;
-
-    final manager = $$DbChatRoundsTableTableManager(
-      $_db,
-      $_db.dbChatRounds,
-    ).filter((f) => f.id.sqlEquals($_column));
-    final item = $_typedResult.readTableOrNull(_roundIdTable($_db));
-    if (item == null) return manager;
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: [item]),
-    );
-  }
-}
-
-class $$DbAttachmentsTableFilterComposer
-    extends Composer<_$AppDatabase, $DbAttachmentsTable> {
-  $$DbAttachmentsTableFilterComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnFilters<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get name => $composableBuilder(
-    column: $table.name,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get relativePath => $composableBuilder(
-    column: $table.relativePath,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<bool> get isImage => $composableBuilder(
-    column: $table.isImage,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get mimeType => $composableBuilder(
-    column: $table.mimeType,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  $$DbChatRoundsTableFilterComposer get roundId {
-    final $$DbChatRoundsTableFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.roundId,
-      referencedTable: $db.dbChatRounds,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$DbChatRoundsTableFilterComposer(
-            $db: $db,
-            $table: $db.dbChatRounds,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-}
-
-class $$DbAttachmentsTableOrderingComposer
-    extends Composer<_$AppDatabase, $DbAttachmentsTable> {
-  $$DbAttachmentsTableOrderingComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnOrderings<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get name => $composableBuilder(
-    column: $table.name,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get relativePath => $composableBuilder(
-    column: $table.relativePath,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<bool> get isImage => $composableBuilder(
-    column: $table.isImage,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get mimeType => $composableBuilder(
-    column: $table.mimeType,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  $$DbChatRoundsTableOrderingComposer get roundId {
-    final $$DbChatRoundsTableOrderingComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.roundId,
-      referencedTable: $db.dbChatRounds,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$DbChatRoundsTableOrderingComposer(
-            $db: $db,
-            $table: $db.dbChatRounds,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-}
-
-class $$DbAttachmentsTableAnnotationComposer
-    extends Composer<_$AppDatabase, $DbAttachmentsTable> {
-  $$DbAttachmentsTableAnnotationComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  GeneratedColumn<String> get id =>
-      $composableBuilder(column: $table.id, builder: (column) => column);
-
-  GeneratedColumn<String> get name =>
-      $composableBuilder(column: $table.name, builder: (column) => column);
-
-  GeneratedColumn<String> get relativePath => $composableBuilder(
-    column: $table.relativePath,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<bool> get isImage =>
-      $composableBuilder(column: $table.isImage, builder: (column) => column);
-
-  GeneratedColumn<String> get mimeType =>
-      $composableBuilder(column: $table.mimeType, builder: (column) => column);
-
-  $$DbChatRoundsTableAnnotationComposer get roundId {
-    final $$DbChatRoundsTableAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.roundId,
-      referencedTable: $db.dbChatRounds,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$DbChatRoundsTableAnnotationComposer(
-            $db: $db,
-            $table: $db.dbChatRounds,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-}
-
-class $$DbAttachmentsTableTableManager
-    extends
-        RootTableManager<
-          _$AppDatabase,
-          $DbAttachmentsTable,
-          DbAttachment,
-          $$DbAttachmentsTableFilterComposer,
-          $$DbAttachmentsTableOrderingComposer,
-          $$DbAttachmentsTableAnnotationComposer,
-          $$DbAttachmentsTableCreateCompanionBuilder,
-          $$DbAttachmentsTableUpdateCompanionBuilder,
-          (DbAttachment, $$DbAttachmentsTableReferences),
-          DbAttachment,
-          PrefetchHooks Function({bool roundId})
-        > {
-  $$DbAttachmentsTableTableManager(_$AppDatabase db, $DbAttachmentsTable table)
-    : super(
-        TableManagerState(
-          db: db,
-          table: table,
-          createFilteringComposer: () =>
-              $$DbAttachmentsTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $$DbAttachmentsTableOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $$DbAttachmentsTableAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback:
-              ({
-                Value<String> id = const Value.absent(),
-                Value<String> roundId = const Value.absent(),
-                Value<String> name = const Value.absent(),
-                Value<String> relativePath = const Value.absent(),
-                Value<bool> isImage = const Value.absent(),
-                Value<String?> mimeType = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => DbAttachmentsCompanion(
-                id: id,
-                roundId: roundId,
-                name: name,
-                relativePath: relativePath,
-                isImage: isImage,
-                mimeType: mimeType,
-                rowid: rowid,
-              ),
-          createCompanionCallback:
-              ({
-                required String id,
-                required String roundId,
-                required String name,
-                required String relativePath,
-                Value<bool> isImage = const Value.absent(),
-                Value<String?> mimeType = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => DbAttachmentsCompanion.insert(
-                id: id,
-                roundId: roundId,
-                name: name,
-                relativePath: relativePath,
-                isImage: isImage,
-                mimeType: mimeType,
-                rowid: rowid,
-              ),
-          withReferenceMapper: (p0) => p0
-              .map(
-                (e) => (
-                  e.readTable(table),
-                  $$DbAttachmentsTableReferences(db, table, e),
-                ),
-              )
-              .toList(),
-          prefetchHooksCallback: ({roundId = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [],
-              addJoins:
-                  <
-                    T extends TableManagerState<
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic
-                    >
-                  >(state) {
-                    if (roundId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.roundId,
-                                referencedTable: $$DbAttachmentsTableReferences
-                                    ._roundIdTable(db),
-                                referencedColumn: $$DbAttachmentsTableReferences
-                                    ._roundIdTable(db)
-                                    .id,
-                              )
-                              as T;
-                    }
-
-                    return state;
-                  },
-              getPrefetchedDataCallback: (items) async {
-                return [];
-              },
-            );
-          },
-        ),
-      );
-}
-
-typedef $$DbAttachmentsTableProcessedTableManager =
-    ProcessedTableManager<
-      _$AppDatabase,
-      $DbAttachmentsTable,
-      DbAttachment,
-      $$DbAttachmentsTableFilterComposer,
-      $$DbAttachmentsTableOrderingComposer,
-      $$DbAttachmentsTableAnnotationComposer,
-      $$DbAttachmentsTableCreateCompanionBuilder,
-      $$DbAttachmentsTableUpdateCompanionBuilder,
-      (DbAttachment, $$DbAttachmentsTableReferences),
-      DbAttachment,
-      PrefetchHooks Function({bool roundId})
-    >;
-
-class $AppDatabaseManager {
-  final _$AppDatabase _db;
-  $AppDatabaseManager(this._db);
-  $$DbConfigStoreTableTableManager get dbConfigStore =>
-      $$DbConfigStoreTableTableManager(_db, _db.dbConfigStore);
-  $$DbConfigProfilesTableTableManager get dbConfigProfiles =>
-      $$DbConfigProfilesTableTableManager(_db, _db.dbConfigProfiles);
-  $$DbSessionsTableTableManager get dbSessions =>
-      $$DbSessionsTableTableManager(_db, _db.dbSessions);
-  $$DbChatRoundsTableTableManager get dbChatRounds =>
-      $$DbChatRoundsTableTableManager(_db, _db.dbChatRounds);
-  $$DbAttachmentsTableTableManager get dbAttachments =>
-      $$DbAttachmentsTableTableManager(_db, _db.dbAttachments);
 }
 ````
 
@@ -8306,128 +4750,21 @@ class MarkdownParser {
 }
 ````
 
-## File: lib/presentation/widgets/markdown_widget.dart
+## File: lib/core/constants/app_constants.dart
 ````dart
-import 'package:flutter/cupertino.dart';
-import 'markdown_parser.dart';
+abstract class AppConstants {
+  // 文件夹名称
+  static const String dirAttachments = 'attachments';
 
-class MarkdownWidget extends StatelessWidget {
-  final String data;
-  final TextStyle? baseStyle;
+  // 配置键
+  static const String keyBaseUrl = 'baseUrl';
+  static const String keyApiKey = 'apiKey';
+  static const String keyTheme = 'theme';
+  static const String keyModel = 'selectedModel';
 
-  const MarkdownWidget({super.key, required this.data, this.baseStyle});
-
-  @override
-  Widget build(BuildContext context) {
-    final blocks = MarkdownParser.parse(data);
-    final theme = CupertinoTheme.of(context);
-    final defaultStyle = baseStyle ?? theme.textTheme.textStyle;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: blocks.map((block) => _buildBlock(block, defaultStyle, theme, context)).toList(),
-    );
-  }
-
-  Widget _buildBlock(
-    MarkdownBlock block, 
-    TextStyle defaultStyle, 
-    CupertinoThemeData theme, 
-    BuildContext context) {
-    switch (block.type) {
-      case MarkdownBlockType.heading:
-        final level = block.level ?? 1;
-        double fontSizeFactor;
-        switch (level) {
-          case 1:
-            fontSizeFactor = 1.8;
-            break;
-          case 2:
-            fontSizeFactor = 1.6;
-            break;
-          case 3:
-            fontSizeFactor = 1.4;
-            break;
-          default:
-            fontSizeFactor = 1.2;
-        }
-        final style = defaultStyle.copyWith(
-          fontSize: theme.textTheme.textStyle.fontSize! * fontSizeFactor,
-        );
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: _buildRichText(block.text ?? '', style),
-        );
-
-      case MarkdownBlockType.paragraph:
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: _buildRichText(block.text ?? '', defaultStyle),
-        );
-
-      case MarkdownBlockType.code:
-        return Container(
-          margin: const EdgeInsets.symmetric(vertical: 8),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey5, context),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Text(
-              block.text ?? '',
-              style: defaultStyle.copyWith(
-                fontFamily: 'monospace',
-                fontSize: 13,
-              ),
-            ),
-          ),
-        );
-
-      case MarkdownBlockType.table:
-        final rows = block.tableRows;
-        if (rows == null || rows.isEmpty) return const SizedBox.shrink();
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Table(
-            border: TableBorder.all(color: CupertinoDynamicColor.resolve(CupertinoColors.separator, context)),
-            children: rows.map((row) {
-              final isHeader = rows.indexOf(row) == 0;
-              return TableRow(
-                decoration: BoxDecoration(
-                  color: isHeader ? CupertinoDynamicColor.resolve(CupertinoColors.systemGrey5, context) : null, // 修改这里
-                ),
-                children: row.cells.map((cell) {
-                  return Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: isHeader
-                        ? _buildRichText(cell, defaultStyle)
-                        : _buildRichText(cell, defaultStyle),
-                  );
-                }).toList(),
-              );
-            }).toList(),
-          ),
-        );
-    }
-  }
-
-  Widget _buildRichText(String text, TextStyle baseStyle) {
-    final spans = MarkdownParser.parseInline(text);
-    return Text.rich(
-      TextSpan(
-        style: baseStyle,
-        children: spans.map((span) {
-          TextStyle style = baseStyle;
-          if (span.type == InlineType.bold) {
-            style = baseStyle.copyWith(fontWeight: FontWeight.bold);
-          }
-          return TextSpan(text: span.text, style: style);
-        }).toList(),
-      ),
-    );
-  }
+  // 默认值
+  static const String defaultBaseUrl = 'https://api.openai.com';
+  static const String defaultTheme = 'system';
 }
 ````
 
@@ -9840,6 +6177,3669 @@ class RemoteChatSource implements ChatSource {
 }
 ````
 
+## File: lib/data/database/database.dart
+````dart
+import 'dart:convert';
+import 'dart:io';
+import 'package:drift/drift.dart';
+import 'package:drift/native.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
+
+import '../../core/models/app_config.dart';
+import '../../core/models/session.dart';
+
+part 'database.g.dart'; // 运行 build_runner 生成
+
+// ==========================================
+// Type Converters
+// ==========================================
+class AppConfigConverter extends TypeConverter<AppConfig, String> {
+  const AppConfigConverter();
+  @override
+  AppConfig fromSql(String fromDb) => 
+    AppConfig.fromJson(jsonDecode(fromDb) as Map<String, dynamic>);
+  @override
+  String toSql(AppConfig value) => jsonEncode(value.toJson());
+}
+
+class SessionConfigConverter extends TypeConverter<SessionConfig, String> {
+  const SessionConfigConverter();
+  @override
+  SessionConfig fromSql(String fromDb) => 
+    SessionConfig.fromJson(jsonDecode(fromDb) as Map<String, dynamic>);
+  @override
+  String toSql(SessionConfig value) => jsonEncode(value.toJson());
+}
+
+// ==========================================
+// Tables
+// ==========================================
+class DbConfigStore extends Table {
+  IntColumn get id => integer().autoIncrement()(); // 永远只有一条记录 id=1
+  TextColumn get activeProfileId => text()();
+}
+
+class DbConfigProfiles extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  TextColumn get config => text().map(const AppConfigConverter())();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+class DbSessions extends Table {
+  TextColumn get id => text()();
+  TextColumn get title => text()();
+  IntColumn get createdAt => integer()();
+  IntColumn get updatedAt => integer()();
+  TextColumn get config => text().map(const SessionConfigConverter()).nullable()();
+  TextColumn get systemPrompt => text().nullable()();
+  BoolColumn get hasUnseenUpdate => boolean().withDefault(const Constant(false))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+class DbChatRounds extends Table {
+  TextColumn get id => text()();
+  TextColumn get sessionId => text().references(DbSessions, #id, onDelete: KeyAction.cascade)();
+  TextColumn get parentId => text().nullable()();
+  IntColumn get createdAt => integer()();
+  TextColumn get userContent => text()();
+  TextColumn get assistantThinking => text().nullable()();
+  TextColumn get assistantContent => text().nullable()();
+  BoolColumn get isIncomplete => boolean().withDefault(const Constant(false))();
+  BoolColumn get hasUnseenUpdate => boolean().withDefault(const Constant(false))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+class DbAttachments extends Table {
+  TextColumn get id => text()();
+  TextColumn get roundId => text().references(DbChatRounds, #id, onDelete: KeyAction.cascade)();
+  TextColumn get name => text()();
+  TextColumn get relativePath => text()();
+  BoolColumn get isImage => boolean().withDefault(const Constant(false))();
+  TextColumn get mimeType => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+// ==========================================
+// Database
+// ==========================================
+@DriftDatabase(
+  tables: [
+    DbConfigStore,
+    DbConfigProfiles,
+    DbSessions,
+    DbChatRounds,
+    DbAttachments,
+  ],
+)
+class AppDatabase extends _$AppDatabase {
+  AppDatabase() : super(_openConnection());
+
+  @override
+  int get schemaVersion => 1;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        beforeOpen: (details) async {
+          // 开启 SQLite 外键约束，实现级联删除
+          await customStatement('PRAGMA foreign_keys = ON');
+        },
+      );
+}
+
+LazyDatabase _openConnection() {
+  return LazyDatabase(() async {
+    final dbFolder = await getApplicationDocumentsDirectory();
+    final file = File(p.join(dbFolder.path, 'ai_chat_v1.sqlite'));
+    return NativeDatabase.createInBackground(file);
+  });
+}
+````
+
+## File: lib/data/database/database.g.dart
+````dart
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+part of 'database.dart';
+
+// ignore_for_file: type=lint
+class $DbConfigStoreTable extends DbConfigStore
+    with TableInfo<$DbConfigStoreTable, DbConfigStoreData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DbConfigStoreTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _activeProfileIdMeta = const VerificationMeta(
+    'activeProfileId',
+  );
+  @override
+  late final GeneratedColumn<String> activeProfileId = GeneratedColumn<String>(
+    'active_profile_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, activeProfileId];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'db_config_store';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DbConfigStoreData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('active_profile_id')) {
+      context.handle(
+        _activeProfileIdMeta,
+        activeProfileId.isAcceptableOrUnknown(
+          data['active_profile_id']!,
+          _activeProfileIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_activeProfileIdMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  DbConfigStoreData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DbConfigStoreData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      activeProfileId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}active_profile_id'],
+      )!,
+    );
+  }
+
+  @override
+  $DbConfigStoreTable createAlias(String alias) {
+    return $DbConfigStoreTable(attachedDatabase, alias);
+  }
+}
+
+class DbConfigStoreData extends DataClass
+    implements Insertable<DbConfigStoreData> {
+  final int id;
+  final String activeProfileId;
+  const DbConfigStoreData({required this.id, required this.activeProfileId});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['active_profile_id'] = Variable<String>(activeProfileId);
+    return map;
+  }
+
+  DbConfigStoreCompanion toCompanion(bool nullToAbsent) {
+    return DbConfigStoreCompanion(
+      id: Value(id),
+      activeProfileId: Value(activeProfileId),
+    );
+  }
+
+  factory DbConfigStoreData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DbConfigStoreData(
+      id: serializer.fromJson<int>(json['id']),
+      activeProfileId: serializer.fromJson<String>(json['activeProfileId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'activeProfileId': serializer.toJson<String>(activeProfileId),
+    };
+  }
+
+  DbConfigStoreData copyWith({int? id, String? activeProfileId}) =>
+      DbConfigStoreData(
+        id: id ?? this.id,
+        activeProfileId: activeProfileId ?? this.activeProfileId,
+      );
+  DbConfigStoreData copyWithCompanion(DbConfigStoreCompanion data) {
+    return DbConfigStoreData(
+      id: data.id.present ? data.id.value : this.id,
+      activeProfileId: data.activeProfileId.present
+          ? data.activeProfileId.value
+          : this.activeProfileId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DbConfigStoreData(')
+          ..write('id: $id, ')
+          ..write('activeProfileId: $activeProfileId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, activeProfileId);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DbConfigStoreData &&
+          other.id == this.id &&
+          other.activeProfileId == this.activeProfileId);
+}
+
+class DbConfigStoreCompanion extends UpdateCompanion<DbConfigStoreData> {
+  final Value<int> id;
+  final Value<String> activeProfileId;
+  const DbConfigStoreCompanion({
+    this.id = const Value.absent(),
+    this.activeProfileId = const Value.absent(),
+  });
+  DbConfigStoreCompanion.insert({
+    this.id = const Value.absent(),
+    required String activeProfileId,
+  }) : activeProfileId = Value(activeProfileId);
+  static Insertable<DbConfigStoreData> custom({
+    Expression<int>? id,
+    Expression<String>? activeProfileId,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (activeProfileId != null) 'active_profile_id': activeProfileId,
+    });
+  }
+
+  DbConfigStoreCompanion copyWith({
+    Value<int>? id,
+    Value<String>? activeProfileId,
+  }) {
+    return DbConfigStoreCompanion(
+      id: id ?? this.id,
+      activeProfileId: activeProfileId ?? this.activeProfileId,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (activeProfileId.present) {
+      map['active_profile_id'] = Variable<String>(activeProfileId.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DbConfigStoreCompanion(')
+          ..write('id: $id, ')
+          ..write('activeProfileId: $activeProfileId')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $DbConfigProfilesTable extends DbConfigProfiles
+    with TableInfo<$DbConfigProfilesTable, DbConfigProfile> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DbConfigProfilesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<AppConfig, String> config =
+      GeneratedColumn<String>(
+        'config',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      ).withConverter<AppConfig>($DbConfigProfilesTable.$converterconfig);
+  @override
+  List<GeneratedColumn> get $columns => [id, name, config];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'db_config_profiles';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DbConfigProfile> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  DbConfigProfile map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DbConfigProfile(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      config: $DbConfigProfilesTable.$converterconfig.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}config'],
+        )!,
+      ),
+    );
+  }
+
+  @override
+  $DbConfigProfilesTable createAlias(String alias) {
+    return $DbConfigProfilesTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<AppConfig, String> $converterconfig =
+      const AppConfigConverter();
+}
+
+class DbConfigProfile extends DataClass implements Insertable<DbConfigProfile> {
+  final String id;
+  final String name;
+  final AppConfig config;
+  const DbConfigProfile({
+    required this.id,
+    required this.name,
+    required this.config,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    {
+      map['config'] = Variable<String>(
+        $DbConfigProfilesTable.$converterconfig.toSql(config),
+      );
+    }
+    return map;
+  }
+
+  DbConfigProfilesCompanion toCompanion(bool nullToAbsent) {
+    return DbConfigProfilesCompanion(
+      id: Value(id),
+      name: Value(name),
+      config: Value(config),
+    );
+  }
+
+  factory DbConfigProfile.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DbConfigProfile(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      config: serializer.fromJson<AppConfig>(json['config']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'config': serializer.toJson<AppConfig>(config),
+    };
+  }
+
+  DbConfigProfile copyWith({String? id, String? name, AppConfig? config}) =>
+      DbConfigProfile(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        config: config ?? this.config,
+      );
+  DbConfigProfile copyWithCompanion(DbConfigProfilesCompanion data) {
+    return DbConfigProfile(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      config: data.config.present ? data.config.value : this.config,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DbConfigProfile(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('config: $config')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, config);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DbConfigProfile &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.config == this.config);
+}
+
+class DbConfigProfilesCompanion extends UpdateCompanion<DbConfigProfile> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<AppConfig> config;
+  final Value<int> rowid;
+  const DbConfigProfilesCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.config = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DbConfigProfilesCompanion.insert({
+    required String id,
+    required String name,
+    required AppConfig config,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
+       config = Value(config);
+  static Insertable<DbConfigProfile> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? config,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (config != null) 'config': config,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DbConfigProfilesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<AppConfig>? config,
+    Value<int>? rowid,
+  }) {
+    return DbConfigProfilesCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      config: config ?? this.config,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (config.present) {
+      map['config'] = Variable<String>(
+        $DbConfigProfilesTable.$converterconfig.toSql(config.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DbConfigProfilesCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('config: $config, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $DbSessionsTable extends DbSessions
+    with TableInfo<$DbSessionsTable, DbSession> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DbSessionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<SessionConfig?, String> config =
+      GeneratedColumn<String>(
+        'config',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      ).withConverter<SessionConfig?>($DbSessionsTable.$converterconfign);
+  static const VerificationMeta _systemPromptMeta = const VerificationMeta(
+    'systemPrompt',
+  );
+  @override
+  late final GeneratedColumn<String> systemPrompt = GeneratedColumn<String>(
+    'system_prompt',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _hasUnseenUpdateMeta = const VerificationMeta(
+    'hasUnseenUpdate',
+  );
+  @override
+  late final GeneratedColumn<bool> hasUnseenUpdate = GeneratedColumn<bool>(
+    'has_unseen_update',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("has_unseen_update" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    title,
+    createdAt,
+    updatedAt,
+    config,
+    systemPrompt,
+    hasUnseenUpdate,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'db_sessions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DbSession> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('system_prompt')) {
+      context.handle(
+        _systemPromptMeta,
+        systemPrompt.isAcceptableOrUnknown(
+          data['system_prompt']!,
+          _systemPromptMeta,
+        ),
+      );
+    }
+    if (data.containsKey('has_unseen_update')) {
+      context.handle(
+        _hasUnseenUpdateMeta,
+        hasUnseenUpdate.isAcceptableOrUnknown(
+          data['has_unseen_update']!,
+          _hasUnseenUpdateMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  DbSession map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DbSession(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      config: $DbSessionsTable.$converterconfign.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}config'],
+        ),
+      ),
+      systemPrompt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}system_prompt'],
+      ),
+      hasUnseenUpdate: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}has_unseen_update'],
+      )!,
+    );
+  }
+
+  @override
+  $DbSessionsTable createAlias(String alias) {
+    return $DbSessionsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<SessionConfig, String> $converterconfig =
+      const SessionConfigConverter();
+  static TypeConverter<SessionConfig?, String?> $converterconfign =
+      NullAwareTypeConverter.wrap($converterconfig);
+}
+
+class DbSession extends DataClass implements Insertable<DbSession> {
+  final String id;
+  final String title;
+  final int createdAt;
+  final int updatedAt;
+  final SessionConfig? config;
+  final String? systemPrompt;
+  final bool hasUnseenUpdate;
+  const DbSession({
+    required this.id,
+    required this.title,
+    required this.createdAt,
+    required this.updatedAt,
+    this.config,
+    this.systemPrompt,
+    required this.hasUnseenUpdate,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['title'] = Variable<String>(title);
+    map['created_at'] = Variable<int>(createdAt);
+    map['updated_at'] = Variable<int>(updatedAt);
+    if (!nullToAbsent || config != null) {
+      map['config'] = Variable<String>(
+        $DbSessionsTable.$converterconfign.toSql(config),
+      );
+    }
+    if (!nullToAbsent || systemPrompt != null) {
+      map['system_prompt'] = Variable<String>(systemPrompt);
+    }
+    map['has_unseen_update'] = Variable<bool>(hasUnseenUpdate);
+    return map;
+  }
+
+  DbSessionsCompanion toCompanion(bool nullToAbsent) {
+    return DbSessionsCompanion(
+      id: Value(id),
+      title: Value(title),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      config: config == null && nullToAbsent
+          ? const Value.absent()
+          : Value(config),
+      systemPrompt: systemPrompt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(systemPrompt),
+      hasUnseenUpdate: Value(hasUnseenUpdate),
+    );
+  }
+
+  factory DbSession.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DbSession(
+      id: serializer.fromJson<String>(json['id']),
+      title: serializer.fromJson<String>(json['title']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+      updatedAt: serializer.fromJson<int>(json['updatedAt']),
+      config: serializer.fromJson<SessionConfig?>(json['config']),
+      systemPrompt: serializer.fromJson<String?>(json['systemPrompt']),
+      hasUnseenUpdate: serializer.fromJson<bool>(json['hasUnseenUpdate']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'title': serializer.toJson<String>(title),
+      'createdAt': serializer.toJson<int>(createdAt),
+      'updatedAt': serializer.toJson<int>(updatedAt),
+      'config': serializer.toJson<SessionConfig?>(config),
+      'systemPrompt': serializer.toJson<String?>(systemPrompt),
+      'hasUnseenUpdate': serializer.toJson<bool>(hasUnseenUpdate),
+    };
+  }
+
+  DbSession copyWith({
+    String? id,
+    String? title,
+    int? createdAt,
+    int? updatedAt,
+    Value<SessionConfig?> config = const Value.absent(),
+    Value<String?> systemPrompt = const Value.absent(),
+    bool? hasUnseenUpdate,
+  }) => DbSession(
+    id: id ?? this.id,
+    title: title ?? this.title,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    config: config.present ? config.value : this.config,
+    systemPrompt: systemPrompt.present ? systemPrompt.value : this.systemPrompt,
+    hasUnseenUpdate: hasUnseenUpdate ?? this.hasUnseenUpdate,
+  );
+  DbSession copyWithCompanion(DbSessionsCompanion data) {
+    return DbSession(
+      id: data.id.present ? data.id.value : this.id,
+      title: data.title.present ? data.title.value : this.title,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      config: data.config.present ? data.config.value : this.config,
+      systemPrompt: data.systemPrompt.present
+          ? data.systemPrompt.value
+          : this.systemPrompt,
+      hasUnseenUpdate: data.hasUnseenUpdate.present
+          ? data.hasUnseenUpdate.value
+          : this.hasUnseenUpdate,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DbSession(')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('config: $config, ')
+          ..write('systemPrompt: $systemPrompt, ')
+          ..write('hasUnseenUpdate: $hasUnseenUpdate')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    title,
+    createdAt,
+    updatedAt,
+    config,
+    systemPrompt,
+    hasUnseenUpdate,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DbSession &&
+          other.id == this.id &&
+          other.title == this.title &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.config == this.config &&
+          other.systemPrompt == this.systemPrompt &&
+          other.hasUnseenUpdate == this.hasUnseenUpdate);
+}
+
+class DbSessionsCompanion extends UpdateCompanion<DbSession> {
+  final Value<String> id;
+  final Value<String> title;
+  final Value<int> createdAt;
+  final Value<int> updatedAt;
+  final Value<SessionConfig?> config;
+  final Value<String?> systemPrompt;
+  final Value<bool> hasUnseenUpdate;
+  final Value<int> rowid;
+  const DbSessionsCompanion({
+    this.id = const Value.absent(),
+    this.title = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.config = const Value.absent(),
+    this.systemPrompt = const Value.absent(),
+    this.hasUnseenUpdate = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DbSessionsCompanion.insert({
+    required String id,
+    required String title,
+    required int createdAt,
+    required int updatedAt,
+    this.config = const Value.absent(),
+    this.systemPrompt = const Value.absent(),
+    this.hasUnseenUpdate = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       title = Value(title),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<DbSession> custom({
+    Expression<String>? id,
+    Expression<String>? title,
+    Expression<int>? createdAt,
+    Expression<int>? updatedAt,
+    Expression<String>? config,
+    Expression<String>? systemPrompt,
+    Expression<bool>? hasUnseenUpdate,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (title != null) 'title': title,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (config != null) 'config': config,
+      if (systemPrompt != null) 'system_prompt': systemPrompt,
+      if (hasUnseenUpdate != null) 'has_unseen_update': hasUnseenUpdate,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DbSessionsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? title,
+    Value<int>? createdAt,
+    Value<int>? updatedAt,
+    Value<SessionConfig?>? config,
+    Value<String?>? systemPrompt,
+    Value<bool>? hasUnseenUpdate,
+    Value<int>? rowid,
+  }) {
+    return DbSessionsCompanion(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      config: config ?? this.config,
+      systemPrompt: systemPrompt ?? this.systemPrompt,
+      hasUnseenUpdate: hasUnseenUpdate ?? this.hasUnseenUpdate,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
+    }
+    if (config.present) {
+      map['config'] = Variable<String>(
+        $DbSessionsTable.$converterconfign.toSql(config.value),
+      );
+    }
+    if (systemPrompt.present) {
+      map['system_prompt'] = Variable<String>(systemPrompt.value);
+    }
+    if (hasUnseenUpdate.present) {
+      map['has_unseen_update'] = Variable<bool>(hasUnseenUpdate.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DbSessionsCompanion(')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('config: $config, ')
+          ..write('systemPrompt: $systemPrompt, ')
+          ..write('hasUnseenUpdate: $hasUnseenUpdate, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $DbChatRoundsTable extends DbChatRounds
+    with TableInfo<$DbChatRoundsTable, DbChatRound> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DbChatRoundsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sessionIdMeta = const VerificationMeta(
+    'sessionId',
+  );
+  @override
+  late final GeneratedColumn<String> sessionId = GeneratedColumn<String>(
+    'session_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES db_sessions (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _parentIdMeta = const VerificationMeta(
+    'parentId',
+  );
+  @override
+  late final GeneratedColumn<String> parentId = GeneratedColumn<String>(
+    'parent_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _userContentMeta = const VerificationMeta(
+    'userContent',
+  );
+  @override
+  late final GeneratedColumn<String> userContent = GeneratedColumn<String>(
+    'user_content',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _assistantThinkingMeta = const VerificationMeta(
+    'assistantThinking',
+  );
+  @override
+  late final GeneratedColumn<String> assistantThinking =
+      GeneratedColumn<String>(
+        'assistant_thinking',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _assistantContentMeta = const VerificationMeta(
+    'assistantContent',
+  );
+  @override
+  late final GeneratedColumn<String> assistantContent = GeneratedColumn<String>(
+    'assistant_content',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _isIncompleteMeta = const VerificationMeta(
+    'isIncomplete',
+  );
+  @override
+  late final GeneratedColumn<bool> isIncomplete = GeneratedColumn<bool>(
+    'is_incomplete',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_incomplete" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _hasUnseenUpdateMeta = const VerificationMeta(
+    'hasUnseenUpdate',
+  );
+  @override
+  late final GeneratedColumn<bool> hasUnseenUpdate = GeneratedColumn<bool>(
+    'has_unseen_update',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("has_unseen_update" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    sessionId,
+    parentId,
+    createdAt,
+    userContent,
+    assistantThinking,
+    assistantContent,
+    isIncomplete,
+    hasUnseenUpdate,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'db_chat_rounds';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DbChatRound> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('session_id')) {
+      context.handle(
+        _sessionIdMeta,
+        sessionId.isAcceptableOrUnknown(data['session_id']!, _sessionIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sessionIdMeta);
+    }
+    if (data.containsKey('parent_id')) {
+      context.handle(
+        _parentIdMeta,
+        parentId.isAcceptableOrUnknown(data['parent_id']!, _parentIdMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('user_content')) {
+      context.handle(
+        _userContentMeta,
+        userContent.isAcceptableOrUnknown(
+          data['user_content']!,
+          _userContentMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_userContentMeta);
+    }
+    if (data.containsKey('assistant_thinking')) {
+      context.handle(
+        _assistantThinkingMeta,
+        assistantThinking.isAcceptableOrUnknown(
+          data['assistant_thinking']!,
+          _assistantThinkingMeta,
+        ),
+      );
+    }
+    if (data.containsKey('assistant_content')) {
+      context.handle(
+        _assistantContentMeta,
+        assistantContent.isAcceptableOrUnknown(
+          data['assistant_content']!,
+          _assistantContentMeta,
+        ),
+      );
+    }
+    if (data.containsKey('is_incomplete')) {
+      context.handle(
+        _isIncompleteMeta,
+        isIncomplete.isAcceptableOrUnknown(
+          data['is_incomplete']!,
+          _isIncompleteMeta,
+        ),
+      );
+    }
+    if (data.containsKey('has_unseen_update')) {
+      context.handle(
+        _hasUnseenUpdateMeta,
+        hasUnseenUpdate.isAcceptableOrUnknown(
+          data['has_unseen_update']!,
+          _hasUnseenUpdateMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  DbChatRound map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DbChatRound(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      sessionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}session_id'],
+      )!,
+      parentId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}parent_id'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+      userContent: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}user_content'],
+      )!,
+      assistantThinking: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}assistant_thinking'],
+      ),
+      assistantContent: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}assistant_content'],
+      ),
+      isIncomplete: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_incomplete'],
+      )!,
+      hasUnseenUpdate: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}has_unseen_update'],
+      )!,
+    );
+  }
+
+  @override
+  $DbChatRoundsTable createAlias(String alias) {
+    return $DbChatRoundsTable(attachedDatabase, alias);
+  }
+}
+
+class DbChatRound extends DataClass implements Insertable<DbChatRound> {
+  final String id;
+  final String sessionId;
+  final String? parentId;
+  final int createdAt;
+  final String userContent;
+  final String? assistantThinking;
+  final String? assistantContent;
+  final bool isIncomplete;
+  final bool hasUnseenUpdate;
+  const DbChatRound({
+    required this.id,
+    required this.sessionId,
+    this.parentId,
+    required this.createdAt,
+    required this.userContent,
+    this.assistantThinking,
+    this.assistantContent,
+    required this.isIncomplete,
+    required this.hasUnseenUpdate,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['session_id'] = Variable<String>(sessionId);
+    if (!nullToAbsent || parentId != null) {
+      map['parent_id'] = Variable<String>(parentId);
+    }
+    map['created_at'] = Variable<int>(createdAt);
+    map['user_content'] = Variable<String>(userContent);
+    if (!nullToAbsent || assistantThinking != null) {
+      map['assistant_thinking'] = Variable<String>(assistantThinking);
+    }
+    if (!nullToAbsent || assistantContent != null) {
+      map['assistant_content'] = Variable<String>(assistantContent);
+    }
+    map['is_incomplete'] = Variable<bool>(isIncomplete);
+    map['has_unseen_update'] = Variable<bool>(hasUnseenUpdate);
+    return map;
+  }
+
+  DbChatRoundsCompanion toCompanion(bool nullToAbsent) {
+    return DbChatRoundsCompanion(
+      id: Value(id),
+      sessionId: Value(sessionId),
+      parentId: parentId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentId),
+      createdAt: Value(createdAt),
+      userContent: Value(userContent),
+      assistantThinking: assistantThinking == null && nullToAbsent
+          ? const Value.absent()
+          : Value(assistantThinking),
+      assistantContent: assistantContent == null && nullToAbsent
+          ? const Value.absent()
+          : Value(assistantContent),
+      isIncomplete: Value(isIncomplete),
+      hasUnseenUpdate: Value(hasUnseenUpdate),
+    );
+  }
+
+  factory DbChatRound.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DbChatRound(
+      id: serializer.fromJson<String>(json['id']),
+      sessionId: serializer.fromJson<String>(json['sessionId']),
+      parentId: serializer.fromJson<String?>(json['parentId']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+      userContent: serializer.fromJson<String>(json['userContent']),
+      assistantThinking: serializer.fromJson<String?>(
+        json['assistantThinking'],
+      ),
+      assistantContent: serializer.fromJson<String?>(json['assistantContent']),
+      isIncomplete: serializer.fromJson<bool>(json['isIncomplete']),
+      hasUnseenUpdate: serializer.fromJson<bool>(json['hasUnseenUpdate']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'sessionId': serializer.toJson<String>(sessionId),
+      'parentId': serializer.toJson<String?>(parentId),
+      'createdAt': serializer.toJson<int>(createdAt),
+      'userContent': serializer.toJson<String>(userContent),
+      'assistantThinking': serializer.toJson<String?>(assistantThinking),
+      'assistantContent': serializer.toJson<String?>(assistantContent),
+      'isIncomplete': serializer.toJson<bool>(isIncomplete),
+      'hasUnseenUpdate': serializer.toJson<bool>(hasUnseenUpdate),
+    };
+  }
+
+  DbChatRound copyWith({
+    String? id,
+    String? sessionId,
+    Value<String?> parentId = const Value.absent(),
+    int? createdAt,
+    String? userContent,
+    Value<String?> assistantThinking = const Value.absent(),
+    Value<String?> assistantContent = const Value.absent(),
+    bool? isIncomplete,
+    bool? hasUnseenUpdate,
+  }) => DbChatRound(
+    id: id ?? this.id,
+    sessionId: sessionId ?? this.sessionId,
+    parentId: parentId.present ? parentId.value : this.parentId,
+    createdAt: createdAt ?? this.createdAt,
+    userContent: userContent ?? this.userContent,
+    assistantThinking: assistantThinking.present
+        ? assistantThinking.value
+        : this.assistantThinking,
+    assistantContent: assistantContent.present
+        ? assistantContent.value
+        : this.assistantContent,
+    isIncomplete: isIncomplete ?? this.isIncomplete,
+    hasUnseenUpdate: hasUnseenUpdate ?? this.hasUnseenUpdate,
+  );
+  DbChatRound copyWithCompanion(DbChatRoundsCompanion data) {
+    return DbChatRound(
+      id: data.id.present ? data.id.value : this.id,
+      sessionId: data.sessionId.present ? data.sessionId.value : this.sessionId,
+      parentId: data.parentId.present ? data.parentId.value : this.parentId,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      userContent: data.userContent.present
+          ? data.userContent.value
+          : this.userContent,
+      assistantThinking: data.assistantThinking.present
+          ? data.assistantThinking.value
+          : this.assistantThinking,
+      assistantContent: data.assistantContent.present
+          ? data.assistantContent.value
+          : this.assistantContent,
+      isIncomplete: data.isIncomplete.present
+          ? data.isIncomplete.value
+          : this.isIncomplete,
+      hasUnseenUpdate: data.hasUnseenUpdate.present
+          ? data.hasUnseenUpdate.value
+          : this.hasUnseenUpdate,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DbChatRound(')
+          ..write('id: $id, ')
+          ..write('sessionId: $sessionId, ')
+          ..write('parentId: $parentId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('userContent: $userContent, ')
+          ..write('assistantThinking: $assistantThinking, ')
+          ..write('assistantContent: $assistantContent, ')
+          ..write('isIncomplete: $isIncomplete, ')
+          ..write('hasUnseenUpdate: $hasUnseenUpdate')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    sessionId,
+    parentId,
+    createdAt,
+    userContent,
+    assistantThinking,
+    assistantContent,
+    isIncomplete,
+    hasUnseenUpdate,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DbChatRound &&
+          other.id == this.id &&
+          other.sessionId == this.sessionId &&
+          other.parentId == this.parentId &&
+          other.createdAt == this.createdAt &&
+          other.userContent == this.userContent &&
+          other.assistantThinking == this.assistantThinking &&
+          other.assistantContent == this.assistantContent &&
+          other.isIncomplete == this.isIncomplete &&
+          other.hasUnseenUpdate == this.hasUnseenUpdate);
+}
+
+class DbChatRoundsCompanion extends UpdateCompanion<DbChatRound> {
+  final Value<String> id;
+  final Value<String> sessionId;
+  final Value<String?> parentId;
+  final Value<int> createdAt;
+  final Value<String> userContent;
+  final Value<String?> assistantThinking;
+  final Value<String?> assistantContent;
+  final Value<bool> isIncomplete;
+  final Value<bool> hasUnseenUpdate;
+  final Value<int> rowid;
+  const DbChatRoundsCompanion({
+    this.id = const Value.absent(),
+    this.sessionId = const Value.absent(),
+    this.parentId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.userContent = const Value.absent(),
+    this.assistantThinking = const Value.absent(),
+    this.assistantContent = const Value.absent(),
+    this.isIncomplete = const Value.absent(),
+    this.hasUnseenUpdate = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DbChatRoundsCompanion.insert({
+    required String id,
+    required String sessionId,
+    this.parentId = const Value.absent(),
+    required int createdAt,
+    required String userContent,
+    this.assistantThinking = const Value.absent(),
+    this.assistantContent = const Value.absent(),
+    this.isIncomplete = const Value.absent(),
+    this.hasUnseenUpdate = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       sessionId = Value(sessionId),
+       createdAt = Value(createdAt),
+       userContent = Value(userContent);
+  static Insertable<DbChatRound> custom({
+    Expression<String>? id,
+    Expression<String>? sessionId,
+    Expression<String>? parentId,
+    Expression<int>? createdAt,
+    Expression<String>? userContent,
+    Expression<String>? assistantThinking,
+    Expression<String>? assistantContent,
+    Expression<bool>? isIncomplete,
+    Expression<bool>? hasUnseenUpdate,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (sessionId != null) 'session_id': sessionId,
+      if (parentId != null) 'parent_id': parentId,
+      if (createdAt != null) 'created_at': createdAt,
+      if (userContent != null) 'user_content': userContent,
+      if (assistantThinking != null) 'assistant_thinking': assistantThinking,
+      if (assistantContent != null) 'assistant_content': assistantContent,
+      if (isIncomplete != null) 'is_incomplete': isIncomplete,
+      if (hasUnseenUpdate != null) 'has_unseen_update': hasUnseenUpdate,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DbChatRoundsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? sessionId,
+    Value<String?>? parentId,
+    Value<int>? createdAt,
+    Value<String>? userContent,
+    Value<String?>? assistantThinking,
+    Value<String?>? assistantContent,
+    Value<bool>? isIncomplete,
+    Value<bool>? hasUnseenUpdate,
+    Value<int>? rowid,
+  }) {
+    return DbChatRoundsCompanion(
+      id: id ?? this.id,
+      sessionId: sessionId ?? this.sessionId,
+      parentId: parentId ?? this.parentId,
+      createdAt: createdAt ?? this.createdAt,
+      userContent: userContent ?? this.userContent,
+      assistantThinking: assistantThinking ?? this.assistantThinking,
+      assistantContent: assistantContent ?? this.assistantContent,
+      isIncomplete: isIncomplete ?? this.isIncomplete,
+      hasUnseenUpdate: hasUnseenUpdate ?? this.hasUnseenUpdate,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (sessionId.present) {
+      map['session_id'] = Variable<String>(sessionId.value);
+    }
+    if (parentId.present) {
+      map['parent_id'] = Variable<String>(parentId.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (userContent.present) {
+      map['user_content'] = Variable<String>(userContent.value);
+    }
+    if (assistantThinking.present) {
+      map['assistant_thinking'] = Variable<String>(assistantThinking.value);
+    }
+    if (assistantContent.present) {
+      map['assistant_content'] = Variable<String>(assistantContent.value);
+    }
+    if (isIncomplete.present) {
+      map['is_incomplete'] = Variable<bool>(isIncomplete.value);
+    }
+    if (hasUnseenUpdate.present) {
+      map['has_unseen_update'] = Variable<bool>(hasUnseenUpdate.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DbChatRoundsCompanion(')
+          ..write('id: $id, ')
+          ..write('sessionId: $sessionId, ')
+          ..write('parentId: $parentId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('userContent: $userContent, ')
+          ..write('assistantThinking: $assistantThinking, ')
+          ..write('assistantContent: $assistantContent, ')
+          ..write('isIncomplete: $isIncomplete, ')
+          ..write('hasUnseenUpdate: $hasUnseenUpdate, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $DbAttachmentsTable extends DbAttachments
+    with TableInfo<$DbAttachmentsTable, DbAttachment> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DbAttachmentsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _roundIdMeta = const VerificationMeta(
+    'roundId',
+  );
+  @override
+  late final GeneratedColumn<String> roundId = GeneratedColumn<String>(
+    'round_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES db_chat_rounds (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _relativePathMeta = const VerificationMeta(
+    'relativePath',
+  );
+  @override
+  late final GeneratedColumn<String> relativePath = GeneratedColumn<String>(
+    'relative_path',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _isImageMeta = const VerificationMeta(
+    'isImage',
+  );
+  @override
+  late final GeneratedColumn<bool> isImage = GeneratedColumn<bool>(
+    'is_image',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_image" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _mimeTypeMeta = const VerificationMeta(
+    'mimeType',
+  );
+  @override
+  late final GeneratedColumn<String> mimeType = GeneratedColumn<String>(
+    'mime_type',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    roundId,
+    name,
+    relativePath,
+    isImage,
+    mimeType,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'db_attachments';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DbAttachment> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('round_id')) {
+      context.handle(
+        _roundIdMeta,
+        roundId.isAcceptableOrUnknown(data['round_id']!, _roundIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_roundIdMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('relative_path')) {
+      context.handle(
+        _relativePathMeta,
+        relativePath.isAcceptableOrUnknown(
+          data['relative_path']!,
+          _relativePathMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_relativePathMeta);
+    }
+    if (data.containsKey('is_image')) {
+      context.handle(
+        _isImageMeta,
+        isImage.isAcceptableOrUnknown(data['is_image']!, _isImageMeta),
+      );
+    }
+    if (data.containsKey('mime_type')) {
+      context.handle(
+        _mimeTypeMeta,
+        mimeType.isAcceptableOrUnknown(data['mime_type']!, _mimeTypeMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  DbAttachment map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DbAttachment(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      roundId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}round_id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      relativePath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}relative_path'],
+      )!,
+      isImage: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_image'],
+      )!,
+      mimeType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}mime_type'],
+      ),
+    );
+  }
+
+  @override
+  $DbAttachmentsTable createAlias(String alias) {
+    return $DbAttachmentsTable(attachedDatabase, alias);
+  }
+}
+
+class DbAttachment extends DataClass implements Insertable<DbAttachment> {
+  final String id;
+  final String roundId;
+  final String name;
+  final String relativePath;
+  final bool isImage;
+  final String? mimeType;
+  const DbAttachment({
+    required this.id,
+    required this.roundId,
+    required this.name,
+    required this.relativePath,
+    required this.isImage,
+    this.mimeType,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['round_id'] = Variable<String>(roundId);
+    map['name'] = Variable<String>(name);
+    map['relative_path'] = Variable<String>(relativePath);
+    map['is_image'] = Variable<bool>(isImage);
+    if (!nullToAbsent || mimeType != null) {
+      map['mime_type'] = Variable<String>(mimeType);
+    }
+    return map;
+  }
+
+  DbAttachmentsCompanion toCompanion(bool nullToAbsent) {
+    return DbAttachmentsCompanion(
+      id: Value(id),
+      roundId: Value(roundId),
+      name: Value(name),
+      relativePath: Value(relativePath),
+      isImage: Value(isImage),
+      mimeType: mimeType == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mimeType),
+    );
+  }
+
+  factory DbAttachment.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DbAttachment(
+      id: serializer.fromJson<String>(json['id']),
+      roundId: serializer.fromJson<String>(json['roundId']),
+      name: serializer.fromJson<String>(json['name']),
+      relativePath: serializer.fromJson<String>(json['relativePath']),
+      isImage: serializer.fromJson<bool>(json['isImage']),
+      mimeType: serializer.fromJson<String?>(json['mimeType']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'roundId': serializer.toJson<String>(roundId),
+      'name': serializer.toJson<String>(name),
+      'relativePath': serializer.toJson<String>(relativePath),
+      'isImage': serializer.toJson<bool>(isImage),
+      'mimeType': serializer.toJson<String?>(mimeType),
+    };
+  }
+
+  DbAttachment copyWith({
+    String? id,
+    String? roundId,
+    String? name,
+    String? relativePath,
+    bool? isImage,
+    Value<String?> mimeType = const Value.absent(),
+  }) => DbAttachment(
+    id: id ?? this.id,
+    roundId: roundId ?? this.roundId,
+    name: name ?? this.name,
+    relativePath: relativePath ?? this.relativePath,
+    isImage: isImage ?? this.isImage,
+    mimeType: mimeType.present ? mimeType.value : this.mimeType,
+  );
+  DbAttachment copyWithCompanion(DbAttachmentsCompanion data) {
+    return DbAttachment(
+      id: data.id.present ? data.id.value : this.id,
+      roundId: data.roundId.present ? data.roundId.value : this.roundId,
+      name: data.name.present ? data.name.value : this.name,
+      relativePath: data.relativePath.present
+          ? data.relativePath.value
+          : this.relativePath,
+      isImage: data.isImage.present ? data.isImage.value : this.isImage,
+      mimeType: data.mimeType.present ? data.mimeType.value : this.mimeType,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DbAttachment(')
+          ..write('id: $id, ')
+          ..write('roundId: $roundId, ')
+          ..write('name: $name, ')
+          ..write('relativePath: $relativePath, ')
+          ..write('isImage: $isImage, ')
+          ..write('mimeType: $mimeType')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, roundId, name, relativePath, isImage, mimeType);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DbAttachment &&
+          other.id == this.id &&
+          other.roundId == this.roundId &&
+          other.name == this.name &&
+          other.relativePath == this.relativePath &&
+          other.isImage == this.isImage &&
+          other.mimeType == this.mimeType);
+}
+
+class DbAttachmentsCompanion extends UpdateCompanion<DbAttachment> {
+  final Value<String> id;
+  final Value<String> roundId;
+  final Value<String> name;
+  final Value<String> relativePath;
+  final Value<bool> isImage;
+  final Value<String?> mimeType;
+  final Value<int> rowid;
+  const DbAttachmentsCompanion({
+    this.id = const Value.absent(),
+    this.roundId = const Value.absent(),
+    this.name = const Value.absent(),
+    this.relativePath = const Value.absent(),
+    this.isImage = const Value.absent(),
+    this.mimeType = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DbAttachmentsCompanion.insert({
+    required String id,
+    required String roundId,
+    required String name,
+    required String relativePath,
+    this.isImage = const Value.absent(),
+    this.mimeType = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       roundId = Value(roundId),
+       name = Value(name),
+       relativePath = Value(relativePath);
+  static Insertable<DbAttachment> custom({
+    Expression<String>? id,
+    Expression<String>? roundId,
+    Expression<String>? name,
+    Expression<String>? relativePath,
+    Expression<bool>? isImage,
+    Expression<String>? mimeType,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (roundId != null) 'round_id': roundId,
+      if (name != null) 'name': name,
+      if (relativePath != null) 'relative_path': relativePath,
+      if (isImage != null) 'is_image': isImage,
+      if (mimeType != null) 'mime_type': mimeType,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DbAttachmentsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? roundId,
+    Value<String>? name,
+    Value<String>? relativePath,
+    Value<bool>? isImage,
+    Value<String?>? mimeType,
+    Value<int>? rowid,
+  }) {
+    return DbAttachmentsCompanion(
+      id: id ?? this.id,
+      roundId: roundId ?? this.roundId,
+      name: name ?? this.name,
+      relativePath: relativePath ?? this.relativePath,
+      isImage: isImage ?? this.isImage,
+      mimeType: mimeType ?? this.mimeType,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (roundId.present) {
+      map['round_id'] = Variable<String>(roundId.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (relativePath.present) {
+      map['relative_path'] = Variable<String>(relativePath.value);
+    }
+    if (isImage.present) {
+      map['is_image'] = Variable<bool>(isImage.value);
+    }
+    if (mimeType.present) {
+      map['mime_type'] = Variable<String>(mimeType.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DbAttachmentsCompanion(')
+          ..write('id: $id, ')
+          ..write('roundId: $roundId, ')
+          ..write('name: $name, ')
+          ..write('relativePath: $relativePath, ')
+          ..write('isImage: $isImage, ')
+          ..write('mimeType: $mimeType, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+abstract class _$AppDatabase extends GeneratedDatabase {
+  _$AppDatabase(QueryExecutor e) : super(e);
+  $AppDatabaseManager get managers => $AppDatabaseManager(this);
+  late final $DbConfigStoreTable dbConfigStore = $DbConfigStoreTable(this);
+  late final $DbConfigProfilesTable dbConfigProfiles = $DbConfigProfilesTable(
+    this,
+  );
+  late final $DbSessionsTable dbSessions = $DbSessionsTable(this);
+  late final $DbChatRoundsTable dbChatRounds = $DbChatRoundsTable(this);
+  late final $DbAttachmentsTable dbAttachments = $DbAttachmentsTable(this);
+  @override
+  Iterable<TableInfo<Table, Object?>> get allTables =>
+      allSchemaEntities.whereType<TableInfo<Table, Object?>>();
+  @override
+  List<DatabaseSchemaEntity> get allSchemaEntities => [
+    dbConfigStore,
+    dbConfigProfiles,
+    dbSessions,
+    dbChatRounds,
+    dbAttachments,
+  ];
+  @override
+  StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'db_sessions',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('db_chat_rounds', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'db_chat_rounds',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('db_attachments', kind: UpdateKind.delete)],
+    ),
+  ]);
+}
+
+typedef $$DbConfigStoreTableCreateCompanionBuilder =
+    DbConfigStoreCompanion Function({
+      Value<int> id,
+      required String activeProfileId,
+    });
+typedef $$DbConfigStoreTableUpdateCompanionBuilder =
+    DbConfigStoreCompanion Function({
+      Value<int> id,
+      Value<String> activeProfileId,
+    });
+
+class $$DbConfigStoreTableFilterComposer
+    extends Composer<_$AppDatabase, $DbConfigStoreTable> {
+  $$DbConfigStoreTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get activeProfileId => $composableBuilder(
+    column: $table.activeProfileId,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$DbConfigStoreTableOrderingComposer
+    extends Composer<_$AppDatabase, $DbConfigStoreTable> {
+  $$DbConfigStoreTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get activeProfileId => $composableBuilder(
+    column: $table.activeProfileId,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$DbConfigStoreTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DbConfigStoreTable> {
+  $$DbConfigStoreTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get activeProfileId => $composableBuilder(
+    column: $table.activeProfileId,
+    builder: (column) => column,
+  );
+}
+
+class $$DbConfigStoreTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $DbConfigStoreTable,
+          DbConfigStoreData,
+          $$DbConfigStoreTableFilterComposer,
+          $$DbConfigStoreTableOrderingComposer,
+          $$DbConfigStoreTableAnnotationComposer,
+          $$DbConfigStoreTableCreateCompanionBuilder,
+          $$DbConfigStoreTableUpdateCompanionBuilder,
+          (
+            DbConfigStoreData,
+            BaseReferences<
+              _$AppDatabase,
+              $DbConfigStoreTable,
+              DbConfigStoreData
+            >,
+          ),
+          DbConfigStoreData,
+          PrefetchHooks Function()
+        > {
+  $$DbConfigStoreTableTableManager(_$AppDatabase db, $DbConfigStoreTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DbConfigStoreTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DbConfigStoreTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$DbConfigStoreTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> activeProfileId = const Value.absent(),
+              }) => DbConfigStoreCompanion(
+                id: id,
+                activeProfileId: activeProfileId,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String activeProfileId,
+              }) => DbConfigStoreCompanion.insert(
+                id: id,
+                activeProfileId: activeProfileId,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$DbConfigStoreTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $DbConfigStoreTable,
+      DbConfigStoreData,
+      $$DbConfigStoreTableFilterComposer,
+      $$DbConfigStoreTableOrderingComposer,
+      $$DbConfigStoreTableAnnotationComposer,
+      $$DbConfigStoreTableCreateCompanionBuilder,
+      $$DbConfigStoreTableUpdateCompanionBuilder,
+      (
+        DbConfigStoreData,
+        BaseReferences<_$AppDatabase, $DbConfigStoreTable, DbConfigStoreData>,
+      ),
+      DbConfigStoreData,
+      PrefetchHooks Function()
+    >;
+typedef $$DbConfigProfilesTableCreateCompanionBuilder =
+    DbConfigProfilesCompanion Function({
+      required String id,
+      required String name,
+      required AppConfig config,
+      Value<int> rowid,
+    });
+typedef $$DbConfigProfilesTableUpdateCompanionBuilder =
+    DbConfigProfilesCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<AppConfig> config,
+      Value<int> rowid,
+    });
+
+class $$DbConfigProfilesTableFilterComposer
+    extends Composer<_$AppDatabase, $DbConfigProfilesTable> {
+  $$DbConfigProfilesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<AppConfig, AppConfig, String> get config =>
+      $composableBuilder(
+        column: $table.config,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+}
+
+class $$DbConfigProfilesTableOrderingComposer
+    extends Composer<_$AppDatabase, $DbConfigProfilesTable> {
+  $$DbConfigProfilesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get config => $composableBuilder(
+    column: $table.config,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$DbConfigProfilesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DbConfigProfilesTable> {
+  $$DbConfigProfilesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<AppConfig, String> get config =>
+      $composableBuilder(column: $table.config, builder: (column) => column);
+}
+
+class $$DbConfigProfilesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $DbConfigProfilesTable,
+          DbConfigProfile,
+          $$DbConfigProfilesTableFilterComposer,
+          $$DbConfigProfilesTableOrderingComposer,
+          $$DbConfigProfilesTableAnnotationComposer,
+          $$DbConfigProfilesTableCreateCompanionBuilder,
+          $$DbConfigProfilesTableUpdateCompanionBuilder,
+          (
+            DbConfigProfile,
+            BaseReferences<
+              _$AppDatabase,
+              $DbConfigProfilesTable,
+              DbConfigProfile
+            >,
+          ),
+          DbConfigProfile,
+          PrefetchHooks Function()
+        > {
+  $$DbConfigProfilesTableTableManager(
+    _$AppDatabase db,
+    $DbConfigProfilesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DbConfigProfilesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DbConfigProfilesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$DbConfigProfilesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<AppConfig> config = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DbConfigProfilesCompanion(
+                id: id,
+                name: name,
+                config: config,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                required AppConfig config,
+                Value<int> rowid = const Value.absent(),
+              }) => DbConfigProfilesCompanion.insert(
+                id: id,
+                name: name,
+                config: config,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$DbConfigProfilesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $DbConfigProfilesTable,
+      DbConfigProfile,
+      $$DbConfigProfilesTableFilterComposer,
+      $$DbConfigProfilesTableOrderingComposer,
+      $$DbConfigProfilesTableAnnotationComposer,
+      $$DbConfigProfilesTableCreateCompanionBuilder,
+      $$DbConfigProfilesTableUpdateCompanionBuilder,
+      (
+        DbConfigProfile,
+        BaseReferences<_$AppDatabase, $DbConfigProfilesTable, DbConfigProfile>,
+      ),
+      DbConfigProfile,
+      PrefetchHooks Function()
+    >;
+typedef $$DbSessionsTableCreateCompanionBuilder =
+    DbSessionsCompanion Function({
+      required String id,
+      required String title,
+      required int createdAt,
+      required int updatedAt,
+      Value<SessionConfig?> config,
+      Value<String?> systemPrompt,
+      Value<bool> hasUnseenUpdate,
+      Value<int> rowid,
+    });
+typedef $$DbSessionsTableUpdateCompanionBuilder =
+    DbSessionsCompanion Function({
+      Value<String> id,
+      Value<String> title,
+      Value<int> createdAt,
+      Value<int> updatedAt,
+      Value<SessionConfig?> config,
+      Value<String?> systemPrompt,
+      Value<bool> hasUnseenUpdate,
+      Value<int> rowid,
+    });
+
+final class $$DbSessionsTableReferences
+    extends BaseReferences<_$AppDatabase, $DbSessionsTable, DbSession> {
+  $$DbSessionsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$DbChatRoundsTable, List<DbChatRound>>
+  _dbChatRoundsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.dbChatRounds,
+    aliasName: $_aliasNameGenerator(
+      db.dbSessions.id,
+      db.dbChatRounds.sessionId,
+    ),
+  );
+
+  $$DbChatRoundsTableProcessedTableManager get dbChatRoundsRefs {
+    final manager = $$DbChatRoundsTableTableManager(
+      $_db,
+      $_db.dbChatRounds,
+    ).filter((f) => f.sessionId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_dbChatRoundsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$DbSessionsTableFilterComposer
+    extends Composer<_$AppDatabase, $DbSessionsTable> {
+  $$DbSessionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SessionConfig?, SessionConfig, String>
+  get config => $composableBuilder(
+    column: $table.config,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<String> get systemPrompt => $composableBuilder(
+    column: $table.systemPrompt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get hasUnseenUpdate => $composableBuilder(
+    column: $table.hasUnseenUpdate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> dbChatRoundsRefs(
+    Expression<bool> Function($$DbChatRoundsTableFilterComposer f) f,
+  ) {
+    final $$DbChatRoundsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.dbChatRounds,
+      getReferencedColumn: (t) => t.sessionId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DbChatRoundsTableFilterComposer(
+            $db: $db,
+            $table: $db.dbChatRounds,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$DbSessionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $DbSessionsTable> {
+  $$DbSessionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get config => $composableBuilder(
+    column: $table.config,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get systemPrompt => $composableBuilder(
+    column: $table.systemPrompt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get hasUnseenUpdate => $composableBuilder(
+    column: $table.hasUnseenUpdate,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$DbSessionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DbSessionsTable> {
+  $$DbSessionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<SessionConfig?, String> get config =>
+      $composableBuilder(column: $table.config, builder: (column) => column);
+
+  GeneratedColumn<String> get systemPrompt => $composableBuilder(
+    column: $table.systemPrompt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get hasUnseenUpdate => $composableBuilder(
+    column: $table.hasUnseenUpdate,
+    builder: (column) => column,
+  );
+
+  Expression<T> dbChatRoundsRefs<T extends Object>(
+    Expression<T> Function($$DbChatRoundsTableAnnotationComposer a) f,
+  ) {
+    final $$DbChatRoundsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.dbChatRounds,
+      getReferencedColumn: (t) => t.sessionId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DbChatRoundsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.dbChatRounds,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$DbSessionsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $DbSessionsTable,
+          DbSession,
+          $$DbSessionsTableFilterComposer,
+          $$DbSessionsTableOrderingComposer,
+          $$DbSessionsTableAnnotationComposer,
+          $$DbSessionsTableCreateCompanionBuilder,
+          $$DbSessionsTableUpdateCompanionBuilder,
+          (DbSession, $$DbSessionsTableReferences),
+          DbSession,
+          PrefetchHooks Function({bool dbChatRoundsRefs})
+        > {
+  $$DbSessionsTableTableManager(_$AppDatabase db, $DbSessionsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DbSessionsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DbSessionsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$DbSessionsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+                Value<int> updatedAt = const Value.absent(),
+                Value<SessionConfig?> config = const Value.absent(),
+                Value<String?> systemPrompt = const Value.absent(),
+                Value<bool> hasUnseenUpdate = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DbSessionsCompanion(
+                id: id,
+                title: title,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                config: config,
+                systemPrompt: systemPrompt,
+                hasUnseenUpdate: hasUnseenUpdate,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String title,
+                required int createdAt,
+                required int updatedAt,
+                Value<SessionConfig?> config = const Value.absent(),
+                Value<String?> systemPrompt = const Value.absent(),
+                Value<bool> hasUnseenUpdate = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DbSessionsCompanion.insert(
+                id: id,
+                title: title,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                config: config,
+                systemPrompt: systemPrompt,
+                hasUnseenUpdate: hasUnseenUpdate,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$DbSessionsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({dbChatRoundsRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [if (dbChatRoundsRefs) db.dbChatRounds],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (dbChatRoundsRefs)
+                    await $_getPrefetchedData<
+                      DbSession,
+                      $DbSessionsTable,
+                      DbChatRound
+                    >(
+                      currentTable: table,
+                      referencedTable: $$DbSessionsTableReferences
+                          ._dbChatRoundsRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$DbSessionsTableReferences(
+                            db,
+                            table,
+                            p0,
+                          ).dbChatRoundsRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where((e) => e.sessionId == item.id),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$DbSessionsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $DbSessionsTable,
+      DbSession,
+      $$DbSessionsTableFilterComposer,
+      $$DbSessionsTableOrderingComposer,
+      $$DbSessionsTableAnnotationComposer,
+      $$DbSessionsTableCreateCompanionBuilder,
+      $$DbSessionsTableUpdateCompanionBuilder,
+      (DbSession, $$DbSessionsTableReferences),
+      DbSession,
+      PrefetchHooks Function({bool dbChatRoundsRefs})
+    >;
+typedef $$DbChatRoundsTableCreateCompanionBuilder =
+    DbChatRoundsCompanion Function({
+      required String id,
+      required String sessionId,
+      Value<String?> parentId,
+      required int createdAt,
+      required String userContent,
+      Value<String?> assistantThinking,
+      Value<String?> assistantContent,
+      Value<bool> isIncomplete,
+      Value<bool> hasUnseenUpdate,
+      Value<int> rowid,
+    });
+typedef $$DbChatRoundsTableUpdateCompanionBuilder =
+    DbChatRoundsCompanion Function({
+      Value<String> id,
+      Value<String> sessionId,
+      Value<String?> parentId,
+      Value<int> createdAt,
+      Value<String> userContent,
+      Value<String?> assistantThinking,
+      Value<String?> assistantContent,
+      Value<bool> isIncomplete,
+      Value<bool> hasUnseenUpdate,
+      Value<int> rowid,
+    });
+
+final class $$DbChatRoundsTableReferences
+    extends BaseReferences<_$AppDatabase, $DbChatRoundsTable, DbChatRound> {
+  $$DbChatRoundsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $DbSessionsTable _sessionIdTable(_$AppDatabase db) =>
+      db.dbSessions.createAlias(
+        $_aliasNameGenerator(db.dbChatRounds.sessionId, db.dbSessions.id),
+      );
+
+  $$DbSessionsTableProcessedTableManager get sessionId {
+    final $_column = $_itemColumn<String>('session_id')!;
+
+    final manager = $$DbSessionsTableTableManager(
+      $_db,
+      $_db.dbSessions,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_sessionIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static MultiTypedResultKey<$DbAttachmentsTable, List<DbAttachment>>
+  _dbAttachmentsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.dbAttachments,
+    aliasName: $_aliasNameGenerator(
+      db.dbChatRounds.id,
+      db.dbAttachments.roundId,
+    ),
+  );
+
+  $$DbAttachmentsTableProcessedTableManager get dbAttachmentsRefs {
+    final manager = $$DbAttachmentsTableTableManager(
+      $_db,
+      $_db.dbAttachments,
+    ).filter((f) => f.roundId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_dbAttachmentsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$DbChatRoundsTableFilterComposer
+    extends Composer<_$AppDatabase, $DbChatRoundsTable> {
+  $$DbChatRoundsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get parentId => $composableBuilder(
+    column: $table.parentId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get userContent => $composableBuilder(
+    column: $table.userContent,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get assistantThinking => $composableBuilder(
+    column: $table.assistantThinking,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get assistantContent => $composableBuilder(
+    column: $table.assistantContent,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isIncomplete => $composableBuilder(
+    column: $table.isIncomplete,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get hasUnseenUpdate => $composableBuilder(
+    column: $table.hasUnseenUpdate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$DbSessionsTableFilterComposer get sessionId {
+    final $$DbSessionsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.sessionId,
+      referencedTable: $db.dbSessions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DbSessionsTableFilterComposer(
+            $db: $db,
+            $table: $db.dbSessions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<bool> dbAttachmentsRefs(
+    Expression<bool> Function($$DbAttachmentsTableFilterComposer f) f,
+  ) {
+    final $$DbAttachmentsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.dbAttachments,
+      getReferencedColumn: (t) => t.roundId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DbAttachmentsTableFilterComposer(
+            $db: $db,
+            $table: $db.dbAttachments,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$DbChatRoundsTableOrderingComposer
+    extends Composer<_$AppDatabase, $DbChatRoundsTable> {
+  $$DbChatRoundsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get parentId => $composableBuilder(
+    column: $table.parentId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get userContent => $composableBuilder(
+    column: $table.userContent,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get assistantThinking => $composableBuilder(
+    column: $table.assistantThinking,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get assistantContent => $composableBuilder(
+    column: $table.assistantContent,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isIncomplete => $composableBuilder(
+    column: $table.isIncomplete,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get hasUnseenUpdate => $composableBuilder(
+    column: $table.hasUnseenUpdate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$DbSessionsTableOrderingComposer get sessionId {
+    final $$DbSessionsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.sessionId,
+      referencedTable: $db.dbSessions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DbSessionsTableOrderingComposer(
+            $db: $db,
+            $table: $db.dbSessions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$DbChatRoundsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DbChatRoundsTable> {
+  $$DbChatRoundsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get parentId =>
+      $composableBuilder(column: $table.parentId, builder: (column) => column);
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get userContent => $composableBuilder(
+    column: $table.userContent,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get assistantThinking => $composableBuilder(
+    column: $table.assistantThinking,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get assistantContent => $composableBuilder(
+    column: $table.assistantContent,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isIncomplete => $composableBuilder(
+    column: $table.isIncomplete,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get hasUnseenUpdate => $composableBuilder(
+    column: $table.hasUnseenUpdate,
+    builder: (column) => column,
+  );
+
+  $$DbSessionsTableAnnotationComposer get sessionId {
+    final $$DbSessionsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.sessionId,
+      referencedTable: $db.dbSessions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DbSessionsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.dbSessions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<T> dbAttachmentsRefs<T extends Object>(
+    Expression<T> Function($$DbAttachmentsTableAnnotationComposer a) f,
+  ) {
+    final $$DbAttachmentsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.dbAttachments,
+      getReferencedColumn: (t) => t.roundId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DbAttachmentsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.dbAttachments,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$DbChatRoundsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $DbChatRoundsTable,
+          DbChatRound,
+          $$DbChatRoundsTableFilterComposer,
+          $$DbChatRoundsTableOrderingComposer,
+          $$DbChatRoundsTableAnnotationComposer,
+          $$DbChatRoundsTableCreateCompanionBuilder,
+          $$DbChatRoundsTableUpdateCompanionBuilder,
+          (DbChatRound, $$DbChatRoundsTableReferences),
+          DbChatRound,
+          PrefetchHooks Function({bool sessionId, bool dbAttachmentsRefs})
+        > {
+  $$DbChatRoundsTableTableManager(_$AppDatabase db, $DbChatRoundsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DbChatRoundsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DbChatRoundsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$DbChatRoundsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> sessionId = const Value.absent(),
+                Value<String?> parentId = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+                Value<String> userContent = const Value.absent(),
+                Value<String?> assistantThinking = const Value.absent(),
+                Value<String?> assistantContent = const Value.absent(),
+                Value<bool> isIncomplete = const Value.absent(),
+                Value<bool> hasUnseenUpdate = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DbChatRoundsCompanion(
+                id: id,
+                sessionId: sessionId,
+                parentId: parentId,
+                createdAt: createdAt,
+                userContent: userContent,
+                assistantThinking: assistantThinking,
+                assistantContent: assistantContent,
+                isIncomplete: isIncomplete,
+                hasUnseenUpdate: hasUnseenUpdate,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String sessionId,
+                Value<String?> parentId = const Value.absent(),
+                required int createdAt,
+                required String userContent,
+                Value<String?> assistantThinking = const Value.absent(),
+                Value<String?> assistantContent = const Value.absent(),
+                Value<bool> isIncomplete = const Value.absent(),
+                Value<bool> hasUnseenUpdate = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DbChatRoundsCompanion.insert(
+                id: id,
+                sessionId: sessionId,
+                parentId: parentId,
+                createdAt: createdAt,
+                userContent: userContent,
+                assistantThinking: assistantThinking,
+                assistantContent: assistantContent,
+                isIncomplete: isIncomplete,
+                hasUnseenUpdate: hasUnseenUpdate,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$DbChatRoundsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({sessionId = false, dbAttachmentsRefs = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (dbAttachmentsRefs) db.dbAttachments,
+                  ],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (sessionId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.sessionId,
+                                    referencedTable:
+                                        $$DbChatRoundsTableReferences
+                                            ._sessionIdTable(db),
+                                    referencedColumn:
+                                        $$DbChatRoundsTableReferences
+                                            ._sessionIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (dbAttachmentsRefs)
+                        await $_getPrefetchedData<
+                          DbChatRound,
+                          $DbChatRoundsTable,
+                          DbAttachment
+                        >(
+                          currentTable: table,
+                          referencedTable: $$DbChatRoundsTableReferences
+                              ._dbAttachmentsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$DbChatRoundsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).dbAttachmentsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.roundId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$DbChatRoundsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $DbChatRoundsTable,
+      DbChatRound,
+      $$DbChatRoundsTableFilterComposer,
+      $$DbChatRoundsTableOrderingComposer,
+      $$DbChatRoundsTableAnnotationComposer,
+      $$DbChatRoundsTableCreateCompanionBuilder,
+      $$DbChatRoundsTableUpdateCompanionBuilder,
+      (DbChatRound, $$DbChatRoundsTableReferences),
+      DbChatRound,
+      PrefetchHooks Function({bool sessionId, bool dbAttachmentsRefs})
+    >;
+typedef $$DbAttachmentsTableCreateCompanionBuilder =
+    DbAttachmentsCompanion Function({
+      required String id,
+      required String roundId,
+      required String name,
+      required String relativePath,
+      Value<bool> isImage,
+      Value<String?> mimeType,
+      Value<int> rowid,
+    });
+typedef $$DbAttachmentsTableUpdateCompanionBuilder =
+    DbAttachmentsCompanion Function({
+      Value<String> id,
+      Value<String> roundId,
+      Value<String> name,
+      Value<String> relativePath,
+      Value<bool> isImage,
+      Value<String?> mimeType,
+      Value<int> rowid,
+    });
+
+final class $$DbAttachmentsTableReferences
+    extends BaseReferences<_$AppDatabase, $DbAttachmentsTable, DbAttachment> {
+  $$DbAttachmentsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $DbChatRoundsTable _roundIdTable(_$AppDatabase db) =>
+      db.dbChatRounds.createAlias(
+        $_aliasNameGenerator(db.dbAttachments.roundId, db.dbChatRounds.id),
+      );
+
+  $$DbChatRoundsTableProcessedTableManager get roundId {
+    final $_column = $_itemColumn<String>('round_id')!;
+
+    final manager = $$DbChatRoundsTableTableManager(
+      $_db,
+      $_db.dbChatRounds,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_roundIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$DbAttachmentsTableFilterComposer
+    extends Composer<_$AppDatabase, $DbAttachmentsTable> {
+  $$DbAttachmentsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get relativePath => $composableBuilder(
+    column: $table.relativePath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isImage => $composableBuilder(
+    column: $table.isImage,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mimeType => $composableBuilder(
+    column: $table.mimeType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$DbChatRoundsTableFilterComposer get roundId {
+    final $$DbChatRoundsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.roundId,
+      referencedTable: $db.dbChatRounds,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DbChatRoundsTableFilterComposer(
+            $db: $db,
+            $table: $db.dbChatRounds,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$DbAttachmentsTableOrderingComposer
+    extends Composer<_$AppDatabase, $DbAttachmentsTable> {
+  $$DbAttachmentsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get relativePath => $composableBuilder(
+    column: $table.relativePath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isImage => $composableBuilder(
+    column: $table.isImage,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mimeType => $composableBuilder(
+    column: $table.mimeType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$DbChatRoundsTableOrderingComposer get roundId {
+    final $$DbChatRoundsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.roundId,
+      referencedTable: $db.dbChatRounds,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DbChatRoundsTableOrderingComposer(
+            $db: $db,
+            $table: $db.dbChatRounds,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$DbAttachmentsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DbAttachmentsTable> {
+  $$DbAttachmentsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get relativePath => $composableBuilder(
+    column: $table.relativePath,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isImage =>
+      $composableBuilder(column: $table.isImage, builder: (column) => column);
+
+  GeneratedColumn<String> get mimeType =>
+      $composableBuilder(column: $table.mimeType, builder: (column) => column);
+
+  $$DbChatRoundsTableAnnotationComposer get roundId {
+    final $$DbChatRoundsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.roundId,
+      referencedTable: $db.dbChatRounds,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DbChatRoundsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.dbChatRounds,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$DbAttachmentsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $DbAttachmentsTable,
+          DbAttachment,
+          $$DbAttachmentsTableFilterComposer,
+          $$DbAttachmentsTableOrderingComposer,
+          $$DbAttachmentsTableAnnotationComposer,
+          $$DbAttachmentsTableCreateCompanionBuilder,
+          $$DbAttachmentsTableUpdateCompanionBuilder,
+          (DbAttachment, $$DbAttachmentsTableReferences),
+          DbAttachment,
+          PrefetchHooks Function({bool roundId})
+        > {
+  $$DbAttachmentsTableTableManager(_$AppDatabase db, $DbAttachmentsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DbAttachmentsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DbAttachmentsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$DbAttachmentsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> roundId = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String> relativePath = const Value.absent(),
+                Value<bool> isImage = const Value.absent(),
+                Value<String?> mimeType = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DbAttachmentsCompanion(
+                id: id,
+                roundId: roundId,
+                name: name,
+                relativePath: relativePath,
+                isImage: isImage,
+                mimeType: mimeType,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String roundId,
+                required String name,
+                required String relativePath,
+                Value<bool> isImage = const Value.absent(),
+                Value<String?> mimeType = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DbAttachmentsCompanion.insert(
+                id: id,
+                roundId: roundId,
+                name: name,
+                relativePath: relativePath,
+                isImage: isImage,
+                mimeType: mimeType,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$DbAttachmentsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({roundId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (roundId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.roundId,
+                                referencedTable: $$DbAttachmentsTableReferences
+                                    ._roundIdTable(db),
+                                referencedColumn: $$DbAttachmentsTableReferences
+                                    ._roundIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$DbAttachmentsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $DbAttachmentsTable,
+      DbAttachment,
+      $$DbAttachmentsTableFilterComposer,
+      $$DbAttachmentsTableOrderingComposer,
+      $$DbAttachmentsTableAnnotationComposer,
+      $$DbAttachmentsTableCreateCompanionBuilder,
+      $$DbAttachmentsTableUpdateCompanionBuilder,
+      (DbAttachment, $$DbAttachmentsTableReferences),
+      DbAttachment,
+      PrefetchHooks Function({bool roundId})
+    >;
+
+class $AppDatabaseManager {
+  final _$AppDatabase _db;
+  $AppDatabaseManager(this._db);
+  $$DbConfigStoreTableTableManager get dbConfigStore =>
+      $$DbConfigStoreTableTableManager(_db, _db.dbConfigStore);
+  $$DbConfigProfilesTableTableManager get dbConfigProfiles =>
+      $$DbConfigProfilesTableTableManager(_db, _db.dbConfigProfiles);
+  $$DbSessionsTableTableManager get dbSessions =>
+      $$DbSessionsTableTableManager(_db, _db.dbSessions);
+  $$DbChatRoundsTableTableManager get dbChatRounds =>
+      $$DbChatRoundsTableTableManager(_db, _db.dbChatRounds);
+  $$DbAttachmentsTableTableManager get dbAttachments =>
+      $$DbAttachmentsTableTableManager(_db, _db.dbAttachments);
+}
+````
+
 ## File: lib/domain/models/session_card_meta.dart
 ````dart
 class SessionCardMeta {
@@ -10375,11 +10375,264 @@ Map<String, dynamic> _$$TreePathImplToJson(_$TreePathImpl instance) =>
     };
 ````
 
+## File: lib/presentation/providers/input_notifier.dart
+````dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/input_state.dart';
+import '../models/pending_attachment.dart';
+
+/// 输入状态 Notifier
+///
+/// 职责：
+/// - 管理输入框文本和附件列表
+/// - 提供状态变更方法
+/// - 不包含发送逻辑、不包含编辑模式、不包含 isSending 状态
+class InputNotifier extends Notifier<InputState> {
+  @override
+  InputState build() => const InputState();
+
+  /// 更新输入文本
+  void updateText(String text) {
+    state = state.copyWith(text: text);
+  }
+
+  /// 添加附件
+  void addAttachment(PendingAttachment attachment) {
+    state = state.copyWith(
+      attachments: [...state.attachments, attachment],
+    );
+  }
+
+  /// 移除指定 ID 的附件
+  void removeAttachment(String id) {
+    state = state.copyWith(
+      attachments: state.attachments.where((a) => a.id != id).toList(),
+    );
+  }
+
+  /// 清空输入状态（文本和附件）
+  void clear() {
+    state = const InputState();
+  }
+}
+
+/// 全局输入状态 Provider
+///
+/// 特点：
+/// - 全局单例：所有会话共享同一份输入草稿
+/// - 自动保留：切换会话时草稿不会丢失
+final inputStateProvider =
+    NotifierProvider<InputNotifier, InputState>(InputNotifier.new);
+````
+
+## File: lib/presentation/widgets/common/app_toast.dart
+````dart
+// lib/presentation/widgets/common/app_toast.dart
+import 'package:flutter/cupertino.dart';
+import '../../../main.dart'; // 全局 navigatorKey
+
+abstract class AppToast {
+  static OverlayEntry? _entry;
+
+  static void show(String message, {Duration duration = const Duration(seconds: 1)}) {
+    _entry?.remove();
+    final overlay = navigatorKey.currentState?.overlay;
+    if (overlay == null) return;
+
+    _entry = OverlayEntry(
+      builder: (context) => Positioned.fill(
+        child: IgnorePointer(
+          child: Center(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                color: const Color(0xE6111827),
+                child: Text(
+                  message,
+                  style: const TextStyle(color: CupertinoColors.white),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    overlay.insert(_entry!);
+    Future.delayed(duration, () {
+      _entry?.remove();
+      if (_entry != null) _entry = null;
+    });
+  }
+}
+````
+
+## File: lib/presentation/widgets/markdown_widget.dart
+````dart
+import 'package:aiservice/presentation/widgets/common/app_toast.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import 'markdown_parser.dart';
+
+class MarkdownWidget extends StatelessWidget {
+  final String data;
+  final TextStyle? baseStyle;
+
+  const MarkdownWidget({super.key, required this.data, this.baseStyle});
+
+  @override
+  Widget build(BuildContext context) {
+    final blocks = MarkdownParser.parse(data);
+    final theme = CupertinoTheme.of(context);
+    final defaultStyle = baseStyle ?? theme.textTheme.textStyle;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: blocks.map((block) => _buildBlock(block, defaultStyle, theme, context)).toList(),
+    );
+  }
+
+  Widget _buildBlock(
+    MarkdownBlock block, 
+    TextStyle defaultStyle, 
+    CupertinoThemeData theme, 
+    BuildContext context) {
+    switch (block.type) {
+      case MarkdownBlockType.heading:
+        final level = block.level ?? 1;
+        double fontSizeFactor;
+        switch (level) {
+          case 1:
+            fontSizeFactor = 1.8;
+            break;
+          case 2:
+            fontSizeFactor = 1.6;
+            break;
+          case 3:
+            fontSizeFactor = 1.4;
+            break;
+          default:
+            fontSizeFactor = 1.2;
+        }
+        final style = defaultStyle.copyWith(
+          fontSize: theme.textTheme.textStyle.fontSize! * fontSizeFactor,
+        );
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: _buildRichText(block.text ?? '', style),
+        );
+
+      case MarkdownBlockType.paragraph:
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: _buildRichText(block.text ?? '', defaultStyle),
+        );
+
+      case MarkdownBlockType.code:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: CupertinoButton(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: block.text ?? ''));
+                  AppToast.show('代码已复制');
+                },
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(CupertinoIcons.doc_on_doc, size: 14),
+                  ],
+                ),
+              ),
+            ),
+            Container(
+              margin: const EdgeInsets.only(top: 8, bottom: 4),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey5, context),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Text(
+                  block.text ?? '',
+                  style: const TextStyle(),
+                ),
+              ),
+            ),            
+          ],
+        );
+
+      case MarkdownBlockType.table:
+        final rows = block.tableRows;
+        if (rows == null || rows.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Table(
+            border: TableBorder.all(color: CupertinoDynamicColor.resolve(CupertinoColors.separator, context)),
+            children: rows.map((row) {
+              final isHeader = rows.indexOf(row) == 0;
+              return TableRow(
+                decoration: BoxDecoration(
+                  color: isHeader ? CupertinoDynamicColor.resolve(CupertinoColors.systemGrey5, context) : null, // 修改这里
+                ),
+                children: row.cells.map((cell) {
+                  return Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: isHeader
+                        ? _buildRichText(cell, defaultStyle)
+                        : _buildRichText(cell, defaultStyle),
+                  );
+                }).toList(),
+              );
+            }).toList(),
+          ),
+        );
+    }
+  }
+
+  Widget _buildRichText(String text, TextStyle baseStyle) {
+    final spans = MarkdownParser.parseInline(text);
+    return Text.rich(
+      TextSpan(
+        style: baseStyle,
+        children: spans.map((span) {
+          TextStyle style = baseStyle;
+          if (span.type == InlineType.bold) {
+            style = baseStyle.copyWith(fontWeight: FontWeight.bold);
+          }
+          return TextSpan(text: span.text, style: style);
+        }).toList(),
+      ),
+    );
+  }
+}
+````
+
+## File: lib/domain/models/session_list_item.dart
+````dart
+class SessionListItem {
+  final String id;
+  final String title;
+  final int updatedAt;
+
+  const SessionListItem({
+    required this.id,
+    required this.title,
+    required this.updatedAt,
+  });
+}
+````
+
 ## File: lib/domain/services/character_card_parser.dart
 ````dart
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
-import 'package:png_chunks_extract/png_chunks_extract.dart' as pngExtract;
 import 'package:uuid/uuid.dart';
 import '../../core/models/chat_round.dart';
 import '../../data/repositories/conversation_repository.dart';
@@ -10478,54 +10731,97 @@ class CharacterData {
 
 /// 角色卡解析器
 class CharacterCardParser {
-  /// 解析文件（支持 PNG 和 JSON）
-  static Future<CharacterData> parseFile(Uint8List bytes, String fileName) async {
+  /// 解析文件（支持 PNG 和 JSON），仅传入文件路径
+  static Future<CharacterData> parseFile(String filePath, String fileName) async {
     final lowerName = fileName.toLowerCase();
+    final file = File(filePath);
+    
+    if (!await file.exists()) {
+      throw Exception('文件不存在');
+    }
+
     if (lowerName.endsWith('.png')) {
-      return _parsePngCard(bytes);
+      return _parsePngCardStream(file);
     } else if (lowerName.endsWith('.json')) {
-      return _parseJsonCard(bytes);
+      return _parseJsonCardStream(file);
     } else {
       throw Exception('不支持的文件格式，请使用 PNG 或 JSON 文件');
     }
   }
 
-  /// 解析 PNG 角色卡（V2/V3）
-  static CharacterData _parsePngCard(Uint8List bytes) {
-    final chunks = pngExtract.extractChunks(bytes);
+  /// 核心优化：流式解析 PNG，跳过巨大的像素块，杜绝 OOM
+  static Future<CharacterData> _parsePngCardStream(File file) async {
+    // PNG 标准签名
+    final signature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+    final raf = await file.open();
     
-    String? base64Data;
-    for (final chunk in chunks) {
-      final chunkName = chunk['name'] as String;
-      if (chunkName == 'tEXt') {
-        final dataBytes = chunk['data'] as List<int>;
-        // 解析 tEXt 块：keyword + 0x00 + text
-        final zeroIndex = dataBytes.indexOf(0);
-        if (zeroIndex == -1) continue;
-        final keyword = utf8.decode(dataBytes.sublist(0, zeroIndex));
-        final textBytes = dataBytes.sublist(zeroIndex + 1);
-        final text = utf8.decode(textBytes);
-        
-        if (keyword == 'ccv3') {
-          base64Data = text;
-          break;
-        } else if (keyword == 'chara' && base64Data == null) {
-          base64Data = text;
-        }
+    try {
+      final header = await raf.read(8);
+      if (header.length < 8) throw Exception('文件太小，不是有效的 PNG');
+      for (int i = 0; i < 8; i++) {
+        if (header[i] != signature[i]) throw Exception('不是有效的 PNG 文件');
       }
+
+      String? base64Data;
+      
+      // 遍历 PNG Chunks
+      while (true) {
+        // 1. 读取 Length (4 bytes)
+        final lengthBytes = await raf.read(4);
+        if (lengthBytes.length < 4) break;
+        final length = ByteData.sublistView(lengthBytes).getUint32(0, Endian.big);
+        
+        // 2. 读取 Chunk Type (4 bytes)
+        final typeBytes = await raf.read(4);
+        if (typeBytes.length < 4) break;
+        final chunkType = String.fromCharCodes(typeBytes);
+        
+        if (chunkType == 'IEND') break; // 结束块
+
+        // 3. 我们只关心 tEXt 块
+        if (chunkType == 'tEXt') {
+          final dataBytes = await raf.read(length);
+          if (dataBytes.length == length) {
+            final zeroIndex = dataBytes.indexOf(0);
+            if (zeroIndex != -1) {
+              final keyword = utf8.decode(dataBytes.sublist(0, zeroIndex));
+              final textBytes = dataBytes.sublist(zeroIndex + 1);
+              final text = utf8.decode(textBytes, allowMalformed: true);
+              
+              if (keyword == 'ccv3' || keyword == 'chara') {
+                base64Data = text;
+                break; // 找到目标数据后直接跳出，不读取后面的像素数据
+              }
+            }
+          }
+        } else {
+          // 跳过不关心的 Chunk 数据 (例如几MB到几十MB的 IDAT 像素块)
+          final currentPos = await raf.position();
+          await raf.setPosition(currentPos + length);
+        }
+        
+        // 4. 跳过 CRC 校验和 (4 bytes)
+        final posAfterData = await raf.position();
+        await raf.setPosition(posAfterData + 4);
+      }
+      
+      if (base64Data == null) {
+        throw Exception('未找到角色数据块（ccv3/chara）');
+      }
+      
+      // 清理可能存在的换行符等空白字符
+      final cleanBase64 = base64Data.replaceAll(RegExp(r'\s+'), '');
+      final jsonString = utf8.decode(base64.decode(cleanBase64));
+      return _parseJsonString(jsonString);
+      
+    } finally {
+      await raf.close();
     }
-    
-    if (base64Data == null) {
-      throw Exception('未找到角色数据块（ccv3/chara）');
-    }
-    
-    final jsonString = utf8.decode(base64.decode(base64Data));
-    return _parseJsonString(jsonString);
   }
 
   /// 解析 JSON 角色卡
-  static CharacterData _parseJsonCard(Uint8List bytes) {
-    final jsonString = utf8.decode(bytes);
+  static Future<CharacterData> _parseJsonCardStream(File file) async {
+    final jsonString = await file.readAsString();
     return _parseJsonString(jsonString);
   }
 
@@ -10576,132 +10872,6 @@ class CharacterCardParser {
       extensions: data['extensions'],
     );
   }
-}
-````
-
-## File: lib/presentation/providers/input_notifier.dart
-````dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/input_state.dart';
-import '../models/pending_attachment.dart';
-
-/// 输入状态 Notifier
-///
-/// 职责：
-/// - 管理输入框文本和附件列表
-/// - 提供状态变更方法
-/// - 不包含发送逻辑、不包含编辑模式、不包含 isSending 状态
-class InputNotifier extends Notifier<InputState> {
-  @override
-  InputState build() => const InputState();
-
-  /// 更新输入文本
-  void updateText(String text) {
-    state = state.copyWith(text: text);
-  }
-
-  /// 添加附件
-  void addAttachment(PendingAttachment attachment) {
-    state = state.copyWith(
-      attachments: [...state.attachments, attachment],
-    );
-  }
-
-  /// 移除指定 ID 的附件
-  void removeAttachment(String id) {
-    state = state.copyWith(
-      attachments: state.attachments.where((a) => a.id != id).toList(),
-    );
-  }
-
-  /// 清空输入状态（文本和附件）
-  void clear() {
-    state = const InputState();
-  }
-}
-
-/// 全局输入状态 Provider
-///
-/// 特点：
-/// - 全局单例：所有会话共享同一份输入草稿
-/// - 自动保留：切换会话时草稿不会丢失
-final inputStateProvider =
-    NotifierProvider<InputNotifier, InputState>(InputNotifier.new);
-````
-
-## File: lib/presentation/widgets/common/app_toast.dart
-````dart
-// lib/presentation/widgets/common/app_toast.dart
-import 'package:flutter/cupertino.dart';
-import '../../../main.dart'; // 全局 navigatorKey
-
-abstract class AppToast {
-  static OverlayEntry? _entry;
-
-  static void show(String message, {Duration duration = const Duration(seconds: 1)}) {
-    _entry?.remove();
-    final overlay = navigatorKey.currentState?.overlay;
-    if (overlay == null) return;
-
-    _entry = OverlayEntry(
-      builder: (context) => Positioned.fill(
-        child: IgnorePointer(
-          child: Center(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                color: const Color(0xE6111827),
-                child: Text(
-                  message,
-                  style: const TextStyle(color: CupertinoColors.white),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    overlay.insert(_entry!);
-    Future.delayed(duration, () {
-      _entry?.remove();
-      if (_entry != null) _entry = null;
-    });
-  }
-}
-````
-
-## File: lib/core/constants/app_constants.dart
-````dart
-abstract class AppConstants {
-  // 文件夹名称
-  static const String dirAttachments = 'attachments';
-
-  // 配置键
-  static const String keyBaseUrl = 'baseUrl';
-  static const String keyApiKey = 'apiKey';
-  static const String keyTheme = 'theme';
-  static const String keyModel = 'selectedModel';
-
-  // 默认值
-  static const String defaultBaseUrl = 'https://api.openai.com';
-  static const String defaultTheme = 'system';
-}
-````
-
-## File: lib/domain/models/session_list_item.dart
-````dart
-class SessionListItem {
-  final String id;
-  final String title;
-  final int updatedAt;
-
-  const SessionListItem({
-    required this.id,
-    required this.title,
-    required this.updatedAt,
-  });
 }
 ````
 
@@ -11466,86 +11636,6 @@ class MyApp extends StatelessWidget {
 }
 ````
 
-## File: lib/presentation/pages/text_attachment_viewer_page.dart
-````dart
-import 'dart:convert';
-import 'dart:io';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show SelectionArea;
-import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../widgets/common/app_page_scaffold.dart';
-import '../widgets/common/app_toast.dart';
-
-final textFileContentProvider = FutureProvider.family<String, String>((ref, filePath) async {
-  final file = File(filePath);
-  if (!await file.exists()) {
-    throw Exception('文件不存在');
-  }
-  final bytes = await file.readAsBytes();
-  return utf8.decode(bytes, allowMalformed: true);
-});
-
-class TextAttachmentViewerPage extends ConsumerWidget {
-  final String title;
-  final String filePath;
-
-  const TextAttachmentViewerPage({
-    super.key,
-    required this.title,
-    required this.filePath,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final contentAsync = ref.watch(textFileContentProvider(filePath));
-
-    return AppPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        middle: Text(title, overflow: TextOverflow.ellipsis),
-        trailing: contentAsync.when(
-          data: (text) => CupertinoButton(
-            padding: EdgeInsets.zero,
-            onPressed: () async {
-              await Clipboard.setData(ClipboardData(text: text));
-              if (context.mounted) AppToast.show('全文已复制');
-            },
-            child: const Icon(CupertinoIcons.doc_on_doc),
-          ),
-          loading: () => const SizedBox.shrink(),
-          error: (_, _) => const SizedBox.shrink(),
-        ),
-      ),
-      body: contentAsync.when(
-        data: (text) {
-          final lines = text.split('\n');
-
-          return Padding(
-            padding: const EdgeInsets.all(16),
-            child: Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              padding: const EdgeInsets.all(16),
-              child: SelectionArea(
-                child: ListView.builder(
-                  itemCount: lines.length,
-                  itemBuilder: (context, index) => Text(lines[index]),
-                ),
-              ),
-            ),
-          );
-        },
-        loading: () => const Center(child: CupertinoActivityIndicator()),
-        error: (e, _) => Center(child: Text('加载失败: $e')),
-      ),
-    );
-  }
-}
-````
-
 ## File: lib/presentation/providers/settings_form_notifier.dart
 ````dart
 // lib/presentation/providers/settings_form_notifier.dart
@@ -11759,105 +11849,81 @@ final settingsFormProvider = NotifierProvider<SettingsFormNotifier, SettingsForm
 );
 ````
 
-## File: lib/presentation/widgets/message_bubble.dart
+## File: lib/presentation/pages/text_attachment_viewer_page.dart
 ````dart
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/cupertino.dart';
-import 'markdown_widget.dart';
+import 'package:flutter/material.dart' show SelectionArea;
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../widgets/common/app_page_scaffold.dart';
+import '../widgets/common/app_toast.dart';
 
-class MessageBubble extends StatelessWidget {
-  final String content;
-  final bool isUser;
-  final VoidCallback onCopy;
-  final VoidCallback onRetryReply;
-  final VoidCallback? onEdit;
+final textFileContentProvider = FutureProvider.family<String, String>((ref, filePath) async {
+  final file = File(filePath);
+  if (!await file.exists()) {
+    throw Exception('文件不存在');
+  }
+  final bytes = await file.readAsBytes();
+  return utf8.decode(bytes, allowMalformed: true);
+});
 
-  const MessageBubble({
+class TextAttachmentViewerPage extends ConsumerWidget {
+  final String title;
+  final String filePath;
+
+  const TextAttachmentViewerPage({
     super.key,
-    required this.content,
-    required this.isUser,
-    required this.onCopy,
-    required this.onRetryReply,
-    this.onEdit,
+    required this.title,
+    required this.filePath,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final bubbleColor = isUser
-        ? CupertinoDynamicColor.resolve(CupertinoColors.systemBlue, context)
-        : CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final contentAsync = ref.watch(textFileContentProvider(filePath));
 
-    final textColor = isUser
-        ? CupertinoDynamicColor.resolve(CupertinoColors.white, context)
-        : CupertinoDynamicColor.resolve(CupertinoColors.label, context);
-
-    final maxWidth = MediaQuery.of(context).size.width * 0.88;
-
-    return Column(
-      crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maxWidth),
-          child: Container(
-            margin: const EdgeInsets.symmetric(vertical: 4),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: bubbleColor,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: MarkdownWidget(
-              data: content,
-              baseStyle: TextStyle(color: textColor),
-            ),
+    return AppPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        middle: Text(title, overflow: TextOverflow.ellipsis),
+        trailing: contentAsync.when(
+          data: (text) => CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: text));
+              if (context.mounted) AppToast.show('全文已复制');
+            },
+            child: const Icon(CupertinoIcons.doc_on_doc),
           ),
+          loading: () => const SizedBox.shrink(),
+          error: (_, _) => const SizedBox.shrink(),
         ),
-        
-        Padding(
-          padding: const EdgeInsets.only(top: 4, bottom: 8, left: 4, right: 4),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CupertinoButton(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                onPressed: onCopy,
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(CupertinoIcons.doc_on_doc, size: 14),
-                    SizedBox(width: 4),
-                    Text('复制', style: TextStyle(fontSize: 12)),
-                  ],
+      ),
+      body: contentAsync.when(
+        data: (text) {
+          final lines = text.split('\n');
+
+          return Padding(
+            padding: const EdgeInsets.all(16),
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.all(16),
+              child: SelectionArea(
+                child: ListView.builder(
+                  itemCount: lines.length,
+                  itemBuilder: (context, index) => Text(lines[index]),
                 ),
               ),
-              CupertinoButton(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                onPressed: onRetryReply,
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(CupertinoIcons.arrow_clockwise, size: 14),
-                    SizedBox(width: 4),
-                    Text('重试', style: TextStyle(fontSize: 12)),
-                  ],
-                ),
-              ),
-              if (onEdit != null)
-                CupertinoButton(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  onPressed: onEdit,
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(CupertinoIcons.pencil, size: 14),
-                      SizedBox(width: 4),
-                      Text('编辑', style: TextStyle(fontSize: 12)),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ],
+            ),
+          );
+        },
+        loading: () => const Center(child: CupertinoActivityIndicator()),
+        error: (e, _) => Center(child: Text('加载失败: $e')),
+      ),
     );
   }
 }
@@ -12003,6 +12069,104 @@ class _FileAttachmentChip extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+````
+
+## File: lib/presentation/widgets/message_bubble.dart
+````dart
+import 'package:flutter/cupertino.dart';
+import 'markdown_widget.dart';
+
+class MessageBubble extends StatelessWidget {
+  final String content;
+  final bool isUser;
+  final VoidCallback onCopy;
+  final VoidCallback onRetryReply;
+  final VoidCallback? onEdit;
+
+  const MessageBubble({
+    super.key,
+    required this.content,
+    required this.isUser,
+    required this.onCopy,
+    required this.onRetryReply,
+    this.onEdit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bubbleColor = isUser
+        ? CupertinoDynamicColor.resolve(CupertinoColors.systemBlue, context)
+        : CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context);
+
+    final textColor = isUser
+        ? CupertinoDynamicColor.resolve(CupertinoColors.white, context)
+        : CupertinoDynamicColor.resolve(CupertinoColors.label, context);
+
+    final maxWidth = MediaQuery.of(context).size.width * 0.88;
+
+    return Column(
+      crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxWidth),
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: bubbleColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: MarkdownWidget(
+              data: content,
+              baseStyle: TextStyle(color: textColor),
+            ),
+          ),
+        ),
+        
+        Padding(
+          padding: const EdgeInsets.only(top: 4, bottom: 8, left: 4, right: 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CupertinoButton(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                onPressed: onCopy,
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(CupertinoIcons.doc_on_doc, size: 14),
+                  ],
+                ),
+              ),
+              CupertinoButton(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                onPressed: onRetryReply,
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(CupertinoIcons.arrow_clockwise, size: 14),
+                  ],
+                ),
+              ),
+              if (onEdit != null)
+                CupertinoButton(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  onPressed: onEdit,
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(CupertinoIcons.pencil, size: 14),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -12265,878 +12429,6 @@ class ConfigService{
       ).config;
     });
   }
-}
-````
-
-## File: lib/presentation/widgets/input_bar.dart
-````dart
-import 'dart:io';
-
-import 'package:aiservice/domain/services/character_card_parser.dart';
-import 'package:aiservice/presentation/models/input_state.dart';
-import 'package:aiservice/presentation/providers/character_provider.dart';
-import 'package:aiservice/presentation/widgets/common/app_toast.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:uuid/uuid.dart';
-
-import '../models/pending_attachment.dart';
-import '../pages/image_attachment_viewer_page.dart';
-import '../pages/text_attachment_viewer_page.dart';
-import '../providers/input_notifier.dart';
-
-class InputBar extends ConsumerStatefulWidget {
-  final Future<void> Function(String text, List<PendingAttachment> attachments) onSend;
-  final VoidCallback? onStop;
-  final bool isIncomplete;
-  final String hintText;
-
-  const InputBar({
-    super.key,
-    required this.onSend,
-    this.onStop,
-    this.isIncomplete = false,
-    this.hintText = '输入消息...',
-  });
-
-  @override
-  ConsumerState<InputBar> createState() => _InputBarState();
-}
-
-class _InputBarState extends ConsumerState<InputBar> {
-  late final TextEditingController _controller;
-  final ImagePicker _imagePicker = ImagePicker();
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _addPendingAttachment({
-    required String name,
-    required String path,
-    required bool isImage,
-    required String mimeType,
-  }) {
-    final attachment = PendingAttachment(
-      id: const Uuid().v4(),
-      name: name,
-      path: path,
-      isImage: isImage,
-      mimeType: mimeType,
-    );
-    ref.read(inputStateProvider.notifier).addAttachment(attachment);
-  }
-
-  bool _isImageFile(String name) {
-    final lower = name.toLowerCase();
-    return lower.endsWith('.png') ||
-        lower.endsWith('.jpg') ||
-        lower.endsWith('.jpeg') ||
-        lower.endsWith('.gif') ||
-        lower.endsWith('.webp') ||
-        lower.endsWith('.bmp');
-  }
-
-  bool _isTextFile(String name) {
-    final lower = name.toLowerCase();
-    return lower.endsWith('.txt') ||
-        lower.endsWith('.md') ||
-        lower.endsWith('.json') ||
-        lower.endsWith('.dart') ||
-        lower.endsWith('.yaml') ||
-        lower.endsWith('.yml') ||
-        lower.endsWith('.log') ||
-        lower.endsWith('.csv');
-  }
-
-  String _mimeForImage(String fileName) {
-    final lower = fileName.toLowerCase();
-    if (lower.endsWith('.png')) return 'image/png';
-    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
-    if (lower.endsWith('.gif')) return 'image/gif';
-    if (lower.endsWith('.webp')) return 'image/webp';
-    if (lower.endsWith('.bmp')) return 'image/bmp';
-    return 'image/png';
-  }
-
-  String _mimeForText(String fileName) {
-    return 'text/plain';
-  }
-
-  Future<void> _pickFileAttachment() async {
-    final result = await FilePicker.pickFiles(
-      allowMultiple: false,
-      withData: false,
-      type: FileType.any,
-    );
-    if (result == null || result.files.isEmpty) return;
-    final file = result.files.single;
-    final filePath = file.path;
-    if (filePath == null || filePath.trim().isEmpty) return;
-
-    final isImage = _isImageFile(file.name);
-    final isText = _isTextFile(file.name);
-
-    if (!isImage && !isText) {
-      if (mounted) {
-        AppToast.show('仅支持图片和文本文件（.txt, .md, .json, .dart, .yaml 等）');
-      }
-      return;
-    }
-
-    final mimeType = isImage ? _mimeForImage(file.name) : _mimeForText(file.name);
-
-    _addPendingAttachment(
-      name: file.name,
-      path: filePath,
-      isImage: isImage,
-      mimeType: mimeType,
-    );
-  }
-
-  Future<void> _pickImageFromGallery() async {
-    final file = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 100,
-    );
-    if (file == null) return;
-
-    final mimeType = file.mimeType ?? _mimeForImage(file.name);
-
-    _addPendingAttachment(
-      name: file.name,
-      path: file.path,
-      isImage: true,
-      mimeType: mimeType,
-    );
-  }
-
-  void _removeAttachment(String id) {
-    ref.read(inputStateProvider.notifier).removeAttachment(id);
-  }
-
-  Future<void> _importCharacterCard() async {
-    final result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['png', 'json'],
-    );
-    if (result == null || result.files.isEmpty) return;
-    final file = result.files.single;
-    final bytes = file.bytes;
-    if (bytes == null) {
-      AppToast.show('无法读取文件');
-      return;
-    }
-    try {
-      final character = await CharacterCardParser.parseFile(bytes, file.name);
-      ref.read(currentCharacterProvider.notifier).state = character;
-      ref.read(characterGreetingSentProvider.notifier).state = false;
-      AppToast.show('已导入角色：${character.name}');
-    } catch (e) {
-      AppToast.show('导入失败：$e');
-    }
-  }
-
-  Future<void> _showAddAttachmentSheet() async {
-    FocusScope.of(context).unfocus();
-    
-    await showCupertinoModalPopup<void>(
-      context: context,
-      builder: (context) {
-        return CupertinoActionSheet(
-          actions: [
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _importCharacterCard();
-              },
-              child: const Text('酒馆角色卡'),
-            ),
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _pickFileAttachment();
-              },
-              child: const Text('文件'),
-            ),
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _pickImageFromGallery();
-              },
-              child: const Text('相册'),
-            ),              
-          ],
-          cancelButton: CupertinoActionSheetAction(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('取消'),
-          ),
-        );
-      },
-    );
-  }
-
-  String _sanitizeInput(String input) {
-    var result = input.replaceAll('\uFEFF', '');               // 移除 BOM
-    result = result.replaceAll(RegExp(r'[\u200B\u200C\u200D]'), ''); // 移除零宽字符
-    result = result.replaceAll('\r\n', '\n').replaceAll('\r', '\n');   // 统一换行符
-    return result;
-  }
-
-  Future<void> _handleSend() async {
-    FocusScope.of(context).unfocus();
-
-    final state = ref.read(inputStateProvider);
-    if (!state.canSend) return;
-
-    final sanitizedText = _sanitizeInput(state.text);
-
-    try {
-      await widget.onSend(sanitizedText, state.attachments);
-      ref.read(inputStateProvider.notifier).clear();
-    } catch (e) {
-      // 发送失败，保持输入内容和附件不变
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    ref.listen<String>(
-      inputStateProvider.select((s) => s.text),
-      (previous, next) {
-        if (next != _controller.text) {
-          _controller.value = TextEditingValue(
-            text: next,
-            selection: TextSelection.collapsed(offset: next.length),
-            composing: TextRange.empty,
-          );
-        }
-      },
-    );
-
-    final inputState = ref.watch(inputStateProvider);
-    final attachments = inputState.attachments;
-    final canSend = inputState.canSend;
-    final showStopButton = widget.isIncomplete;
-
-    return SafeArea(
-      top: false,
-      child: Container(
-        color: CupertinoDynamicColor.resolve(CupertinoColors.systemGroupedBackground, context),
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (attachments.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: attachments.map((attachment) {
-                      final file = File(attachment.path);
-                      if (attachment.isImage) {
-                        return _PendingImageAttachment(
-                          attachment: attachment,
-                          file: file,
-                          onRemove: () => _removeAttachment(attachment.id),
-                        );
-                      } else {
-                        return _PendingFileAttachment(
-                          attachment: attachment,
-                          file: file,
-                          onRemove: () => _removeAttachment(attachment.id),
-                        );
-                      }
-                    }).toList(),
-                  ),
-                ),
-              ),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                CupertinoButton(
-                  padding: EdgeInsets.zero,
-                  onPressed: _showAddAttachmentSheet,
-                  child: const Icon(CupertinoIcons.add),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey5, context),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: CupertinoTextField(
-                      controller: _controller,
-                      minLines: 1,
-                      maxLines: 6,
-                      keyboardType: TextInputType.multiline,
-                      placeholder: widget.hintText,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      onChanged: (value) {
-                        ref.read(inputStateProvider.notifier).updateText(value);
-                      },
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                if (showStopButton)
-                  CupertinoButton.filled(
-                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-                    borderRadius: BorderRadius.circular(8),
-                    onPressed: widget.onStop,
-                    child: const Icon(CupertinoIcons.stop_fill, size: 20),
-                  )
-                else
-                  CupertinoButton.filled(
-                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-                    borderRadius: BorderRadius.circular(8),
-                    onPressed: canSend ? _handleSend : null,
-                    child: const Icon(CupertinoIcons.arrow_up, size: 20),
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ================= 新增的预览组件 =================
-
-class _PendingImageAttachment extends StatelessWidget {
-  final PendingAttachment attachment;
-  final File file;
-  final VoidCallback onRemove;
-
-  const _PendingImageAttachment({
-    required this.attachment,
-    required this.file,
-    required this.onRemove,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        // 点击图片进行全屏预览
-        GestureDetector(
-          onTap: () {
-            Navigator.of(context).push(
-              CupertinoPageRoute(
-                builder: (_) => ImageAttachmentViewerPage(
-                  title: attachment.name,
-                  filePath: file.path,
-                ),
-              ),
-            );
-          },
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.file(
-              file,
-              width: 60,
-              height: 60,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  width: 60,
-                  height: 60,
-                  color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey5, context),
-                  child: const Icon(CupertinoIcons.photo, color: CupertinoColors.systemGrey),
-                );
-              },
-            ),
-          ),
-        ),
-        // 右上角删除按钮
-        Positioned(
-          top: 2,
-          right: 2,
-          child: GestureDetector(
-            onTap: onRemove,
-            child: Container(
-              decoration: BoxDecoration(
-                color: CupertinoColors.black.withOpacity(0.5),
-                shape: BoxShape.circle,
-              ),
-              padding: const EdgeInsets.all(2),
-              child: const Icon(
-                CupertinoIcons.xmark_circle_fill,
-                color: CupertinoColors.white,
-                size: 18,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _PendingFileAttachment extends StatelessWidget {
-  final PendingAttachment attachment;
-  final File file;
-  final VoidCallback onRemove;
-
-  const _PendingFileAttachment({
-    required this.attachment,
-    required this.file,
-    required this.onRemove,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey5, context),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // 点击文件名及图标区域进行文本预览
-          Flexible(
-            child: GestureDetector(
-              onTap: () {
-                // 上游已做拦截，走到这里的必然是文本文件，直接跳转预览
-                Navigator.of(context).push(
-                  CupertinoPageRoute(
-                    builder: (_) => TextAttachmentViewerPage(
-                      title: attachment.name,
-                      filePath: file.path,
-                    ),
-                  ),
-                );
-              },
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(CupertinoIcons.doc_text, size: 16),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      attachment.name,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          // 右侧独立的删除按钮
-          GestureDetector(
-            onTap: onRemove,
-            child: const Icon(CupertinoIcons.xmark_circle_fill, size: 16),
-          ),
-        ],
-      ),
-    );
-  }
-}
-````
-
-## File: lib/data/repositories/conversation_repository.dart
-````dart
-// data/repositories/conversation_repository.dart
-import 'dart:async';
-import 'dart:io';
-import 'package:drift/drift.dart';
-import '../data_sources/local_file_source.dart';
-import '../../core/models/attachment.dart';
-import '../../core/models/chat_round.dart';
-import '../../core/models/session.dart';
-import '../../domain/models/session_list_item.dart';
-import '../database/database.dart';
-import '../../domain/models/session_card_meta.dart';
-import 'package:rxdart/rxdart.dart';
-
-class ConversationRepository {
-  final AppDatabase _db;
-  final LocalFileSource _fileService;
-  ConversationRepository(this._db, this._fileService);
-
-  // ========== 响应式查询 ==========
-
-  Stream<List<SessionListItem>> watchSessionListItems() {
-    final query = (_db.select(_db.dbSessions)
-      ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]));
-    return query.watch().map((sessions) {
-      return sessions.map((session) {
-        return SessionListItem(
-          id: session.id,
-          title: session.title,
-          updatedAt: session.updatedAt,
-        );
-      }).toList();
-    });
-  }
-
-  Stream<SessionCardMeta> watchSessionCardMeta(String sessionId) {
-    final lastRoundStream = (_db.select(_db.dbChatRounds)
-          ..where((t) => t.sessionId.equals(sessionId))
-          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
-          ..limit(1))
-        .watchSingleOrNull();
-
-    final countStream = (_db.selectOnly(_db.dbChatRounds)
-          ..addColumns([countAll()])
-          ..where(_db.dbChatRounds.sessionId.equals(sessionId)))
-        .watchSingle()
-        .map((row) => row.read(countAll()) ?? 0);
-
-    final hasUnseenStream = (_db.select(_db.dbChatRounds)
-          ..where((t) => t.sessionId.equals(sessionId))
-          ..where((t) => t.hasUnseenUpdate.equals(true))
-          ..limit(1))
-        .watchSingleOrNull()
-        .map((row) => row != null);
-
-    return Rx.combineLatest3(lastRoundStream, countStream, hasUnseenStream,
-        (lastRound, count, hasUnseen) {
-      final previewRound = lastRound;
-      final userPreview = previewRound == null
-          ? '点击开始新的对话'
-          : previewRound.userContent.trim().isEmpty
-              ? '（空输入）'
-              : previewRound.userContent.trim();
-      final aiPreview = previewRound == null
-          ? '（等待回复）'
-          : (previewRound.assistantContent?.trim().isNotEmpty ?? false)
-              ? previewRound.assistantContent!
-              : (previewRound.isIncomplete ? '正在生成...' : '（等待回复）');
-
-      return SessionCardMeta(
-        roundCount: count,
-        previewRoundId: previewRound?.id,
-        userPreview: userPreview,
-        aiPreview: aiPreview,
-        hasUnseen: hasUnseen,
-        isStreaming: previewRound?.isIncomplete == true,
-      );
-    });
-  }
-
-  // ========== 细粒度监听（新增） ==========
-
-  Stream<List<({String id, String? parentId})>> watchSessionTopology(String sessionId) {
-    final query = _db.selectOnly(_db.dbChatRounds)
-      ..addColumns([_db.dbChatRounds.id, _db.dbChatRounds.parentId])
-      ..where(_db.dbChatRounds.sessionId.equals(sessionId))
-      ..orderBy([OrderingTerm.asc(_db.dbChatRounds.createdAt)]);
-    return query.watch().map((rows) => rows.map((r) => (
-      id: r.read(_db.dbChatRounds.id)!,
-      parentId: r.read(_db.dbChatRounds.parentId)
-    )).toList());
-  }
-
-  /// 仅监听单条消息的完整详情（含附件）- 改用 rxdart 组合两个独立查询
-  Stream<ChatRound?> watchSingleRound(String roundId) {
-    final roundStream = (_db.select(_db.dbChatRounds)
-          ..where((t) => t.id.equals(roundId)))
-        .watchSingleOrNull();
-
-    final attachmentsStream = (_db.select(_db.dbAttachments)
-          ..where((t) => t.roundId.equals(roundId)))
-        .watch()
-        .map((rows) => rows.map((a) => Attachment(
-              id: a.id,
-              name: a.name,
-              relativePath: a.relativePath,
-              isImage: a.isImage,
-              mimeType: a.mimeType,
-            )).toList());
-
-    return Rx.combineLatest2(roundStream, attachmentsStream,
-        (DbChatRound? round, List<Attachment> attachments) {
-      if (round == null) return null;
-      return ChatRound(
-        id: round.id,
-        parentId: round.parentId,
-        createdAt: round.createdAt,
-        userContent: round.userContent,
-        userAttachments: attachments,
-        assistantThinking: round.assistantThinking,
-        assistantContent: round.assistantContent,
-        isIncomplete: round.isIncomplete,
-        hasUnseenUpdate: round.hasUnseenUpdate,
-      );
-    });
-  }
-
-  Future<List<ChatRound>> getContextRounds(String roundId) async {
-    final roundsQuery = _db.customSelect(
-      '''
-      WITH RECURSIVE ctx_chain AS (
-        SELECT id, session_id, parent_id, created_at, user_content,
-              assistant_thinking, assistant_content, is_incomplete, has_unseen_update
-        FROM db_chat_rounds WHERE id = :roundId
-        UNION ALL
-        SELECT r.id, r.session_id, r.parent_id, r.created_at, r.user_content,
-              r.assistant_thinking, r.assistant_content, r.is_incomplete, r.has_unseen_update
-        FROM db_chat_rounds r
-        INNER JOIN ctx_chain c ON r.id = c.parent_id
-      )
-      SELECT * FROM ctx_chain ORDER BY created_at ASC
-      ''',
-      readsFrom: {_db.dbChatRounds},
-      variables: [Variable.withString(roundId)],
-    );
-
-    final dbRounds = await roundsQuery.map((row) {
-      return DbChatRound(
-        id: row.read<String>('id'),
-        sessionId: row.read<String>('session_id'),
-        parentId: row.read<String?>('parent_id'),
-        createdAt: row.read<int>('created_at'),
-        userContent: row.read<String>('user_content'),
-        assistantThinking: row.read<String?>('assistant_thinking'),
-        assistantContent: row.read<String?>('assistant_content'),
-        isIncomplete: row.read<bool>('is_incomplete'),
-        hasUnseenUpdate: row.read<bool>('has_unseen_update'),
-      );
-    }).get();
-
-    if (dbRounds.isEmpty) return [];
-
-    final roundIds = dbRounds.map((r) => r.id).toList();
-    final dbAttachments = await (_db.select(_db.dbAttachments)
-          ..where((t) => t.roundId.isIn(roundIds)))
-        .get();
-
-    final attachmentMap = <String, List<Attachment>>{};
-    for (final att in dbAttachments) {
-      attachmentMap.putIfAbsent(att.roundId, () => []).add(
-        Attachment(
-          id: att.id,
-          name: att.name,
-          relativePath: att.relativePath,
-          isImage: att.isImage,
-          mimeType: att.mimeType,
-        ),
-      );
-    }
-
-    return dbRounds.map((round) => _mapToChatRound(round, attachmentMap[round.id] ?? [])).toList();
-  }
-
-  Stream<String?> watchSessionTitle(String sessionId) {
-    return (_db.select(_db.dbSessions)
-          ..where((t) => t.id.equals(sessionId)))
-        .map((row) => row.title)
-        .watchSingleOrNull();
-  }
-
-  ChatRound _mapToChatRound(DbChatRound row, List<Attachment> attachments) {
-    return ChatRound(
-      id: row.id,
-      parentId: row.parentId,
-      createdAt: row.createdAt,
-      userContent: row.userContent,
-      userAttachments: attachments,
-      assistantThinking: row.assistantThinking,
-      assistantContent: row.assistantContent,
-      isIncomplete: row.isIncomplete,
-      hasUnseenUpdate: row.hasUnseenUpdate,
-    );
-  }
-
-  Future<void> _cleanupOrphanAttachments(Iterable<String> relativePaths) async {
-    final uniquePaths = relativePaths.toSet();
-    if (uniquePaths.isEmpty) return;
-
-    final referencedPaths = await (_db.select(_db.dbAttachments)
-          ..where((t) => t.relativePath.isIn(uniquePaths)))
-        .map((t) => t.relativePath)
-        .get();
-
-    final orphanPaths = uniquePaths.difference(referencedPaths.toSet());
-
-    for (final path in orphanPaths) {
-      try {
-        await _fileService.deleteAttachment(path);
-      } catch (_) {}
-    }
-  }
-
-  // ========== 写操作 ==========
-
-  Future<void> deleteRoundsAndCleanupOrphanAttachments(
-    String sessionId,
-    List<String> roundIds,
-  ) async {
-    if (roundIds.isEmpty) return;
-
-    // 1. 收集候选附件路径（改用直接查询，不用 join）
-    final candidatePaths = (await (_db.select(_db.dbAttachments)
-          ..where((t) => t.roundId.isIn(roundIds)))
-        .get())
-        .map((a) => a.relativePath)
-        .toSet();
-
-    // 2. 提交数据库变更
-    await _db.transaction(() async {
-      await (_db.delete(_db.dbChatRounds)
-            ..where((t) => t.sessionId.equals(sessionId) & t.id.isIn(roundIds)))
-          .go();
-      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-          .write(
-        DbSessionsCompanion(
-          updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
-        ),
-      );
-    });
-
-    // 3. 基于最终态清理物理文件
-    await _cleanupOrphanAttachments(candidatePaths);
-  }
-
-  Future<void> deleteSession(String sessionId) async {
-    // 1. 收集候选附件路径（先查出所有 round id，再查附件）
-    final roundIds = await (_db.select(_db.dbChatRounds)
-          ..where((t) => t.sessionId.equals(sessionId)))
-        .map((r) => r.id)
-        .get();
-
-    final candidatePaths = <String>{};
-    if (roundIds.isNotEmpty) {
-      final attachments = await (_db.select(_db.dbAttachments)
-            ..where((t) => t.roundId.isIn(roundIds)))
-          .get();
-      candidatePaths.addAll(attachments.map((a) => a.relativePath));
-    }
-
-    // 2. 提交数据库变更
-    await (_db.delete(_db.dbSessions)..where((t) => t.id.equals(sessionId))).go();
-
-    // 3. 基于最终态清理物理文件
-    await _cleanupOrphanAttachments(candidatePaths);
-  }
-
-  Future<Session> createSession({
-    required String sessionId,
-    required String title,
-  }) async {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final session = Session(
-      id: sessionId,
-      title: title,
-      createdAt: now,
-      updatedAt: now,
-      rounds: [],
-    );
-    await _db.into(_db.dbSessions).insert(
-          DbSessionsCompanion.insert(
-            id: session.id,
-            title: session.title,
-            createdAt: session.createdAt,
-            updatedAt: session.updatedAt,
-          ),
-        );
-    return session;
-  }
-
-  Future<void> updateSessionTitle(String sessionId, String title) async {
-    await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-        .write(
-      DbSessionsCompanion(
-        title: Value(title),
-        updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
-      ),
-    );
-  }
-
-  Future<void> appendRound(String sessionId, ChatRound round) async {
-    await _db.transaction(() async {
-      await _db.into(_db.dbChatRounds).insert(
-            DbChatRoundsCompanion.insert(
-              id: round.id,
-              sessionId: sessionId,
-              parentId: Value(round.parentId),
-              createdAt: round.createdAt,
-              userContent: round.userContent,
-              assistantThinking: Value(round.assistantThinking),
-              assistantContent: Value(round.assistantContent),
-              isIncomplete: Value(round.isIncomplete),
-              hasUnseenUpdate: Value(round.hasUnseenUpdate),
-            ),
-          );
-      for (final attach in round.userAttachments) {
-        await _db.into(_db.dbAttachments).insert(
-              DbAttachmentsCompanion.insert(
-                id: attach.id,
-                roundId: round.id,
-                name: attach.name,
-                relativePath: attach.relativePath,
-                isImage: Value(attach.isImage),
-                mimeType: Value(attach.mimeType),
-              ),
-            );
-      }
-      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-          .write(
-        DbSessionsCompanion(
-          updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
-        ),
-      );
-    });
-  }
-
-  Future<void> updateRound({
-    required String roundId,
-    String? userContent,
-    String? assistantThinking,
-    String? assistantContent,
-    bool? isIncomplete,
-    bool? hasUnseenUpdate,
-  }) async {
-    await (_db.update(_db.dbChatRounds)..where((t) => t.id.equals(roundId)))
-      .write(DbChatRoundsCompanion(
-        userContent: userContent != null 
-          ? Value(userContent) 
-          : const Value.absent(),
-        assistantThinking: assistantThinking != null
-          ? Value(assistantThinking)
-          : const Value.absent(),
-        assistantContent: assistantContent != null
-          ? Value(assistantContent)
-          : const Value.absent(),
-        isIncomplete: isIncomplete != null
-          ? Value(isIncomplete)
-          : const Value.absent(),
-        hasUnseenUpdate: hasUnseenUpdate != null
-          ? Value(hasUnseenUpdate)
-          : const Value.absent(),
-      ));
-  }
-
-  // ========== 附件读写接口保留 ==========
-  Future<String> saveAttachment(Uint8List data, String fileName) async =>
-      await _fileService.saveAttachment(data, fileName);
-
-  File getAttachment(String relativePath) => _fileService.readAttachment(relativePath);
-
-  Future<void> deleteAttachment(String relativePath) async =>
-      await _fileService.deleteAttachment(relativePath);
 }
 ````
 
@@ -13559,6 +12851,495 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       await notifier.save();
       if (mounted) AppToast.show('已恢复默认设置');
     }
+  }
+}
+````
+
+## File: lib/presentation/widgets/input_bar.dart
+````dart
+import 'dart:io';
+
+import 'package:aiservice/domain/services/character_card_parser.dart';
+import 'package:aiservice/presentation/models/input_state.dart';
+import 'package:aiservice/presentation/providers/character_provider.dart';
+import 'package:aiservice/presentation/widgets/common/app_toast.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:uuid/uuid.dart';
+
+import '../models/pending_attachment.dart';
+import '../pages/image_attachment_viewer_page.dart';
+import '../pages/text_attachment_viewer_page.dart';
+import '../providers/input_notifier.dart';
+
+class InputBar extends ConsumerStatefulWidget {
+  final Future<void> Function(String text, List<PendingAttachment> attachments) onSend;
+  final VoidCallback? onStop;
+  final bool isIncomplete;
+  final String hintText;
+
+  const InputBar({
+    super.key,
+    required this.onSend,
+    this.onStop,
+    this.isIncomplete = false,
+    this.hintText = '输入消息...',
+  });
+
+  @override
+  ConsumerState<InputBar> createState() => _InputBarState();
+}
+
+class _InputBarState extends ConsumerState<InputBar> {
+  late final TextEditingController _controller;
+  final ImagePicker _imagePicker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _addPendingAttachment({
+    required String name,
+    required String path,
+    required bool isImage,
+    required String mimeType,
+  }) {
+    final attachment = PendingAttachment(
+      id: const Uuid().v4(),
+      name: name,
+      path: path,
+      isImage: isImage,
+      mimeType: mimeType,
+    );
+    ref.read(inputStateProvider.notifier).addAttachment(attachment);
+  }
+
+  bool _isImageFile(String name) {
+    final lower = name.toLowerCase();
+    return lower.endsWith('.png') ||
+        lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.gif') ||
+        lower.endsWith('.webp') ||
+        lower.endsWith('.bmp');
+  }
+
+  bool _isTextFile(String name) {
+    final lower = name.toLowerCase();
+    return lower.endsWith('.txt') ||
+        lower.endsWith('.md') ||
+        lower.endsWith('.json') ||
+        lower.endsWith('.dart') ||
+        lower.endsWith('.yaml') ||
+        lower.endsWith('.yml') ||
+        lower.endsWith('.log') ||
+        lower.endsWith('.csv');
+  }
+
+  String _mimeForImage(String fileName) {
+    final lower = fileName.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+    if (lower.endsWith('.gif')) return 'image/gif';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    if (lower.endsWith('.bmp')) return 'image/bmp';
+    return 'image/png';
+  }
+
+  String _mimeForText(String fileName) {
+    return 'text/plain';
+  }
+
+  Future<void> _pickFileAttachment() async {
+    final result = await FilePicker.pickFiles(
+      allowMultiple: false,
+      withData: false,
+      type: FileType.any,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.single;
+    final filePath = file.path;
+    if (filePath == null || filePath.trim().isEmpty) return;
+
+    final isImage = _isImageFile(file.name);
+    final isText = _isTextFile(file.name);
+
+    if (!isImage && !isText) {
+      if (mounted) {
+        AppToast.show('仅支持图片和文本文件（.txt, .md, .json, .dart, .yaml 等）');
+      }
+      return;
+    }
+
+    final mimeType = isImage ? _mimeForImage(file.name) : _mimeForText(file.name);
+
+    _addPendingAttachment(
+      name: file.name,
+      path: filePath,
+      isImage: isImage,
+      mimeType: mimeType,
+    );
+  }
+
+  Future<void> _pickImageFromGallery() async {
+    final file = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 100,
+    );
+    if (file == null) return;
+
+    final mimeType = file.mimeType ?? _mimeForImage(file.name);
+
+    _addPendingAttachment(
+      name: file.name,
+      path: file.path,
+      isImage: true,
+      mimeType: mimeType,
+    );
+  }
+
+  void _removeAttachment(String id) {
+    ref.read(inputStateProvider.notifier).removeAttachment(id);
+  }
+
+  Future<void> _importCharacterCard() async {
+    final result = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['png', 'json'],
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.single;
+    
+    final filePath = file.path;
+    if (filePath == null || filePath.trim().isEmpty) {
+      AppToast.show('无法获取文件路径');
+      return;
+    }
+
+    try {
+      final character = await CharacterCardParser.parseFile(filePath, file.name);
+      ref.read(currentCharacterProvider.notifier).state = character;
+      ref.read(characterGreetingSentProvider.notifier).state = false;
+      AppToast.show('已导入角色：${character.name}');
+    } catch (e) {
+      AppToast.show('导入失败：$e');
+    }
+  }
+
+  Future<void> _showAddAttachmentSheet() async {
+    FocusScope.of(context).unfocus();
+    
+    await showCupertinoModalPopup<void>(
+      context: context,
+      builder: (context) {
+        return CupertinoActionSheet(
+          actions: [
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _importCharacterCard();
+              },
+              child: const Text('酒馆角色卡'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _pickFileAttachment();
+              },
+              child: const Text('文件'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _pickImageFromGallery();
+              },
+              child: const Text('相册'),
+            ),              
+          ],
+          cancelButton: CupertinoActionSheetAction(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('取消'),
+          ),
+        );
+      },
+    );
+  }
+
+  String _sanitizeInput(String input) {
+    var result = input.replaceAll('\uFEFF', '');               // 移除 BOM
+    result = result.replaceAll(RegExp(r'[\u200B\u200C\u200D]'), ''); // 移除零宽字符
+    result = result.replaceAll('\r\n', '\n').replaceAll('\r', '\n');   // 统一换行符
+    return result;
+  }
+
+  Future<void> _handleSend() async {
+    FocusScope.of(context).unfocus();
+
+    final state = ref.read(inputStateProvider);
+    if (!state.canSend) return;
+
+    final sanitizedText = _sanitizeInput(state.text);
+
+    try {
+      await widget.onSend(sanitizedText, state.attachments);
+      ref.read(inputStateProvider.notifier).clear();
+    } catch (e) {
+      // 发送失败，保持输入内容和附件不变
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen<String>(
+      inputStateProvider.select((s) => s.text),
+      (previous, next) {
+        if (next != _controller.text) {
+          _controller.value = TextEditingValue(
+            text: next,
+            selection: TextSelection.collapsed(offset: next.length),
+            composing: TextRange.empty,
+          );
+        }
+      },
+    );
+
+    final inputState = ref.watch(inputStateProvider);
+    final attachments = inputState.attachments;
+    final canSend = inputState.canSend;
+    final showStopButton = widget.isIncomplete;
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        color: CupertinoDynamicColor.resolve(CupertinoColors.systemGroupedBackground, context),
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (attachments.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: attachments.map((attachment) {
+                      final file = File(attachment.path);
+                      if (attachment.isImage) {
+                        return _PendingImageAttachment(
+                          attachment: attachment,
+                          file: file,
+                          onRemove: () => _removeAttachment(attachment.id),
+                        );
+                      } else {
+                        return _PendingFileAttachment(
+                          attachment: attachment,
+                          file: file,
+                          onRemove: () => _removeAttachment(attachment.id),
+                        );
+                      }
+                    }).toList(),
+                  ),
+                ),
+              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: _showAddAttachmentSheet,
+                  child: const Icon(CupertinoIcons.add),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey5, context),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: CupertinoTextField(
+                      controller: _controller,
+                      minLines: 1,
+                      maxLines: 6,
+                      keyboardType: TextInputType.multiline,
+                      placeholder: widget.hintText,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      onChanged: (value) {
+                        ref.read(inputStateProvider.notifier).updateText(value);
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (showStopButton)
+                  CupertinoButton.filled(
+                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                    borderRadius: BorderRadius.circular(8),
+                    onPressed: widget.onStop,
+                    child: const Icon(CupertinoIcons.stop_fill, size: 20),
+                  )
+                else
+                  CupertinoButton.filled(
+                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                    borderRadius: BorderRadius.circular(8),
+                    onPressed: canSend ? _handleSend : null,
+                    child: const Icon(CupertinoIcons.arrow_up, size: 20),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ================= 新增的预览组件 =================
+
+class _PendingImageAttachment extends StatelessWidget {
+  final PendingAttachment attachment;
+  final File file;
+  final VoidCallback onRemove;
+
+  const _PendingImageAttachment({
+    required this.attachment,
+    required this.file,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        // 点击图片进行全屏预览
+        GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(
+              CupertinoPageRoute(
+                builder: (_) => ImageAttachmentViewerPage(
+                  title: attachment.name,
+                  filePath: file.path,
+                ),
+              ),
+            );
+          },
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.file(
+              file,
+              width: 60,
+              height: 60,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  width: 60,
+                  height: 60,
+                  color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey5, context),
+                  child: const Icon(CupertinoIcons.photo, color: CupertinoColors.systemGrey),
+                );
+              },
+            ),
+          ),
+        ),
+        // 右上角删除按钮
+        Positioned(
+          top: 2,
+          right: 2,
+          child: GestureDetector(
+            onTap: onRemove,
+            child: Container(
+              decoration: BoxDecoration(
+                color: CupertinoColors.black.withOpacity(0.5),
+                shape: BoxShape.circle,
+              ),
+              padding: const EdgeInsets.all(2),
+              child: const Icon(
+                CupertinoIcons.xmark_circle_fill,
+                color: CupertinoColors.white,
+                size: 18,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PendingFileAttachment extends StatelessWidget {
+  final PendingAttachment attachment;
+  final File file;
+  final VoidCallback onRemove;
+
+  const _PendingFileAttachment({
+    required this.attachment,
+    required this.file,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey5, context),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 点击文件名及图标区域进行文本预览
+          Flexible(
+            child: GestureDetector(
+              onTap: () {
+                // 上游已做拦截，走到这里的必然是文本文件，直接跳转预览
+                Navigator.of(context).push(
+                  CupertinoPageRoute(
+                    builder: (_) => TextAttachmentViewerPage(
+                      title: attachment.name,
+                      filePath: file.path,
+                    ),
+                  ),
+                );
+              },
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(CupertinoIcons.doc_text, size: 16),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      attachment.name,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          // 右侧独立的删除按钮
+          GestureDetector(
+            onTap: onRemove,
+            child: const Icon(CupertinoIcons.xmark_circle_fill, size: 16),
+          ),
+        ],
+      ),
+    );
   }
 }
 ````
@@ -14034,6 +13815,401 @@ class _PreviewLine extends StatelessWidget {
       ],
     );
   }
+}
+````
+
+## File: lib/data/repositories/conversation_repository.dart
+````dart
+// data/repositories/conversation_repository.dart
+import 'dart:async';
+import 'dart:io';
+import 'package:drift/drift.dart';
+import '../data_sources/local_file_source.dart';
+import '../../core/models/attachment.dart';
+import '../../core/models/chat_round.dart';
+import '../../core/models/session.dart';
+import '../../domain/models/session_list_item.dart';
+import '../database/database.dart';
+import '../../domain/models/session_card_meta.dart';
+import 'package:rxdart/rxdart.dart';
+
+class ConversationRepository {
+  final AppDatabase _db;
+  final LocalFileSource _fileService;
+  ConversationRepository(this._db, this._fileService);
+
+  // ========== 响应式查询 ==========
+
+  Stream<List<SessionListItem>> watchSessionListItems() {
+    final query = (_db.select(_db.dbSessions)
+      ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]));
+    return query.watch().map((sessions) {
+      return sessions.map((session) {
+        return SessionListItem(
+          id: session.id,
+          title: session.title,
+          updatedAt: session.updatedAt,
+        );
+      }).toList();
+    });
+  }
+
+  Stream<SessionCardMeta> watchSessionCardMeta(String sessionId) {
+    final lastRoundStream = (_db.select(_db.dbChatRounds)
+          ..where((t) => t.sessionId.equals(sessionId))
+          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
+          ..limit(1))
+        .watchSingleOrNull();
+
+    final countStream = (_db.selectOnly(_db.dbChatRounds)
+          ..addColumns([countAll()])
+          ..where(_db.dbChatRounds.sessionId.equals(sessionId)))
+        .watchSingle()
+        .map((row) => row.read(countAll()) ?? 0);
+
+    final hasUnseenStream = (_db.select(_db.dbChatRounds)
+          ..where((t) => t.sessionId.equals(sessionId))
+          ..where((t) => t.hasUnseenUpdate.equals(true))
+          ..limit(1))
+        .watchSingleOrNull()
+        .map((row) => row != null);
+
+    return Rx.combineLatest3(lastRoundStream, countStream, hasUnseenStream,
+        (lastRound, count, hasUnseen) {
+      final previewRound = lastRound;
+      final userPreview = previewRound == null
+          ? '点击开始新的对话'
+          : previewRound.userContent.trim().isEmpty
+              ? '（空输入）'
+              : previewRound.userContent.trim();
+      final aiPreview = previewRound == null
+          ? '（等待回复）'
+          : (previewRound.assistantContent?.trim().isNotEmpty ?? false)
+              ? previewRound.assistantContent!
+              : (previewRound.isIncomplete ? '正在生成...' : '（等待回复）');
+
+      return SessionCardMeta(
+        roundCount: count,
+        previewRoundId: previewRound?.id,
+        userPreview: userPreview,
+        aiPreview: aiPreview,
+        hasUnseen: hasUnseen,
+        isStreaming: previewRound?.isIncomplete == true,
+      );
+    });
+  }
+
+  // ========== 细粒度监听（新增） ==========
+
+  Stream<List<({String id, String? parentId})>> watchSessionTopology(String sessionId) {
+    final query = _db.selectOnly(_db.dbChatRounds)
+      ..addColumns([_db.dbChatRounds.id, _db.dbChatRounds.parentId])
+      ..where(_db.dbChatRounds.sessionId.equals(sessionId))
+      ..orderBy([OrderingTerm.asc(_db.dbChatRounds.createdAt)]);
+    return query.watch().map((rows) => rows.map((r) => (
+      id: r.read(_db.dbChatRounds.id)!,
+      parentId: r.read(_db.dbChatRounds.parentId)
+    )).toList());
+  }
+
+  /// 仅监听单条消息的完整详情（含附件）- 改用 rxdart 组合两个独立查询
+  Stream<ChatRound?> watchSingleRound(String roundId) {
+    final roundStream = (_db.select(_db.dbChatRounds)
+          ..where((t) => t.id.equals(roundId)))
+        .watchSingleOrNull();
+
+    final attachmentsStream = (_db.select(_db.dbAttachments)
+          ..where((t) => t.roundId.equals(roundId)))
+        .watch()
+        .map((rows) => rows.map((a) => Attachment(
+              id: a.id,
+              name: a.name,
+              relativePath: a.relativePath,
+              isImage: a.isImage,
+              mimeType: a.mimeType,
+            )).toList());
+
+    return Rx.combineLatest2(roundStream, attachmentsStream,
+        (DbChatRound? round, List<Attachment> attachments) {
+      if (round == null) return null;
+      return ChatRound(
+        id: round.id,
+        parentId: round.parentId,
+        createdAt: round.createdAt,
+        userContent: round.userContent,
+        userAttachments: attachments,
+        assistantThinking: round.assistantThinking,
+        assistantContent: round.assistantContent,
+        isIncomplete: round.isIncomplete,
+        hasUnseenUpdate: round.hasUnseenUpdate,
+      );
+    });
+  }
+
+  Future<List<ChatRound>> getContextRounds(String roundId) async {
+    final roundsQuery = _db.customSelect(
+      '''
+      WITH RECURSIVE ctx_chain AS (
+        SELECT id, session_id, parent_id, created_at, user_content,
+              assistant_thinking, assistant_content, is_incomplete, has_unseen_update
+        FROM db_chat_rounds WHERE id = :roundId
+        UNION ALL
+        SELECT r.id, r.session_id, r.parent_id, r.created_at, r.user_content,
+              r.assistant_thinking, r.assistant_content, r.is_incomplete, r.has_unseen_update
+        FROM db_chat_rounds r
+        INNER JOIN ctx_chain c ON r.id = c.parent_id
+      )
+      SELECT * FROM ctx_chain ORDER BY created_at ASC
+      ''',
+      readsFrom: {_db.dbChatRounds},
+      variables: [Variable.withString(roundId)],
+    );
+
+    final dbRounds = await roundsQuery.map((row) {
+      return DbChatRound(
+        id: row.read<String>('id'),
+        sessionId: row.read<String>('session_id'),
+        parentId: row.read<String?>('parent_id'),
+        createdAt: row.read<int>('created_at'),
+        userContent: row.read<String>('user_content'),
+        assistantThinking: row.read<String?>('assistant_thinking'),
+        assistantContent: row.read<String?>('assistant_content'),
+        isIncomplete: row.read<bool>('is_incomplete'),
+        hasUnseenUpdate: row.read<bool>('has_unseen_update'),
+      );
+    }).get();
+
+    if (dbRounds.isEmpty) return [];
+
+    final roundIds = dbRounds.map((r) => r.id).toList();
+    final dbAttachments = await (_db.select(_db.dbAttachments)
+          ..where((t) => t.roundId.isIn(roundIds)))
+        .get();
+
+    final attachmentMap = <String, List<Attachment>>{};
+    for (final att in dbAttachments) {
+      attachmentMap.putIfAbsent(att.roundId, () => []).add(
+        Attachment(
+          id: att.id,
+          name: att.name,
+          relativePath: att.relativePath,
+          isImage: att.isImage,
+          mimeType: att.mimeType,
+        ),
+      );
+    }
+
+    return dbRounds.map((round) => _mapToChatRound(round, attachmentMap[round.id] ?? [])).toList();
+  }
+
+  Stream<String?> watchSessionTitle(String sessionId) {
+    return (_db.select(_db.dbSessions)
+          ..where((t) => t.id.equals(sessionId)))
+        .map((row) => row.title)
+        .watchSingleOrNull();
+  }
+
+  ChatRound _mapToChatRound(DbChatRound row, List<Attachment> attachments) {
+    return ChatRound(
+      id: row.id,
+      parentId: row.parentId,
+      createdAt: row.createdAt,
+      userContent: row.userContent,
+      userAttachments: attachments,
+      assistantThinking: row.assistantThinking,
+      assistantContent: row.assistantContent,
+      isIncomplete: row.isIncomplete,
+      hasUnseenUpdate: row.hasUnseenUpdate,
+    );
+  }
+
+  Future<void> _cleanupOrphanAttachments(Iterable<String> relativePaths) async {
+    final uniquePaths = relativePaths.toSet();
+    if (uniquePaths.isEmpty) return;
+
+    final referencedPaths = await (_db.select(_db.dbAttachments)
+          ..where((t) => t.relativePath.isIn(uniquePaths)))
+        .map((t) => t.relativePath)
+        .get();
+
+    final orphanPaths = uniquePaths.difference(referencedPaths.toSet());
+
+    for (final path in orphanPaths) {
+      try {
+        await _fileService.deleteAttachment(path);
+      } catch (_) {}
+    }
+  }
+
+  // ========== 写操作 ==========
+
+  Future<void> deleteRoundsAndCleanupOrphanAttachments(
+    String sessionId,
+    List<String> roundIds,
+  ) async {
+    if (roundIds.isEmpty) return;
+
+    // 1. 收集候选附件路径（改用直接查询，不用 join）
+    final candidatePaths = (await (_db.select(_db.dbAttachments)
+          ..where((t) => t.roundId.isIn(roundIds)))
+        .get())
+        .map((a) => a.relativePath)
+        .toSet();
+
+    // 2. 提交数据库变更
+    await _db.transaction(() async {
+      await (_db.delete(_db.dbChatRounds)
+            ..where((t) => t.sessionId.equals(sessionId) & t.id.isIn(roundIds)))
+          .go();
+      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
+          .write(
+        DbSessionsCompanion(
+          updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+        ),
+      );
+    });
+
+    // 3. 基于最终态清理物理文件
+    await _cleanupOrphanAttachments(candidatePaths);
+  }
+
+  Future<void> deleteSession(String sessionId) async {
+    // 1. 收集候选附件路径（先查出所有 round id，再查附件）
+    final roundIds = await (_db.select(_db.dbChatRounds)
+          ..where((t) => t.sessionId.equals(sessionId)))
+        .map((r) => r.id)
+        .get();
+
+    final candidatePaths = <String>{};
+    if (roundIds.isNotEmpty) {
+      final attachments = await (_db.select(_db.dbAttachments)
+            ..where((t) => t.roundId.isIn(roundIds)))
+          .get();
+      candidatePaths.addAll(attachments.map((a) => a.relativePath));
+    }
+
+    // 2. 提交数据库变更
+    await (_db.delete(_db.dbSessions)..where((t) => t.id.equals(sessionId))).go();
+
+    // 3. 基于最终态清理物理文件
+    await _cleanupOrphanAttachments(candidatePaths);
+  }
+
+  Future<Session> createSession({
+    required String sessionId,
+    required String title,
+    String? systemPrompt,
+  }) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final session = Session(
+      id: sessionId,
+      title: title,
+      createdAt: now,
+      updatedAt: now,
+      rounds: [],
+      systemPrompt: systemPrompt,
+    );
+    await _db.into(_db.dbSessions).insert(
+          DbSessionsCompanion.insert(
+            id: session.id,
+            title: session.title,
+            createdAt: session.createdAt,
+            updatedAt: session.updatedAt,
+            systemPrompt: Value(systemPrompt),
+          ),
+        );
+    return session;
+  }
+
+  Future<String?> getSystemPrompt(String sessionId) async {
+    return await (_db.select(_db.dbSessions)
+          ..where((t) => t.id.equals(sessionId)))
+        .map((t) => t.systemPrompt)
+        .getSingleOrNull();
+  }
+
+  Future<void> updateSessionTitle(String sessionId, String title) async {
+    await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
+        .write(
+      DbSessionsCompanion(
+        title: Value(title),
+        updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
+  }
+
+  Future<void> appendRound(String sessionId, ChatRound round) async {
+    await _db.transaction(() async {
+      await _db.into(_db.dbChatRounds).insert(
+            DbChatRoundsCompanion.insert(
+              id: round.id,
+              sessionId: sessionId,
+              parentId: Value(round.parentId),
+              createdAt: round.createdAt,
+              userContent: round.userContent,
+              assistantThinking: Value(round.assistantThinking),
+              assistantContent: Value(round.assistantContent),
+              isIncomplete: Value(round.isIncomplete),
+              hasUnseenUpdate: Value(round.hasUnseenUpdate),
+            ),
+          );
+      for (final attach in round.userAttachments) {
+        await _db.into(_db.dbAttachments).insert(
+              DbAttachmentsCompanion.insert(
+                id: attach.id,
+                roundId: round.id,
+                name: attach.name,
+                relativePath: attach.relativePath,
+                isImage: Value(attach.isImage),
+                mimeType: Value(attach.mimeType),
+              ),
+            );
+      }
+      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
+          .write(
+        DbSessionsCompanion(
+          updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+        ),
+      );
+    });
+  }
+
+  Future<void> updateRound({
+    required String roundId,
+    String? userContent,
+    String? assistantThinking,
+    String? assistantContent,
+    bool? isIncomplete,
+    bool? hasUnseenUpdate,
+  }) async {
+    await (_db.update(_db.dbChatRounds)..where((t) => t.id.equals(roundId)))
+      .write(DbChatRoundsCompanion(
+        userContent: userContent != null 
+          ? Value(userContent) 
+          : const Value.absent(),
+        assistantThinking: assistantThinking != null
+          ? Value(assistantThinking)
+          : const Value.absent(),
+        assistantContent: assistantContent != null
+          ? Value(assistantContent)
+          : const Value.absent(),
+        isIncomplete: isIncomplete != null
+          ? Value(isIncomplete)
+          : const Value.absent(),
+        hasUnseenUpdate: hasUnseenUpdate != null
+          ? Value(hasUnseenUpdate)
+          : const Value.absent(),
+      ));
+  }
+
+  // ========== 附件读写接口保留 ==========
+  Future<String> saveAttachment(Uint8List data, String fileName) async =>
+      await _fileService.saveAttachment(data, fileName);
+
+  File getAttachment(String relativePath) => _fileService.readAttachment(relativePath);
+
+  Future<void> deleteAttachment(String relativePath) async =>
+      await _fileService.deleteAttachment(relativePath);
 }
 ````
 

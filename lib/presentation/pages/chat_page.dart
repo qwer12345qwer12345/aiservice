@@ -1,6 +1,5 @@
 import 'package:aiservice/data/repositories/conversation_repository.dart';
 import 'package:aiservice/di/providers.dart';
-import 'package:aiservice/domain/services/character_card_parser.dart';
 import 'package:aiservice/domain/services/chat_service.dart';
 import 'package:aiservice/presentation/models/pending_attachment.dart';
 import 'package:flutter/cupertino.dart';
@@ -16,7 +15,6 @@ import '../widgets/thought_bubble.dart';
 import '../widgets/common/app_page_scaffold.dart';
 import '../widgets/common/app_toast.dart';
 import 'branch_tree_page.dart';
-import '../providers/character_provider.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   final String sessionId;
@@ -72,21 +70,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     }
   }
 
-  Future<void> _maybeSendGreeting() async {
-    final character = ref.read(currentCharacterProvider);
-    final greetingSent = ref.read(characterGreetingSentProvider);
-    
-    if (character != null && !greetingSent && character.firstMes.isNotEmpty) {
-      ref.read(characterGreetingSentProvider.notifier).state = true;
-      
-      final newId = await character.appendGreeting(
-        repository: ref.read(conversationRepositoryProvider),
-        sessionId: widget.sessionId,
-      );
-      _updateBranch(newId);
-    }
-  }
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -106,7 +89,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         content: widget.initialMessage!,
         parentRoundId: _currentRoundId,
         pendingAttachments: widget.initialAttachments ?? [],
-        character: ref.read(currentCharacterProvider),
       );
       _updateBranch(newId);
     } catch (e) {
@@ -157,19 +139,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final sessionTitle = ref.watch(sessionTitleProvider(widget.sessionId)).valueOrNull ?? '未加载';
     final currentRoundAsync = ref.watch(roundDetailProvider(_currentRoundId ?? ''));
     final isIncomplete = currentRoundAsync.valueOrNull?.isIncomplete ?? false;
-    
-    ref.listen<CharacterData?>(
-      currentCharacterProvider,
-      (previous, next) {
-        if (previous?.name != next?.name) {
-          ref.read(characterGreetingSentProvider.notifier).state = false;
-        }
-      },
-    );
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _maybeSendGreeting();
-    });
 
     final visibleRoundIds = ref.watch(visibleRoundIdsProvider(( 
       sessionId: widget.sessionId,
@@ -244,7 +213,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 content: text,
                 parentRoundId: _currentRoundId,
                 pendingAttachments: attachments,
-                character: ref.read(currentCharacterProvider),
               );
               _updateBranch(newId);
             },
@@ -264,7 +232,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       sourceRouter: ref.read(chatSourceRouterProvider),
       sessionId: widget.sessionId,
       sourceRound: sourceRound,
-      character: ref.read(currentCharacterProvider),
     );
     _updateBranch(newId);
   }

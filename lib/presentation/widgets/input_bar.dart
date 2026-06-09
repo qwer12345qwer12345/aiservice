@@ -1,8 +1,6 @@
 import 'dart:io';
 
-import 'package:aiservice/domain/services/character_card_parser.dart';
 import 'package:aiservice/presentation/models/input_state.dart';
-import 'package:aiservice/presentation/providers/character_provider.dart';
 import 'package:aiservice/presentation/widgets/common/app_toast.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
@@ -153,30 +151,6 @@ class _InputBarState extends ConsumerState<InputBar> {
     ref.read(inputStateProvider.notifier).removeAttachment(id);
   }
 
-  Future<void> _importCharacterCard() async {
-    final result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['png', 'json'],
-    );
-    if (result == null || result.files.isEmpty) return;
-    final file = result.files.single;
-    
-    final filePath = file.path;
-    if (filePath == null || filePath.trim().isEmpty) {
-      AppToast.show('无法获取文件路径');
-      return;
-    }
-
-    try {
-      final character = await CharacterCardParser.parseFile(filePath, file.name);
-      ref.read(currentCharacterProvider.notifier).state = character;
-      ref.read(characterGreetingSentProvider.notifier).state = false;
-      AppToast.show('已导入角色：${character.name}');
-    } catch (e) {
-      AppToast.show('导入失败：$e');
-    }
-  }
-
   Future<void> _showAddAttachmentSheet() async {
     FocusScope.of(context).unfocus();
     
@@ -185,13 +159,6 @@ class _InputBarState extends ConsumerState<InputBar> {
       builder: (context) {
         return CupertinoActionSheet(
           actions: [
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _importCharacterCard();
-              },
-              child: const Text('酒馆角色卡'),
-            ),
             CupertinoActionSheetAction(
               onPressed: () {
                 Navigator.of(context).pop();

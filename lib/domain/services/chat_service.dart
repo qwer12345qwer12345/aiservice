@@ -7,7 +7,6 @@ import '../../data/repositories/conversation_repository.dart';
 import '../../data/services/config_service.dart';
 import '../../presentation/models/pending_attachment.dart';
 import 'attachment_preparer.dart';
-import 'character_card_parser.dart';
 import 'chat_context_builder.dart';
 import 'stream_processor.dart';
 
@@ -22,7 +21,6 @@ class ChatService {
     required String content,
     required String? parentRoundId,
     required List<PendingAttachment> pendingAttachments,
-    CharacterData? character,
   }) async {
     final savedAttachments = await savePendingAttachments(repository, pendingAttachments);
     final newRoundId = await _createRound(
@@ -38,7 +36,6 @@ class ChatService {
       configService: configService,
       sourceRouter: sourceRouter,
       roundId: newRoundId,
-      character: character,
     );
     
     return newRoundId;
@@ -50,7 +47,6 @@ class ChatService {
     required ChatSourceRouter sourceRouter,
     required String sessionId,
     required ChatRound sourceRound,
-    CharacterData? character,
   }) async {
     final newRoundId = await _createRound(
       repository: repository,
@@ -65,7 +61,6 @@ class ChatService {
       configService: configService,
       sourceRouter: sourceRouter,
       roundId: newRoundId,
-      character: character,
     );
 
     return newRoundId;
@@ -88,13 +83,11 @@ class ChatService {
     required ConfigService configService,
     required ChatSourceRouter sourceRouter,
     required String roundId,
-    CharacterData? character,
   }) async {
     final contextRounds = await repository.getContextRounds(roundId);
     final apiContext = await buildApiContextFromRounds(
       contextRounds,
       repository,
-      character,
     );
 
     final config = await configService.loadConfig();
