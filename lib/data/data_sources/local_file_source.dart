@@ -2,7 +2,6 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as path;
-import '../../core/constants/app_constants.dart';
 
 class LocalFileSource{
   final String _baseDir;
@@ -14,8 +13,6 @@ class LocalFileSource{
 
   Future<void> initDirectories() async {
     await _directory.create(recursive: true);
-    await Directory(path.join(_baseDir, AppConstants.dirAttachments))
-      .create(recursive: true);
   }
 
   Future<void> deleteAttachment(String relativePath) async {
@@ -33,16 +30,15 @@ class LocalFileSource{
     try {
       final ext = path.extension(fileName).toLowerCase();
       final hash = sha256.convert(data).toString();
-       final hashedFileName = '$hash$ext';
-      final relativePath = '${AppConstants.dirAttachments}/$hashedFileName';
-      final filePath = path.join(_baseDir, relativePath);
-       final file = File(filePath);
+      final hashedFileName = '$hash$ext';
+      final filePath = path.join(_baseDir, hashedFileName);
+      final file = File(filePath);
 
       if (!await file.exists()) {
         await file.writeAsBytes(data, flush: true);
       }
 
-      return relativePath;
+      return hashedFileName;
     } on FileSystemException catch (e) {
       throw Exception('保存附件失败：${e.message}');
     }
