@@ -98,17 +98,19 @@ class ConfigService {
   }
 
   Stream<GlobalSettings> watchGlobalSettings() {
-    final profilesStream = _repository.watchProfiles();
-    final activeIdStream = _repository.watchActiveProfileId();
-    return Rx.combineLatest2(profilesStream, activeIdStream, (profiles, activeId) {
-      if (profiles.isEmpty) return null;
-      final effectiveActiveId = activeId ?? profiles.first.id;
-      return GlobalSettings(
-        activeProfileId: effectiveActiveId,
-        profiles: profiles,
-      );
-    }).where((store) => store != null).map((store) => store!);
-  }
+  final profilesStream = _repository.watchProfiles();
+  final activeIdStream = _repository.watchActiveProfileId();
+  return Rx.combineLatest2(profilesStream, activeIdStream, (profiles, activeId) {
+    if (profiles.isEmpty) {
+      return GlobalSettings.defaultSettings();
+    }
+    final effectiveActiveId = activeId ?? profiles.first.id;
+    return GlobalSettings(
+      activeProfileId: effectiveActiveId,
+      profiles: profiles,
+    );
+  });
+}
 
   Stream<ConfigProfile> watchActiveConfig() {
     return watchGlobalSettings().map((settings) {
