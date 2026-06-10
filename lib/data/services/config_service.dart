@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:aiservice/data/data_sources/chat_source_router.dart';
 import 'package:collection/collection.dart';
+import 'package:http/http.dart' as http;
 import 'package:rxdart/rxdart.dart';
 import '../../core/models/app_config.dart';
 import '../repositories/config_repository.dart';
@@ -39,9 +40,11 @@ class ConfigService {
     await _repository.updateProfileConfig(settings.activeProfileId, config);
   }
 
-  Future<void> refreshModels(ConfigProfile targetConfig) async {
+  Future<void> refreshModels(
+    ConfigProfile targetConfig, 
+    {required http.Client client,}) async {
     final source = _sourceRouter.getSourceFromConfig(targetConfig);
-    final remoteModels = await source.fetchModels(targetConfig);
+    final remoteModels = await source.fetchModels(targetConfig, client: client);
     final updatedModels = remoteModels.map((remote) {
       final old = targetConfig.availableModels.firstWhereOrNull((m) => m.id == remote.id);
       return remote.copyWith(

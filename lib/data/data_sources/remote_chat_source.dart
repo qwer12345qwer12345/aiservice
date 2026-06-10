@@ -27,7 +27,10 @@ class RemoteChatSource implements ChatSource {
   }
 
   @override
-  Future<List<ModelInfo>> fetchModels(ConfigProfile config) async {
+  Future<List<ModelInfo>> fetchModels(
+    ConfigProfile config, {
+    required http.Client client,
+  }) async {
     final builder = _getBuilder(config.apiMode);
     final ctx = ApiBuildContext(
       config: config,

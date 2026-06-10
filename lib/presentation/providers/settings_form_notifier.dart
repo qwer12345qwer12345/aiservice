@@ -1,5 +1,6 @@
 // lib/presentation/providers/settings_form_notifier.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 import '../../core/models/app_config.dart';
 import '../../core/models/model_info.dart';
 import '../../data/services/config_service.dart';
@@ -36,6 +37,7 @@ class SettingsFormState {
 class SettingsFormNotifier extends Notifier<SettingsFormState> {
   late final ConfigService _configService;
   ConfigProfile? _lastLoadedConfig;
+  http.Client? _currentClient;
 
   @override
   SettingsFormState build() {
@@ -145,18 +147,29 @@ class SettingsFormNotifier extends Notifier<SettingsFormState> {
     state = state.copyWith(config: ConfigProfile.defaultProfile());
   }
 
+  
+
   Future<void> refreshModels() async {
-    if (state.isRefreshingModels) return;
+    if (state.isRefreshingModels) {
+      _currentClient?.close();
+      state = state.copyWith(isRefreshingModels: false);
+      return;
+    }
 
     state = state.copyWith(isRefreshingModels: true);
+    final client = http.Client();
+    _currentClient = client;
+
     try {
-      await _configService.refreshModels(state.config);
-      state = state.copyWith(isRefreshingModels: false);
+      await _configService.refreshModels(state.config, client: client);
+      final refreshed = await _configService.loadActiveConfig();
+      state = state.copyWith(config: refreshed, isRefreshingModels: false);
     } catch (e) {
-      state = state.copyWith(
-        isRefreshingModels: false,
-      );
+      state = state.copyWith(isRefreshingModels: false);
       rethrow;
+    } finally {
+      _currentClient = null;
+      client.close();
     }
   }
 

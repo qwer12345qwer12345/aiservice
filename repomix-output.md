@@ -2480,6 +2480,42 @@ class SseEventDecoder {
 }
 ````
 
+## File: lib/domain/models/session_card_meta.dart
+````dart
+class SessionCardMeta {
+  final int roundCount;
+  final String? previewRoundId;
+  final String userPreview;
+  final String aiPreview;
+  final bool hasUnseen;
+  final bool isStreaming;
+
+  const SessionCardMeta({
+    required this.roundCount,
+    required this.previewRoundId,
+    required this.userPreview,
+    required this.aiPreview,
+    required this.hasUnseen,
+    required this.isStreaming,
+  });
+}
+````
+
+## File: lib/domain/models/session_list_item.dart
+````dart
+class SessionListItem {
+  final String id;
+  final String title;
+  final int updatedAt;
+
+  const SessionListItem({
+    required this.id,
+    required this.title,
+    required this.updatedAt,
+  });
+}
+````
+
 ## File: lib/domain/models/tree_node.dart
 ````dart
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -5103,48 +5139,16 @@ import '../../core/models/app_config.dart';
 import '../../core/models/api_message.dart';
 import '../../core/models/chat_chunk.dart';
 import '../../core/models/model_info.dart';
+import 'package:http/http.dart' as http;   // 新增导入
 
 abstract class ChatSource {
-  Future<List<ModelInfo>> fetchModels(ConfigProfile config);
+  Future<List<ModelInfo>> fetchModels(
+    ConfigProfile config, {
+    required http.Client client,
+  });
   Stream<ChatChunk> chatStream({
     required ConfigProfile config,
     required List<ApiMessage> context,
-  });
-}
-````
-
-## File: lib/domain/models/session_card_meta.dart
-````dart
-class SessionCardMeta {
-  final int roundCount;
-  final String? previewRoundId;
-  final String userPreview;
-  final String aiPreview;
-  final bool hasUnseen;
-  final bool isStreaming;
-
-  const SessionCardMeta({
-    required this.roundCount,
-    required this.previewRoundId,
-    required this.userPreview,
-    required this.aiPreview,
-    required this.hasUnseen,
-    required this.isStreaming,
-  });
-}
-````
-
-## File: lib/domain/models/session_list_item.dart
-````dart
-class SessionListItem {
-  final String id;
-  final String title;
-  final int updatedAt;
-
-  const SessionListItem({
-    required this.id,
-    required this.title,
-    required this.updatedAt,
   });
 }
 ````
@@ -6007,7 +6011,10 @@ class RemoteChatSource implements ChatSource {
   }
 
   @override
-  Future<List<ModelInfo>> fetchModels(ConfigProfile config) async {
+  Future<List<ModelInfo>> fetchModels(
+    ConfigProfile config, {
+    required http.Client client,
+  }) async {
     final builder = _getBuilder(config.apiMode);
     final ctx = ApiBuildContext(
       config: config,
@@ -11237,6 +11244,26 @@ Future<List<ApiMessageContentPart>> _buildAttachmentParts(
 }
 ````
 
+## File: lib/presentation/providers/session_list_notifier.dart
+````dart
+// lib/presentation/providers/session_list_notifier.dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../di/providers.dart';
+import '../../domain/models/session_list_item.dart';
+import '../../domain/models/session_card_meta.dart';
+
+final sessionListProvider = StreamProvider<List<SessionListItem>>((ref) {
+  final repository = ref.watch(conversationRepositoryProvider);
+  return repository.watchSessionListItems();
+});
+
+final sessionCardMetaProvider =
+    StreamProvider.family<SessionCardMeta, String>((ref, sessionId) {
+  final repository = ref.watch(conversationRepositoryProvider);
+  return repository.watchSessionCardMeta(sessionId);
+});
+````
+
 ## File: lib/presentation/widgets/thought_bubble.dart
 ````dart
 import 'package:flutter/cupertino.dart';
@@ -11362,12 +11389,22 @@ class ChatService {
     required String sessionId,
     required ChatRound sourceRound,
   }) async {
+    final newAttachments = sourceRound.userAttachments.map((old) {
+      return Attachment(
+        id: const Uuid().v4(),
+        name: old.name,
+        relativePath: old.relativePath,
+        isImage: old.isImage,
+        mimeType: old.mimeType,
+      );
+    }).toList();
+
     final newRoundId = await _createRound(
       repository: repository,
       sessionId: sessionId,
       content: sourceRound.userContent,
       parentRoundId: sourceRound.parentId,
-      attachments: sourceRound.userAttachments,
+      attachments: newAttachments,
     );
 
     _startGeneration(
@@ -11516,26 +11553,6 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-````
-
-## File: lib/presentation/providers/session_list_notifier.dart
-````dart
-// lib/presentation/providers/session_list_notifier.dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../di/providers.dart';
-import '../../domain/models/session_list_item.dart';
-import '../../domain/models/session_card_meta.dart';
-
-final sessionListProvider = StreamProvider<List<SessionListItem>>((ref) {
-  final repository = ref.watch(conversationRepositoryProvider);
-  return repository.watchSessionListItems();
-});
-
-final sessionCardMetaProvider =
-    StreamProvider.family<SessionCardMeta, String>((ref, sessionId) {
-  final repository = ref.watch(conversationRepositoryProvider);
-  return repository.watchSessionCardMeta(sessionId);
-});
 ````
 
 ## File: lib/presentation/pages/text_attachment_viewer_page.dart
@@ -11865,6 +11882,7 @@ class MessageBubble extends StatelessWidget {
 ````dart
 // lib/presentation/providers/settings_form_notifier.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 import '../../core/models/app_config.dart';
 import '../../core/models/model_info.dart';
 import '../../data/services/config_service.dart';
@@ -11901,6 +11919,7 @@ class SettingsFormState {
 class SettingsFormNotifier extends Notifier<SettingsFormState> {
   late final ConfigService _configService;
   ConfigProfile? _lastLoadedConfig;
+  http.Client? _currentClient;
 
   @override
   SettingsFormState build() {
@@ -12010,18 +12029,29 @@ class SettingsFormNotifier extends Notifier<SettingsFormState> {
     state = state.copyWith(config: ConfigProfile.defaultProfile());
   }
 
+  
+
   Future<void> refreshModels() async {
-    if (state.isRefreshingModels) return;
+    if (state.isRefreshingModels) {
+      _currentClient?.close();
+      state = state.copyWith(isRefreshingModels: false);
+      return;
+    }
 
     state = state.copyWith(isRefreshingModels: true);
+    final client = http.Client();
+    _currentClient = client;
+
     try {
-      await _configService.refreshModels(state.config);
-      state = state.copyWith(isRefreshingModels: false);
+      await _configService.refreshModels(state.config, client: client);
+      final refreshed = await _configService.loadActiveConfig();
+      state = state.copyWith(config: refreshed, isRefreshingModels: false);
     } catch (e) {
-      state = state.copyWith(
-        isRefreshingModels: false,
-      );
+      state = state.copyWith(isRefreshingModels: false);
       rethrow;
+    } finally {
+      _currentClient = null;
+      client.close();
     }
   }
 
@@ -12047,6 +12077,7 @@ final settingsFormProvider = NotifierProvider<SettingsFormNotifier, SettingsForm
 import 'dart:async';
 import 'package:aiservice/data/data_sources/chat_source_router.dart';
 import 'package:collection/collection.dart';
+import 'package:http/http.dart' as http;
 import 'package:rxdart/rxdart.dart';
 import '../../core/models/app_config.dart';
 import '../repositories/config_repository.dart';
@@ -12085,9 +12116,11 @@ class ConfigService {
     await _repository.updateProfileConfig(settings.activeProfileId, config);
   }
 
-  Future<void> refreshModels(ConfigProfile targetConfig) async {
+  Future<void> refreshModels(
+    ConfigProfile targetConfig, 
+    {required http.Client client,}) async {
     final source = _sourceRouter.getSourceFromConfig(targetConfig);
-    final remoteModels = await source.fetchModels(targetConfig);
+    final remoteModels = await source.fetchModels(targetConfig, client: client);
     final updatedModels = remoteModels.map((remote) {
       final old = targetConfig.availableModels.firstWhereOrNull((m) => m.id == remote.id);
       return remote.copyWith(
@@ -12165,465 +12198,6 @@ class ConfigService {
         orElse: () => settings.profiles.first,
       );
     });
-  }
-}
-````
-
-## File: lib/presentation/pages/branch_tree_page.dart
-````dart
-import 'dart:math';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
-
-import '../../di/providers.dart';
-import '../../domain/models/tree_node.dart';
-import '../../domain/services/tree_builder.dart';
-import '../providers/chat_notifier.dart' show chatTopologyProvider, roundDetailProvider;
-import '../widgets/common/app_page_scaffold.dart';
-import '../widgets/common/app_toast.dart';
-
-const double _nodeWidth = 300.0;
-const double _nodeHeight = 200.0;
-const double _levelSeparation = 120.0;
-const double _siblingSeparation = 40.0;
-const double _canvasPadding = 2000.0;
-
-class BranchTreePage extends ConsumerStatefulWidget {
-  final String sessionId;
-  final String initialFocusRoundId;
-
-  const BranchTreePage({
-    super.key,
-    required this.sessionId,
-    required this.initialFocusRoundId,
-  });
-
-  @override
-  ConsumerState<BranchTreePage> createState() => _BranchTreePageState();
-}
-
-class _BranchTreePageState extends ConsumerState<BranchTreePage> {
-  final TransformationController _transformationController = TransformationController();
-  final GlobalKey _viewerKey = GlobalKey();
-  final Map<String, double> _nodeWidthCache = {};
-  bool _hasFocused = false;
-
-  @override
-  void dispose() {
-    _transformationController.dispose();
-    super.dispose();
-  }
-
-  void _computeWidthsForTree(TreeNode root) {
-    void postOrder(TreeNode node) {
-      if (node.children.isEmpty) {
-        _nodeWidthCache[node.id] = _nodeWidth;
-        return;
-      }
-      double total = 0;
-      for (final child in node.children) {
-        postOrder(child);
-        total += _nodeWidthCache[child.id]!;
-      }
-      total += (node.children.length - 1) * _siblingSeparation;
-      _nodeWidthCache[node.id] = total;
-    }
-    postOrder(root);
-  }
-
-  double _subtreeWidth(TreeNode node) {
-    return _nodeWidthCache[node.id] ?? _nodeWidth;
-  }
-
-  void _layoutNode(TreeNode node, double x, double y, Map<String, Offset> positions) {
-    positions[node.id] = Offset(x, y);
-    if (node.children.isEmpty) return;
-
-    final childWidths = node.children.map((c) => _subtreeWidth(c)).toList();
-    final totalChildrenWidth = childWidths.fold(0.0, (a, b) => a + b) +
-        (node.children.length - 1) * _siblingSeparation;
-    double startX = x + (_nodeWidth - totalChildrenWidth) / 2;
-    for (int i = 0; i < node.children.length; i++) {
-      final child = node.children[i];
-      final childWidth = childWidths[i];
-      final childX = startX + childWidth / 2 - _nodeWidth / 2;
-      _layoutNode(child, childX, y + _nodeHeight + _levelSeparation, positions);
-      startX += childWidth + _siblingSeparation;
-    }
-  }
-
-  _TreeLayout _computeLayout(List<TreeNode> roots) {
-    _nodeWidthCache.clear();
-    for (final root in roots) {
-      _computeWidthsForTree(root);
-    }
-    final positions = <String, Offset>{};
-    double currentX = 0;
-    double maxHeight = 0;
-
-    for (final root in roots) {
-      final tempPositions = <String, Offset>{};
-      _layoutNode(root, currentX, 0, tempPositions);
-
-      double minX = double.infinity, maxX = -double.infinity;
-      double minY = double.infinity, maxY = -double.infinity;
-      for (final pos in tempPositions.values) {
-        minX = min(minX, pos.dx);
-        maxX = max(maxX, pos.dx + _nodeWidth);
-        minY = min(minY, pos.dy);
-        maxY = max(maxY, pos.dy + _nodeHeight);
-      }
-      final width = maxX - minX;
-      final height = maxY - minY;
-
-      final offsetX = currentX - minX;
-      for (final entry in tempPositions.entries) {
-        positions[entry.key] = Offset(entry.value.dx + offsetX, entry.value.dy);
-      }
-
-      currentX += width + _siblingSeparation;
-      maxHeight = max(maxHeight, height);
-    }
-
-    final canvasWidth = currentX + _canvasPadding * 2;
-    final canvasHeight = maxHeight + _canvasPadding * 2;
-    return _TreeLayout(positions: positions, canvasSize: Size(canvasWidth, canvasHeight));
-  }
-
-  List<(Offset, Offset)> _buildParentChildPairs(List<TreeNode> roots, Map<String, Offset> positions) {
-    final pairs = <(Offset, Offset)>[];
-    void traverse(TreeNode node) {
-      final parentPos = positions[node.id];
-      if (parentPos == null) return;
-      for (final child in node.children) {
-        final childPos = positions[child.id];
-        if (childPos != null) {
-          pairs.add((parentPos, childPos));
-        }
-        traverse(child);
-      }
-    }
-    for (final root in roots) traverse(root);
-    return pairs;
-  }
-
-  List<Widget> _buildAllNodeWidgets(List<TreeNode> roots, Map<String, Offset> positions) {
-    final widgets = <Widget>[];
-    void addNode(TreeNode node) {
-      final pos = positions[node.id];
-      if (pos != null) {
-        widgets.add(
-          Positioned(
-            left: pos.dx,
-            top: pos.dy,
-            child: _TreeNodeCard(
-              roundId: node.id,
-              onSwitch: () => Navigator.of(context).pop(node.id),
-              onDelete: () async {
-                if (await _confirmDelete()) await _deleteNode(node.id);
-              },
-            ),
-          ),
-        );
-      }
-      for (final child in node.children) addNode(child);
-    }
-    for (final root in roots) addNode(root);
-    return widgets;
-  }
-
-  Future<void> _deleteNode(String nodeId) async {
-    final topology = await ref.read(chatTopologyProvider(widget.sessionId).future);
-    final roots = buildTree(topology);
-    final target = _findNodeById(roots, nodeId);
-    if (target == null) return;
-    final ids = _collectSubtreeIds(target).toList();
-    try {
-      await ref.read(conversationRepositoryProvider)
-          .deleteRoundsAndCleanupOrphanAttachments(widget.sessionId, ids);
-    } catch (e) {
-      if (mounted) AppToast.show('删除失败：$e');
-    }
-  }
-
-  Future<bool> _confirmDelete() async {
-    return await showCupertinoDialog<bool>(
-          context: context,
-          builder: (ctx) => CupertinoAlertDialog(
-            title: const Text('删除节点'),
-            content: const Text('确定删除这一轮及其后续全部分支吗？'),
-            actions: [
-              CupertinoDialogAction(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('取消'),
-              ),
-              CupertinoDialogAction(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                isDestructiveAction: true,
-                child: const Text('删除'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-  }
-
-  Set<String> _collectSubtreeIds(TreeNode root) {
-    final ids = <String>{};
-    final stack = <TreeNode>[root];
-    while (stack.isNotEmpty) {
-      final node = stack.removeLast();
-      ids.add(node.id);
-      stack.addAll(node.children);
-    }
-    return ids;
-  }
-
-  TreeNode? _findNodeById(List<TreeNode> roots, String targetId) {
-    final stack = [...roots];
-    while (stack.isNotEmpty) {
-      final node = stack.removeLast();
-      if (node.id == targetId) return node;
-      stack.addAll(node.children);
-    }
-    return null;
-  }
-
-  void _focusOnNode(String nodeId, Map<String, Offset> positions) {
-    if (_hasFocused) return;
-    final nodePos = positions[nodeId];
-    if (nodePos == null) return;
-    final viewerBox = _viewerKey.currentContext?.findRenderObject() as RenderBox?;
-    if (viewerBox == null) return;
-    final viewerSize = viewerBox.size;
-    final nodeCenter = Offset(nodePos.dx + _nodeWidth / 2, nodePos.dy + _nodeHeight / 2);
-    final targetOffset = Offset(viewerSize.width / 2 - nodeCenter.dx, viewerSize.height / 2 - nodeCenter.dy);
-    _transformationController.value = Matrix4.identity()..translate(targetOffset.dx, targetOffset.dy);
-    _hasFocused = true;
-    setState(() {});
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final topology = ref.watch(chatTopologyProvider(widget.sessionId));
-    return AppPageScaffold(
-      navigationBar: CupertinoNavigationBar(middle: const Text('分支树')),
-      body: topology.when(
-        loading: () => const Center(child: CupertinoActivityIndicator()),
-        error: (err, _) => Center(child: Text('加载分支结构失败：$err')),
-        data: (topology) {
-          final roots = buildTree(topology);
-          if (roots.isEmpty) return const Center(child: Text('暂无分支结构'));
-          final layout = _computeLayout(roots);
-          final positions = layout.positions;
-          final canvasSize = layout.canvasSize;
-          final pairs = _buildParentChildPairs(roots, positions);
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!_hasFocused) _focusOnNode(widget.initialFocusRoundId, positions);
-          });
-          return InteractiveViewer(
-            key: _viewerKey,
-            transformationController: _transformationController,
-            minScale: 0.2,
-            maxScale: 3.0,
-            constrained: false,
-            boundaryMargin: const EdgeInsets.all(_canvasPadding),
-            child: SizedBox(
-              width: canvasSize.width,
-              height: canvasSize.height,
-              child: Stack(
-                children: [
-                  CustomPaint(
-                    painter: _OrthogonalLinePainter(pairs: pairs),
-                    size: canvasSize,
-                  ),
-                  ..._buildAllNodeWidgets(roots, positions),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _TreeLayout {
-  final Map<String, Offset> positions;
-  final Size canvasSize;
-  _TreeLayout({required this.positions, required this.canvasSize});
-}
-
-class _OrthogonalLinePainter extends CustomPainter {
-  final List<(Offset, Offset)> pairs;
-  _OrthogonalLinePainter({required this.pairs});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = CupertinoColors.separator
-      ..strokeWidth = 1.2
-      ..style = PaintingStyle.stroke;
-    for (final pair in pairs) {
-      final parentCenter = Offset(pair.$1.dx + _nodeWidth / 2, pair.$1.dy + _nodeHeight / 2);
-      final childCenter = Offset(pair.$2.dx + _nodeWidth / 2, pair.$2.dy + _nodeHeight / 2);
-      final start = Offset(parentCenter.dx, parentCenter.dy + _nodeHeight / 2);
-      final end = Offset(childCenter.dx, childCenter.dy - _nodeHeight / 2);
-      final midY = (start.dy + end.dy) / 2;
-      final path = Path()
-        ..moveTo(start.dx, start.dy)
-        ..lineTo(start.dx, midY)
-        ..lineTo(end.dx, midY)
-        ..lineTo(end.dx, end.dy);
-      canvas.drawPath(path, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _OrthogonalLinePainter oldDelegate) => true;
-}
-
-class _TreeNodeCard extends ConsumerWidget {
-  final String roundId;
-  final VoidCallback onSwitch;
-  final VoidCallback onDelete;
-
-  const _TreeNodeCard({
-    required this.roundId,
-    required this.onSwitch,
-    required this.onDelete,
-  });
-
-  Widget _buildStatusDot({required bool isStreaming, required bool hasUnseen}) {
-    if (isStreaming) {
-      return Container(
-        width: 8,
-        height: 8,
-        decoration: const BoxDecoration(
-          color: CupertinoColors.systemOrange,
-          shape: BoxShape.circle,
-        ),
-      );
-    }
-    if (hasUnseen) {
-      return Container(
-        width: 8,
-        height: 8,
-        decoration: const BoxDecoration(
-          color: CupertinoColors.systemBlue,
-          shape: BoxShape.circle,
-        ),
-      );
-    }
-    return const SizedBox.shrink();
-  }
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final round = ref.watch(roundDetailProvider(roundId)).valueOrNull;
-    final dateText = round == null
-        ? null
-        : DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(round.createdAt));
-    final userText = round?.userContent;
-    final aiText = round == null
-        ? null
-        : ((round.assistantContent ?? '').trim().isEmpty ? '（等待回复）' : round.assistantContent!);
-
-    return CupertinoContextMenu(
-      actions: [
-        CupertinoContextMenuAction(
-          onPressed: () {
-            Navigator.pop(context);
-            onDelete();
-          },
-          isDestructiveAction: true,
-          child: const Text('删除节点'),
-        ),
-      ],
-      child: Container(
-        width: _nodeWidth,
-        height: _nodeHeight,
-        decoration: BoxDecoration(
-          color: CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    dateText ?? '加载中...',
-                    style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
-                      color: CupertinoDynamicColor.resolve(CupertinoColors.label, context),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (round != null && (round.isIncomplete || round.hasUnseenUpdate))
-                  _buildStatusDot(isStreaming: round.isIncomplete, hasUnseen: round.hasUnseenUpdate),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Expanded(child: _PreviewSlot(label: 'YOU', content: userText, loading: round == null)),
-            const SizedBox(height: 4),
-            Expanded(child: _PreviewSlot(label: 'AI', content: aiText, loading: round == null)),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: CupertinoButton.filled(
-                borderRadius: BorderRadius.circular(12),
-                onPressed: onSwitch,
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: const Text('切换到此分支'),
-              ),
-            )
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PreviewSlot extends StatelessWidget {
-  final String label;
-  final String? content;
-  final bool loading;
-
-  const _PreviewSlot({
-    required this.label,
-    required this.content,
-    required this.loading,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final textColor = CupertinoDynamicColor.resolve(CupertinoColors.label, context);
-    final style = CupertinoTheme.of(context).textTheme.textStyle.copyWith(color: textColor);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 34,
-          child: Text('$label ', style: style),
-        ),
-        Expanded(
-          child: loading
-              ? const Text('加载中...', maxLines: 2, overflow: TextOverflow.ellipsis)
-              : Text(
-                  (content == null || content!.trim().isEmpty) ? '（空）' : content!,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: style,
-                ),
-        ),
-      ],
-    );
   }
 }
 ````
@@ -13102,6 +12676,465 @@ class _PreviewLine extends StatelessWidget {
 }
 ````
 
+## File: lib/presentation/pages/branch_tree_page.dart
+````dart
+import 'dart:math';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+
+import '../../di/providers.dart';
+import '../../domain/models/tree_node.dart';
+import '../../domain/services/tree_builder.dart';
+import '../providers/chat_notifier.dart' show chatTopologyProvider, roundDetailProvider;
+import '../widgets/common/app_page_scaffold.dart';
+import '../widgets/common/app_toast.dart';
+
+const double _nodeWidth = 300.0;
+const double _nodeHeight = 200.0;
+const double _levelSeparation = 120.0;
+const double _siblingSeparation = 40.0;
+const double _canvasPadding = 2000.0;
+
+class BranchTreePage extends ConsumerStatefulWidget {
+  final String sessionId;
+  final String initialFocusRoundId;
+
+  const BranchTreePage({
+    super.key,
+    required this.sessionId,
+    required this.initialFocusRoundId,
+  });
+
+  @override
+  ConsumerState<BranchTreePage> createState() => _BranchTreePageState();
+}
+
+class _BranchTreePageState extends ConsumerState<BranchTreePage> {
+  final TransformationController _transformationController = TransformationController();
+  final GlobalKey _viewerKey = GlobalKey();
+  final Map<String, double> _nodeWidthCache = {};
+  bool _hasFocused = false;
+
+  @override
+  void dispose() {
+    _transformationController.dispose();
+    super.dispose();
+  }
+
+  void _computeWidthsForTree(TreeNode root) {
+    void postOrder(TreeNode node) {
+      if (node.children.isEmpty) {
+        _nodeWidthCache[node.id] = _nodeWidth;
+        return;
+      }
+      double total = 0;
+      for (final child in node.children) {
+        postOrder(child);
+        total += _nodeWidthCache[child.id]!;
+      }
+      total += (node.children.length - 1) * _siblingSeparation;
+      _nodeWidthCache[node.id] = total;
+    }
+    postOrder(root);
+  }
+
+  double _subtreeWidth(TreeNode node) {
+    return _nodeWidthCache[node.id] ?? _nodeWidth;
+  }
+
+  void _layoutNode(TreeNode node, double x, double y, Map<String, Offset> positions) {
+    positions[node.id] = Offset(x, y);
+    if (node.children.isEmpty) return;
+
+    final childWidths = node.children.map((c) => _subtreeWidth(c)).toList();
+    final totalChildrenWidth = childWidths.fold(0.0, (a, b) => a + b) +
+        (node.children.length - 1) * _siblingSeparation;
+    double startX = x + (_nodeWidth - totalChildrenWidth) / 2;
+    for (int i = 0; i < node.children.length; i++) {
+      final child = node.children[i];
+      final childWidth = childWidths[i];
+      final childX = startX + childWidth / 2 - _nodeWidth / 2;
+      _layoutNode(child, childX, y + _nodeHeight + _levelSeparation, positions);
+      startX += childWidth + _siblingSeparation;
+    }
+  }
+
+  _TreeLayout _computeLayout(List<TreeNode> roots) {
+    _nodeWidthCache.clear();
+    for (final root in roots) {
+      _computeWidthsForTree(root);
+    }
+    final positions = <String, Offset>{};
+    double currentX = 0;
+    double maxHeight = 0;
+
+    for (final root in roots) {
+      final tempPositions = <String, Offset>{};
+      _layoutNode(root, currentX, 0, tempPositions);
+
+      double minX = double.infinity, maxX = -double.infinity;
+      double minY = double.infinity, maxY = -double.infinity;
+      for (final pos in tempPositions.values) {
+        minX = min(minX, pos.dx);
+        maxX = max(maxX, pos.dx + _nodeWidth);
+        minY = min(minY, pos.dy);
+        maxY = max(maxY, pos.dy + _nodeHeight);
+      }
+      final width = maxX - minX;
+      final height = maxY - minY;
+
+      final offsetX = currentX - minX;
+      for (final entry in tempPositions.entries) {
+        positions[entry.key] = Offset(entry.value.dx + offsetX, entry.value.dy);
+      }
+
+      currentX += width + _siblingSeparation;
+      maxHeight = max(maxHeight, height);
+    }
+
+    final canvasWidth = currentX + _canvasPadding * 2;
+    final canvasHeight = maxHeight + _canvasPadding * 2;
+    return _TreeLayout(positions: positions, canvasSize: Size(canvasWidth, canvasHeight));
+  }
+
+  List<(Offset, Offset)> _buildParentChildPairs(List<TreeNode> roots, Map<String, Offset> positions) {
+    final pairs = <(Offset, Offset)>[];
+    void traverse(TreeNode node) {
+      final parentPos = positions[node.id];
+      if (parentPos == null) return;
+      for (final child in node.children) {
+        final childPos = positions[child.id];
+        if (childPos != null) {
+          pairs.add((parentPos, childPos));
+        }
+        traverse(child);
+      }
+    }
+    for (final root in roots) traverse(root);
+    return pairs;
+  }
+
+  List<Widget> _buildAllNodeWidgets(List<TreeNode> roots, Map<String, Offset> positions) {
+    final widgets = <Widget>[];
+    void addNode(TreeNode node) {
+      final pos = positions[node.id];
+      if (pos != null) {
+        widgets.add(
+          Positioned(
+            left: pos.dx,
+            top: pos.dy,
+            child: _TreeNodeCard(
+              roundId: node.id,
+              onSwitch: () => Navigator.of(context).pop(node.id),
+              onDelete: () async {
+                if (await _confirmDelete()) await _deleteNode(node.id);
+              },
+            ),
+          ),
+        );
+      }
+      for (final child in node.children) addNode(child);
+    }
+    for (final root in roots) addNode(root);
+    return widgets;
+  }
+
+  Future<void> _deleteNode(String nodeId) async {
+    final topology = await ref.read(chatTopologyProvider(widget.sessionId).future);
+    final roots = buildTree(topology);
+    final target = _findNodeById(roots, nodeId);
+    if (target == null) return;
+    final ids = _collectSubtreeIds(target).toList();
+    try {
+      await ref.read(conversationRepositoryProvider)
+          .deleteRoundsAndCleanupOrphanAttachments(widget.sessionId, ids);
+    } catch (e) {
+      if (mounted) AppToast.show('删除失败：$e');
+    }
+  }
+
+  Future<bool> _confirmDelete() async {
+    return await showCupertinoDialog<bool>(
+          context: context,
+          builder: (ctx) => CupertinoAlertDialog(
+            title: const Text('删除节点'),
+            content: const Text('确定删除这一轮及其后续全部分支吗？'),
+            actions: [
+              CupertinoDialogAction(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('取消'),
+              ),
+              CupertinoDialogAction(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                isDestructiveAction: true,
+                child: const Text('删除'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  Set<String> _collectSubtreeIds(TreeNode root) {
+    final ids = <String>{};
+    final stack = <TreeNode>[root];
+    while (stack.isNotEmpty) {
+      final node = stack.removeLast();
+      ids.add(node.id);
+      stack.addAll(node.children);
+    }
+    return ids;
+  }
+
+  TreeNode? _findNodeById(List<TreeNode> roots, String targetId) {
+    final stack = [...roots];
+    while (stack.isNotEmpty) {
+      final node = stack.removeLast();
+      if (node.id == targetId) return node;
+      stack.addAll(node.children);
+    }
+    return null;
+  }
+
+  void _focusOnNode(String nodeId, Map<String, Offset> positions) {
+    if (_hasFocused) return;
+    final nodePos = positions[nodeId];
+    if (nodePos == null) return;
+    final viewerBox = _viewerKey.currentContext?.findRenderObject() as RenderBox?;
+    if (viewerBox == null) return;
+    final viewerSize = viewerBox.size;
+    final nodeCenter = Offset(nodePos.dx + _nodeWidth / 2, nodePos.dy + _nodeHeight / 2);
+    final targetOffset = Offset(viewerSize.width / 2 - nodeCenter.dx, viewerSize.height / 2 - nodeCenter.dy);
+    _transformationController.value = Matrix4.identity()..translate(targetOffset.dx, targetOffset.dy);
+    _hasFocused = true;
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final topology = ref.watch(chatTopologyProvider(widget.sessionId));
+    return AppPageScaffold(
+      navigationBar: CupertinoNavigationBar(middle: const Text('分支树')),
+      body: topology.when(
+        loading: () => const Center(child: CupertinoActivityIndicator()),
+        error: (err, _) => Center(child: Text('加载分支结构失败：$err')),
+        data: (topology) {
+          final roots = buildTree(topology);
+          if (roots.isEmpty) return const Center(child: Text('暂无分支结构'));
+          final layout = _computeLayout(roots);
+          final positions = layout.positions;
+          final canvasSize = layout.canvasSize;
+          final pairs = _buildParentChildPairs(roots, positions);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!_hasFocused) _focusOnNode(widget.initialFocusRoundId, positions);
+          });
+          return InteractiveViewer(
+            key: _viewerKey,
+            transformationController: _transformationController,
+            minScale: 0.2,
+            maxScale: 3.0,
+            constrained: false,
+            boundaryMargin: const EdgeInsets.all(_canvasPadding),
+            child: SizedBox(
+              width: canvasSize.width,
+              height: canvasSize.height,
+              child: Stack(
+                children: [
+                  CustomPaint(
+                    painter: _OrthogonalLinePainter(pairs: pairs),
+                    size: canvasSize,
+                  ),
+                  ..._buildAllNodeWidgets(roots, positions),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _TreeLayout {
+  final Map<String, Offset> positions;
+  final Size canvasSize;
+  _TreeLayout({required this.positions, required this.canvasSize});
+}
+
+class _OrthogonalLinePainter extends CustomPainter {
+  final List<(Offset, Offset)> pairs;
+  _OrthogonalLinePainter({required this.pairs});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = CupertinoColors.separator
+      ..strokeWidth = 1.2
+      ..style = PaintingStyle.stroke;
+    for (final pair in pairs) {
+      final parentCenter = Offset(pair.$1.dx + _nodeWidth / 2, pair.$1.dy + _nodeHeight / 2);
+      final childCenter = Offset(pair.$2.dx + _nodeWidth / 2, pair.$2.dy + _nodeHeight / 2);
+      final start = Offset(parentCenter.dx, parentCenter.dy + _nodeHeight / 2);
+      final end = Offset(childCenter.dx, childCenter.dy - _nodeHeight / 2);
+      final midY = (start.dy + end.dy) / 2;
+      final path = Path()
+        ..moveTo(start.dx, start.dy)
+        ..lineTo(start.dx, midY)
+        ..lineTo(end.dx, midY)
+        ..lineTo(end.dx, end.dy);
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _OrthogonalLinePainter oldDelegate) => true;
+}
+
+class _TreeNodeCard extends ConsumerWidget {
+  final String roundId;
+  final VoidCallback onSwitch;
+  final VoidCallback onDelete;
+
+  const _TreeNodeCard({
+    required this.roundId,
+    required this.onSwitch,
+    required this.onDelete,
+  });
+
+  Widget _buildStatusDot({required bool isStreaming, required bool hasUnseen}) {
+    if (isStreaming) {
+      return Container(
+        width: 8,
+        height: 8,
+        decoration: const BoxDecoration(
+          color: CupertinoColors.systemOrange,
+          shape: BoxShape.circle,
+        ),
+      );
+    }
+    if (hasUnseen) {
+      return Container(
+        width: 8,
+        height: 8,
+        decoration: const BoxDecoration(
+          color: CupertinoColors.systemBlue,
+          shape: BoxShape.circle,
+        ),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final round = ref.watch(roundDetailProvider(roundId)).valueOrNull;
+    final dateText = round == null
+        ? null
+        : DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(round.createdAt));
+    final userText = round?.userContent;
+    final aiText = round == null
+        ? null
+        : ((round.assistantContent ?? '').trim().isEmpty ? '（等待回复）' : round.assistantContent!);
+
+    return CupertinoContextMenu(
+      actions: [
+        CupertinoContextMenuAction(
+          onPressed: () {
+            Navigator.pop(context);
+            onDelete();
+          },
+          isDestructiveAction: true,
+          child: const Text('删除节点'),
+        ),
+      ],
+      child: Container(
+        width: _nodeWidth,
+        height: _nodeHeight,
+        decoration: BoxDecoration(
+          color: CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    dateText ?? '加载中...',
+                    style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+                      color: CupertinoDynamicColor.resolve(CupertinoColors.label, context),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (round != null && (round.isIncomplete || round.hasUnseenUpdate))
+                  _buildStatusDot(isStreaming: round.isIncomplete, hasUnseen: round.hasUnseenUpdate),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Expanded(child: _PreviewSlot(label: 'YOU', content: userText, loading: round == null)),
+            const SizedBox(height: 4),
+            Expanded(child: _PreviewSlot(label: 'AI', content: aiText, loading: round == null)),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: CupertinoButton.filled(
+                borderRadius: BorderRadius.circular(12),
+                onPressed: onSwitch,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: const Text('切换到此分支'),
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PreviewSlot extends StatelessWidget {
+  final String label;
+  final String? content;
+  final bool loading;
+
+  const _PreviewSlot({
+    required this.label,
+    required this.content,
+    required this.loading,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = CupertinoDynamicColor.resolve(CupertinoColors.label, context);
+    final style = CupertinoTheme.of(context).textTheme.textStyle.copyWith(color: textColor);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 34,
+          child: Text('$label ', style: style),
+        ),
+        Expanded(
+          child: loading
+              ? const Text('加载中...', maxLines: 2, overflow: TextOverflow.ellipsis)
+              : Text(
+                  (content == null || content!.trim().isEmpty) ? '（空）' : content!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: style,
+                ),
+        ),
+      ],
+    );
+  }
+}
+````
+
 ## File: lib/presentation/providers/chat_notifier.dart
 ````dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13141,6 +13174,389 @@ final visibleRoundIdsProvider =
     return path.reversed.toList();
   },
 );
+````
+
+## File: lib/data/repositories/conversation_repository.dart
+````dart
+// data/repositories/conversation_repository.dart
+import 'dart:async';
+import 'dart:io';
+import 'package:drift/drift.dart';
+import '../data_sources/local_file_source.dart';
+import '../../core/models/attachment.dart';
+import '../../core/models/chat_round.dart';
+import '../../core/models/session.dart';
+import '../../domain/models/session_list_item.dart';
+import '../database/database.dart';
+import '../../domain/models/session_card_meta.dart';
+import 'package:rxdart/rxdart.dart';
+
+class ConversationRepository {
+  final AppDatabase _db;
+  final LocalFileSource _fileService;
+  ConversationRepository(this._db, this._fileService);
+
+  // ========== 响应式查询 ==========
+
+  Stream<List<SessionListItem>> watchSessionListItems() {
+    final query = (_db.select(_db.dbSessions)
+      ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]));
+    return query.watch().map((sessions) {
+      return sessions.map((session) {
+        return SessionListItem(
+          id: session.id,
+          title: session.title,
+          updatedAt: session.updatedAt,
+        );
+      }).toList();
+    });
+  }
+
+  Stream<SessionCardMeta> watchSessionCardMeta(String sessionId) {
+    final lastRoundStream = (_db.select(_db.dbChatRounds)
+          ..where((t) => t.sessionId.equals(sessionId))
+          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
+          ..limit(1))
+        .watchSingleOrNull();
+
+    final countStream = (_db.selectOnly(_db.dbChatRounds)
+          ..addColumns([countAll()])
+          ..where(_db.dbChatRounds.sessionId.equals(sessionId)))
+        .watchSingle()
+        .map((row) => row.read(countAll()) ?? 0);
+
+    final hasUnseenStream = (_db.select(_db.dbChatRounds)
+          ..where((t) => t.sessionId.equals(sessionId))
+          ..where((t) => t.hasUnseenUpdate.equals(true))
+          ..limit(1))
+        .watchSingleOrNull()
+        .map((row) => row != null);
+
+    return Rx.combineLatest3(lastRoundStream, countStream, hasUnseenStream,
+        (lastRound, count, hasUnseen) {
+      final previewRound = lastRound;
+      final userPreview = previewRound == null
+          ? '点击开始新的对话'
+          : previewRound.userContent.trim().isEmpty
+              ? '（空输入）'
+              : previewRound.userContent.trim();
+      final aiPreview = previewRound == null
+          ? '（等待回复）'
+          : (previewRound.assistantContent?.trim().isNotEmpty ?? false)
+              ? previewRound.assistantContent!
+              : (previewRound.isIncomplete ? '正在生成...' : '（等待回复）');
+
+      return SessionCardMeta(
+        roundCount: count,
+        previewRoundId: previewRound?.id,
+        userPreview: userPreview,
+        aiPreview: aiPreview,
+        hasUnseen: hasUnseen,
+        isStreaming: previewRound?.isIncomplete == true,
+      );
+    });
+  }
+
+  // ========== 细粒度监听（新增） ==========
+
+  Stream<List<({String id, String? parentId})>> watchSessionTopology(String sessionId) {
+    final query = _db.selectOnly(_db.dbChatRounds)
+      ..addColumns([_db.dbChatRounds.id, _db.dbChatRounds.parentId])
+      ..where(_db.dbChatRounds.sessionId.equals(sessionId))
+      ..orderBy([OrderingTerm.asc(_db.dbChatRounds.createdAt)]);
+    return query.watch().map((rows) => rows.map((r) => (
+      id: r.read(_db.dbChatRounds.id)!,
+      parentId: r.read(_db.dbChatRounds.parentId)
+    )).toList());
+  }
+
+  /// 仅监听单条消息的完整详情（含附件）- 改用 rxdart 组合两个独立查询
+  Stream<ChatRound?> watchSingleRound(String roundId) {
+    final roundStream = (_db.select(_db.dbChatRounds)
+          ..where((t) => t.id.equals(roundId)))
+        .watchSingleOrNull();
+
+    final attachmentsStream = (_db.select(_db.dbAttachments)
+          ..where((t) => t.roundId.equals(roundId)))
+        .watch()
+        .map((rows) => rows.map((a) => Attachment(
+              id: a.id,
+              name: a.name,
+              relativePath: a.relativePath,
+              isImage: a.isImage,
+              mimeType: a.mimeType,
+            )).toList());
+
+    return Rx.combineLatest2(roundStream, attachmentsStream,
+        (DbChatRound? round, List<Attachment> attachments) {
+      if (round == null) return null;
+      return ChatRound(
+        id: round.id,
+        parentId: round.parentId,
+        createdAt: round.createdAt,
+        userContent: round.userContent,
+        userAttachments: attachments,
+        assistantThinking: round.assistantThinking,
+        assistantContent: round.assistantContent,
+        isIncomplete: round.isIncomplete,
+        hasUnseenUpdate: round.hasUnseenUpdate,
+      );
+    });
+  }
+
+  Future<List<ChatRound>> getContextRounds(String roundId) async {
+    final roundsQuery = _db.customSelect(
+      '''
+      WITH RECURSIVE ctx_chain AS (
+        SELECT id, session_id, parent_id, created_at, user_content,
+              assistant_thinking, assistant_content, is_incomplete, has_unseen_update
+        FROM db_chat_rounds WHERE id = :roundId
+        UNION ALL
+        SELECT r.id, r.session_id, r.parent_id, r.created_at, r.user_content,
+              r.assistant_thinking, r.assistant_content, r.is_incomplete, r.has_unseen_update
+        FROM db_chat_rounds r
+        INNER JOIN ctx_chain c ON r.id = c.parent_id
+      )
+      SELECT * FROM ctx_chain ORDER BY created_at ASC
+      ''',
+      readsFrom: {_db.dbChatRounds},
+      variables: [Variable.withString(roundId)],
+    );
+
+    final dbRounds = await roundsQuery.map((row) {
+      return DbChatRound(
+        id: row.read<String>('id'),
+        sessionId: row.read<String>('session_id'),
+        parentId: row.read<String?>('parent_id'),
+        createdAt: row.read<int>('created_at'),
+        userContent: row.read<String>('user_content'),
+        assistantThinking: row.read<String?>('assistant_thinking'),
+        assistantContent: row.read<String?>('assistant_content'),
+        isIncomplete: row.read<bool>('is_incomplete'),
+        hasUnseenUpdate: row.read<bool>('has_unseen_update'),
+      );
+    }).get();
+
+    if (dbRounds.isEmpty) return [];
+
+    final roundIds = dbRounds.map((r) => r.id).toList();
+    final dbAttachments = await (_db.select(_db.dbAttachments)
+          ..where((t) => t.roundId.isIn(roundIds)))
+        .get();
+
+    final attachmentMap = <String, List<Attachment>>{};
+    for (final att in dbAttachments) {
+      attachmentMap.putIfAbsent(att.roundId, () => []).add(
+        Attachment(
+          id: att.id,
+          name: att.name,
+          relativePath: att.relativePath,
+          isImage: att.isImage,
+          mimeType: att.mimeType,
+        ),
+      );
+    }
+
+    return dbRounds.map((round) => _mapToChatRound(round, attachmentMap[round.id] ?? [])).toList();
+  }
+
+  Stream<String?> watchSessionTitle(String sessionId) {
+    return (_db.select(_db.dbSessions)
+          ..where((t) => t.id.equals(sessionId)))
+        .map((row) => row.title)
+        .watchSingleOrNull();
+  }
+
+  ChatRound _mapToChatRound(DbChatRound row, List<Attachment> attachments) {
+    return ChatRound(
+      id: row.id,
+      parentId: row.parentId,
+      createdAt: row.createdAt,
+      userContent: row.userContent,
+      userAttachments: attachments,
+      assistantThinking: row.assistantThinking,
+      assistantContent: row.assistantContent,
+      isIncomplete: row.isIncomplete,
+      hasUnseenUpdate: row.hasUnseenUpdate,
+    );
+  }
+
+  Future<void> _cleanupOrphanAttachments(Iterable<String> relativePaths) async {
+    final uniquePaths = relativePaths.toSet();
+    if (uniquePaths.isEmpty) return;
+
+    final referencedPaths = await (_db.select(_db.dbAttachments)
+          ..where((t) => t.relativePath.isIn(uniquePaths)))
+        .map((t) => t.relativePath)
+        .get();
+
+    final orphanPaths = uniquePaths.difference(referencedPaths.toSet());
+
+    for (final path in orphanPaths) {
+      try {
+        await _fileService.deleteAttachment(path);
+      } catch (_) {}
+    }
+  }
+
+  // ========== 写操作 ==========
+
+  Future<void> deleteRoundsAndCleanupOrphanAttachments(
+    String sessionId,
+    List<String> roundIds,
+  ) async {
+    if (roundIds.isEmpty) return;
+
+    // 1. 收集候选附件路径（改用直接查询，不用 join）
+    final candidatePaths = (await (_db.select(_db.dbAttachments)
+          ..where((t) => t.roundId.isIn(roundIds)))
+        .get())
+        .map((a) => a.relativePath)
+        .toSet();
+
+    // 2. 提交数据库变更
+    await _db.transaction(() async {
+      await (_db.delete(_db.dbChatRounds)
+            ..where((t) => t.sessionId.equals(sessionId) & t.id.isIn(roundIds)))
+          .go();
+      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
+          .write(
+        DbSessionsCompanion(
+          updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+        ),
+      );
+    });
+
+    // 3. 基于最终态清理物理文件
+    await _cleanupOrphanAttachments(candidatePaths);
+  }
+
+  Future<void> deleteSession(String sessionId) async {
+    // 1. 收集候选附件路径（先查出所有 round id，再查附件）
+    final roundIds = await (_db.select(_db.dbChatRounds)
+          ..where((t) => t.sessionId.equals(sessionId)))
+        .map((r) => r.id)
+        .get();
+
+    final candidatePaths = <String>{};
+    if (roundIds.isNotEmpty) {
+      final attachments = await (_db.select(_db.dbAttachments)
+            ..where((t) => t.roundId.isIn(roundIds)))
+          .get();
+      candidatePaths.addAll(attachments.map((a) => a.relativePath));
+    }
+
+    // 2. 提交数据库变更
+    await (_db.delete(_db.dbSessions)..where((t) => t.id.equals(sessionId))).go();
+
+    // 3. 基于最终态清理物理文件
+    await _cleanupOrphanAttachments(candidatePaths);
+  }
+
+  Future<Session> createSession({
+    required String sessionId,
+    required String title,
+  }) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final session = Session(
+      id: sessionId,
+      title: title,
+      updatedAt: now,
+      rounds: [],
+    );
+    await _db.into(_db.dbSessions).insert(
+          DbSessionsCompanion.insert(
+            id: session.id,
+            title: session.title,
+            updatedAt: session.updatedAt,
+          ),
+        );
+    return session;
+  }
+
+  Future<void> updateSessionTitle(String sessionId, String title) async {
+    await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
+        .write(
+      DbSessionsCompanion(
+        title: Value(title),
+        updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
+  }
+
+  Future<void> appendRound(String sessionId, ChatRound round) async {
+    await _db.transaction(() async {
+      await _db.into(_db.dbChatRounds).insert(
+            DbChatRoundsCompanion.insert(
+              id: round.id,
+              sessionId: sessionId,
+              parentId: Value(round.parentId),
+              createdAt: round.createdAt,
+              userContent: round.userContent,
+              assistantThinking: Value(round.assistantThinking),
+              assistantContent: Value(round.assistantContent),
+              isIncomplete: Value(round.isIncomplete),
+              hasUnseenUpdate: Value(round.hasUnseenUpdate),
+            ),
+          );
+      for (final attach in round.userAttachments) {
+        await _db.into(_db.dbAttachments).insert(
+              DbAttachmentsCompanion.insert(
+                id: attach.id,
+                roundId: round.id,
+                name: attach.name,
+                relativePath: attach.relativePath,
+                isImage: Value(attach.isImage),
+                mimeType: Value(attach.mimeType),
+              ),
+            );
+      }
+      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
+          .write(
+        DbSessionsCompanion(
+          updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+        ),
+      );
+    });
+  }
+
+  Future<void> updateRound({
+    required String roundId,
+    String? userContent,
+    String? assistantThinking,
+    String? assistantContent,
+    bool? isIncomplete,
+    bool? hasUnseenUpdate,
+  }) async {
+    await (_db.update(_db.dbChatRounds)..where((t) => t.id.equals(roundId)))
+      .write(DbChatRoundsCompanion(
+        userContent: userContent != null 
+          ? Value(userContent) 
+          : const Value.absent(),
+        assistantThinking: assistantThinking != null
+          ? Value(assistantThinking)
+          : const Value.absent(),
+        assistantContent: assistantContent != null
+          ? Value(assistantContent)
+          : const Value.absent(),
+        isIncomplete: isIncomplete != null
+          ? Value(isIncomplete)
+          : const Value.absent(),
+        hasUnseenUpdate: hasUnseenUpdate != null
+          ? Value(hasUnseenUpdate)
+          : const Value.absent(),
+      ));
+  }
+
+  // ========== 附件读写接口保留 ==========
+  Future<String> saveAttachment(Uint8List data, String fileName) async =>
+      await _fileService.saveAttachment(data, fileName);
+
+  File getAttachment(String relativePath) => _fileService.readAttachment(relativePath);
+
+  Future<void> deleteAttachment(String relativePath) async =>
+      await _fileService.deleteAttachment(relativePath);
+}
 ````
 
 ## File: lib/presentation/pages/settings_page.dart
@@ -13315,7 +13731,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   }
                 },
                 child: formState.isRefreshingModels
-                    ? const SizedBox(width: 20, height: 20, child: CupertinoActivityIndicator())
+                    ? const Text('取消', style: TextStyle(color: CupertinoColors.systemRed))
                     : const Text('立即同步'),
               ),
             ],
@@ -14015,389 +14431,6 @@ class _PendingFileAttachment extends StatelessWidget {
       ),
     );
   }
-}
-````
-
-## File: lib/data/repositories/conversation_repository.dart
-````dart
-// data/repositories/conversation_repository.dart
-import 'dart:async';
-import 'dart:io';
-import 'package:drift/drift.dart';
-import '../data_sources/local_file_source.dart';
-import '../../core/models/attachment.dart';
-import '../../core/models/chat_round.dart';
-import '../../core/models/session.dart';
-import '../../domain/models/session_list_item.dart';
-import '../database/database.dart';
-import '../../domain/models/session_card_meta.dart';
-import 'package:rxdart/rxdart.dart';
-
-class ConversationRepository {
-  final AppDatabase _db;
-  final LocalFileSource _fileService;
-  ConversationRepository(this._db, this._fileService);
-
-  // ========== 响应式查询 ==========
-
-  Stream<List<SessionListItem>> watchSessionListItems() {
-    final query = (_db.select(_db.dbSessions)
-      ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]));
-    return query.watch().map((sessions) {
-      return sessions.map((session) {
-        return SessionListItem(
-          id: session.id,
-          title: session.title,
-          updatedAt: session.updatedAt,
-        );
-      }).toList();
-    });
-  }
-
-  Stream<SessionCardMeta> watchSessionCardMeta(String sessionId) {
-    final lastRoundStream = (_db.select(_db.dbChatRounds)
-          ..where((t) => t.sessionId.equals(sessionId))
-          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
-          ..limit(1))
-        .watchSingleOrNull();
-
-    final countStream = (_db.selectOnly(_db.dbChatRounds)
-          ..addColumns([countAll()])
-          ..where(_db.dbChatRounds.sessionId.equals(sessionId)))
-        .watchSingle()
-        .map((row) => row.read(countAll()) ?? 0);
-
-    final hasUnseenStream = (_db.select(_db.dbChatRounds)
-          ..where((t) => t.sessionId.equals(sessionId))
-          ..where((t) => t.hasUnseenUpdate.equals(true))
-          ..limit(1))
-        .watchSingleOrNull()
-        .map((row) => row != null);
-
-    return Rx.combineLatest3(lastRoundStream, countStream, hasUnseenStream,
-        (lastRound, count, hasUnseen) {
-      final previewRound = lastRound;
-      final userPreview = previewRound == null
-          ? '点击开始新的对话'
-          : previewRound.userContent.trim().isEmpty
-              ? '（空输入）'
-              : previewRound.userContent.trim();
-      final aiPreview = previewRound == null
-          ? '（等待回复）'
-          : (previewRound.assistantContent?.trim().isNotEmpty ?? false)
-              ? previewRound.assistantContent!
-              : (previewRound.isIncomplete ? '正在生成...' : '（等待回复）');
-
-      return SessionCardMeta(
-        roundCount: count,
-        previewRoundId: previewRound?.id,
-        userPreview: userPreview,
-        aiPreview: aiPreview,
-        hasUnseen: hasUnseen,
-        isStreaming: previewRound?.isIncomplete == true,
-      );
-    });
-  }
-
-  // ========== 细粒度监听（新增） ==========
-
-  Stream<List<({String id, String? parentId})>> watchSessionTopology(String sessionId) {
-    final query = _db.selectOnly(_db.dbChatRounds)
-      ..addColumns([_db.dbChatRounds.id, _db.dbChatRounds.parentId])
-      ..where(_db.dbChatRounds.sessionId.equals(sessionId))
-      ..orderBy([OrderingTerm.asc(_db.dbChatRounds.createdAt)]);
-    return query.watch().map((rows) => rows.map((r) => (
-      id: r.read(_db.dbChatRounds.id)!,
-      parentId: r.read(_db.dbChatRounds.parentId)
-    )).toList());
-  }
-
-  /// 仅监听单条消息的完整详情（含附件）- 改用 rxdart 组合两个独立查询
-  Stream<ChatRound?> watchSingleRound(String roundId) {
-    final roundStream = (_db.select(_db.dbChatRounds)
-          ..where((t) => t.id.equals(roundId)))
-        .watchSingleOrNull();
-
-    final attachmentsStream = (_db.select(_db.dbAttachments)
-          ..where((t) => t.roundId.equals(roundId)))
-        .watch()
-        .map((rows) => rows.map((a) => Attachment(
-              id: a.id,
-              name: a.name,
-              relativePath: a.relativePath,
-              isImage: a.isImage,
-              mimeType: a.mimeType,
-            )).toList());
-
-    return Rx.combineLatest2(roundStream, attachmentsStream,
-        (DbChatRound? round, List<Attachment> attachments) {
-      if (round == null) return null;
-      return ChatRound(
-        id: round.id,
-        parentId: round.parentId,
-        createdAt: round.createdAt,
-        userContent: round.userContent,
-        userAttachments: attachments,
-        assistantThinking: round.assistantThinking,
-        assistantContent: round.assistantContent,
-        isIncomplete: round.isIncomplete,
-        hasUnseenUpdate: round.hasUnseenUpdate,
-      );
-    });
-  }
-
-  Future<List<ChatRound>> getContextRounds(String roundId) async {
-    final roundsQuery = _db.customSelect(
-      '''
-      WITH RECURSIVE ctx_chain AS (
-        SELECT id, session_id, parent_id, created_at, user_content,
-              assistant_thinking, assistant_content, is_incomplete, has_unseen_update
-        FROM db_chat_rounds WHERE id = :roundId
-        UNION ALL
-        SELECT r.id, r.session_id, r.parent_id, r.created_at, r.user_content,
-              r.assistant_thinking, r.assistant_content, r.is_incomplete, r.has_unseen_update
-        FROM db_chat_rounds r
-        INNER JOIN ctx_chain c ON r.id = c.parent_id
-      )
-      SELECT * FROM ctx_chain ORDER BY created_at ASC
-      ''',
-      readsFrom: {_db.dbChatRounds},
-      variables: [Variable.withString(roundId)],
-    );
-
-    final dbRounds = await roundsQuery.map((row) {
-      return DbChatRound(
-        id: row.read<String>('id'),
-        sessionId: row.read<String>('session_id'),
-        parentId: row.read<String?>('parent_id'),
-        createdAt: row.read<int>('created_at'),
-        userContent: row.read<String>('user_content'),
-        assistantThinking: row.read<String?>('assistant_thinking'),
-        assistantContent: row.read<String?>('assistant_content'),
-        isIncomplete: row.read<bool>('is_incomplete'),
-        hasUnseenUpdate: row.read<bool>('has_unseen_update'),
-      );
-    }).get();
-
-    if (dbRounds.isEmpty) return [];
-
-    final roundIds = dbRounds.map((r) => r.id).toList();
-    final dbAttachments = await (_db.select(_db.dbAttachments)
-          ..where((t) => t.roundId.isIn(roundIds)))
-        .get();
-
-    final attachmentMap = <String, List<Attachment>>{};
-    for (final att in dbAttachments) {
-      attachmentMap.putIfAbsent(att.roundId, () => []).add(
-        Attachment(
-          id: att.id,
-          name: att.name,
-          relativePath: att.relativePath,
-          isImage: att.isImage,
-          mimeType: att.mimeType,
-        ),
-      );
-    }
-
-    return dbRounds.map((round) => _mapToChatRound(round, attachmentMap[round.id] ?? [])).toList();
-  }
-
-  Stream<String?> watchSessionTitle(String sessionId) {
-    return (_db.select(_db.dbSessions)
-          ..where((t) => t.id.equals(sessionId)))
-        .map((row) => row.title)
-        .watchSingleOrNull();
-  }
-
-  ChatRound _mapToChatRound(DbChatRound row, List<Attachment> attachments) {
-    return ChatRound(
-      id: row.id,
-      parentId: row.parentId,
-      createdAt: row.createdAt,
-      userContent: row.userContent,
-      userAttachments: attachments,
-      assistantThinking: row.assistantThinking,
-      assistantContent: row.assistantContent,
-      isIncomplete: row.isIncomplete,
-      hasUnseenUpdate: row.hasUnseenUpdate,
-    );
-  }
-
-  Future<void> _cleanupOrphanAttachments(Iterable<String> relativePaths) async {
-    final uniquePaths = relativePaths.toSet();
-    if (uniquePaths.isEmpty) return;
-
-    final referencedPaths = await (_db.select(_db.dbAttachments)
-          ..where((t) => t.relativePath.isIn(uniquePaths)))
-        .map((t) => t.relativePath)
-        .get();
-
-    final orphanPaths = uniquePaths.difference(referencedPaths.toSet());
-
-    for (final path in orphanPaths) {
-      try {
-        await _fileService.deleteAttachment(path);
-      } catch (_) {}
-    }
-  }
-
-  // ========== 写操作 ==========
-
-  Future<void> deleteRoundsAndCleanupOrphanAttachments(
-    String sessionId,
-    List<String> roundIds,
-  ) async {
-    if (roundIds.isEmpty) return;
-
-    // 1. 收集候选附件路径（改用直接查询，不用 join）
-    final candidatePaths = (await (_db.select(_db.dbAttachments)
-          ..where((t) => t.roundId.isIn(roundIds)))
-        .get())
-        .map((a) => a.relativePath)
-        .toSet();
-
-    // 2. 提交数据库变更
-    await _db.transaction(() async {
-      await (_db.delete(_db.dbChatRounds)
-            ..where((t) => t.sessionId.equals(sessionId) & t.id.isIn(roundIds)))
-          .go();
-      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-          .write(
-        DbSessionsCompanion(
-          updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
-        ),
-      );
-    });
-
-    // 3. 基于最终态清理物理文件
-    await _cleanupOrphanAttachments(candidatePaths);
-  }
-
-  Future<void> deleteSession(String sessionId) async {
-    // 1. 收集候选附件路径（先查出所有 round id，再查附件）
-    final roundIds = await (_db.select(_db.dbChatRounds)
-          ..where((t) => t.sessionId.equals(sessionId)))
-        .map((r) => r.id)
-        .get();
-
-    final candidatePaths = <String>{};
-    if (roundIds.isNotEmpty) {
-      final attachments = await (_db.select(_db.dbAttachments)
-            ..where((t) => t.roundId.isIn(roundIds)))
-          .get();
-      candidatePaths.addAll(attachments.map((a) => a.relativePath));
-    }
-
-    // 2. 提交数据库变更
-    await (_db.delete(_db.dbSessions)..where((t) => t.id.equals(sessionId))).go();
-
-    // 3. 基于最终态清理物理文件
-    await _cleanupOrphanAttachments(candidatePaths);
-  }
-
-  Future<Session> createSession({
-    required String sessionId,
-    required String title,
-  }) async {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final session = Session(
-      id: sessionId,
-      title: title,
-      updatedAt: now,
-      rounds: [],
-    );
-    await _db.into(_db.dbSessions).insert(
-          DbSessionsCompanion.insert(
-            id: session.id,
-            title: session.title,
-            updatedAt: session.updatedAt,
-          ),
-        );
-    return session;
-  }
-
-  Future<void> updateSessionTitle(String sessionId, String title) async {
-    await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-        .write(
-      DbSessionsCompanion(
-        title: Value(title),
-        updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
-      ),
-    );
-  }
-
-  Future<void> appendRound(String sessionId, ChatRound round) async {
-    await _db.transaction(() async {
-      await _db.into(_db.dbChatRounds).insert(
-            DbChatRoundsCompanion.insert(
-              id: round.id,
-              sessionId: sessionId,
-              parentId: Value(round.parentId),
-              createdAt: round.createdAt,
-              userContent: round.userContent,
-              assistantThinking: Value(round.assistantThinking),
-              assistantContent: Value(round.assistantContent),
-              isIncomplete: Value(round.isIncomplete),
-              hasUnseenUpdate: Value(round.hasUnseenUpdate),
-            ),
-          );
-      for (final attach in round.userAttachments) {
-        await _db.into(_db.dbAttachments).insert(
-              DbAttachmentsCompanion.insert(
-                id: attach.id,
-                roundId: round.id,
-                name: attach.name,
-                relativePath: attach.relativePath,
-                isImage: Value(attach.isImage),
-                mimeType: Value(attach.mimeType),
-              ),
-            );
-      }
-      await (_db.update(_db.dbSessions)..where((t) => t.id.equals(sessionId)))
-          .write(
-        DbSessionsCompanion(
-          updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
-        ),
-      );
-    });
-  }
-
-  Future<void> updateRound({
-    required String roundId,
-    String? userContent,
-    String? assistantThinking,
-    String? assistantContent,
-    bool? isIncomplete,
-    bool? hasUnseenUpdate,
-  }) async {
-    await (_db.update(_db.dbChatRounds)..where((t) => t.id.equals(roundId)))
-      .write(DbChatRoundsCompanion(
-        userContent: userContent != null 
-          ? Value(userContent) 
-          : const Value.absent(),
-        assistantThinking: assistantThinking != null
-          ? Value(assistantThinking)
-          : const Value.absent(),
-        assistantContent: assistantContent != null
-          ? Value(assistantContent)
-          : const Value.absent(),
-        isIncomplete: isIncomplete != null
-          ? Value(isIncomplete)
-          : const Value.absent(),
-        hasUnseenUpdate: hasUnseenUpdate != null
-          ? Value(hasUnseenUpdate)
-          : const Value.absent(),
-      ));
-  }
-
-  // ========== 附件读写接口保留 ==========
-  Future<String> saveAttachment(Uint8List data, String fileName) async =>
-      await _fileService.saveAttachment(data, fileName);
-
-  File getAttachment(String relativePath) => _fileService.readAttachment(relativePath);
-
-  Future<void> deleteAttachment(String relativePath) async =>
-      await _fileService.deleteAttachment(relativePath);
 }
 ````
 

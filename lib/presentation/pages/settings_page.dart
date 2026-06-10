@@ -168,7 +168,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   }
                 },
                 child: formState.isRefreshingModels
-                    ? const SizedBox(width: 20, height: 20, child: CupertinoActivityIndicator())
+                    ? const Text('取消', style: TextStyle(color: CupertinoColors.systemRed))
                     : const Text('立即同步'),
               ),
             ],

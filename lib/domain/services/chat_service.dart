@@ -48,12 +48,22 @@ class ChatService {
     required String sessionId,
     required ChatRound sourceRound,
   }) async {
+    final newAttachments = sourceRound.userAttachments.map((old) {
+      return Attachment(
+        id: const Uuid().v4(),
+        name: old.name,
+        relativePath: old.relativePath,
+        isImage: old.isImage,
+        mimeType: old.mimeType,
+      );
+    }).toList();
+
     final newRoundId = await _createRound(
       repository: repository,
       sessionId: sessionId,
       content: sourceRound.userContent,
       parentRoundId: sourceRound.parentId,
-      attachments: sourceRound.userAttachments,
+      attachments: newAttachments,
     );
 
     _startGeneration(
