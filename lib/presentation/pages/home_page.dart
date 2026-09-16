@@ -6,9 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../domain/models/session_list_item.dart';
 import '../providers/session_list_notifier.dart';
 import '../widgets/common/app_page_scaffold.dart';
-import '../widgets/input_bar.dart';
 import 'chat_page.dart';
-import 'settings_page.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -84,22 +82,10 @@ class HomePage extends ConsumerWidget {
     return AppPageScaffold(
       navigationBar: CupertinoNavigationBar(
         middle: const Text('AI Chat'),
-        trailing: CupertinoButton(
-          onPressed: () {
-            Navigator.push(
-              context,
-              CupertinoPageRoute(
-                builder: (_) => const SettingsPage(),
-              ),
-            );
-          },
-          child: const Icon(CupertinoIcons.settings),
-        ),
       ),
-      body: Column(
+      body: Stack(
         children: [
-          Expanded(
-            child: sessionsAsync.when(
+          sessionsAsync.when(
               loading: () => const Center(child: CupertinoActivityIndicator()),
               error: (e, st) => _HomeErrorState(
                 message: '加载会话失败：$e',
@@ -126,26 +112,25 @@ class HomePage extends ConsumerWidget {
                 );
               },
             ),
-          ),
-          InputBar(
-            hintText: '发送消息',
-            onSend: (content, attachments) async {
-              final repository = ref.read(conversationRepositoryProvider);
-              final sessionId = const Uuid().v4();
-              await repository.createSession(sessionId: sessionId, title: '新对话');
-              if (context.mounted) {
-                Navigator.push(
-                  context,
-                  CupertinoPageRoute(
-                    builder: (_) => ChatPage(
-                      sessionId: sessionId,
-                      initialMessage: content,
-                      initialAttachments: attachments,
+          Positioned(
+            right: 16,
+            bottom: 16,
+            child: CupertinoButton.filled(
+              onPressed: () async {
+                final repository = ref.read(conversationRepositoryProvider);
+                final sessionId = const Uuid().v4();
+                await repository.createSession(sessionId: sessionId, title: '新对话');
+                if (context.mounted) {
+                  Navigator.push(
+                    context,
+                    CupertinoPageRoute(
+                      builder: (_) => ChatPage(sessionId: sessionId),
                     ),
-                  ),
-                );
-              }
-            },
+                  );
+                }
+              },
+              child: const Icon(CupertinoIcons.add),
+            ),
           ),
         ],
       ),

@@ -1,7 +1,6 @@
 import 'package:aiservice/data/repositories/conversation_repository.dart';
 import 'package:aiservice/di/providers.dart';
 import 'package:aiservice/domain/services/chat_service.dart';
-import 'package:aiservice/presentation/models/pending_attachment.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show SelectionArea;
 import 'package:flutter/services.dart';
@@ -19,15 +18,11 @@ import 'branch_tree_page.dart';
 class ChatPage extends ConsumerStatefulWidget {
   final String sessionId;
   final String? initialRoundId;
-  final String? initialMessage;
-  final List<PendingAttachment>? initialAttachments;
 
   const ChatPage({
     super.key,
     required this.sessionId,
     this.initialRoundId,
-    this.initialMessage,
-    this.initialAttachments,
   });
 
   @override
@@ -36,7 +31,6 @@ class ChatPage extends ConsumerStatefulWidget {
 
 class _ChatPageState extends ConsumerState<ChatPage> {
   PageController? _pageController;
-  bool _initialMessageHandled = false;
 
   String? _branchLeafId;
   String? _currentRoundId;
@@ -67,32 +61,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         _branchLeafId = topology.last.id;
         _currentRoundId = _branchLeafId;
       });
-    }
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _handleInitialMessage();
-  }
-
-  void _handleInitialMessage() async { 
-    if (_initialMessageHandled || widget.initialMessage == null) return;
-    _initialMessageHandled = true;
-
-    try {
-      final newId = await ChatService.sendMessage(
-        repository: ref.read(conversationRepositoryProvider),
-        configService: ref.read(configServiceProvider),
-        sourceRouter: ref.read(chatSourceRouterProvider),
-        sessionId: widget.sessionId,
-        content: widget.initialMessage!,
-        parentRoundId: _currentRoundId,
-        pendingAttachments: widget.initialAttachments ?? [],
-      );
-      _updateBranch(newId);
-    } catch (e) {
-      AppToast.show('发送失败：$e');
     }
   }
 
@@ -140,6 +108,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final currentRoundAsync = ref.watch(roundDetailProvider(_currentRoundId ?? ''));
     final isIncomplete = currentRoundAsync.valueOrNull?.isIncomplete ?? false;
 
+    final topology = ref.watch(chatTopologyProvider(widget.sessionId)).valueOrNull ?? [];
     final visibleRoundIds = ref.watch(visibleRoundIdsProvider(( 
       sessionId: widget.sessionId,
       roundId: _branchLeafId,
@@ -165,7 +134,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               CupertinoPageRoute(
                 builder: (_) => BranchTreePage(
                   sessionId: widget.sessionId,
-                  initialFocusRoundId: _currentRoundId!,
+                  initialFocusRoundId: _currentRoundId,
                 ),
               ),
             );
@@ -178,7 +147,18 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         children: [
           Expanded(
             child: visibleRoundIds.isEmpty
-                ? const Center(child: Text('加载中'))
+                ? const Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(CupertinoIcons.sparkles, size: 40),
+                        SizedBox(height: 16),
+                        Text('开始你的第一段对话', style: TextStyle(fontSize: 20)),
+                        SizedBox(height: 8),
+                        Text('在下方输入问题，系统会自动创建回复。'),
+                      ],
+                    ),
+                  )
                 : PageView.builder(
                     controller: _pageController,
                     physics: const PageScrollPhysics(),

@@ -19,12 +19,12 @@ const double _canvasPadding = 2000.0;
 
 class BranchTreePage extends ConsumerStatefulWidget {
   final String sessionId;
-  final String initialFocusRoundId;
+  final String? initialFocusRoundId;
 
   const BranchTreePage({
     super.key,
     required this.sessionId,
-    required this.initialFocusRoundId,
+    this.initialFocusRoundId,
   });
 
   @override
@@ -248,7 +248,9 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
           final canvasSize = layout.canvasSize;
           final pairs = _buildParentChildPairs(roots, positions);
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!_hasFocused) _focusOnNode(widget.initialFocusRoundId, positions);
+            if (!_hasFocused && widget.initialFocusRoundId != null) {
+              _focusOnNode(widget.initialFocusRoundId!, positions);
+            }
           });
           return InteractiveViewer(
             key: _viewerKey,

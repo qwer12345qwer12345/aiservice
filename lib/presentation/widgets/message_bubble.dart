@@ -19,13 +19,8 @@ class MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bubbleColor = isUser
-        ? CupertinoDynamicColor.resolve(CupertinoColors.systemBlue, context)
-        : CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context);
-
-    final textColor = isUser
-        ? CupertinoDynamicColor.resolve(CupertinoColors.white, context)
-        : CupertinoDynamicColor.resolve(CupertinoColors.label, context);
+    final bubbleColor = CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context);
+    final textColor = CupertinoDynamicColor.resolve(CupertinoColors.label, context);
 
     final maxWidth = MediaQuery.of(context).size.width * 0.88;
 
