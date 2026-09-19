@@ -677,7 +677,7 @@ as String,
 /// @nodoc
 mixin _$ApiMessage {
 
- String get role; String? get content; String? get reasoning; List<ApiMessageContentPart> get parts; List<ToolCall> get toolCalls; String? get toolCallId;
+ String get role; String? get content; String? get reasoning; List<ApiMessageContentPart> get parts;
 /// Create a copy of ApiMessage
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -691,20 +691,20 @@ $ApiMessageCopyWith<ApiMessage> get copyWith => _$ApiMessageCopyWithImpl<ApiMess
 @override
 bool operator ==(Object other) {
   final _this = this as ApiMessage;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is ApiMessage&&(identical(other.role, _this.role) || other.role == _this.role)&&(identical(other.content, _this.content) || other.content == _this.content)&&(identical(other.reasoning, _this.reasoning) || other.reasoning == _this.reasoning)&&const DeepCollectionEquality().equals(other.parts, _this.parts)&&const DeepCollectionEquality().equals(other.toolCalls, _this.toolCalls)&&(identical(other.toolCallId, _this.toolCallId) || other.toolCallId == _this.toolCallId));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ApiMessage&&(identical(other.role, _this.role) || other.role == _this.role)&&(identical(other.content, _this.content) || other.content == _this.content)&&(identical(other.reasoning, _this.reasoning) || other.reasoning == _this.reasoning)&&const DeepCollectionEquality().equals(other.parts, _this.parts));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
   final _this = this as ApiMessage;
-  return Object.hash(runtimeType,_this.role,_this.content,_this.reasoning,const DeepCollectionEquality().hash(_this.parts),const DeepCollectionEquality().hash(_this.toolCalls),_this.toolCallId);
+  return Object.hash(runtimeType,_this.role,_this.content,_this.reasoning,const DeepCollectionEquality().hash(_this.parts));
 }
 
 @override
 String toString() {
   final _this = this as ApiMessage;
-  return 'ApiMessage(role: ${_this.role}, content: ${_this.content}, reasoning: ${_this.reasoning}, parts: ${_this.parts}, toolCalls: ${_this.toolCalls}, toolCallId: ${_this.toolCallId})';
+  return 'ApiMessage(role: ${_this.role}, content: ${_this.content}, reasoning: ${_this.reasoning}, parts: ${_this.parts})';
 }
 
 
@@ -715,7 +715,7 @@ abstract mixin class $ApiMessageCopyWith<$Res>  {
   factory $ApiMessageCopyWith(ApiMessage value, $Res Function(ApiMessage) _then) = _$ApiMessageCopyWithImpl;
 @useResult
 $Res call({
- String role, String? content, String? reasoning, List<ApiMessageContentPart> parts, List<ToolCall> toolCalls, String? toolCallId
+ String role, String? content, String? reasoning, List<ApiMessageContentPart> parts
 });
 
 
@@ -732,15 +732,13 @@ class _$ApiMessageCopyWithImpl<$Res>
 
 /// Create a copy of ApiMessage
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? role = null,Object? content = freezed,Object? reasoning = freezed,Object? parts = null,Object? toolCalls = null,Object? toolCallId = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? role = null,Object? content = freezed,Object? reasoning = freezed,Object? parts = null,}) {
   return _then(ApiMessage(
 role: null == role ? _self.role : role // ignore: cast_nullable_to_non_nullable
 as String,content: freezed == content ? _self.content : content // ignore: cast_nullable_to_non_nullable
 as String?,reasoning: freezed == reasoning ? _self.reasoning : reasoning // ignore: cast_nullable_to_non_nullable
 as String?,parts: null == parts ? _self.parts : parts // ignore: cast_nullable_to_non_nullable
-as List<ApiMessageContentPart>,toolCalls: null == toolCalls ? _self.toolCalls : toolCalls // ignore: cast_nullable_to_non_nullable
-as List<ToolCall>,toolCallId: freezed == toolCallId ? _self.toolCallId : toolCallId // ignore: cast_nullable_to_non_nullable
-as String?,
+as List<ApiMessageContentPart>,
   ));
 }
 
@@ -825,10 +823,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String role,  String? content,  String? reasoning,  List<ApiMessageContentPart> parts,  List<ToolCall> toolCalls,  String? toolCallId)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String role,  String? content,  String? reasoning,  List<ApiMessageContentPart> parts)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _ApiMessage() when $default != null:
-return $default(_that.role,_that.content,_that.reasoning,_that.parts,_that.toolCalls,_that.toolCallId);case _:
+return $default(_that.role,_that.content,_that.reasoning,_that.parts);case _:
   return orElse();
 
 }
@@ -846,10 +844,10 @@ return $default(_that.role,_that.content,_that.reasoning,_that.parts,_that.toolC
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String role,  String? content,  String? reasoning,  List<ApiMessageContentPart> parts,  List<ToolCall> toolCalls,  String? toolCallId)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String role,  String? content,  String? reasoning,  List<ApiMessageContentPart> parts)  $default,) {final _that = this;
 switch (_that) {
 case _ApiMessage():
-return $default(_that.role,_that.content,_that.reasoning,_that.parts,_that.toolCalls,_that.toolCallId);case _:
+return $default(_that.role,_that.content,_that.reasoning,_that.parts);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -866,10 +864,10 @@ return $default(_that.role,_that.content,_that.reasoning,_that.parts,_that.toolC
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String role,  String? content,  String? reasoning,  List<ApiMessageContentPart> parts,  List<ToolCall> toolCalls,  String? toolCallId)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String role,  String? content,  String? reasoning,  List<ApiMessageContentPart> parts)?  $default,) {final _that = this;
 switch (_that) {
 case _ApiMessage() when $default != null:
-return $default(_that.role,_that.content,_that.reasoning,_that.parts,_that.toolCalls,_that.toolCallId);case _:
+return $default(_that.role,_that.content,_that.reasoning,_that.parts);case _:
   return null;
 
 }
@@ -881,7 +879,7 @@ return $default(_that.role,_that.content,_that.reasoning,_that.parts,_that.toolC
 @JsonSerializable()
 
 class _ApiMessage implements ApiMessage {
-  const _ApiMessage({required this.role, this.content, this.reasoning,  List<ApiMessageContentPart> parts = const [],  List<ToolCall> toolCalls = const [], this.toolCallId}): _parts = parts,_toolCalls = toolCalls;
+  const _ApiMessage({required this.role, this.content, this.reasoning,  List<ApiMessageContentPart> parts = const []}): _parts = parts;
   factory _ApiMessage.fromJson(Map<String, dynamic> json) => _$ApiMessageFromJson(json);
 
 @override final  String role;
@@ -894,14 +892,6 @@ class _ApiMessage implements ApiMessage {
   return EqualUnmodifiableListView(_parts);
 }
 
- final  List<ToolCall> _toolCalls;
-@override@JsonKey() List<ToolCall> get toolCalls {
-  if (_toolCalls is EqualUnmodifiableListView) return _toolCalls;
-  // ignore: implicit_dynamic_type
-  return EqualUnmodifiableListView(_toolCalls);
-}
-
-@override final  String? toolCallId;
 
 /// Create a copy of ApiMessage
 /// with the given fields replaced by the non-null parameter values.
@@ -916,18 +906,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _ApiMessage&&(identical(other.role, role) || other.role == role)&&(identical(other.content, content) || other.content == content)&&(identical(other.reasoning, reasoning) || other.reasoning == reasoning)&&const DeepCollectionEquality().equals(other.parts, _parts)&&const DeepCollectionEquality().equals(other.toolCalls, _toolCalls)&&(identical(other.toolCallId, toolCallId) || other.toolCallId == toolCallId));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _ApiMessage&&(identical(other.role, role) || other.role == role)&&(identical(other.content, content) || other.content == content)&&(identical(other.reasoning, reasoning) || other.reasoning == reasoning)&&const DeepCollectionEquality().equals(other.parts, _parts));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hash(runtimeType,role,content,reasoning,const DeepCollectionEquality().hash(_parts),const DeepCollectionEquality().hash(_toolCalls),toolCallId);
+    return Object.hash(runtimeType,role,content,reasoning,const DeepCollectionEquality().hash(_parts));
 }
 
 @override
 String toString() {
-    return 'ApiMessage(role: $role, content: $content, reasoning: $reasoning, parts: $parts, toolCalls: $toolCalls, toolCallId: $toolCallId)';
+    return 'ApiMessage(role: $role, content: $content, reasoning: $reasoning, parts: $parts)';
 }
 
 
@@ -938,7 +928,7 @@ abstract mixin class _$ApiMessageCopyWith<$Res> implements $ApiMessageCopyWith<$
   factory _$ApiMessageCopyWith(_ApiMessage value, $Res Function(_ApiMessage) _then) = __$ApiMessageCopyWithImpl;
 @override @useResult
 $Res call({
- String role, String? content, String? reasoning, List<ApiMessageContentPart> parts, List<ToolCall> toolCalls, String? toolCallId
+ String role, String? content, String? reasoning, List<ApiMessageContentPart> parts
 });
 
 
@@ -955,15 +945,13 @@ class __$ApiMessageCopyWithImpl<$Res>
 
 /// Create a copy of ApiMessage
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? role = null,Object? content = freezed,Object? reasoning = freezed,Object? parts = null,Object? toolCalls = null,Object? toolCallId = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? role = null,Object? content = freezed,Object? reasoning = freezed,Object? parts = null,}) {
   return _then(_ApiMessage(
 role: null == role ? _self.role : role // ignore: cast_nullable_to_non_nullable
 as String,content: freezed == content ? _self.content : content // ignore: cast_nullable_to_non_nullable
 as String?,reasoning: freezed == reasoning ? _self.reasoning : reasoning // ignore: cast_nullable_to_non_nullable
 as String?,parts: null == parts ? _self._parts : parts // ignore: cast_nullable_to_non_nullable
-as List<ApiMessageContentPart>,toolCalls: null == toolCalls ? _self._toolCalls : toolCalls // ignore: cast_nullable_to_non_nullable
-as List<ToolCall>,toolCallId: freezed == toolCallId ? _self.toolCallId : toolCallId // ignore: cast_nullable_to_non_nullable
-as String?,
+as List<ApiMessageContentPart>,
   ));
 }
 

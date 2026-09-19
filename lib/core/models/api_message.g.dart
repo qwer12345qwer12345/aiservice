@@ -53,12 +53,6 @@ _ApiMessage _$ApiMessageFromJson(Map<String, dynamic> json) => _ApiMessage(
           )
           .toList() ??
       const [],
-  toolCalls:
-      (json['toolCalls'] as List<dynamic>?)
-          ?.map((e) => ToolCall.fromJson(e as Map<String, dynamic>))
-          .toList() ??
-      const [],
-  toolCallId: json['toolCallId'] as String?,
 );
 
 Map<String, dynamic> _$ApiMessageToJson(_ApiMessage instance) =>
@@ -67,6 +61,4 @@ Map<String, dynamic> _$ApiMessageToJson(_ApiMessage instance) =>
       'content': instance.content,
       'reasoning': instance.reasoning,
       'parts': instance.parts,
-      'toolCalls': instance.toolCalls,
-      'toolCallId': instance.toolCallId,
     };

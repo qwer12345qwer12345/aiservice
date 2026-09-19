@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/input_state.dart';
-import '../models/pending_attachment.dart';
+import '../../core/models/pending_attachment.dart';
 
 /// 输入状态 Notifier
 ///

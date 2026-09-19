@@ -5,7 +5,6 @@ import 'package:drift/drift.dart';
 import '../data_sources/local_file_source.dart';
 import '../../core/models/attachment.dart';
 import '../../core/models/chat_round.dart';
-import '../../core/models/session.dart';
 import '../../domain/models/session_list_item.dart';
 import '../database/database.dart';
 import '../../domain/models/session_card_meta.dart';
@@ -273,25 +272,18 @@ class ConversationRepository {
     await _cleanupOrphanAttachments(candidatePaths);
   }
 
-  Future<Session> createSession({
+  Future<void> createSession({
     required String sessionId,
     required String title,
   }) async {
     final now = DateTime.now().millisecondsSinceEpoch;
-    final session = Session(
-      id: sessionId,
-      title: title,
-      updatedAt: now,
-      rounds: [],
-    );
     await _db.into(_db.dbSessions).insert(
           DbSessionsCompanion.insert(
-            id: session.id,
-            title: session.title,
-            updatedAt: session.updatedAt,
+            id: sessionId,
+            title: title,
+            updatedAt: now,
           ),
         );
-    return session;
   }
 
   Future<void> updateSessionTitle(String sessionId, String title) async {

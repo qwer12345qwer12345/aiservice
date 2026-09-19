@@ -1,5 +1,4 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'tool_call.dart';
 
 part 'api_message.freezed.dart';
 part 'api_message.g.dart';
@@ -37,8 +36,6 @@ abstract class ApiMessage with _$ApiMessage {
     String? content,
     String? reasoning,
     @Default([]) List<ApiMessageContentPart> parts,
-    @Default([]) List<ToolCall> toolCalls,
-    String? toolCallId,
   }) = _ApiMessage;
 
   factory ApiMessage.fromJson(Map<String, dynamic> json) =>

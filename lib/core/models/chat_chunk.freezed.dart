@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$ChatChunk {
 
- String? get content; String? get reasoningContent; bool get isDone; String? get error; List<ToolCallRequest> get toolCalls;
+ String? get content; String? get reasoningContent; bool get isDone; String? get error;
 /// Create a copy of ChatChunk
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -27,20 +27,20 @@ $ChatChunkCopyWith<ChatChunk> get copyWith => _$ChatChunkCopyWithImpl<ChatChunk>
 @override
 bool operator ==(Object other) {
   final _this = this as ChatChunk;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is ChatChunk&&(identical(other.content, _this.content) || other.content == _this.content)&&(identical(other.reasoningContent, _this.reasoningContent) || other.reasoningContent == _this.reasoningContent)&&(identical(other.isDone, _this.isDone) || other.isDone == _this.isDone)&&(identical(other.error, _this.error) || other.error == _this.error)&&const DeepCollectionEquality().equals(other.toolCalls, _this.toolCalls));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ChatChunk&&(identical(other.content, _this.content) || other.content == _this.content)&&(identical(other.reasoningContent, _this.reasoningContent) || other.reasoningContent == _this.reasoningContent)&&(identical(other.isDone, _this.isDone) || other.isDone == _this.isDone)&&(identical(other.error, _this.error) || other.error == _this.error));
 }
 
 
 @override
 int get hashCode {
   final _this = this as ChatChunk;
-  return Object.hash(runtimeType,_this.content,_this.reasoningContent,_this.isDone,_this.error,const DeepCollectionEquality().hash(_this.toolCalls));
+  return Object.hash(runtimeType,_this.content,_this.reasoningContent,_this.isDone,_this.error);
 }
 
 @override
 String toString() {
   final _this = this as ChatChunk;
-  return 'ChatChunk(content: ${_this.content}, reasoningContent: ${_this.reasoningContent}, isDone: ${_this.isDone}, error: ${_this.error}, toolCalls: ${_this.toolCalls})';
+  return 'ChatChunk(content: ${_this.content}, reasoningContent: ${_this.reasoningContent}, isDone: ${_this.isDone}, error: ${_this.error})';
 }
 
 
@@ -51,7 +51,7 @@ abstract mixin class $ChatChunkCopyWith<$Res>  {
   factory $ChatChunkCopyWith(ChatChunk value, $Res Function(ChatChunk) _then) = _$ChatChunkCopyWithImpl;
 @useResult
 $Res call({
- String? content, String? reasoningContent, bool isDone, String? error, List<ToolCallRequest> toolCalls
+ String? content, String? reasoningContent, bool isDone, String? error
 });
 
 
@@ -68,14 +68,13 @@ class _$ChatChunkCopyWithImpl<$Res>
 
 /// Create a copy of ChatChunk
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? content = freezed,Object? reasoningContent = freezed,Object? isDone = null,Object? error = freezed,Object? toolCalls = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? content = freezed,Object? reasoningContent = freezed,Object? isDone = null,Object? error = freezed,}) {
   return _then(ChatChunk(
 content: freezed == content ? _self.content : content // ignore: cast_nullable_to_non_nullable
 as String?,reasoningContent: freezed == reasoningContent ? _self.reasoningContent : reasoningContent // ignore: cast_nullable_to_non_nullable
 as String?,isDone: null == isDone ? _self.isDone : isDone // ignore: cast_nullable_to_non_nullable
 as bool,error: freezed == error ? _self.error : error // ignore: cast_nullable_to_non_nullable
-as String?,toolCalls: null == toolCalls ? _self.toolCalls : toolCalls // ignore: cast_nullable_to_non_nullable
-as List<ToolCallRequest>,
+as String?,
   ));
 }
 
@@ -160,10 +159,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String? content,  String? reasoningContent,  bool isDone,  String? error,  List<ToolCallRequest> toolCalls)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String? content,  String? reasoningContent,  bool isDone,  String? error)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _ChatChunk() when $default != null:
-return $default(_that.content,_that.reasoningContent,_that.isDone,_that.error,_that.toolCalls);case _:
+return $default(_that.content,_that.reasoningContent,_that.isDone,_that.error);case _:
   return orElse();
 
 }
@@ -181,10 +180,10 @@ return $default(_that.content,_that.reasoningContent,_that.isDone,_that.error,_t
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String? content,  String? reasoningContent,  bool isDone,  String? error,  List<ToolCallRequest> toolCalls)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String? content,  String? reasoningContent,  bool isDone,  String? error)  $default,) {final _that = this;
 switch (_that) {
 case _ChatChunk():
-return $default(_that.content,_that.reasoningContent,_that.isDone,_that.error,_that.toolCalls);case _:
+return $default(_that.content,_that.reasoningContent,_that.isDone,_that.error);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -201,10 +200,10 @@ return $default(_that.content,_that.reasoningContent,_that.isDone,_that.error,_t
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String? content,  String? reasoningContent,  bool isDone,  String? error,  List<ToolCallRequest> toolCalls)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String? content,  String? reasoningContent,  bool isDone,  String? error)?  $default,) {final _that = this;
 switch (_that) {
 case _ChatChunk() when $default != null:
-return $default(_that.content,_that.reasoningContent,_that.isDone,_that.error,_that.toolCalls);case _:
+return $default(_that.content,_that.reasoningContent,_that.isDone,_that.error);case _:
   return null;
 
 }
@@ -216,20 +215,13 @@ return $default(_that.content,_that.reasoningContent,_that.isDone,_that.error,_t
 
 
 class _ChatChunk implements ChatChunk {
-  const _ChatChunk({this.content, this.reasoningContent, required this.isDone, this.error,  List<ToolCallRequest> toolCalls = const []}): _toolCalls = toolCalls;
+  const _ChatChunk({this.content, this.reasoningContent, required this.isDone, this.error});
   
 
 @override final  String? content;
 @override final  String? reasoningContent;
 @override final  bool isDone;
 @override final  String? error;
- final  List<ToolCallRequest> _toolCalls;
-@override@JsonKey() List<ToolCallRequest> get toolCalls {
-  if (_toolCalls is EqualUnmodifiableListView) return _toolCalls;
-  // ignore: implicit_dynamic_type
-  return EqualUnmodifiableListView(_toolCalls);
-}
-
 
 /// Create a copy of ChatChunk
 /// with the given fields replaced by the non-null parameter values.
@@ -241,18 +233,18 @@ _$ChatChunkCopyWith<_ChatChunk> get copyWith => __$ChatChunkCopyWithImpl<_ChatCh
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _ChatChunk&&(identical(other.content, content) || other.content == content)&&(identical(other.reasoningContent, reasoningContent) || other.reasoningContent == reasoningContent)&&(identical(other.isDone, isDone) || other.isDone == isDone)&&(identical(other.error, error) || other.error == error)&&const DeepCollectionEquality().equals(other.toolCalls, _toolCalls));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _ChatChunk&&(identical(other.content, content) || other.content == content)&&(identical(other.reasoningContent, reasoningContent) || other.reasoningContent == reasoningContent)&&(identical(other.isDone, isDone) || other.isDone == isDone)&&(identical(other.error, error) || other.error == error));
 }
 
 
 @override
 int get hashCode {
-    return Object.hash(runtimeType,content,reasoningContent,isDone,error,const DeepCollectionEquality().hash(_toolCalls));
+    return Object.hash(runtimeType,content,reasoningContent,isDone,error);
 }
 
 @override
 String toString() {
-    return 'ChatChunk(content: $content, reasoningContent: $reasoningContent, isDone: $isDone, error: $error, toolCalls: $toolCalls)';
+    return 'ChatChunk(content: $content, reasoningContent: $reasoningContent, isDone: $isDone, error: $error)';
 }
 
 
@@ -263,7 +255,7 @@ abstract mixin class _$ChatChunkCopyWith<$Res> implements $ChatChunkCopyWith<$Re
   factory _$ChatChunkCopyWith(_ChatChunk value, $Res Function(_ChatChunk) _then) = __$ChatChunkCopyWithImpl;
 @override @useResult
 $Res call({
- String? content, String? reasoningContent, bool isDone, String? error, List<ToolCallRequest> toolCalls
+ String? content, String? reasoningContent, bool isDone, String? error
 });
 
 
@@ -280,14 +272,13 @@ class __$ChatChunkCopyWithImpl<$Res>
 
 /// Create a copy of ChatChunk
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? content = freezed,Object? reasoningContent = freezed,Object? isDone = null,Object? error = freezed,Object? toolCalls = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? content = freezed,Object? reasoningContent = freezed,Object? isDone = null,Object? error = freezed,}) {
   return _then(_ChatChunk(
 content: freezed == content ? _self.content : content // ignore: cast_nullable_to_non_nullable
 as String?,reasoningContent: freezed == reasoningContent ? _self.reasoningContent : reasoningContent // ignore: cast_nullable_to_non_nullable
 as String?,isDone: null == isDone ? _self.isDone : isDone // ignore: cast_nullable_to_non_nullable
 as bool,error: freezed == error ? _self.error : error // ignore: cast_nullable_to_non_nullable
-as String?,toolCalls: null == toolCalls ? _self._toolCalls : toolCalls // ignore: cast_nullable_to_non_nullable
-as List<ToolCallRequest>,
+as String?,
   ));
 }
 

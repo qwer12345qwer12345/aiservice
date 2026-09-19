@@ -1,5 +1,5 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'pending_attachment.dart';
+import '../../core/models/pending_attachment.dart';
 
 part 'input_state.freezed.dart';
 

@@ -1,6 +1,5 @@
 import 'package:aiservice/data/repositories/conversation_repository.dart';
 import 'package:aiservice/di/providers.dart';
-import 'package:aiservice/domain/services/chat_service.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show SelectionArea;
 import 'package:flutter/services.dart';
@@ -184,16 +183,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             hintText: '发送消息',
             isIncomplete: isIncomplete, 
             onStop: () {
-              ChatService.stopGeneration(
-                _currentRoundId!, 
-                ref.read(conversationRepositoryProvider),
-              );
+              if (_currentRoundId != null) {
+                ref.read(chatServiceProvider).stopGeneration(_currentRoundId!);
+              }
             },
             onSend: (text, attachments) async {
-              final newId = await ChatService.sendMessage(
-                repository: ref.read(conversationRepositoryProvider),
-                configService: ref.read(configServiceProvider),
-                sourceRouter: ref.read(chatSourceRouterProvider),
+              final newId = await ref.read(chatServiceProvider).sendMessage(
                 sessionId: widget.sessionId,
                 content: text,
                 parentRoundId: _currentRoundId,
@@ -211,10 +206,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final sourceRound = await ref.read(roundDetailProvider(roundId).future);
     if (sourceRound == null) return;
 
-    final newId = await ChatService.retryFromRound(
-      repository: ref.read(conversationRepositoryProvider),
-      configService: ref.read(configServiceProvider),
-      sourceRouter: ref.read(chatSourceRouterProvider),
+    final newId = await ref.read(chatServiceProvider).retryFromRound(
       sessionId: widget.sessionId,
       sourceRound: sourceRound,
     );

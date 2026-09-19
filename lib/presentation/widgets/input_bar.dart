@@ -8,7 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 
-import '../models/pending_attachment.dart';
+import '../../core/models/pending_attachment.dart';
 import '../pages/image_attachment_viewer_page.dart';
 import '../pages/text_attachment_viewer_page.dart';
 import '../providers/input_notifier.dart';
@@ -371,7 +371,7 @@ class _PendingImageAttachment extends StatelessWidget {
             onTap: onRemove,
             child: Container(
               decoration: BoxDecoration(
-                color: CupertinoColors.black.withOpacity(0.5),
+                color: CupertinoColors.black.withValues(alpha: 0.5),
                 shape: BoxShape.circle,
               ),
               padding: const EdgeInsets.all(2),

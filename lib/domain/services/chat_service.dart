@@ -1,51 +1,50 @@
 import 'dart:async';
-import 'package:aiservice/data/data_sources/chat_source_router.dart';
+import 'dart:io';
 import 'package:uuid/uuid.dart';
 import '../../core/models/attachment.dart';
 import '../../core/models/chat_round.dart';
 import '../../core/models/generation_event.dart';
+import '../../core/models/pending_attachment.dart';
+import '../../data/data_sources/chat_source.dart';
 import '../../data/repositories/conversation_repository.dart';
 import '../../data/services/config_service.dart';
-import '../../presentation/models/pending_attachment.dart';
-import 'attachment_preparer.dart';
 import 'chat_context_builder.dart';
 import 'stream_processor.dart';
 
 class ChatService {
-  static final Map<String, StreamSubscription> _activeGenerations = {};
+  final ConversationRepository _repository;
+  final ConfigService _configService;
+  final ChatSource _chatSource;
+  final Map<String, StreamSubscription> _activeGenerations = {};
 
-  static Future<String> sendMessage({
+  ChatService({
     required ConversationRepository repository,
     required ConfigService configService,
-    required ChatSourceRouter sourceRouter,
+    required ChatSource chatSource,
+  })  : _repository = repository,
+        _configService = configService,
+        _chatSource = chatSource;
+
+  Future<String> sendMessage({
     required String sessionId,
     required String content,
     required String? parentRoundId,
     required List<PendingAttachment> pendingAttachments,
   }) async {
-    final savedAttachments = await savePendingAttachments(repository, pendingAttachments);
+    final savedAttachments = await _savePendingAttachments(pendingAttachments);
     final newRoundId = await _createRound(
-      repository: repository,
       sessionId: sessionId,
       content: content,
       parentRoundId: parentRoundId,
       attachments: savedAttachments,
     );
-    
-    _startGeneration(
-      repository: repository,
-      configService: configService,
-      sourceRouter: sourceRouter,
-      roundId: newRoundId,
-    );
-    
+
+    _startGeneration(roundId: newRoundId);
+
     return newRoundId;
   }
 
-  static Future<String> retryFromRound({
-    required ConversationRepository repository,
-    required ConfigService configService,
-    required ChatSourceRouter sourceRouter,
+  Future<String> retryFromRound({
     required String sessionId,
     required ChatRound sourceRound,
   }) async {
@@ -60,28 +59,22 @@ class ChatService {
     }).toList();
 
     final newRoundId = await _createRound(
-      repository: repository,
       sessionId: sessionId,
       content: sourceRound.userContent,
       parentRoundId: sourceRound.parentId,
       attachments: newAttachments,
     );
 
-    _startGeneration(
-      repository: repository,
-      configService: configService,
-      sourceRouter: sourceRouter,
-      roundId: newRoundId,
-    );
+    _startGeneration(roundId: newRoundId);
 
     return newRoundId;
   }
 
-  static void stopGeneration(String roundId, ConversationRepository repository) {
+  void stopGeneration(String roundId) {
     final subscription = _activeGenerations.remove(roundId);
     if (subscription != null) {
       subscription.cancel();
-      repository.updateRound(
+      _repository.updateRound(
         roundId: roundId,
         isIncomplete: false,
         hasUnseenUpdate: true,
@@ -89,22 +82,36 @@ class ChatService {
     }
   }
 
-  static Future<void> _startGeneration({
-    required ConversationRepository repository,
-    required ConfigService configService,
-    required ChatSourceRouter sourceRouter,
+  Future<List<Attachment>> _savePendingAttachments(List<PendingAttachment> pending) async {
+    final result = <Attachment>[];
+    for (final item in pending) {
+      final bytes = await File(item.path).readAsBytes();
+      final relativePath = await _repository.saveAttachment(bytes, item.name);
+      result.add(
+        Attachment(
+          id: item.id,
+          name: item.name,
+          relativePath: relativePath,
+          isImage: item.isImage,
+          mimeType: item.mimeType,
+        ),
+      );
+    }
+    return result;
+  }
+
+  Future<void> _startGeneration({
     required String roundId,
   }) async {
-    final contextRounds = await repository.getContextRounds(roundId);
+    final contextRounds = await _repository.getContextRounds(roundId);
     final apiContext = await buildApiContextFromRounds(
       contextRounds,
-      repository,
+      _repository,
     );
 
-    final config = await configService.loadActiveConfig();
-    final source = sourceRouter.getSourceFromConfig(config);
-    
-    final chatStream = source.chatStream(
+    final config = await _configService.loadActiveConfig();
+
+    final chatStream = _chatSource.chatStream(
       config: config,
       context: apiContext,
     );
@@ -115,14 +122,14 @@ class ChatService {
     final subscription = eventStream.listen((event) {
       switch (event) {
         case PartialGeneration(:final content, :final reasoning):
-          repository.updateRound(
+          _repository.updateRound(
             roundId: roundId,
             assistantContent: content,
             assistantThinking: reasoning,
             isIncomplete: true,
           );
         case CompletedGeneration(:final content, :final reasoning):
-          repository.updateRound(
+          _repository.updateRound(
             roundId: roundId,
             assistantContent: content,
             assistantThinking: reasoning,
@@ -131,7 +138,7 @@ class ChatService {
           );
           _activeGenerations.remove(roundId);
         case FailedGeneration(:final content, :final reasoning):
-          repository.updateRound(
+          _repository.updateRound(
             roundId: roundId,
             assistantContent: content,
             assistantThinking: reasoning,
@@ -145,8 +152,7 @@ class ChatService {
     _activeGenerations[roundId] = subscription;
   }
 
-  static Future<String> _createRound({
-    required ConversationRepository repository,
+  Future<String> _createRound({
     required String sessionId,
     required String content,
     required String? parentRoundId,
@@ -161,7 +167,7 @@ class ChatService {
       isIncomplete: true,
       hasUnseenUpdate: false,
     );
-    await repository.appendRound(sessionId, newRound);
+    await _repository.appendRound(sessionId, newRound);
     return newRound.id;
   }
 }
