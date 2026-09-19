@@ -1,6 +1,5 @@
 import 'dart:math';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -145,12 +144,14 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
           Positioned(
             left: pos.dx,
             top: pos.dy,
-            child: _TreeNodeCard(
-              roundId: node.id,
-              onSwitch: () => Navigator.of(context).pop(node.id),
-              onDelete: () async {
-                if (await _confirmDelete()) await _deleteNode(node.id);
-              },
+            child: RepaintBoundary(
+              child: _TreeNodeCard(
+                roundId: node.id,
+                onSwitch: () => Navigator.of(context).pop(node.id),
+                onDelete: () async {
+                  if (await _confirmDelete()) await _deleteNode(node.id);
+                },
+              ),
             ),
           ),
         );
@@ -259,17 +260,21 @@ class _BranchTreePageState extends ConsumerState<BranchTreePage> {
             maxScale: 3.0,
             constrained: false,
             boundaryMargin: const EdgeInsets.all(_canvasPadding),
-            child: SizedBox(
-              width: canvasSize.width,
-              height: canvasSize.height,
-              child: Stack(
-                children: [
-                  CustomPaint(
-                    painter: _OrthogonalLinePainter(pairs: pairs),
-                    size: canvasSize,
-                  ),
-                  ..._buildAllNodeWidgets(roots, positions),
-                ],
+            child: RepaintBoundary(
+              child: SizedBox(
+                width: canvasSize.width,
+                height: canvasSize.height,
+                child: Stack(
+                  children: [
+                    RepaintBoundary(
+                      child: CustomPaint(
+                        painter: _OrthogonalLinePainter(pairs: pairs),
+                        size: canvasSize,
+                      ),
+                    ),
+                    ..._buildAllNodeWidgets(roots, positions),
+                  ],
+                ),
               ),
             ),
           );
@@ -311,7 +316,14 @@ class _OrthogonalLinePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _OrthogonalLinePainter oldDelegate) => true;
+  bool shouldRepaint(covariant _OrthogonalLinePainter oldDelegate) {
+    if (identical(pairs, oldDelegate.pairs)) return false;
+    if (pairs.length != oldDelegate.pairs.length) return true;
+    for (int i = 0; i < pairs.length; i++) {
+      if (pairs[i] != oldDelegate.pairs[i]) return true;
+    }
+    return false;
+  }
 }
 
 class _TreeNodeCard extends ConsumerWidget {
@@ -360,17 +372,32 @@ class _TreeNodeCard extends ConsumerWidget {
         ? null
         : ((round.assistantContent ?? '').trim().isEmpty ? '（等待回复）' : round.assistantContent!);
 
-    return CupertinoContextMenu(
-      actions: [
-        CupertinoContextMenuAction(
-          onPressed: () {
-            Navigator.pop(context);
-            onDelete();
-          },
-          isDestructiveAction: true,
-          child: const Text('删除节点'),
+    void showActionSheet() {
+      showCupertinoModalPopup<void>(
+        context: context,
+        builder: (BuildContext context) => CupertinoActionSheet(
+          title: const Text('节点操作'),
+          actions: <CupertinoActionSheetAction>[
+            CupertinoActionSheetAction(
+              isDestructiveAction: true,
+              onPressed: () {
+                Navigator.pop(context);
+                onDelete();
+              },
+              child: const Text('删除节点'),
+            ),
+          ],
+          cancelButton: CupertinoActionSheetAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
         ),
-      ],
+      );
+    }
+
+    return GestureDetector(
+      onLongPress: showActionSheet,
       child: Container(
         width: _nodeWidth,
         height: _nodeHeight,

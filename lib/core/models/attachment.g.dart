@@ -6,16 +6,15 @@ part of 'attachment.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$AttachmentImpl _$$AttachmentImplFromJson(Map<String, dynamic> json) =>
-    _$AttachmentImpl(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      relativePath: json['relativePath'] as String,
-      isImage: json['isImage'] as bool? ?? false,
-      mimeType: json['mimeType'] as String?,
-    );
+_Attachment _$AttachmentFromJson(Map<String, dynamic> json) => _Attachment(
+  id: json['id'] as String,
+  name: json['name'] as String,
+  relativePath: json['relativePath'] as String,
+  isImage: json['isImage'] as bool? ?? false,
+  mimeType: json['mimeType'] as String?,
+);
 
-Map<String, dynamic> _$$AttachmentImplToJson(_$AttachmentImpl instance) =>
+Map<String, dynamic> _$AttachmentToJson(_Attachment instance) =>
     <String, dynamic>{
       'id': instance.id,
       'name': instance.name,

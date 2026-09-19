@@ -121,8 +121,7 @@ class HomePage extends ConsumerWidget {
                 final sessionId = const Uuid().v4();
                 await repository.createSession(sessionId: sessionId, title: '新对话');
                 if (context.mounted) {
-                  Navigator.push(
-                    context,
+                  Navigator.of(context, rootNavigator: true).push(
                     CupertinoPageRoute(
                       builder: (_) => ChatPage(sessionId: sessionId),
                     ),
@@ -298,6 +297,41 @@ class _SessionCard extends ConsumerWidget {
     );
   }
 
+  void _showActionSheet(BuildContext context) {
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (BuildContext context) => CupertinoActionSheet(
+        title: Text(
+          item.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        actions: <CupertinoActionSheetAction>[
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(context);
+              onRename(item);
+            },
+            child: const Text('重命名'),
+          ),
+          CupertinoActionSheetAction(
+            isDestructiveAction: true,
+            onPressed: () {
+              Navigator.pop(context);
+              onDelete(item);
+            },
+            child: const Text('删除'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sessionId = item.id;
@@ -305,119 +339,91 @@ class _SessionCard extends ConsumerWidget {
         .format(DateTime.fromMillisecondsSinceEpoch(item.updatedAt));
     final metaAsync = ref.watch(sessionCardMetaProvider(item.id));
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // 获取父级最大宽度，并减去可能的内边距（ListView 默认有 padding 16）
-        final maxWidth = constraints.maxWidth - 32;
-        return CupertinoContextMenu(
-          actions: [
-            CupertinoContextMenuAction(
-              child: const Text('重命名'),
-              onPressed: () {
-                Navigator.of(context).pop();
-                onRename(item);
-              },
-            ),
-            CupertinoContextMenuAction(
-              isDestructiveAction: true,
-              onPressed: () {
-                Navigator.of(context).pop();
-                onDelete(item);
-              },
-              child: const Text('删除'),
-            ),
-          ],
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: maxWidth),
-            child: GestureDetector(
-              onTap: () async {
-                await Navigator.push(
-                  context,
-                  CupertinoPageRoute(
-                    builder: (_) => ChatPage(sessionId: sessionId),
-                  ),
-                );
-              },
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: CupertinoDynamicColor.resolve(
-                    CupertinoColors.systemBackground,
-                    context,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: metaAsync.when(
-                  loading: () => Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 8),
-                      const Text('加载中...'),
-                      const SizedBox(height: 8),
-                      _buildMetaChip(updatedAt, icon: CupertinoIcons.clock),
-                    ],
-                  ),
-                  error: (e, st) => Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 8),
-                      const Text('加载摘要失败'),
-                      const SizedBox(height: 8),
-                      _buildMetaChip(updatedAt, icon: CupertinoIcons.clock),
-                    ],
-                  ),
-                  data: (meta) => Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              item.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          if (meta.isStreaming) ...[
-                            const SizedBox(width: 8),
-                            const _BlinkingDot(),
-                          ],
-                          if (meta.hasUnseen) ...[
-                            const SizedBox(width: 8),
-                            const _BlueDot(),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      _PreviewLine(
-                        label: 'YOU',
-                        text: meta.userPreview,
-                      ),
-                      const SizedBox(height: 4),
-                      _PreviewLine(
-                        label: 'AI',
-                        text: meta.aiPreview,
-                      ),
-                      const SizedBox(height: 8),
-                      _buildMetaChip(updatedAt, icon: CupertinoIcons.clock),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+    return GestureDetector(
+      onTap: () async {
+        await Navigator.of(context, rootNavigator: true).push(
+          CupertinoPageRoute(
+            builder: (_) => ChatPage(sessionId: sessionId),
           ),
         );
       },
+      onLongPress: () => _showActionSheet(context),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: CupertinoDynamicColor.resolve(
+            CupertinoColors.systemBackground,
+            context,
+          ),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: metaAsync.when(
+          loading: () => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 8),
+              const Text('加载中...'),
+              const SizedBox(height: 8),
+              _buildMetaChip(updatedAt, icon: CupertinoIcons.clock),
+            ],
+          ),
+          error: (e, st) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 8),
+              const Text('加载摘要失败'),
+              const SizedBox(height: 8),
+              _buildMetaChip(updatedAt, icon: CupertinoIcons.clock),
+            ],
+          ),
+          data: (meta) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (meta.isStreaming) ...[
+                    const SizedBox(width: 8),
+                    const _BlinkingDot(),
+                  ],
+                  if (meta.hasUnseen) ...[
+                    const SizedBox(width: 8),
+                    const _BlueDot(),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 8),
+              _PreviewLine(
+                label: 'YOU',
+                text: meta.userPreview,
+              ),
+              const SizedBox(height: 4),
+              _PreviewLine(
+                label: 'AI',
+                text: meta.aiPreview,
+              ),
+              const SizedBox(height: 8),
+              _buildMetaChip(updatedAt, icon: CupertinoIcons.clock),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

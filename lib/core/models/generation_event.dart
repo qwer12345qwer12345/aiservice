@@ -4,7 +4,7 @@ part 'generation_event.freezed.dart';
 
 /// 生成过程中的统一事件
 @freezed
-class GenerationEvent with _$GenerationEvent {
+abstract class GenerationEvent with _$GenerationEvent {
   const factory GenerationEvent.partial({
     required String content,
     required String reasoning,

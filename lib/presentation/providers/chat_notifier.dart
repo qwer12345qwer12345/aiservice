@@ -18,13 +18,18 @@ final roundDetailProvider = StreamProvider.family<ChatRound?, String>((ref, roun
   return ref.watch(conversationRepositoryProvider).watchSingleRound(roundId);
 });
 
+final topologyParentMapProvider =
+    Provider.family<Map<String, String?>, String>((ref, sessionId) {
+  final topology = ref.watch(chatTopologyProvider(sessionId)).valueOrNull ?? [];
+  return {for (var t in topology) t.id: t.parentId};
+});
+
 final visibleRoundIdsProvider =
     Provider.family<List<String>, ({String sessionId, String? roundId})>(
   (ref, args) {
-    final topology = ref.watch(chatTopologyProvider(args.sessionId)).valueOrNull ?? [];
     if (args.roundId == null) return const [];
 
-    final idToParent = {for (var t in topology) t.id: t.parentId};
+    final idToParent = ref.watch(topologyParentMapProvider(args.sessionId));
     final path = <String>[];
     String? currentId = args.roundId;
 

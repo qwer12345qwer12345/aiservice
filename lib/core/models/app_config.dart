@@ -5,7 +5,7 @@ part 'app_config.freezed.dart';
 
 /// 配置档案（单个配置集）
 @freezed
-class ConfigProfile with _$ConfigProfile {
+abstract class ConfigProfile with _$ConfigProfile {
   const factory ConfigProfile({
     required String id,
     required String name,
@@ -34,7 +34,7 @@ class ConfigProfile with _$ConfigProfile {
 
 /// 全局设置（多档案 + 当前激活的档案ID）
 @freezed
-class GlobalSettings with _$GlobalSettings {
+abstract class GlobalSettings with _$GlobalSettings {
   const factory GlobalSettings({
     required String activeProfileId,
     @Default([]) List<ConfigProfile> profiles,

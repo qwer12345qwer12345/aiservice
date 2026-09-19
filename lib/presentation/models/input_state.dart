@@ -4,7 +4,7 @@ import 'pending_attachment.dart';
 part 'input_state.freezed.dart';
 
 @freezed
-class InputState with _$InputState {
+abstract class InputState with _$InputState {
   const factory InputState({
     /// 输入框文本
     @Default('') String text,

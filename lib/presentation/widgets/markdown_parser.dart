@@ -56,6 +56,9 @@ class MarkdownBlock {
 
 /// Markdown 解析器（仅支持标题、粗体、代码块、表格）
 class MarkdownParser {
+  static final RegExp _headingRegex = RegExp(r'^(#{1,6})\s+(.*)$');
+  static final RegExp _tableSeparatorRegex = RegExp(r'^\|[\s\-:|]+\|$');
+
   /// 解析完整文本
   static List<MarkdownBlock> parse(String data) {
     final lines = data.split('\n');
@@ -72,7 +75,7 @@ class MarkdownParser {
       }
 
       // 标题
-      final headingMatch = RegExp(r'^(#{1,6})\s+(.*)$').firstMatch(line);
+      final headingMatch = _headingRegex.firstMatch(line);
       if (headingMatch != null) {
         final level = headingMatch.group(1)!.length;
         final text = headingMatch.group(2)!;
@@ -138,7 +141,7 @@ class MarkdownParser {
   }
 
   static bool _isTableSeparator(String line) {
-    return RegExp(r'^\|[\s\-:|]+\|$').hasMatch(line);
+    return _tableSeparatorRegex.hasMatch(line);
   }
 
   static List<String> _splitTableRow(String line) {

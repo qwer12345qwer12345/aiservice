@@ -6,14 +6,13 @@ part of 'model_info.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$ModelInfoImpl _$$ModelInfoImplFromJson(Map<String, dynamic> json) =>
-    _$ModelInfoImpl(
-      id: json['id'] as String,
-      overrideSupportsReasoning: json['overrideSupportsReasoning'] as bool?,
-      overrideSupportsVision: json['overrideSupportsVision'] as bool?,
-    );
+_ModelInfo _$ModelInfoFromJson(Map<String, dynamic> json) => _ModelInfo(
+  id: json['id'] as String,
+  overrideSupportsReasoning: json['overrideSupportsReasoning'] as bool?,
+  overrideSupportsVision: json['overrideSupportsVision'] as bool?,
+);
 
-Map<String, dynamic> _$$ModelInfoImplToJson(_$ModelInfoImpl instance) =>
+Map<String, dynamic> _$ModelInfoToJson(_ModelInfo instance) =>
     <String, dynamic>{
       'id': instance.id,
       'overrideSupportsReasoning': instance.overrideSupportsReasoning,

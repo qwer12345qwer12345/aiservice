@@ -94,6 +94,18 @@ class AppDatabase extends _$AppDatabase {
         beforeOpen: (details) async {
           // 开启 SQLite 外键约束，实现级联删除
           await customStatement('PRAGMA foreign_keys = ON');
+          // 开启 WAL 模式以大幅提高并发读写性能，避免流式写入阻塞查询
+          await customStatement('PRAGMA journal_mode = WAL');
+          // 创建核心索引，避免全表扫描
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS idx_chat_rounds_session ON db_chat_rounds(session_id, created_at DESC)',
+          );
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS idx_chat_rounds_parent ON db_chat_rounds(parent_id)',
+          );
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS idx_attachments_round ON db_attachments(round_id)',
+          );
         },
       );
 }

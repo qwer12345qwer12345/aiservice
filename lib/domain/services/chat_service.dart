@@ -3,6 +3,7 @@ import 'package:aiservice/data/data_sources/chat_source_router.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/models/attachment.dart';
 import '../../core/models/chat_round.dart';
+import '../../core/models/generation_event.dart';
 import '../../data/repositories/conversation_repository.dart';
 import '../../data/services/config_service.dart';
 import '../../presentation/models/pending_attachment.dart';
@@ -112,16 +113,15 @@ class ChatService {
     final eventStream = processor.process(chatStream);
 
     final subscription = eventStream.listen((event) {
-      event.when(
-        partial: (content, reasoning) {
+      switch (event) {
+        case PartialGeneration(:final content, :final reasoning):
           repository.updateRound(
             roundId: roundId,
             assistantContent: content,
             assistantThinking: reasoning,
             isIncomplete: true,
           );
-        },
-        completed: (content, reasoning) {
+        case CompletedGeneration(:final content, :final reasoning):
           repository.updateRound(
             roundId: roundId,
             assistantContent: content,
@@ -130,18 +130,16 @@ class ChatService {
             hasUnseenUpdate: true,
           );
           _activeGenerations.remove(roundId);
-        },
-        failed: (error, content, reasoning) {
+        case FailedGeneration(:final content, :final reasoning):
           repository.updateRound(
             roundId: roundId,
-            assistantContent: content, 
+            assistantContent: content,
             assistantThinking: reasoning,
             isIncomplete: false,
             hasUnseenUpdate: true,
           );
           _activeGenerations.remove(roundId);
-        },
-      );
+      }
     });
 
     _activeGenerations[roundId] = subscription;

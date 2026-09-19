@@ -4,7 +4,7 @@ part 'tree_node.freezed.dart';
 part 'tree_node.g.dart';
 
 @freezed
-class TreeNode with _$TreeNode {
+abstract class TreeNode with _$TreeNode {
   const factory TreeNode({
     required String id,
     String? parentId,
@@ -17,7 +17,7 @@ class TreeNode with _$TreeNode {
 }
 
 @freezed
-class TreePath with _$TreePath {
+abstract class TreePath with _$TreePath {
   const factory TreePath({
     required List<TreeNode> nodes,
     required TreeNode targetNode,

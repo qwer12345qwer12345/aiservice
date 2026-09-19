@@ -4,7 +4,7 @@ part 'model_info.freezed.dart';
 part 'model_info.g.dart';
 
 @freezed
-class ModelInfo with _$ModelInfo {
+abstract class ModelInfo with _$ModelInfo {
   const factory ModelInfo({
     required String id,
 

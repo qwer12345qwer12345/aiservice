@@ -5,7 +5,7 @@ part 'chat_round.freezed.dart';
 part 'chat_round.g.dart';
 
 @freezed
-class ChatRound with _$ChatRound {
+abstract class ChatRound with _$ChatRound {
   const factory ChatRound({
     required String id,
     String? parentId,

@@ -105,10 +105,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     }
 
     final sessionTitle = ref.watch(sessionTitleProvider(widget.sessionId)).valueOrNull ?? '未加载';
-    final currentRoundAsync = ref.watch(roundDetailProvider(_currentRoundId ?? ''));
-    final isIncomplete = currentRoundAsync.valueOrNull?.isIncomplete ?? false;
+    final isIncomplete = ref.watch(
+      roundDetailProvider(_currentRoundId ?? '').select(
+        (s) => s.valueOrNull?.isIncomplete ?? false,
+      ),
+    );
 
-    final topology = ref.watch(chatTopologyProvider(widget.sessionId)).valueOrNull ?? [];
     final visibleRoundIds = ref.watch(visibleRoundIdsProvider(( 
       sessionId: widget.sessionId,
       roundId: _branchLeafId,
@@ -119,7 +121,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     if (currentIndex != -1) {
       _pageController ??= PageController(initialPage: currentIndex);
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _pageController!.jumpToPage(currentIndex);
+        if (_pageController?.hasClients == true &&
+            _pageController?.page?.round() != currentIndex) {
+          _pageController!.jumpToPage(currentIndex);
+        }
       });
     } else {
       _pageController ??= PageController(initialPage: 0);

@@ -2545,7 +2545,16 @@ class $$DbConfigStoreTableTableManager
                 activeProfileId: activeProfileId,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$DbConfigStoreTable, DbConfigStoreData>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $DbConfigStoreTable,
+                    DbConfigStoreData
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -2607,10 +2616,7 @@ final class $$DbConfigProfilesTableReferences
   _dbAvailableModelsRefsTable(_$AppDatabase db) =>
       MultiTypedResultKey.fromTable(
         db.dbAvailableModels,
-        aliasName: $_aliasNameGenerator(
-          db.dbConfigProfiles.id,
-          db.dbAvailableModels.profileId,
-        ),
+        aliasName: 'db_config_profiles__id__db_available_models__profile_id',
       );
 
   $$DbAvailableModelsTableProcessedTableManager get dbAvailableModelsRefs {
@@ -2892,7 +2898,7 @@ class $$DbConfigProfilesTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$DbConfigProfilesTable, DbConfigProfile>(table),
                   $$DbConfigProfilesTableReferences(db, table, e),
                 ),
               )
@@ -2977,13 +2983,9 @@ final class $$DbAvailableModelsTableReferences
     super.$_typedResult,
   );
 
-  static $DbConfigProfilesTable _profileIdTable(_$AppDatabase db) =>
-      db.dbConfigProfiles.createAlias(
-        $_aliasNameGenerator(
-          db.dbAvailableModels.profileId,
-          db.dbConfigProfiles.id,
-        ),
-      );
+  static $DbConfigProfilesTable _profileIdTable(_$AppDatabase db) => db
+      .dbConfigProfiles
+      .createAlias('db_available_models__profile_id__db_config_profiles__id');
 
   $$DbConfigProfilesTableProcessedTableManager get profileId {
     final $_column = $_itemColumn<String>('profile_id')!;
@@ -3204,7 +3206,7 @@ class $$DbAvailableModelsTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$DbAvailableModelsTable, DbAvailableModel>(table),
                   $$DbAvailableModelsTableReferences(db, table, e),
                 ),
               )
@@ -3292,10 +3294,7 @@ final class $$DbSessionsTableReferences
   static MultiTypedResultKey<$DbChatRoundsTable, List<DbChatRound>>
   _dbChatRoundsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
     db.dbChatRounds,
-    aliasName: $_aliasNameGenerator(
-      db.dbSessions.id,
-      db.dbChatRounds.sessionId,
-    ),
+    aliasName: 'db_sessions__id__db_chat_rounds__session_id',
   );
 
   $$DbChatRoundsTableProcessedTableManager get dbChatRoundsRefs {
@@ -3483,7 +3482,7 @@ class $$DbSessionsTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$DbSessionsTable, DbSession>(table),
                   $$DbSessionsTableReferences(db, table, e),
                 ),
               )
@@ -3568,9 +3567,7 @@ final class $$DbChatRoundsTableReferences
   $$DbChatRoundsTableReferences(super.$_db, super.$_table, super.$_typedResult);
 
   static $DbSessionsTable _sessionIdTable(_$AppDatabase db) =>
-      db.dbSessions.createAlias(
-        $_aliasNameGenerator(db.dbChatRounds.sessionId, db.dbSessions.id),
-      );
+      db.dbSessions.createAlias('db_chat_rounds__session_id__db_sessions__id');
 
   $$DbSessionsTableProcessedTableManager get sessionId {
     final $_column = $_itemColumn<String>('session_id')!;
@@ -3589,10 +3586,7 @@ final class $$DbChatRoundsTableReferences
   static MultiTypedResultKey<$DbAttachmentsTable, List<DbAttachment>>
   _dbAttachmentsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
     db.dbAttachments,
-    aliasName: $_aliasNameGenerator(
-      db.dbChatRounds.id,
-      db.dbAttachments.roundId,
-    ),
+    aliasName: 'db_chat_rounds__id__db_attachments__round_id',
   );
 
   $$DbAttachmentsTableProcessedTableManager get dbAttachmentsRefs {
@@ -3948,7 +3942,7 @@ class $$DbChatRoundsTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$DbChatRoundsTable, DbChatRound>(table),
                   $$DbChatRoundsTableReferences(db, table, e),
                 ),
               )
@@ -4068,10 +4062,8 @@ final class $$DbAttachmentsTableReferences
     super.$_typedResult,
   );
 
-  static $DbChatRoundsTable _roundIdTable(_$AppDatabase db) =>
-      db.dbChatRounds.createAlias(
-        $_aliasNameGenerator(db.dbAttachments.roundId, db.dbChatRounds.id),
-      );
+  static $DbChatRoundsTable _roundIdTable(_$AppDatabase db) => db.dbChatRounds
+      .createAlias('db_attachments__round_id__db_chat_rounds__id');
 
   $$DbChatRoundsTableProcessedTableManager get roundId {
     final $_column = $_itemColumn<String>('round_id')!;
@@ -4319,7 +4311,7 @@ class $$DbAttachmentsTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$DbAttachmentsTable, DbAttachment>(table),
                   $$DbAttachmentsTableReferences(db, table, e),
                 ),
               )

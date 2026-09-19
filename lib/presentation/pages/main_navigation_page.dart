@@ -11,11 +11,24 @@ class MainNavigationPage extends ConsumerStatefulWidget {
 }
 
 class _MainNavigationPageState extends ConsumerState<MainNavigationPage> {
-  int _currentIndex = 0;
+  late final CupertinoTabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = CupertinoTabController();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return CupertinoTabScaffold(
+      controller: _tabController,
       tabBar: CupertinoTabBar(
         items: const [
           BottomNavigationBarItem(
@@ -27,12 +40,6 @@ class _MainNavigationPageState extends ConsumerState<MainNavigationPage> {
             label: '设置',
           ),
         ],
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
       ),
       tabBuilder: (context, index) {
         switch (index) {

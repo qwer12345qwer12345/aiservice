@@ -1,10 +1,11 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'tool_call.dart';
 
 part 'api_message.freezed.dart';
 part 'api_message.g.dart';
 
 @Freezed(unionKey: 'runtimeType')
-class ApiMessageContentPart with _$ApiMessageContentPart {
+abstract class ApiMessageContentPart with _$ApiMessageContentPart {
   const factory ApiMessageContentPart.text({
     @Default('text') String type,
     required String text,
@@ -20,7 +21,7 @@ class ApiMessageContentPart with _$ApiMessageContentPart {
 }
 
 @freezed
-class ApiImageUrl with _$ApiImageUrl {
+abstract class ApiImageUrl with _$ApiImageUrl {
   const factory ApiImageUrl({
     required String url,
   }) = _ApiImageUrl;
@@ -30,12 +31,14 @@ class ApiImageUrl with _$ApiImageUrl {
 }
 
 @freezed
-class ApiMessage with _$ApiMessage {
+abstract class ApiMessage with _$ApiMessage {
   const factory ApiMessage({
     required String role,
     String? content,
     String? reasoning,
     @Default([]) List<ApiMessageContentPart> parts,
+    @Default([]) List<ToolCall> toolCalls,
+    String? toolCallId,
   }) = _ApiMessage;
 
   factory ApiMessage.fromJson(Map<String, dynamic> json) =>
